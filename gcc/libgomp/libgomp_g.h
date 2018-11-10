@@ -51,7 +51,8 @@ extern void GOMP_atomic_end (void);
 extern bool GOMP_loop_static_start (long, long, long, long, long *, long *);
 extern bool GOMP_loop_dynamic_start (long, long, long, long, long *, long *);
 extern bool GOMP_loop_guided_start (long, long, long, long, long *, long *);
-extern bool GOMP_loop_runtime_start (long, long, long, long *, long *);
+extern bool GOMP_loop_runtime_start (long, long, long, long *, long *,
+       	    			     unsigned long long);
 extern bool GOMP_loop_nonmonotonic_dynamic_start (long, long, long, long,
 						  long *, long *);
 extern bool GOMP_loop_nonmonotonic_guided_start (long, long, long, long,
@@ -93,7 +94,7 @@ extern void GOMP_parallel_loop_dynamic_start (void (*)(void *), void *,
 extern void GOMP_parallel_loop_guided_start (void (*)(void *), void *,
 					     unsigned, long, long, long, long);
 extern void GOMP_parallel_loop_runtime_start (void (*)(void *), void *,
-					      unsigned, long, long, long);
+					      unsigned, long, long, long, unsigned long long);
 extern void GOMP_parallel_loop_static (void (*)(void *), void *,
 				       unsigned, long, long, long, long,
 				       unsigned);
@@ -105,7 +106,7 @@ extern void GOMP_parallel_loop_guided (void (*)(void *), void *,
 				       unsigned);
 extern void GOMP_parallel_loop_runtime (void (*)(void *), void *,
 					unsigned, long, long, long,
-					unsigned);
+					unsigned, unsigned long long);
 extern void GOMP_parallel_loop_nonmonotonic_dynamic (void (*)(void *), void *,
 						     unsigned, long, long,
 						     long, long, unsigned);
@@ -113,9 +114,9 @@ extern void GOMP_parallel_loop_nonmonotonic_guided (void (*)(void *), void *,
 						    unsigned, long, long,
 						    long, long, unsigned);
 
-extern void GOMP_loop_end (void);
-extern void GOMP_loop_end_nowait (void);
-extern bool GOMP_loop_end_cancel (void);
+extern void GOMP_loop_end (unsigned long long);
+extern void GOMP_loop_end_nowait (unsigned long long);
+extern bool GOMP_loop_end_cancel (unsigned long long);
 
 /* loop_ull.c */
 
@@ -141,7 +142,8 @@ extern bool GOMP_loop_ull_runtime_start (bool, unsigned long long,
 					 unsigned long long,
 					 unsigned long long,
 					 unsigned long long *,
-					 unsigned long long *);
+					 unsigned long long *,
+					 unsigned long long);
 extern bool GOMP_loop_ull_nonmonotonic_dynamic_start (bool, unsigned long long,
 						      unsigned long long,
 						      unsigned long long,

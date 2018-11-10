@@ -1,5 +1,6 @@
 ## Process this file with automake to produce Makefile.in
 
+AUTOMAKE_OPTIONS = info-in-builddir
 ACLOCAL_AMFLAGS = -I .. -I ../config
 SUBDIRS = testsuite
 
@@ -58,7 +59,7 @@ libgomp_la_LDFLAGS = $(libgomp_version_info) $(libgomp_version_script) \
 libgomp_la_DEPENDENCIES = $(libgomp_version_dep)
 libgomp_la_LINK = $(LINK) $(libgomp_la_LDFLAGS)
 
-libgomp_la_SOURCES = alloc.c atomic.c barrier.c critical.c env.c error.c \
+libgomp_la_SOURCES = init_hook.c alloc.c atomic.c barrier.c critical.c env.c error.c \
 	icv.c icv-device.c iter.c iter_ull.c loop.c loop_ull.c ordered.c \
 	parallel.c sections.c single.c task.c team.c work.c lock.c mutex.c \
 	proc.c sem.c bar.c ptrlock.c time.c fortran.c affinity.c target.c \
@@ -136,5 +137,7 @@ stamp-build-info: libgomp.texi
 	@touch $@
 
 
-CLEANFILES = $(STAMP_GENINSRC) $(STAMP_BUILD_INFO) libgomp.info
+CLEANFILES = $(STAMP_GENINSRC) $(STAMP_BUILD_INFO)
 MAINTAINERCLEANFILES = $(srcdir)/libgomp.info
+
+include $(top_srcdir)/../multilib.am
