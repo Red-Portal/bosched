@@ -3122,7 +3122,7 @@ expand_omp_for_generic (struct omp_region *region,
         t = builtin_decl_explicit (BUILT_IN_GOMP_LOOP_END_CANCEL);
     else
         t = builtin_decl_explicit (BUILT_IN_GOMP_LOOP_END);
-    gcall *call_stmt = gimple_build_call (t, 0);
+    gcall *call_stmt = gimple_build_call (t, 1, region_id);
     if (gimple_omp_return_lhs (gsi_stmt (gsi)))
         gimple_call_set_lhs (call_stmt, gimple_omp_return_lhs (gsi_stmt (gsi)));
     gsi_insert_after (&gsi, call_stmt, GSI_SAME_STMT);
