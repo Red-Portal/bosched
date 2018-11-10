@@ -186,7 +186,6 @@ bool
 GOMP_loop_runtime_start (long start, long end, long incr,
                          long *istart, long *iend, region_id_t id)
 {
-    //printf("executing omp region: %llu\n", id);
     struct gomp_task_icv *icv = gomp_icv (false);
 
     switch (icv->run_sched_var)

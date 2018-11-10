@@ -279,40 +279,52 @@ gomp_work_share_end_cancel (region_id_t region_id)
 void
 gomp_work_share_end_nowait (region_id_t region_id)
 {
-  struct gomp_thread *thr = gomp_thread ();
-  struct gomp_team *team = thr->ts.team;
-  struct gomp_work_share *ws = thr->ts.work_share;
-  unsigned completed;
+    struct gomp_thread *thr = gomp_thread ();
+    struct gomp_team *team = thr->ts.team;
+    struct gomp_work_share *ws = thr->ts.work_share;
+    unsigned completed;
 
-  /* Work sharing constructs can be orphaned.  */
-  if (team == NULL)
+    struct gomp_task_icv *icv = gomp_icv (false);
+    /* Work sharing constructs can be orphaned.  */
+    if (team == NULL)
     {
-      free_work_share (NULL, ws);
-      thr->ts.work_share = NULL;
-      return;
+        if (is_bo_schedule(icv->run_sched_var))
+        {
+            bo_schedule_end(region_id);
+        }
+        free_work_share (NULL, ws);
+        thr->ts.work_share = NULL;
+        return;
     }
-
-  if (__builtin_expect (thr->ts.last_work_share == NULL, 0))
-    return;
 
 #ifdef HAVE_SYNC_BUILTINS
-  completed = __sync_add_and_fetch (&ws->threads_completed, 1);
+    completed = __sync_add_and_fetch (&ws->threads_completed, 1);
 #else
-  gomp_mutex_lock (&ws->lock);
-  completed = ++ws->threads_completed;
-  gomp_mutex_unlock (&ws->lock);
+    gomp_mutex_lock (&ws->lock);
+    completed = ++ws->threads_completed;
+    gomp_mutex_unlock (&ws->lock);
 #endif
 
-  if (completed == team->nthreads)
+    if (__builtin_expect (thr->ts.last_work_share == NULL, 0))
     {
-      team->work_shares_to_free = thr->ts.work_share;
-      free_work_share (team, thr->ts.last_work_share);
-
-      struct gomp_task_icv *icv = gomp_icv (false);
-      if(is_bo_schedule(icv->run_sched_var))
-      {
-          bo_schedule_end(region_id);
-      }
+        if (is_bo_schedule(icv->run_sched_var) &&
+            completed == team->nthreads)
+        {
+            bo_schedule_end(region_id);
+        }
+        return;
     }
-  thr->ts.last_work_share = NULL;
+
+
+    if (completed == team->nthreads)
+    {
+        team->work_shares_to_free = thr->ts.work_share;
+        free_work_share (team, thr->ts.last_work_share);
+
+        if(is_bo_schedule(icv->run_sched_var))
+        {
+            bo_schedule_end(region_id);
+        }
+    }
+    thr->ts.last_work_share = NULL;
 }
