@@ -708,13 +708,28 @@ expand_parallel_call (struct omp_region *region, basic_block bb,
 
     adjust_context_and_scope (gimple_block (entry_stmt), child_fndecl);
 
-    vec_alloc (args, 4 + vec_safe_length (ws_args));
+    if(region->inner->type == OMP_CLAUSE_SCHEDULE_RUNTIME)
+    {
+        vec_alloc (args, 5 + vec_safe_length (ws_args));
+    }
+    else
+    {
+        vec_alloc (args, 4 + vec_safe_length (ws_args));
+    }
+        
     args->quick_push (t2);
     args->quick_push (t1);
     args->quick_push (val);
     if (ws_args)
         args->splice (*ws_args);
     args->quick_push (flags);
+
+    if(region->inner->type == OMP_CLAUSE_SCHEDULE_RUNTIME)
+    {
+        tree region_id = build_int_cst (long_long_unsigned_type_node,
+                                        static_cast<region_id_t>(region));
+        args->quick_push (region_id);
+    }
 
     t = build_call_expr_loc_vec (UNKNOWN_LOCATION,
                                  builtin_decl_explicit (start_ix), args);
