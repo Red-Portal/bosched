@@ -230,7 +230,7 @@ gomp_work_share_end (region_id_t region_id)
 	  free_work_share (team, thr->ts.last_work_share);
 
       struct gomp_task_icv *icv = gomp_icv (false);
-      if(sched == GFS_RUNTIME, && is_bo_schedule(icv->run_sched_var))
+      if(is_bo_schedule(icv->run_sched_var))
       {
           bo_schedule_end(region_id);
       }
@@ -262,7 +262,7 @@ gomp_work_share_end_cancel (region_id_t region_id)
 	  free_work_share (team, thr->ts.last_work_share);
 
       struct gomp_task_icv *icv = gomp_icv (false);
-      if(sched == GFS_RUNTIME, && is_bo_schedule(icv->run_sched_var))
+      if(is_bo_schedule(icv->run_sched_var))
       {
           bo_schedule_end(region_id);
       }
@@ -309,7 +309,7 @@ gomp_work_share_end_nowait (region_id_t region_id)
       free_work_share (team, thr->ts.last_work_share);
 
       struct gomp_task_icv *icv = gomp_icv (false);
-      if(sched == GFS_RUNTIME, && is_bo_schedule(icv->run_sched_var))
+      if(is_bo_schedule(icv->run_sched_var))
       {
           bo_schedule_end(region_id);
       }

@@ -29,7 +29,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "libgomp.h"
-#include "hook.h"
 #include "bo_scheduling.h"
 
 typedef unsigned long long region_id_t;
@@ -41,7 +40,7 @@ static inline void
 gomp_loop_init (struct gomp_work_share *ws, long start, long end, long incr,
                 enum gomp_schedule_type sched, long chunk_size, region_id_t region_id)
 {
-    if(sched == GFS_RUNTIME, && is_bo_schedule(sched))
+    if(is_bo_schedule(sched))
     {
         bo_schedule_begin(region_id);
         double param = bo_schedule_parameter(region_id);
@@ -116,9 +115,9 @@ gomp_loop_static_start (long start, long end, long incr, long chunk_size,
     if (gomp_work_share_start (false))
     {
 
-        printf("starting omp runtime region!\n");
+        //printf("starting omp runtime region!\n");
         gomp_loop_init (thr->ts.work_share, start, end, incr,
-                        GFS_STATIC, chunk_size);
+                        GFS_STATIC, chunk_size, 0);
         gomp_work_share_init_done ();
     }
 
@@ -140,7 +139,7 @@ gomp_loop_dynamic_start (long start, long end, long incr, long chunk_size,
     if (gomp_work_share_start (false))
     {
         gomp_loop_init (thr->ts.work_share, start, end, incr,
-                        GFS_DYNAMIC, chunk_size);
+                        GFS_DYNAMIC, chunk_size, 0);
         gomp_work_share_init_done ();
     }
 
@@ -168,7 +167,7 @@ gomp_loop_guided_start (long start, long end, long incr, long chunk_size,
     if (gomp_work_share_start (false))
     {
         gomp_loop_init (thr->ts.work_share, start, end, incr,
-                        GFS_GUIDED, chunk_size);
+                        GFS_GUIDED, chunk_size, 0);
         gomp_work_share_init_done ();
     }
 
@@ -187,7 +186,7 @@ bool
 GOMP_loop_runtime_start (long start, long end, long incr,
                          long *istart, long *iend, region_id_t id)
 {
-    printf("executing omp region: %llu\n", id);
+    //printf("executing omp region: %llu\n", id);
     struct gomp_task_icv *icv = gomp_icv (false);
 
     switch (icv->run_sched_var)
@@ -226,7 +225,7 @@ gomp_loop_ordered_static_start (long start, long end, long incr,
     if (gomp_work_share_start (true))
     {
         gomp_loop_init (thr->ts.work_share, start, end, incr,
-                        GFS_STATIC, chunk_size);
+                        GFS_STATIC, chunk_size, 0);
         gomp_ordered_static_init ();
         gomp_work_share_init_done ();
     }
@@ -238,11 +237,12 @@ static bool
 gomp_loop_ordered_dynamic_start (long start, long end, long incr,
                                  long chunk_size, long *istart, long *iend)
 {
+    bool ret;
     struct gomp_thread *thr = gomp_thread ();
     if (gomp_work_share_start (true))
     {
         gomp_loop_init (thr->ts.work_share, start, end, incr,
-                        GFS_DYNAMIC, chunk_size);
+                        GFS_DYNAMIC, chunk_size, 0);
         gomp_mutex_lock (&thr->ts.work_share->lock);
         gomp_work_share_init_done ();
     }
@@ -267,7 +267,7 @@ gomp_loop_ordered_guided_start (long start, long end, long incr,
     if (gomp_work_share_start (true))
     {
         gomp_loop_init (thr->ts.work_share, start, end, incr,
-                        GFS_GUIDED, chunk_size);
+                        GFS_GUIDED, chunk_size, 0);
         gomp_mutex_lock (&thr->ts.work_share->lock);
         gomp_work_share_init_done ();
     }
@@ -327,7 +327,7 @@ gomp_loop_doacross_static_start (unsigned ncounts, long *counts,
     if (gomp_work_share_start (false))
     {
         gomp_loop_init (thr->ts.work_share, 0, counts[0], 1,
-                        GFS_STATIC, chunk_size);
+                        GFS_STATIC, chunk_size, 0);
         gomp_doacross_init (ncounts, counts, chunk_size);
         gomp_work_share_init_done ();
     }
@@ -345,7 +345,7 @@ gomp_loop_doacross_dynamic_start (unsigned ncounts, long *counts,
     if (gomp_work_share_start (false))
     {
         gomp_loop_init (thr->ts.work_share, 0, counts[0], 1,
-                        GFS_DYNAMIC, chunk_size);
+                        GFS_DYNAMIC, chunk_size, 0);
         gomp_doacross_init (ncounts, counts, chunk_size);
         gomp_work_share_init_done ();
     }
@@ -371,7 +371,7 @@ gomp_loop_doacross_guided_start (unsigned ncounts, long *counts,
     if (gomp_work_share_start (false))
     {
         gomp_loop_init (thr->ts.work_share, 0, counts[0], 1,
-                        GFS_GUIDED, chunk_size);
+                        GFS_GUIDED, chunk_size, 0);
         gomp_doacross_init (ncounts, counts, chunk_size);
         gomp_work_share_init_done ();
     }
@@ -576,7 +576,7 @@ gomp_parallel_loop_start (void (*fn) (void *), void *data,
 
     num_threads = gomp_resolve_num_threads (num_threads, 0);
     team = gomp_new_team (num_threads);
-    gomp_loop_init (&team->work_shares[0], start, end, incr, sched, chunk_size);
+    gomp_loop_init (&team->work_shares[0], start, end, incr, sched, chunk_size, id);
     gomp_team_start (fn, data, num_threads, flags, team);
 }
 
@@ -586,7 +586,7 @@ GOMP_parallel_loop_static_start (void (*fn) (void *), void *data,
                                  long incr, long chunk_size)
 {
     gomp_parallel_loop_start (fn, data, num_threads, start, end, incr,
-                              GFS_STATIC, chunk_size, 0);
+                              GFS_STATIC, chunk_size, 0, 0);
 }
 
 void
@@ -595,7 +595,7 @@ GOMP_parallel_loop_dynamic_start (void (*fn) (void *), void *data,
                                   long incr, long chunk_size)
 {
     gomp_parallel_loop_start (fn, data, num_threads, start, end, incr,
-                              GFS_DYNAMIC, chunk_size, 0);
+                              GFS_DYNAMIC, chunk_size, 0, 0);
 }
 
 void
@@ -604,7 +604,7 @@ GOMP_parallel_loop_guided_start (void (*fn) (void *), void *data,
                                  long incr, long chunk_size)
 {
     gomp_parallel_loop_start (fn, data, num_threads, start, end, incr,
-                              GFS_GUIDED, chunk_size, 0);
+                              GFS_GUIDED, chunk_size, 0, 0);
 }
 
 void
@@ -615,7 +615,7 @@ GOMP_parallel_loop_runtime_start (void (*fn) (void *), void *data,
     //printf("executing omp region: %llu\n", id);
     struct gomp_task_icv *icv = gomp_icv (false);
     gomp_parallel_loop_start (fn, data, num_threads, start, end, incr,
-                              icv->run_sched_var, icv->run_sched_chunk_size, id);
+                              icv->run_sched_var, icv->run_sched_chunk_size, 0, id);
 }
 
 ialias_redirect (GOMP_parallel_end)
@@ -689,7 +689,7 @@ GOMP_parallel_loop_runtime (void (*fn) (void *), void *data,
                             unsigned num_threads, long start, long end,
                             long incr, unsigned flags, region_id_t id)
 {
-    printf("executing omp region: %llu\n", id);
+    //printf("executing omp region: %llu\n", id);
     struct gomp_task_icv *icv = gomp_icv (false);
     gomp_parallel_loop_start (fn, data, num_threads, start, end,
                               incr, icv->run_sched_var,

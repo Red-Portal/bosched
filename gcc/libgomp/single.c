@@ -50,7 +50,7 @@ GOMP_single_start (void)
   bool ret = gomp_work_share_start (false);
   if (ret)
     gomp_work_share_init_done ();
-  gomp_work_share_end_nowait ();
+  gomp_work_share_end_nowait (0);
   return ret;
 #endif
 }
@@ -80,7 +80,7 @@ GOMP_single_copy_start (void)
       gomp_team_barrier_wait (&thr->ts.team->barrier);
 
       ret = thr->ts.work_share->copyprivate;
-      gomp_work_share_end_nowait ();
+      gomp_work_share_end_nowait (0);
     }
 
   return ret;
@@ -101,5 +101,5 @@ GOMP_single_copy_end (void *data)
       gomp_team_barrier_wait (&team->barrier);
     }
 
-  gomp_work_share_end_nowait ();
+  gomp_work_share_end_nowait (0);
 }

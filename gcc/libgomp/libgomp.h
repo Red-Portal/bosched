@@ -141,7 +141,7 @@ enum gomp_schedule_type
   GFS_AUTO,
 
   FS_AF,
-  Fs_FAC2,
+  FS_FAC2,
   FS_FSS,
   FS_TSS,
   FS_CSS,
@@ -704,6 +704,7 @@ extern pthread_attr_t gomp_thread_attr;
 extern pthread_key_t gomp_thread_destructor;
 #endif
 
+
 /* Function prototypes.  */
 
 /* affinity.c */
@@ -1005,7 +1006,7 @@ enum gomp_map_vars_kind
 };
 
 extern void gomp_acc_insert_pointer (size_t, void **, size_t *, void *);
-extern void gomp_acc_remove_pointer (void *, size_t, bool, int, int, int);
+extern void gomp_acc_remove_pointer (void *, bool, int, int);
 extern void gomp_acc_declare_allocate (bool, size_t, void **, size_t *,
 				       unsigned short *);
 
@@ -1035,6 +1036,7 @@ gomp_work_share_init_done (void)
   if (__builtin_expect (thr->ts.last_work_share != NULL, 1))
     gomp_ptrlock_set (&thr->ts.last_work_share->next_ws, thr->ts.work_share);
 }
+
 
 #ifdef HAVE_ATTRIBUTE_VISIBILITY
 # pragma GCC visibility pop

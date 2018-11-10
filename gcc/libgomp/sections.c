@@ -26,7 +26,7 @@
 /* This file handles the SECTIONS construct.  */
 
 #include "libgomp.h"
-
+#include "bo_scheduling.h"
 
 /* Initialize the given work share construct from the given arguments.  */
 
@@ -166,17 +166,17 @@ GOMP_parallel_sections (void (*fn) (void *), void *data,
 void
 GOMP_sections_end (void)
 {
-  gomp_work_share_end ();
+    gomp_work_share_end (0);
 }
 
 bool
 GOMP_sections_end_cancel (void)
 {
-  return gomp_work_share_end_cancel ();
+    return gomp_work_share_end_cancel (0);
 }
 
 void
 GOMP_sections_end_nowait (void)
 {
-  gomp_work_share_end_nowait ();
+    gomp_work_share_end_nowait (0);
 }

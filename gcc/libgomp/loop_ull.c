@@ -29,6 +29,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "libgomp.h"
+#include "bo_scheduling.h"
 
 typedef unsigned long long gomp_ull;
 typedef unsigned long long region_id_t;
@@ -41,7 +42,7 @@ gomp_loop_ull_init (struct gomp_work_share *ws, bool up, gomp_ull start,
                     gomp_ull chunk_size, region_id_t region_id)
 {
     struct gomp_task_icv *icv = gomp_icv (false);
-    if(sched == GFS_RUNTIME, && is_bo_schedule(icv->run_sched_var))
+    if(is_bo_schedule(icv->run_sched_var))
     {
         bo_schedule_begin(region_id);
         double param = bo_schedule_parameter(region_id);
@@ -161,7 +162,7 @@ gomp_loop_ull_guided_start (bool up, gomp_ull start, gomp_ull end,
   if (gomp_work_share_start (false))
     {
       gomp_loop_ull_init (thr->ts.work_share, up, start, end, incr,
-                          GFS_GUIDED, chunk_size, n);
+                          GFS_GUIDED, chunk_size, 0);
       gomp_work_share_init_done ();
     }
 
