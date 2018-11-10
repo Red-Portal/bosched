@@ -2771,6 +2771,7 @@ expand_omp_for_generic (struct omp_region *region,
                     t = build_call_expr (builtin_decl_explicit (start_fn),
                                          6, t0, t1, t2, t3, t4, region_id);
                 }
+                else
                 {
                     t = build_call_expr (builtin_decl_explicit (start_fn),
                                          5, t0, t1, t2, t3, t4);
@@ -2805,6 +2806,7 @@ expand_omp_for_generic (struct omp_region *region,
                     t = build_call_expr (builtin_decl_explicit (start_fn),
                                          7, t5, t0, t1, t2, t3, t4, region_id);
                 }
+                else
                 {
                     t = build_call_expr (builtin_decl_explicit (start_fn),
                                          6, t5, t0, t1, t2, t3, t4);
