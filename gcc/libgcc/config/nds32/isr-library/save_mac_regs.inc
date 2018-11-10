@@ -24,7 +24,7 @@
    <http://www.gnu.org/licenses/>.  */
 
 .macro SAVE_MAC_REGS
-#if __NDS32_DX_REGS__
+#ifdef NDS32_DX_REGS
 	mfusr	$r1, $d0.lo
 	mfusr	$r2, $d0.hi
 	mfusr	$r3, $d1.lo

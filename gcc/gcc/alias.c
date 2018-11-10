@@ -1554,17 +1554,6 @@ record_set (rtx dest, const_rtx set, void *data ATTRIBUTE_UNUSED)
 	  new_reg_base_value[regno] = 0;
 	  return;
 	}
-      /* A CLOBBER_HIGH only wipes out the old value if the mode of the old
-	 value is greater than that of the clobber.  */
-      else if (GET_CODE (set) == CLOBBER_HIGH)
-	{
-	  if (new_reg_base_value[regno] != 0
-	      && reg_is_clobbered_by_clobber_high (
-		   regno, GET_MODE (new_reg_base_value[regno]), XEXP (set, 0)))
-	    new_reg_base_value[regno] = 0;
-	  return;
-	}
-
       src = SET_SRC (set);
     }
   else
@@ -2273,10 +2262,9 @@ get_addr (rtx x)
 	  rtx op0 = get_addr (XEXP (x, 0));
 	  if (op0 != XEXP (x, 0))
 	    {
-	      poly_int64 c;
 	      if (GET_CODE (x) == PLUS
-		  && poly_int_rtx_p (XEXP (x, 1), &c))
-		return plus_constant (GET_MODE (x), op0, c);
+		  && GET_CODE (XEXP (x, 1)) == CONST_INT)
+		return plus_constant (GET_MODE (x), op0, INTVAL (XEXP (x, 1)));
 	      return simplify_gen_binary (GET_CODE (x), GET_MODE (x),
 					  op0, XEXP (x, 1));
 	    }
@@ -2563,11 +2551,10 @@ memrefs_conflict_p (poly_int64 xsize, rtx x, poly_int64 ysize, rtx y,
 	    return offset_overlap_p (c, xsize, ysize);
 
 	  /* Can't properly adjust our sizes.  */
-	  poly_int64 c1;
-	  if (!poly_int_rtx_p (x1, &c1)
-	      || !can_div_trunc_p (xsize, c1, &xsize)
-	      || !can_div_trunc_p (ysize, c1, &ysize)
-	      || !can_div_trunc_p (c, c1, &c))
+	  if (!CONST_INT_P (x1)
+	      || !can_div_trunc_p (xsize, INTVAL (x1), &xsize)
+	      || !can_div_trunc_p (ysize, INTVAL (x1), &ysize)
+	      || !can_div_trunc_p (c, INTVAL (x1), &c))
 	    return -1;
 	  return memrefs_conflict_p (xsize, x0, ysize, y0, c);
 	}
@@ -2711,22 +2698,22 @@ adjust_offset_for_component_ref (tree x, bool *known_p,
     {
       tree xoffset = component_ref_field_offset (x);
       tree field = TREE_OPERAND (x, 1);
-      if (!poly_int_tree_p (xoffset))
+      if (TREE_CODE (xoffset) != INTEGER_CST)
 	{
 	  *known_p = false;
 	  return;
 	}
 
-      poly_offset_int woffset
-	= (wi::to_poly_offset (xoffset)
+      offset_int woffset
+	= (wi::to_offset (xoffset)
 	   + (wi::to_offset (DECL_FIELD_BIT_OFFSET (field))
-	      >> LOG2_BITS_PER_UNIT)
-	   + *offset);
-      if (!woffset.to_shwi (offset))
+	      >> LOG2_BITS_PER_UNIT));
+      if (!wi::fits_uhwi_p (woffset))
 	{
 	  *known_p = false;
 	  return;
 	}
+      *offset += woffset.to_uhwi ();
 
       x = TREE_OPERAND (x, 0);
     }
@@ -3270,6 +3257,15 @@ memory_modified_in_insn_p (const_rtx mem, const_rtx insn)
   return memory_modified;
 }
 
+/* Return TRUE if the destination of a set is rtx identical to
+   ITEM.  */
+static inline bool
+set_dest_equal_p (const_rtx set, const_rtx item)
+{
+  rtx dest = SET_DEST (set);
+  return rtx_equal_p (dest, item);
+}
+
 /* Initialize the aliasing machinery.  Initialize the REG_KNOWN_VALUE
    array.  */
 
@@ -3411,7 +3407,6 @@ init_alias_analysis (void)
 			  && DF_REG_DEF_COUNT (regno) != 1)
 			note = NULL_RTX;
 
-		      poly_int64 offset;
 		      if (note != NULL_RTX
 			  && GET_CODE (XEXP (note, 0)) != EXPR_LIST
 			  && ! rtx_varies_p (XEXP (note, 0), 1)
@@ -3426,9 +3421,10 @@ init_alias_analysis (void)
 			       && GET_CODE (src) == PLUS
 			       && REG_P (XEXP (src, 0))
 			       && (t = get_reg_known_value (REGNO (XEXP (src, 0))))
-			       && poly_int_rtx_p (XEXP (src, 1), &offset))
+			       && CONST_INT_P (XEXP (src, 1)))
 			{
-			  t = plus_constant (GET_MODE (src), t, offset);
+			  t = plus_constant (GET_MODE (src), t,
+					     INTVAL (XEXP (src, 1)));
 			  set_reg_known_value (regno, t);
 			  set_reg_known_equiv_p (regno, false);
 			}

@@ -16,51 +16,47 @@ import (
 	"cmd/go/internal/web"
 )
 
-// Test that RepoRootForImportPath determines the correct RepoRoot for a given importPath.
+// Test that RepoRootForImportPath creates the correct RepoRoot for a given importPath.
 // TODO(cmang): Add tests for SVN and BZR.
 func TestRepoRootForImportPath(t *testing.T) {
 	testenv.MustHaveExternalNetwork(t)
 
 	tests := []struct {
 		path string
-		want *RepoRoot
+		want *repoRoot
 	}{
 		{
 			"github.com/golang/groupcache",
-			&RepoRoot{
+			&repoRoot{
 				vcs:  vcsGit,
-				Repo: "https://github.com/golang/groupcache",
+				repo: "https://github.com/golang/groupcache",
 			},
 		},
 		// Unicode letters in directories (issue 18660).
 		{
 			"github.com/user/unicode/испытание",
-			&RepoRoot{
+			&repoRoot{
 				vcs:  vcsGit,
-				Repo: "https://github.com/user/unicode",
+				repo: "https://github.com/user/unicode",
 			},
 		},
 		// IBM DevOps Services tests
 		{
 			"hub.jazz.net/git/user1/pkgname",
-			&RepoRoot{
+			&repoRoot{
 				vcs:  vcsGit,
-				Repo: "https://hub.jazz.net/git/user1/pkgname",
+				repo: "https://hub.jazz.net/git/user1/pkgname",
 			},
 		},
 		{
 			"hub.jazz.net/git/user1/pkgname/submodule/submodule/submodule",
-			&RepoRoot{
+			&repoRoot{
 				vcs:  vcsGit,
-				Repo: "https://hub.jazz.net/git/user1/pkgname",
+				repo: "https://hub.jazz.net/git/user1/pkgname",
 			},
 		},
 		{
 			"hub.jazz.net",
-			nil,
-		},
-		{
-			"hubajazz.net",
 			nil,
 		},
 		{
@@ -91,9 +87,9 @@ func TestRepoRootForImportPath(t *testing.T) {
 		},
 		{
 			"hub.jazz.net/git/user/pkg.name",
-			&RepoRoot{
+			&repoRoot{
 				vcs:  vcsGit,
-				Repo: "https://hub.jazz.net/git/user/pkg.name",
+				repo: "https://hub.jazz.net/git/user/pkg.name",
 			},
 		},
 		// User names cannot have uppercase letters
@@ -104,9 +100,9 @@ func TestRepoRootForImportPath(t *testing.T) {
 		// OpenStack tests
 		{
 			"git.openstack.org/openstack/swift",
-			&RepoRoot{
+			&repoRoot{
 				vcs:  vcsGit,
-				Repo: "https://git.openstack.org/openstack/swift",
+				repo: "https://git.openstack.org/openstack/swift",
 			},
 		},
 		// Trailing .git is less preferred but included for
@@ -114,16 +110,16 @@ func TestRepoRootForImportPath(t *testing.T) {
 		// be compilable on both old and new go
 		{
 			"git.openstack.org/openstack/swift.git",
-			&RepoRoot{
+			&repoRoot{
 				vcs:  vcsGit,
-				Repo: "https://git.openstack.org/openstack/swift.git",
+				repo: "https://git.openstack.org/openstack/swift.git",
 			},
 		},
 		{
 			"git.openstack.org/openstack/swift/go/hummingbird",
-			&RepoRoot{
+			&repoRoot{
 				vcs:  vcsGit,
-				Repo: "https://git.openstack.org/openstack/swift",
+				repo: "https://git.openstack.org/openstack/swift",
 			},
 		},
 		{
@@ -145,28 +141,24 @@ func TestRepoRootForImportPath(t *testing.T) {
 			nil,
 		},
 		{
-			"gitbapache.org",
-			nil,
-		},
-		{
 			"git.apache.org/package-name.git",
-			&RepoRoot{
+			&repoRoot{
 				vcs:  vcsGit,
-				Repo: "https://git.apache.org/package-name.git",
+				repo: "https://git.apache.org/package-name.git",
 			},
 		},
 		{
 			"git.apache.org/package-name_2.x.git/path/to/lib",
-			&RepoRoot{
+			&repoRoot{
 				vcs:  vcsGit,
-				Repo: "https://git.apache.org/package-name_2.x.git",
+				repo: "https://git.apache.org/package-name_2.x.git",
 			},
 		},
 		{
 			"chiselapp.com/user/kyle/repository/fossilgg",
-			&RepoRoot{
+			&repoRoot{
 				vcs:  vcsFossil,
-				Repo: "https://chiselapp.com/user/kyle/repository/fossilgg",
+				repo: "https://chiselapp.com/user/kyle/repository/fossilgg",
 			},
 		},
 		{
@@ -181,21 +173,21 @@ func TestRepoRootForImportPath(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		got, err := RepoRootForImportPath(test.path, IgnoreMod, web.Secure)
+		got, err := repoRootForImportPath(test.path, web.Secure)
 		want := test.want
 
 		if want == nil {
 			if err == nil {
-				t.Errorf("RepoRootForImportPath(%q): Error expected but not received", test.path)
+				t.Errorf("repoRootForImportPath(%q): Error expected but not received", test.path)
 			}
 			continue
 		}
 		if err != nil {
-			t.Errorf("RepoRootForImportPath(%q): %v", test.path, err)
+			t.Errorf("repoRootForImportPath(%q): %v", test.path, err)
 			continue
 		}
-		if got.vcs.name != want.vcs.name || got.Repo != want.Repo {
-			t.Errorf("RepoRootForImportPath(%q) = VCS(%s) Repo(%s), want VCS(%s) Repo(%s)", test.path, got.vcs, got.Repo, want.vcs, want.Repo)
+		if got.vcs.name != want.vcs.name || got.repo != want.repo {
+			t.Errorf("repoRootForImportPath(%q) = VCS(%s) Repo(%s), want VCS(%s) Repo(%s)", test.path, got.vcs, got.repo, want.vcs, want.repo)
 		}
 	}
 }
@@ -227,18 +219,18 @@ func TestFromDir(t *testing.T) {
 			f.Close()
 		}
 
-		want := RepoRoot{
+		want := repoRoot{
 			vcs:  vcs,
-			Root: path.Join("example.com", vcs.name),
+			root: path.Join("example.com", vcs.name),
 		}
-		var got RepoRoot
-		got.vcs, got.Root, err = vcsFromDir(dir, tempDir)
+		var got repoRoot
+		got.vcs, got.root, err = vcsFromDir(dir, tempDir)
 		if err != nil {
 			t.Errorf("FromDir(%q, %q): %v", dir, tempDir, err)
 			continue
 		}
-		if got.vcs.name != want.vcs.name || got.Root != want.Root {
-			t.Errorf("FromDir(%q, %q) = VCS(%s) Root(%s), want VCS(%s) Root(%s)", dir, tempDir, got.vcs, got.Root, want.vcs, want.Root)
+		if got.vcs.name != want.vcs.name || got.root != want.root {
+			t.Errorf("FromDir(%q, %q) = VCS(%s) Root(%s), want VCS(%s) Root(%s)", dir, tempDir, got.vcs, got.root, want.vcs, want.root)
 		}
 	}
 }
@@ -401,22 +393,6 @@ func TestMatchGoImport(t *testing.T) {
 			path: "different.example.com/user/foo",
 			err:  errors.New("meta tags do not match import path"),
 		},
-		{
-			imports: []metaImport{
-				{Prefix: "myitcv.io/blah2", VCS: "mod", RepoRoot: "https://raw.githubusercontent.com/myitcv/pubx/master"},
-				{Prefix: "myitcv.io", VCS: "git", RepoRoot: "https://github.com/myitcv/x"},
-			},
-			path: "myitcv.io/blah2/foo",
-			mi:   metaImport{Prefix: "myitcv.io/blah2", VCS: "mod", RepoRoot: "https://raw.githubusercontent.com/myitcv/pubx/master"},
-		},
-		{
-			imports: []metaImport{
-				{Prefix: "myitcv.io/blah2", VCS: "mod", RepoRoot: "https://raw.githubusercontent.com/myitcv/pubx/master"},
-				{Prefix: "myitcv.io", VCS: "git", RepoRoot: "https://github.com/myitcv/x"},
-			},
-			path: "myitcv.io/other",
-			mi:   metaImport{Prefix: "myitcv.io", VCS: "git", RepoRoot: "https://github.com/myitcv/x"},
-		},
 	}
 
 	for _, test := range tests {
@@ -433,36 +409,6 @@ func TestMatchGoImport(t *testing.T) {
 	}
 }
 
-<<<<<<< HEAD
-func TestValidateRepoRoot(t *testing.T) {
-	tests := []struct {
-		root string
-		ok   bool
-	}{
-		{
-			root: "",
-			ok:   false,
-		},
-		{
-			root: "http://",
-			ok:   true,
-		},
-		{
-			root: "git+ssh://",
-			ok:   true,
-		},
-		{
-			root: "http#://",
-			ok:   false,
-		},
-		{
-			root: "-config",
-			ok:   false,
-		},
-		{
-			root: "-config://",
-			ok:   false,
-=======
 func TestValidateRepoRootScheme(t *testing.T) {
 	tests := []struct {
 		root string
@@ -487,21 +433,10 @@ func TestValidateRepoRootScheme(t *testing.T) {
 		{
 			root: "-config://",
 			err:  "invalid scheme",
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
 		},
 	}
 
 	for _, test := range tests {
-<<<<<<< HEAD
-		err := validateRepoRoot(test.root)
-		ok := err == nil
-		if ok != test.ok {
-			want := "error"
-			if test.ok {
-				want = "nil"
-			}
-			t.Errorf("validateRepoRoot(%q) = %q, want %s", test.root, err, want)
-=======
 		err := validateRepoRootScheme(test.root)
 		if err == nil {
 			if test.err != "" {
@@ -513,7 +448,6 @@ func TestValidateRepoRootScheme(t *testing.T) {
 			}
 		} else if err.Error() != test.err {
 			t.Errorf("validateRepoRootScheme(%q) = %q, want %q", test.root, err, test.err)
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
 		}
 	}
 }

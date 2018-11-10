@@ -224,11 +224,6 @@ namespace __facet_shims
     void
     __messages_close(other_abi, const facet*, messages_base::catalog);
 
-#pragma GCC diagnostic push
-// Suppress -Wabi=2 warnings due to empty struct argument passing changes.
-// TODO This should use -Wabi=12 but that currently fails (PR c++/87611).
-#pragma GCC diagnostic ignored "-Wabi"
-
   namespace // unnamed
   {
     struct __shim_accessor : facet
@@ -771,8 +766,6 @@ namespace __facet_shims
       else
 	return m->put(s, intl, io, fill, units);
     }
-
-#pragma GCC diagnostic pop
 
   template ostreambuf_iterator<char>
   __money_put(current_abi, const facet*, ostreambuf_iterator<char>,

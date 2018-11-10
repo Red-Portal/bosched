@@ -67,9 +67,9 @@ package body Adabkend is
       Driver (Lib.Cunit (Types.Main_Unit));
    end Call_Back_End;
 
-   -----------------------------
-   -- Scan_Compiler_Arguments --
-   -----------------------------
+   ------------------------
+   -- Scan_Compiler_Args --
+   ------------------------
 
    procedure Scan_Compiler_Arguments is
       Output_File_Name_Seen : Boolean := False;

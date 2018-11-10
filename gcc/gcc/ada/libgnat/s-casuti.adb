@@ -58,13 +58,6 @@ package body System.Case_Util is
       end loop;
    end To_Lower;
 
-   function To_Lower (A : String) return String is
-      Result : String := A;
-   begin
-      To_Lower (Result);
-      return Result;
-   end To_Lower;
-
    --------------
    -- To_Mixed --
    --------------
@@ -82,13 +75,6 @@ package body System.Case_Util is
 
          Ucase := A (J) = '_';
       end loop;
-   end To_Mixed;
-
-   function To_Mixed (A : String) return String is
-      Result : String := A;
-   begin
-      To_Mixed (Result);
-      return Result;
    end To_Mixed;
 
    --------------
@@ -114,13 +100,6 @@ package body System.Case_Util is
       for J in A'Range loop
          A (J) := To_Upper (A (J));
       end loop;
-   end To_Upper;
-
-   function To_Upper (A : String) return String is
-      Result : String := A;
-   begin
-      To_Upper (Result);
-      return Result;
    end To_Upper;
 
 end System.Case_Util;

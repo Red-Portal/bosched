@@ -63,11 +63,7 @@ class Linemap
   virtual std::string
   to_string(Location) = 0;
 
-  // Return the file name for a given location.
-  virtual std::string
-  location_file(Location) = 0;
-
-  // Return the line number for a given location.
+  // Return the line number for a given location (for debugging dumps)
   virtual int
   location_line(Location) = 0;
 
@@ -144,15 +140,7 @@ class Linemap
     return Linemap::instance_->to_string(loc);
   }
 
-  // Return the file name of a location.
-  static std::string
-  location_to_file(Location loc)
-  {
-    go_assert(Linemap::instance_ != NULL);
-    return Linemap::instance_->location_file(loc);
-  }
-
-  // Return line number of a location.
+  // Return line number for location
   static int
   location_to_line(Location loc)
   {

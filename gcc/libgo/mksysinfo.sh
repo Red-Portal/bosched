@@ -29,7 +29,6 @@ echo 'type _ unsafe.Pointer' >> ${OUT}
 # will all have a leading underscore.
 grep -v '^// ' gen-sysinfo.go | \
   grep -v '^func' | \
-  grep -v '^var' | \
   grep -v '^type _timeval ' | \
   grep -v '^type _timespec_t ' | \
   grep -v '^type _timespec ' | \
@@ -71,11 +70,6 @@ fi
 # The os package requires F_DUPFD_CLOEXEC to be defined.
 if ! grep '^const F_DUPFD_CLOEXEC' ${OUT} >/dev/null 2>&1; then
   echo "const F_DUPFD_CLOEXEC = 0" >> ${OUT}
-fi
-
-# The internal/poll package requires F_GETPIPE_SZ to be defined.
-if ! grep '^const F_GETPIPE_SZ' ${OUT} >/dev/null 2>&1; then
-  echo "const F_GETPIPE_SZ = 0" >> ${OUT}
 fi
 
 # AIX 7.1 is a 64 bits value for _FCLOEXEC (referenced by O_CLOEXEC)
@@ -136,12 +130,6 @@ if ! grep '^const SYS_GETDENTS ' ${OUT} >/dev/null 2>&1; then
 fi
 if ! grep '^const SYS_GETDENTS64 ' ${OUT} >/dev/null 2>&1; then
   echo "const SYS_GETDENTS64 = 0" >> ${OUT}
-fi
-
-# The syscall package wants the geteuid system call number.  It isn't
-# defined on Alpha, which only provides the getresuid system call.
-if ! grep '^const SYS_GETEUID ' ${OUT} >/dev/null 2>&1; then
-  echo "const SYS_GETEUID = 0" >> ${OUT}
 fi
 
 # Stat constants.

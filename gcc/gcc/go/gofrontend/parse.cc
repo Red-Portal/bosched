@@ -2360,10 +2360,7 @@ Parse::function_decl(unsigned int pragmas)
 	{ GOPRAGMA_NOINLINE, "noinline", false, true, true },
 	{ GOPRAGMA_SYSTEMSTACK, "systemstack", false, true, true },
 	{ GOPRAGMA_NOWRITEBARRIER, "nowritebarrier", false, true, true },
-	{ GOPRAGMA_NOWRITEBARRIERREC, "nowritebarrierrec", false, true,
-	  true },
-	{ GOPRAGMA_YESWRITEBARRIERREC, "yeswritebarrierrec", false, true,
-	  true },
+	{ GOPRAGMA_NOWRITEBARRIERREC, "nowritebarrierrec", false, true, true },
 	{ GOPRAGMA_CGOUNSAFEARGS, "cgo_unsafe_args", false, true, true },
 	{ GOPRAGMA_UINTPTRESCAPES, "uintptrescapes", true, true, true },
       };
@@ -4304,15 +4301,9 @@ Parse::go_or_defer_stat()
   this->gogo_->start_block(stat_location);
   Statement* stat;
   if (is_go)
-    {
-      stat = Statement::make_go_statement(call_expr, stat_location);
-      call_expr->set_is_concurrent();
-    }
+    stat = Statement::make_go_statement(call_expr, stat_location);
   else
-    {
-      stat = Statement::make_defer_statement(call_expr, stat_location);
-      call_expr->set_is_deferred();
-    }
+    stat = Statement::make_defer_statement(call_expr, stat_location);
   this->gogo_->add_statement(stat);
   this->gogo_->add_block(this->gogo_->finish_block(stat_location),
 			 stat_location);

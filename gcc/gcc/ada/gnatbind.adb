@@ -167,61 +167,55 @@ procedure Gnatbind is
       --  -r switch is used. Not all restrictions are output for the reasons
       --  given below in the list, and this array is used to test whether
       --  the corresponding pragma should be listed. True means that it
-      --  should be listed.
+      --  should not be listed.
 
-      Restrictions_To_List : constant array (All_Restrictions) of Boolean :=
-        (No_Standard_Allocators_After_Elaboration => False,
+      No_Restriction_List : constant array (All_Restrictions) of Boolean :=
+        (No_Standard_Allocators_After_Elaboration => True,
          --  This involves run-time conditions not checkable at compile time
 
-         No_Anonymous_Allocators         => False,
+         No_Anonymous_Allocators         => True,
          --  Premature, since we have not implemented this yet
 
-         No_Exception_Propagation        => False,
+         No_Exception_Propagation        => True,
          --  Modifies code resulting in different exception semantics
 
-         No_Exceptions                   => False,
+         No_Exceptions                   => True,
          --  Has unexpected Suppress (All_Checks) effect
 
-         No_Implicit_Conditionals        => False,
+         No_Implicit_Conditionals        => True,
          --  This could modify and pessimize generated code
 
-         No_Implicit_Dynamic_Code        => False,
+         No_Implicit_Dynamic_Code        => True,
          --  This could modify and pessimize generated code
 
-         No_Implicit_Loops               => False,
+         No_Implicit_Loops               => True,
          --  This could modify and pessimize generated code
 
-         No_Recursion                    => False,
+         No_Recursion                    => True,
          --  Not checkable at compile time
 
-         No_Reentrancy                   => False,
+         No_Reentrancy                   => True,
          --  Not checkable at compile time
 
-         Max_Entry_Queue_Length          => False,
+         Max_Entry_Queue_Length           => True,
          --  Not checkable at compile time
 
-         Max_Storage_At_Blocking         => False,
+         Max_Storage_At_Blocking         => True,
          --  Not checkable at compile time
-
-         No_Implementation_Restrictions  => False,
-         --  Listing this one would cause a chicken&egg problem; the program
-         --  doesn't use implementation-defined restrictions, but after
-         --  applying the listed restrictions, it probably WILL use them,
-         --  so No_Implementation_Restrictions will cause an error.
 
          --  The following three should not be partition-wide, so the
          --  following tests are junk to be removed eventually ???
 
-         No_Specification_Of_Aspect      => False,
+         No_Specification_Of_Aspect      => True,
          --  Requires a parameter value, not a count
 
-         No_Use_Of_Attribute             => False,
+         No_Use_Of_Attribute             => True,
          --  Requires a parameter value, not a count
 
-         No_Use_Of_Pragma                => False,
+         No_Use_Of_Pragma                => True,
          --  Requires a parameter value, not a count
 
-         others                          => True);
+         others                          => False);
 
       Additional_Restrictions_Listed : Boolean := False;
       --  Set True if we have listed header for restrictions
@@ -285,14 +279,14 @@ procedure Gnatbind is
       --  Loop through restrictions
 
       for R in All_Restrictions loop
-         if Restrictions_To_List (R)
+         if not No_Restriction_List (R)
            and then Restriction_Could_Be_Set (R)
          then
             if not Additional_Restrictions_Listed then
                Write_Eol;
                Write_Line
-                 ("--  The following additional restrictions may be applied "
-                  & "to this partition:");
+                 ("The following additional restrictions may be applied to "
+                  & "this partition:");
                Additional_Restrictions_Listed := True;
             end if;
 

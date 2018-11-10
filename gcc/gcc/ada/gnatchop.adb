@@ -599,7 +599,7 @@ procedure Gnatchop is
       Chop_Name   : constant String_Access   := File.Table (Num).Name;
       Save_Stdout : constant File_Descriptor := dup (Standout);
       Offset_Name : Temp_File_Name;
-      Offset_FD   : File_Descriptor := Invalid_FD;
+      Offset_FD   : File_Descriptor;
       Buffer      : String_Access;
       Success     : Boolean;
       Failure     : exception;
@@ -685,12 +685,10 @@ procedure Gnatchop is
 
    exception
       when Failure | Types.Terminate_Program =>
-         if Offset_FD /= Invalid_FD then
-            Close (Offset_FD);
-         end if;
-
+         Close (Offset_FD);
          Delete_File (Offset_Name'Address, Success);
          return False;
+
    end Parse_File;
 
    -----------------------

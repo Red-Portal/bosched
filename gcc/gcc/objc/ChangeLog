@@ -1,8 +1,3 @@
-<<<<<<< HEAD
-2018-10-17  David Malcolm  <dmalcolm@redhat.com>
-
-	* Make-lang.in (selftest-objc): New.
-=======
 2018-07-26  Release Manager
 
 	* GCC 8.2.0 released.
@@ -10,7 +5,6 @@
 2018-05-02  Release Manager
 
 	* GCC 8.1.0 released.
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
 
 2018-04-20  Martin Liska  <mliska@suse.cz>
 
@@ -2063,7 +2057,7 @@
 	Merge from 'apple/trunk' branch on FSF servers.
 
 	2005-08-23  Stuart Hastings  <stuart@apple.com>
-		    Ziemowit Laski  <zlaski@apple.com>
+	            Ziemowit Laski  <zlaski@apple.com>
 
 	Radar 4209854
 	* objc-act.c (objc_decay_parm_type): New function.

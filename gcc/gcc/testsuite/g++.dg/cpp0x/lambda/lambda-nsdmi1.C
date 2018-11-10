@@ -1,7 +1,7 @@
 // PR c++/56464
 // { dg-do run { target c++11 } }
 
-struct bug { bug*a = [&]{ return [=]{return this;}(); }(); }; // { dg-warning "implicit capture" "" { target c++2a } }
+struct bug { bug*a = [&]{ return [=]{return this;}(); }(); };
 int main()
 {
   bug b;

@@ -155,27 +155,36 @@ tree
 build_memfn_type (tree fntype, tree ctype, cp_cv_quals quals,
 		  cp_ref_qualifier rqual)
 {
+  tree raises;
+  tree attrs;
+  int type_quals;
+  bool late_return_type_p;
+
   if (fntype == error_mark_node || ctype == error_mark_node)
     return error_mark_node;
 
   gcc_assert (TREE_CODE (fntype) == FUNCTION_TYPE
 	      || TREE_CODE (fntype) == METHOD_TYPE);
 
-  cp_cv_quals type_quals = quals & ~TYPE_QUAL_RESTRICT;
+  type_quals = quals & ~TYPE_QUAL_RESTRICT;
   ctype = cp_build_qualified_type (ctype, type_quals);
+  raises = TYPE_RAISES_EXCEPTIONS (fntype);
+  attrs = TYPE_ATTRIBUTES (fntype);
+  late_return_type_p = TYPE_HAS_LATE_RETURN_TYPE (fntype);
+  fntype = build_method_type_directly (ctype, TREE_TYPE (fntype),
+				       (TREE_CODE (fntype) == METHOD_TYPE
+					? TREE_CHAIN (TYPE_ARG_TYPES (fntype))
+					: TYPE_ARG_TYPES (fntype)));
+  if (attrs)
+    fntype = cp_build_type_attribute_variant (fntype, attrs);
+  if (rqual)
+    fntype = build_ref_qualified_type (fntype, rqual);
+  if (raises)
+    fntype = build_exception_variant (fntype, raises);
+  if (late_return_type_p)
+    TYPE_HAS_LATE_RETURN_TYPE (fntype) = 1;
 
-  tree newtype
-    = build_method_type_directly (ctype, TREE_TYPE (fntype),
-				  (TREE_CODE (fntype) == METHOD_TYPE
-				   ? TREE_CHAIN (TYPE_ARG_TYPES (fntype))
-				   : TYPE_ARG_TYPES (fntype)));
-  if (tree attrs = TYPE_ATTRIBUTES (fntype))
-    newtype = cp_build_type_attribute_variant (newtype, attrs);
-  newtype = build_cp_fntype_variant (newtype, rqual,
-				     TYPE_RAISES_EXCEPTIONS (fntype),
-				     TYPE_HAS_LATE_RETURN_TYPE (fntype));
-
-  return newtype;
+  return fntype;
 }
 
 /* Return a variant of FNTYPE, a FUNCTION_TYPE or METHOD_TYPE, with its
@@ -184,28 +193,36 @@ build_memfn_type (tree fntype, tree ctype, cp_cv_quals quals,
 tree
 change_return_type (tree new_ret, tree fntype)
 {
+  tree newtype;
+  tree args = TYPE_ARG_TYPES (fntype);
+  tree raises = TYPE_RAISES_EXCEPTIONS (fntype);
+  tree attrs = TYPE_ATTRIBUTES (fntype);
+  bool late_return_type_p = TYPE_HAS_LATE_RETURN_TYPE (fntype);
+
   if (new_ret == error_mark_node)
     return fntype;
 
   if (same_type_p (new_ret, TREE_TYPE (fntype)))
     return fntype;
 
-  tree newtype;
-  tree args = TYPE_ARG_TYPES (fntype);
-
   if (TREE_CODE (fntype) == FUNCTION_TYPE)
     {
       newtype = build_function_type (new_ret, args);
       newtype = apply_memfn_quals (newtype,
-				   type_memfn_quals (fntype));
+				   type_memfn_quals (fntype),
+				   type_memfn_rqual (fntype));
     }
   else
     newtype = build_method_type_directly
       (class_of_this_parm (fntype), new_ret, TREE_CHAIN (args));
-
-  if (tree attrs = TYPE_ATTRIBUTES (fntype))
+  if (FUNCTION_REF_QUALIFIED (fntype))
+    newtype = build_ref_qualified_type (newtype, type_memfn_rqual (fntype));
+  if (raises)
+    newtype = build_exception_variant (newtype, raises);
+  if (attrs)
     newtype = cp_build_type_attribute_variant (newtype, attrs);
-  newtype = cxx_copy_lang_qualifiers (newtype, fntype);
+  if (late_return_type_p)
+    TYPE_HAS_LATE_RETURN_TYPE (newtype) = 1;
 
   return newtype;
 }
@@ -309,10 +326,12 @@ maybe_retrofit_in_chrg (tree fn)
   /* And rebuild the function type.  */
   fntype = build_method_type_directly (basetype, TREE_TYPE (TREE_TYPE (fn)),
 				       arg_types);
+  if (TYPE_RAISES_EXCEPTIONS (TREE_TYPE (fn)))
+    fntype = build_exception_variant (fntype,
+				      TYPE_RAISES_EXCEPTIONS (TREE_TYPE (fn)));
   if (TYPE_ATTRIBUTES (TREE_TYPE (fn)))
     fntype = (cp_build_type_attribute_variant
 	      (fntype, TYPE_ATTRIBUTES (TREE_TYPE (fn))));
-  fntype = cxx_copy_lang_qualifiers (fntype, TREE_TYPE (fn));
   TREE_TYPE (fn) = fntype;
 
   /* Now we've got the in-charge parameter.  */
@@ -443,7 +462,7 @@ grok_array_decl (location_t loc, tree array_expr, tree index_exp,
       if (array_expr == error_mark_node || index_exp == error_mark_node)
 	error ("ambiguous conversion for array subscript");
 
-      if (TYPE_PTR_P (TREE_TYPE (array_expr)))
+      if (TREE_CODE (TREE_TYPE (array_expr)) == POINTER_TYPE)
 	array_expr = mark_rvalue_use (array_expr);
       else
 	array_expr = mark_lvalue_use_nonread (array_expr);
@@ -756,15 +775,13 @@ finish_static_data_member_decl (tree decl,
   if (LOCAL_CLASS_P (current_class_type)
       /* We already complained about the template definition.  */
       && !DECL_TEMPLATE_INSTANTIATION (decl))
-    permerror (DECL_SOURCE_LOCATION (decl),
-	       "local class %q#T shall not have static data member %q#D",
+    permerror (input_location, "local class %q#T shall not have static data member %q#D",
 	       current_class_type, decl);
   else
     for (tree t = current_class_type; TYPE_P (t);
 	 t = CP_TYPE_CONTEXT (t))
       if (TYPE_UNNAMED_P (t))
 	{
-	  auto_diagnostic_group d;
 	  if (permerror (DECL_SOURCE_LOCATION (decl),
 			 "static data member %qD in unnamed class", decl))
 	    inform (DECL_SOURCE_LOCATION (TYPE_NAME (t)),
@@ -1034,7 +1051,7 @@ grokbitfield (const cp_declarator *declarator,
     return void_type_node;
 
   if (!INTEGRAL_OR_ENUMERATION_TYPE_P (TREE_TYPE (value))
-      && (INDIRECT_TYPE_P (value)
+      && (POINTER_TYPE_P (value)
           || !dependent_type_p (TREE_TYPE (value))))
     {
       error ("bit-field %qD with non-integral type", value);
@@ -1320,6 +1337,7 @@ tree
 cp_reconstruct_complex_type (tree type, tree bottom)
 {
   tree inner, outer;
+  bool late_return_type_p = false;
 
   if (TYPE_PTR_P (type))
     {
@@ -1327,7 +1345,7 @@ cp_reconstruct_complex_type (tree type, tree bottom)
       outer = build_pointer_type_for_mode (inner, TYPE_MODE (type),
 					   TYPE_REF_CAN_ALIAS_ALL (type));
     }
-  else if (TYPE_REF_P (type))
+  else if (TREE_CODE (type) == REFERENCE_TYPE)
     {
       inner = cp_reconstruct_complex_type (TREE_TYPE (type), bottom);
       outer = build_reference_type_for_mode (inner, TYPE_MODE (type),
@@ -1345,12 +1363,16 @@ cp_reconstruct_complex_type (tree type, tree bottom)
     }
   else if (TREE_CODE (type) == FUNCTION_TYPE)
     {
+      late_return_type_p = TYPE_HAS_LATE_RETURN_TYPE (type);
       inner = cp_reconstruct_complex_type (TREE_TYPE (type), bottom);
       outer = build_function_type (inner, TYPE_ARG_TYPES (type));
-      outer = apply_memfn_quals (outer, type_memfn_quals (type));
+      outer = apply_memfn_quals (outer,
+				 type_memfn_quals (type),
+				 type_memfn_rqual (type));
     }
   else if (TREE_CODE (type) == METHOD_TYPE)
     {
+      late_return_type_p = TYPE_HAS_LATE_RETURN_TYPE (type);
       inner = cp_reconstruct_complex_type (TREE_TYPE (type), bottom);
       /* The build_method_type_directly() routine prepends 'this' to argument list,
 	 so we must compensate by getting rid of it.  */
@@ -1370,7 +1392,9 @@ cp_reconstruct_complex_type (tree type, tree bottom)
   if (TYPE_ATTRIBUTES (type))
     outer = cp_build_type_attribute_variant (outer, TYPE_ATTRIBUTES (type));
   outer = cp_build_qualified_type (outer, cp_type_quals (type));
-  outer = cxx_copy_lang_qualifiers (outer, type);
+
+  if (late_return_type_p)
+    TYPE_HAS_LATE_RETURN_TYPE (outer) = 1;
 
   return outer;
 }
@@ -1388,8 +1412,7 @@ cp_check_const_attributes (tree attributes)
   for (attr = attributes; attr; attr = TREE_CHAIN (attr))
     {
       tree arg;
-      for (arg = TREE_VALUE (attr); arg && TREE_CODE (arg) == TREE_LIST;
-	   arg = TREE_CHAIN (arg))
+      for (arg = TREE_VALUE (attr); arg; arg = TREE_CHAIN (arg))
 	{
 	  tree expr = TREE_VALUE (arg);
 	  if (EXPR_P (expr))
@@ -1666,11 +1689,7 @@ finish_anon_union (tree anon_union_decl)
       DECL_NAME (anon_union_decl) = DECL_NAME (main_decl);
       maybe_commonize_var (anon_union_decl);
       if (TREE_STATIC (anon_union_decl) || DECL_EXTERNAL (anon_union_decl))
-	{
-	  if (DECL_DISCRIMINATOR_P (anon_union_decl))
-	    determine_local_discriminator (anon_union_decl);
-	  mangle_decl (anon_union_decl);
-	}
+	mangle_decl (anon_union_decl);
       DECL_NAME (anon_union_decl) = NULL_TREE;
     }
 
@@ -1683,7 +1702,7 @@ finish_anon_union (tree anon_union_decl)
    what compiler will be expecting.  */
 
 tree
-coerce_new_type (tree type, location_t loc)
+coerce_new_type (tree type)
 {
   int e = 0;
   tree args = TYPE_ARG_TYPES (type);
@@ -1693,8 +1712,7 @@ coerce_new_type (tree type, location_t loc)
   if (!same_type_p (TREE_TYPE (type), ptr_type_node))
     {
       e = 1;
-      error_at (loc, "%<operator new%> must return type %qT",
-		ptr_type_node);
+      error ("%<operator new%> must return type %qT", ptr_type_node);
     }
 
   if (args && args != void_list_node)
@@ -1705,8 +1723,8 @@ coerce_new_type (tree type, location_t loc)
 	     
 	     The first parameter shall not have an associated default
 	     argument.  */
-	  error_at (loc, "the first parameter of %<operator new%> cannot "
-		    "have a default argument");
+	  error ("the first parameter of %<operator new%> cannot "
+		 "have a default argument");
 	  /* Throw away the default argument.  */
 	  TREE_PURPOSE (args) = NULL_TREE;
 	}
@@ -1721,7 +1739,7 @@ coerce_new_type (tree type, location_t loc)
     e = 2;
 
   if (e == 2)
-    permerror (loc, "%<operator new%> takes type %<size_t%> (%qT) "
+    permerror (input_location, "%<operator new%> takes type %<size_t%> (%qT) "
 	       "as first parameter", size_type_node);
 
   switch (e)
@@ -1730,9 +1748,9 @@ coerce_new_type (tree type, location_t loc)
       args = tree_cons (NULL_TREE, size_type_node, args);
       /* Fall through.  */
     case 1:
-      type = (cxx_copy_lang_qualifiers
+      type = build_exception_variant
 	      (build_function_type (ptr_type_node, args),
-	       type));
+	       TYPE_RAISES_EXCEPTIONS (type));
       /* Fall through.  */
     default:;
   }
@@ -1740,7 +1758,7 @@ coerce_new_type (tree type, location_t loc)
 }
 
 tree
-coerce_delete_type (tree type, location_t loc)
+coerce_delete_type (tree type)
 {
   int e = 0;
   tree args = TYPE_ARG_TYPES (type);
@@ -1750,8 +1768,7 @@ coerce_delete_type (tree type, location_t loc)
   if (!same_type_p (TREE_TYPE (type), void_type_node))
     {
       e = 1;
-      error_at (loc, "%<operator delete%> must return type %qT",
-		void_type_node);
+      error ("%<operator delete%> must return type %qT", void_type_node);
     }
 
   if (!args || args == void_list_node
@@ -1760,8 +1777,8 @@ coerce_delete_type (tree type, location_t loc)
       e = 2;
       if (args && args != void_list_node)
 	args = TREE_CHAIN (args);
-      error_at (loc, "%<operator delete%> takes type %qT as first parameter",
-		ptr_type_node);
+      error ("%<operator delete%> takes type %qT as first parameter",
+	     ptr_type_node);
     }
   switch (e)
   {
@@ -1769,9 +1786,9 @@ coerce_delete_type (tree type, location_t loc)
       args = tree_cons (NULL_TREE, ptr_type_node, args);
       /* Fall through.  */
     case 1:
-      type = (cxx_copy_lang_qualifiers
+      type = build_exception_variant
 	      (build_function_type (void_type_node, args),
-	       type));
+	       TYPE_RAISES_EXCEPTIONS (type));
       /* Fall through.  */
     default:;
   }
@@ -1819,17 +1836,6 @@ mark_vtable_entries (tree decl)
       input_location = DECL_SOURCE_LOCATION (fn);
       mark_used (fn);
     }
-}
-
-/* Adjust the TLS model on variable DECL if need be, typically after
-   the linkage of DECL has been modified.  */
-
-static void
-adjust_var_decl_tls_model (tree decl)
-{
-  if (CP_DECL_THREAD_LOCAL_P (decl)
-      && !lookup_attribute ("tls_model", DECL_ATTRIBUTES (decl)))
-    set_decl_tls_model (decl, decl_default_tls_model (decl));
 }
 
 /* Set DECL up to have the closest approximation of "initialized common"
@@ -1882,9 +1888,6 @@ comdat_linkage (tree decl)
 
   if (TREE_PUBLIC (decl))
     DECL_COMDAT (decl) = 1;
-
-  if (VAR_P (decl))
-    adjust_var_decl_tls_model (decl);
 }
 
 /* For win32 we also want to put explicit instantiations in
@@ -1923,8 +1926,6 @@ maybe_make_one_only (tree decl)
 	  /* Mark it needed so we don't forget to emit it.  */
           node->forced_by_abi = true;
 	  TREE_USED (decl) = 1;
-
-	  adjust_var_decl_tls_model (decl);
 	}
     }
 }
@@ -1942,12 +1943,8 @@ vague_linkage_p (tree decl)
 	 maybe-in-charge 'tor variants; in that case we need to check one of
 	 the "clones" for the real linkage.  But only in that case; before
 	 maybe_clone_body we haven't yet copied the linkage to the clones.  */
-<<<<<<< HEAD
-      if (DECL_MAYBE_IN_CHARGE_CDTOR_P (decl)
-=======
       if ((DECL_MAYBE_IN_CHARGE_DESTRUCTOR_P (decl)
 	   || DECL_MAYBE_IN_CHARGE_CONSTRUCTOR_P (decl))
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
 	  && !DECL_ABSTRACT_P (decl)
 	  && DECL_CHAIN (decl)
 	  && DECL_CLONED_FUNCTION_P (DECL_CHAIN (decl)))
@@ -3609,7 +3606,8 @@ start_static_storage_duration_function (unsigned count)
       priority_info_map = splay_tree_new (splay_tree_compare_ints,
 					  /*delete_key_fn=*/0,
 					  /*delete_value_fn=*/
-					  splay_tree_delete_pointers);
+					  (splay_tree_delete_value_fn)
+					  (void (*) (void)) free);
 
       /* We always need to generate functions for the
 	 DEFAULT_INIT_PRIORITY so enter it now.  That way when we walk
@@ -4261,7 +4259,7 @@ decl_maybe_constant_var_p (tree decl)
   if (DECL_HAS_VALUE_EXPR_P (decl))
     /* A proxy isn't constant.  */
     return false;
-  if (TYPE_REF_P (type))
+  if (TREE_CODE (type) == REFERENCE_TYPE)
     /* References can be constant.  */;
   else if (CP_TYPE_CONST_NON_VOLATILE_P (type)
 	   && INTEGRAL_OR_ENUMERATION_TYPE_P (type))
@@ -4297,7 +4295,6 @@ no_linkage_error (tree decl)
   else if (TYPE_UNNAMED_P (t))
     {
       bool d = false;
-      auto_diagnostic_group grp;
       if (cxx_dialect >= cxx11)
 	d = permerror (DECL_SOURCE_LOCATION (decl), "%q#D, declared using "
 		       "unnamed type, is used but never defined", decl);
@@ -4765,13 +4762,13 @@ c_parse_final_cleanups (void)
 	     inline, with resulting performance improvements.  */
 	  tree ssdf_body;
 
-	  /* Make sure the back end knows about all the variables.  */
-	  write_out_vars (vars);
-
 	  /* Set the line and file, so that it is obviously not from
 	     the source file.  */
 	  input_location = locus_at_end_of_parsing;
 	  ssdf_body = start_static_storage_duration_function (ssdf_count);
+
+	  /* Make sure the back end knows about all the variables.  */
+	  write_out_vars (vars);
 
 	  /* First generate code to do all the initializations.  */
 	  if (vars)
@@ -5187,58 +5184,6 @@ maybe_instantiate_decl (tree decl)
     }
 }
 
-/* Maybe warn if DECL is deprecated, subject to COMPLAIN.  Returns whether or
-   not a warning was emitted.  */
-
-bool
-cp_warn_deprecated_use (tree decl, tsubst_flags_t complain)
-{
-  if (!(complain & tf_warning) || !decl
-      || deprecated_state == DEPRECATED_SUPPRESS)
-    return false;
-
-  if (!TREE_DEPRECATED (decl))
-    {
-      /* Perhaps this is a deprecated typedef.  */
-      if (TYPE_P (decl) && TYPE_NAME (decl))
-	decl = TYPE_NAME (decl);
-
-      if (!TREE_DEPRECATED (decl))
-	return false;
-    }
-
-  /* Don't warn within members of a deprecated type.  */
-  if (TYPE_P (decl)
-      && currently_open_class (decl))
-    return false;
-
-  bool warned = false;
-  if (cxx_dialect >= cxx11
-      && DECL_P (decl)
-      && DECL_ARTIFICIAL (decl)
-      && DECL_NONSTATIC_MEMBER_FUNCTION_P (decl)
-      && copy_fn_p (decl))
-    {
-      auto_diagnostic_group d;
-      /* Don't warn about system library classes (c++/86342).  */
-      if (!DECL_IN_SYSTEM_HEADER (decl))
-	warned = warning (OPT_Wdeprecated_copy,
-			  "implicitly-declared %qD is deprecated", decl);
-      if (warned)
-	{
-	  tree ctx = DECL_CONTEXT (decl);
-	  tree other = classtype_has_user_copy_or_dtor (ctx);
-	  inform (DECL_SOURCE_LOCATION (other),
-		  "because %qT has user-provided %qD",
-		  ctx, other);
-	}
-    }
-  else
-    warned = warn_deprecated_use (decl, NULL_TREE);
-
-  return warned;
-}
-
 /* Mark DECL (either a _DECL or a BASELINK) as "used" in the program.
    If DECL is a specialization or implicitly declared class member,
    generate the actual definition.  Return false if something goes
@@ -5303,7 +5248,9 @@ mark_used (tree decl, tsubst_flags_t complain)
       return false;
     }
 
-  cp_warn_deprecated_use (decl, complain);
+  if (TREE_DEPRECATED (decl) && (complain & tf_warning)
+      && deprecated_state != DEPRECATED_SUPPRESS)
+    warn_deprecated_use (decl, NULL_TREE);
 
   /* We can only check DECL_ODR_USED on variables or functions with
      DECL_LANG_SPECIFIC set, and these are also the only decls that we

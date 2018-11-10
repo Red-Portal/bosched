@@ -1,4 +1,5 @@
-/* { dg-do compile { target c++17 } } */
+/* { dg-do compile } */
+/* { dg-options "-std=c++17" } */
 
 const static char c0 = u8'';		// { dg-error "empty character" }
 const static char c1 = u8'ab';  	// { dg-warning "multi-character character constant" }

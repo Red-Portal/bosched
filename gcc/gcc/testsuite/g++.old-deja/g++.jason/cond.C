@@ -47,10 +47,11 @@ int main()
   if (struct B * foo = new B)
     ;
 
-  if (int f () = 1)		// { dg-error "declares a function" } 
+  if (int f () = 1)		// { dg-warning "extern" "extern" } 
+  // { dg-error "is initialized like a variable" "var" { target *-*-* } .-1 }
     ;
   
-  if (int a[2] = {1, 2})	// { dg-error "declares an array" }
+  if (int a[2] = {1, 2})	// { dg-error "extended init" "" { target { ! c++11 } } }
     ;
 
 }

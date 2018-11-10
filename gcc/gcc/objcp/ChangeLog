@@ -1,12 +1,3 @@
-<<<<<<< HEAD
-2018-10-17  David Malcolm  <dmalcolm@redhat.com>
-
-	* Make-lang.in (selftest-obj-c++): New.
-
-2018-05-07  Nathan Sidwell  <nathan@acm.org>
-
-	* objcp-lang.c (objcxx_init_ts): Don't call init_shadowed_var_for_decl.
-=======
 2018-07-26  Release Manager
 
 	* GCC 8.2.0 released.
@@ -14,7 +5,6 @@
 2018-05-02  Release Manager
 
 	* GCC 8.1.0 released.
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
 
 2018-01-03  Jakub Jelinek  <jakub@redhat.com>
 
@@ -46,7 +36,7 @@
 
 	* objcp-decl.c: Remove unused header files.
 	* objcp-lang.c: Likewise.
-
+	
 2015-10-29  Andrew MacLeod  <amacleod@redhat.com>
 
 	* objcp-decl.c: Reorder #include's and remove duplicates.
@@ -61,7 +51,7 @@
 
 	* objcp-decl.c: Do not include input.h, line-map.h or is-a.h.
 	* objcp-lang.c: Likewise.
-
+	
 2015-06-08  Andrew MacLeod  <amacleod@redhat.com>
 
 	* objcp-decl.c : Adjust include files.
@@ -255,7 +245,7 @@
 
 	* Make-lang.in (cc1objplus-dummy): Remove.
 	(cc1objplus-checksum): Change to run checksum over object files
-	and options only.
+        and options only.
 
 2010-10-04  Andi Kleen  <ak@linux.intel.com>
 
@@ -402,13 +392,13 @@
 	Revert:
 
 	2008-02-07  Andreas Tobler  <andreast-list@fgznet.ch>
-		    Douglas Gregor  <doug.gregor@gmail.com>
+	            Douglas Gregor  <doug.gregor@gmail.com>
  
 	PR bootstrap/35115
 	* objcp-decl.c (objcp_comptypes): Call cp_comptypes, not comptypes.
 
 2008-02-07  Andreas Tobler  <andreast-list@fgznet.ch>
-	    Douglas Gregor  <doug.gregor@gmail.com>
+            Douglas Gregor  <doug.gregor@gmail.com>
  
 	PR bootstrap/35115
 	* objcp-decl.c (objcp_comptypes): Call cp_comptypes, not comptypes.

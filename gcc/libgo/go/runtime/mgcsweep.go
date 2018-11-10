@@ -51,7 +51,7 @@ func bgsweep(c chan int) {
 	lock(&sweep.lock)
 	sweep.parked = true
 	c <- 1
-	goparkunlock(&sweep.lock, waitReasonGCSweepWait, traceEvGoBlock, 1)
+	goparkunlock(&sweep.lock, "GC sweep wait", traceEvGoBlock, 1)
 
 	for {
 		for gosweepone() != ^uintptr(0) {
@@ -70,7 +70,7 @@ func bgsweep(c chan int) {
 			continue
 		}
 		sweep.parked = true
-		goparkunlock(&sweep.lock, waitReasonGCSweepWait, traceEvGoBlock, 1)
+		goparkunlock(&sweep.lock, "GC sweep wait", traceEvGoBlock, 1)
 	}
 }
 
@@ -296,7 +296,7 @@ func (s *mspan) sweep(preserve bool) bool {
 	}
 	nfreed := s.allocCount - nalloc
 
-	// This check is not reliable with gccgo, because of
+	// This test is not reliable with gccgo, because of
 	// conservative stack scanning. The test boils down to
 	// checking that no new bits have been set in gcmarkBits since
 	// the span was added to the sweep count. New bits are set by
@@ -309,23 +309,16 @@ func (s *mspan) sweep(preserve bool) bool {
 	// check to be inaccurate, and it will keep an object live
 	// unnecessarily, but provided the pointer is not really live
 	// it is not otherwise a problem. So we disable the test for gccgo.
-	nfreedSigned := int(nfreed)
-	if nalloc > s.allocCount {
-		// print("runtime: nelems=", s.nelems, " nalloc=", nalloc, " previous allocCount=", s.allocCount, " nfreed=", nfreed, "\n")
-		// throw("sweep increased allocation count")
-
-		// For gccgo, adjust the freed count as a signed number.
-		nfreedSigned = int(s.allocCount) - int(nalloc)
-		if uintptr(nalloc) == s.nelems {
-			s.freeindex = s.nelems
-		}
+	if false && nalloc > s.allocCount {
+		print("runtime: nelems=", s.nelems, " nalloc=", nalloc, " previous allocCount=", s.allocCount, " nfreed=", nfreed, "\n")
+		throw("sweep increased allocation count")
 	}
 
 	s.allocCount = nalloc
 	wasempty := s.nextFreeIndex() == s.nelems
 	s.freeindex = 0 // reset allocation index to start of span.
 	if trace.enabled {
-		getg().m.p.ptr().traceReclaimed += uintptr(nfreedSigned) * s.elemsize
+		getg().m.p.ptr().traceReclaimed += uintptr(nfreed) * s.elemsize
 	}
 
 	// gcmarkBits becomes the allocBits.
@@ -341,7 +334,7 @@ func (s *mspan) sweep(preserve bool) bool {
 	// But we need to set it before we make the span available for allocation
 	// (return it to heap or mcentral), because allocation code assumes that a
 	// span is already swept if available for allocation.
-	if freeToHeap || nfreedSigned <= 0 {
+	if freeToHeap || nfreed == 0 {
 		// The span must be in our exclusive ownership until we update sweepgen,
 		// check for potential races.
 		if s.state != mSpanInUse || s.sweepgen != sweepgen-1 {
@@ -354,11 +347,8 @@ func (s *mspan) sweep(preserve bool) bool {
 		atomic.Store(&s.sweepgen, sweepgen)
 	}
 
-	if spc.sizeclass() != 0 {
-		c.local_nsmallfree[spc.sizeclass()] += uintptr(nfreedSigned)
-	}
-
-	if nfreedSigned > 0 && spc.sizeclass() != 0 {
+	if nfreed > 0 && spc.sizeclass() != 0 {
+		c.local_nsmallfree[spc.sizeclass()] += uintptr(nfreed)
 		res = mheap_.central[spc].mcentral.freeSpan(s, preserve, wasempty)
 		// MCentral_FreeSpan updates sweepgen
 	} else if freeToHeap {

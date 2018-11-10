@@ -89,17 +89,6 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
 
     public:
       // Constructors:
-
-      /**
-       *  @brief  Starts with an empty string buffer.
-       *
-       *  The default constructor initializes the parent class using its
-       *  own default ctor.
-      */
-      basic_stringbuf()
-      : __streambuf_type(), _M_mode(ios_base::in | ios_base::out), _M_string()
-      { }
-
       /**
        *  @brief  Starts with an empty string buffer.
        *  @param  __mode  Whether the buffer can read, or write, or both.
@@ -108,7 +97,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  own default ctor.
       */
       explicit
-      basic_stringbuf(ios_base::openmode __mode)
+      basic_stringbuf(ios_base::openmode __mode = ios_base::in | ios_base::out)
       : __streambuf_type(), _M_mode(__mode), _M_string()
       { }
 
@@ -412,22 +401,8 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
 
     public:
       // Constructors:
-
       /**
        *  @brief  Default constructor starts with an empty string buffer.
-       *
-       *  Initializes @c sb using @c in, and passes @c &sb to the base
-       *  class initializer.  Does not allocate any buffer.
-       *
-       *  That's a lie.  We initialize the base class with NULL, because the
-       *  string class does its own memory management.
-      */
-      basic_istringstream()
-      : __istream_type(), _M_stringbuf(ios_base::in)
-      { this->init(&_M_stringbuf); }
-
-      /**
-       *  @brief  Starts with an empty string buffer.
        *  @param  __mode  Whether the buffer can read, or write, or both.
        *
        *  @c ios_base::in is automatically included in @a __mode.
@@ -439,7 +414,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  string class does its own memory management.
       */
       explicit
-      basic_istringstream(ios_base::openmode __mode)
+      basic_istringstream(ios_base::openmode __mode = ios_base::in)
       : __istream_type(), _M_stringbuf(__mode | ios_base::in)
       { this->init(&_M_stringbuf); }
 
@@ -570,22 +545,8 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
 
     public:
       // Constructors/destructor:
-
       /**
        *  @brief  Default constructor starts with an empty string buffer.
-       *
-       *  Initializes @c sb using @c mode|out, and passes @c &sb to the base
-       *  class initializer.  Does not allocate any buffer.
-       *
-       *  That's a lie.  We initialize the base class with NULL, because the
-       *  string class does its own memory management.
-      */
-      basic_ostringstream()
-      : __ostream_type(), _M_stringbuf(ios_base::out)
-      { this->init(&_M_stringbuf); }
-
-      /**
-       *  @brief  Starts with an empty string buffer.
        *  @param  __mode  Whether the buffer can read, or write, or both.
        *
        *  @c ios_base::out is automatically included in @a mode.
@@ -597,7 +558,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  string class does its own memory management.
       */
       explicit
-      basic_ostringstream(ios_base::openmode __mode)
+      basic_ostringstream(ios_base::openmode __mode = ios_base::out)
       : __ostream_type(), _M_stringbuf(__mode | ios_base::out)
       { this->init(&_M_stringbuf); }
 
@@ -728,32 +689,19 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
 
     public:
       // Constructors/destructors
-
       /**
        *  @brief  Default constructor starts with an empty string buffer.
-       *
-       *  Initializes @c sb using the mode @c in|out, and passes @c &sb
-       *  to the base class initializer.  Does not allocate any buffer.
-       *
-       *  That's a lie.  We initialize the base class with NULL, because the
-       *  string class does its own memory management.
-      */
-      basic_stringstream()
-      : __iostream_type(), _M_stringbuf(ios_base::out | ios_base::in)
-      { this->init(&_M_stringbuf); }
-
-      /**
-       *  @brief  Starts with an empty string buffer.
        *  @param  __m  Whether the buffer can read, or write, or both.
        *
-       *  Initializes @c sb using the mode from @c __m, and passes @c &sb
-       *  to the base class initializer.  Does not allocate any buffer.
+       *  Initializes @c sb using the mode from @c __m, and passes @c
+       *  &sb to the base class initializer.  Does not allocate any
+       *  buffer.
        *
        *  That's a lie.  We initialize the base class with NULL, because the
        *  string class does its own memory management.
       */
       explicit
-      basic_stringstream(ios_base::openmode __m)
+      basic_stringstream(ios_base::openmode __m = ios_base::out | ios_base::in)
       : __iostream_type(), _M_stringbuf(__m)
       { this->init(&_M_stringbuf); }
 

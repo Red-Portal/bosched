@@ -37,11 +37,3 @@ runtime_panicstring(const char *s)
 	runtime_newErrorCString(s, &err);
 	runtime_panic(err);
 }
-
-extern void runtime_abort(void) __asm__(GOSYM_PREFIX "runtime.abort");
-
-void
-runtime_abort()
-{
-	abort();
-}

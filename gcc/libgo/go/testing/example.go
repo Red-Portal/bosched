@@ -5,6 +5,7 @@
 package testing
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -71,7 +72,7 @@ func runExample(eg InternalExample) (ok bool) {
 	os.Stdout = w
 	outC := make(chan string)
 	go func() {
-		var buf strings.Builder
+		var buf bytes.Buffer
 		_, err := io.Copy(&buf, r)
 		r.Close()
 		if err != nil {

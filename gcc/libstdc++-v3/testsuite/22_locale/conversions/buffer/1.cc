@@ -22,7 +22,6 @@
 #include <locale>
 #include <sstream>
 #include <testsuite_hooks.h>
-#include <testsuite_common_types.h>
 
 template<typename Elem>
 struct cvt : std::codecvt<Elem, char, std::mbstate_t> { };
@@ -43,9 +42,6 @@ void test01()
   VERIFY( buf.rdbuf(&sbuf) == nullptr );
   VERIFY( buf.rdbuf() == &sbuf );
   VERIFY( buf.rdbuf(nullptr) == &sbuf );
-
-  __gnu_test::implicitly_default_constructible test;
-  test.operator()<buf_conv<wchar_t>>(); // P0935R0
 }
 
 void test02()

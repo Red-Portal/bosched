@@ -559,7 +559,6 @@ static struct table_elt *insert_with_costs (rtx, struct table_elt *, unsigned,
 static struct table_elt *insert (rtx, struct table_elt *, unsigned,
 				 machine_mode);
 static void merge_equiv_classes (struct table_elt *, struct table_elt *);
-static void invalidate_reg (rtx, bool);
 static void invalidate (rtx, machine_mode);
 static void remove_invalid_refs (unsigned int);
 static void remove_invalid_subreg_refs (unsigned int, poly_uint64,
@@ -1819,85 +1818,7 @@ check_dependence (const_rtx x, rtx exp, machine_mode mode, rtx addr)
     }
   return false;
 }
-
-/* Remove from the hash table, or mark as invalid, all expressions whose
-   values could be altered by storing in register X.
-
-   CLOBBER_HIGH is set if X was part of a CLOBBER_HIGH expression.  */
-
-static void
-invalidate_reg (rtx x, bool clobber_high)
-{
-  gcc_assert (GET_CODE (x) == REG);
-
-  /* If X is a register, dependencies on its contents are recorded
-     through the qty number mechanism.  Just change the qty number of
-     the register, mark it as invalid for expressions that refer to it,
-     and remove it itself.  */
-  unsigned int regno = REGNO (x);
-  unsigned int hash = HASH (x, GET_MODE (x));
-
-  /* Remove REGNO from any quantity list it might be on and indicate
-     that its value might have changed.  If it is a pseudo, remove its
-     entry from the hash table.
-
-     For a hard register, we do the first two actions above for any
-     additional hard registers corresponding to X.  Then, if any of these
-     registers are in the table, we must remove any REG entries that
-     overlap these registers.  */
-
-  delete_reg_equiv (regno);
-  REG_TICK (regno)++;
-  SUBREG_TICKED (regno) = -1;
-
-  if (regno >= FIRST_PSEUDO_REGISTER)
-    {
-      gcc_assert (!clobber_high);
-      remove_pseudo_from_table (x, hash);
-    }
-  else
-    {
-      HOST_WIDE_INT in_table = TEST_HARD_REG_BIT (hard_regs_in_table, regno);
-      unsigned int endregno = END_REGNO (x);
-      unsigned int rn;
-      struct table_elt *p, *next;
-
-      CLEAR_HARD_REG_BIT (hard_regs_in_table, regno);
-
-      for (rn = regno + 1; rn < endregno; rn++)
-	{
-	  in_table |= TEST_HARD_REG_BIT (hard_regs_in_table, rn);
-	  CLEAR_HARD_REG_BIT (hard_regs_in_table, rn);
-	  delete_reg_equiv (rn);
-	  REG_TICK (rn)++;
-	  SUBREG_TICKED (rn) = -1;
-	}
-
-      if (in_table)
-	for (hash = 0; hash < HASH_SIZE; hash++)
-	  for (p = table[hash]; p; p = next)
-	    {
-	      next = p->next_same_hash;
-
-	      if (!REG_P (p->exp) || REGNO (p->exp) >= FIRST_PSEUDO_REGISTER)
-		continue;
-
-	      if (clobber_high)
-		{
-		  if (reg_is_clobbered_by_clobber_high (p->exp, x))
-		    remove_from_table (p, hash);
-		}
-	      else
-		{
-		  unsigned int tregno = REGNO (p->exp);
-		  unsigned int tendregno = END_REGNO (p->exp);
-		  if (tendregno > regno && tregno < endregno)
-		    remove_from_table (p, hash);
-		}
-	    }
-    }
-}
-
+
 /* Remove from the hash table, or mark as invalid, all expressions whose
    values could be altered by storing in X.  X is a register, a subreg, or
    a memory reference with nonvarying address (because, when a memory
@@ -1920,7 +1841,65 @@ invalidate (rtx x, machine_mode full_mode)
   switch (GET_CODE (x))
     {
     case REG:
-      invalidate_reg (x, false);
+      {
+	/* If X is a register, dependencies on its contents are recorded
+	   through the qty number mechanism.  Just change the qty number of
+	   the register, mark it as invalid for expressions that refer to it,
+	   and remove it itself.  */
+	unsigned int regno = REGNO (x);
+	unsigned int hash = HASH (x, GET_MODE (x));
+
+	/* Remove REGNO from any quantity list it might be on and indicate
+	   that its value might have changed.  If it is a pseudo, remove its
+	   entry from the hash table.
+
+	   For a hard register, we do the first two actions above for any
+	   additional hard registers corresponding to X.  Then, if any of these
+	   registers are in the table, we must remove any REG entries that
+	   overlap these registers.  */
+
+	delete_reg_equiv (regno);
+	REG_TICK (regno)++;
+	SUBREG_TICKED (regno) = -1;
+
+	if (regno >= FIRST_PSEUDO_REGISTER)
+	  remove_pseudo_from_table (x, hash);
+	else
+	  {
+	    HOST_WIDE_INT in_table
+	      = TEST_HARD_REG_BIT (hard_regs_in_table, regno);
+	    unsigned int endregno = END_REGNO (x);
+	    unsigned int tregno, tendregno, rn;
+	    struct table_elt *p, *next;
+
+	    CLEAR_HARD_REG_BIT (hard_regs_in_table, regno);
+
+	    for (rn = regno + 1; rn < endregno; rn++)
+	      {
+		in_table |= TEST_HARD_REG_BIT (hard_regs_in_table, rn);
+		CLEAR_HARD_REG_BIT (hard_regs_in_table, rn);
+		delete_reg_equiv (rn);
+		REG_TICK (rn)++;
+		SUBREG_TICKED (rn) = -1;
+	      }
+
+	    if (in_table)
+	      for (hash = 0; hash < HASH_SIZE; hash++)
+		for (p = table[hash]; p; p = next)
+		  {
+		    next = p->next_same_hash;
+
+		    if (!REG_P (p->exp)
+			|| REGNO (p->exp) >= FIRST_PSEUDO_REGISTER)
+		      continue;
+
+		    tregno = REGNO (p->exp);
+		    tendregno = END_REGNO (p->exp);
+		    if (tendregno > regno && tregno < endregno)
+		      remove_from_table (p, hash);
+		  }
+	  }
+      }
       return;
 
     case SUBREG:
@@ -3133,7 +3112,6 @@ fold_rtx (rtx x, rtx_insn *insn)
   int i;
   rtx new_rtx = 0;
   int changed = 0;
-  poly_int64 xval;
 
   /* Operands of X.  */
   /* Workaround -Wmaybe-uninitialized false positive during
@@ -3614,11 +3592,12 @@ fold_rtx (rtx x, rtx_insn *insn)
 	case MINUS:
 	  /* If we have (MINUS Y C), see if Y is known to be (PLUS Z C2).
 	     If so, produce (PLUS Z C2-C).  */
-	  if (const_arg1 != 0 && poly_int_rtx_p (const_arg1, &xval))
+	  if (const_arg1 != 0 && CONST_INT_P (const_arg1))
 	    {
 	      rtx y = lookup_as_function (XEXP (x, 0), PLUS);
-	      if (y && poly_int_rtx_p (XEXP (y, 1)))
-		return fold_rtx (plus_constant (mode, copy_rtx (y), -xval),
+	      if (y && CONST_INT_P (XEXP (y, 1)))
+		return fold_rtx (plus_constant (mode, copy_rtx (y),
+						-INTVAL (const_arg1)),
 				 NULL);
 	    }
 
@@ -4420,8 +4399,6 @@ canonicalize_insn (rtx_insn *insn, struct set **psets, int n_sets)
       if (MEM_P (XEXP (x, 0)))
 	canon_reg (XEXP (x, 0), insn);
     }
-  else if (GET_CODE (x) == CLOBBER_HIGH)
-    gcc_assert (REG_P (XEXP (x, 0)));
   else if (GET_CODE (x) == USE
 	   && ! (REG_P (XEXP (x, 0))
 		 && REGNO (XEXP (x, 0)) < FIRST_PSEUDO_REGISTER))
@@ -4453,8 +4430,6 @@ canonicalize_insn (rtx_insn *insn, struct set **psets, int n_sets)
 	      if (MEM_P (XEXP (y, 0)))
 		canon_reg (XEXP (y, 0), insn);
 	    }
-	  else if (GET_CODE (y) == CLOBBER_HIGH)
-	    gcc_assert (REG_P (XEXP (y, 0)));
 	  else if (GET_CODE (y) == USE
 		   && ! (REG_P (XEXP (y, 0))
 			 && REGNO (XEXP (y, 0)) < FIRST_PSEUDO_REGISTER))
@@ -6155,12 +6130,6 @@ invalidate_from_clobbers (rtx_insn *insn)
 	    invalidate (XEXP (ref, 0), GET_MODE (ref));
 	}
     }
-  if (GET_CODE (x) == CLOBBER_HIGH)
-    {
-      rtx ref = XEXP (x, 0);
-      gcc_assert (REG_P (ref));
-      invalidate_reg (ref, true);
-    }
   else if (GET_CODE (x) == PARALLEL)
     {
       int i;
@@ -6176,12 +6145,6 @@ invalidate_from_clobbers (rtx_insn *insn)
 	      else if (GET_CODE (ref) == STRICT_LOW_PART
 		       || GET_CODE (ref) == ZERO_EXTRACT)
 		invalidate (XEXP (ref, 0), GET_MODE (ref));
-	    }
-	  else if (GET_CODE (y) == CLOBBER_HIGH)
-	    {
-	      rtx ref = XEXP (y, 0);
-	      gcc_assert (REG_P (ref));
-	      invalidate_reg (ref, true);
 	    }
 	}
     }
@@ -6200,17 +6163,8 @@ invalidate_from_sets_and_clobbers (rtx_insn *insn)
   if (CALL_P (insn))
     {
       for (tem = CALL_INSN_FUNCTION_USAGE (insn); tem; tem = XEXP (tem, 1))
-	{
-	  rtx temx = XEXP (tem, 0);
-	  if (GET_CODE (temx) == CLOBBER)
-	    invalidate (SET_DEST (temx), VOIDmode);
-	  else if (GET_CODE (temx) == CLOBBER_HIGH)
-	    {
-	      rtx temref = XEXP (temx, 0);
-	      gcc_assert (REG_P (temref));
-	      invalidate_reg (temref, true);
-	    }
-	}
+	if (GET_CODE (XEXP (tem, 0)) == CLOBBER)
+	  invalidate (SET_DEST (XEXP (tem, 0)), VOIDmode);
     }
 
   /* Ensure we invalidate the destination register of a CALL insn.
@@ -6236,12 +6190,6 @@ invalidate_from_sets_and_clobbers (rtx_insn *insn)
 	      else if (GET_CODE (clobbered) == STRICT_LOW_PART
 		       || GET_CODE (clobbered) == ZERO_EXTRACT)
 		invalidate (XEXP (clobbered, 0), GET_MODE (clobbered));
-	    }
-	  else if (GET_CODE (y) == CLOBBER_HIGH)
-	    {
-	      rtx ref = XEXP (y, 0);
-	      gcc_assert (REG_P (ref));
-	      invalidate_reg (ref, true);
 	    }
 	  else if (GET_CODE (y) == SET && GET_CODE (SET_SRC (y)) == CALL)
 	    invalidate (SET_DEST (y), VOIDmode);
@@ -6902,10 +6850,6 @@ count_reg_usage (rtx x, int *counts, rtx dest, int incr)
 	count_reg_usage (XEXP (XEXP (x, 0), 0), counts, NULL_RTX, incr);
       return;
 
-    case CLOBBER_HIGH:
-      gcc_assert (REG_P ((XEXP (x, 0))));
-      return;
-
     case SET:
       /* Unless we are setting a REG, count everything in SET_DEST.  */
       if (!REG_P (SET_DEST (x)))
@@ -6958,8 +6902,7 @@ count_reg_usage (rtx x, int *counts, rtx dest, int incr)
 	  || (REG_NOTE_KIND (x) != REG_NONNEG && GET_CODE (XEXP (x,0)) == USE)
 	  /* FUNCTION_USAGE expression lists may include (CLOBBER (mem /u)),
 	     involving registers in the address.  */
-	  || GET_CODE (XEXP (x, 0)) == CLOBBER
-	  || GET_CODE (XEXP (x, 0)) == CLOBBER_HIGH)
+	  || GET_CODE (XEXP (x, 0)) == CLOBBER)
 	count_reg_usage (XEXP (x, 0), counts, NULL_RTX, incr);
 
       count_reg_usage (XEXP (x, 1), counts, NULL_RTX, incr);
@@ -7043,9 +6986,7 @@ insn_live_p (rtx_insn *insn, int *counts)
 	      if (set_live_p (elt, insn, counts))
 		return true;
 	    }
-	  else if (GET_CODE (elt) != CLOBBER
-		   && GET_CODE (elt) != CLOBBER_HIGH
-		   && GET_CODE (elt) != USE)
+	  else if (GET_CODE (elt) != CLOBBER && GET_CODE (elt) != USE)
 	    return true;
 	}
       return false;

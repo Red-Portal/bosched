@@ -11,8 +11,6 @@ fn1 (void)
 /* { dg-begin-multiline-output "" }
    __builtin_printf                                ("xxxxxxxxxxxxxxxxx%dxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
                                                                       ~^
-                                                                       |
-                                                                       int
    { dg-end-multiline-output "" } */
 
 }

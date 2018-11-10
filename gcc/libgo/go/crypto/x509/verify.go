@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"net"
 	"net/url"
-	"os"
 	"reflect"
 	"runtime"
 	"strconv"
@@ -19,9 +18,6 @@ import (
 	"time"
 	"unicode/utf8"
 )
-
-// ignoreCN disables interpreting Common Name as a hostname. See issue 24151.
-var ignoreCN = strings.Contains(os.Getenv("GODEBUG"), "x509ignoreCN=1")
 
 type InvalidReason int
 
@@ -47,18 +43,13 @@ const (
 	NameMismatch
 	// NameConstraintsWithoutSANs results when a leaf certificate doesn't
 	// contain a Subject Alternative Name extension, but a CA certificate
-	// contains name constraints, and the Common Name can be interpreted as
-	// a hostname.
-	//
-	// You can avoid this error by setting the experimental GODEBUG environment
-	// variable to "x509ignoreCN=1", disabling Common Name matching entirely.
-	// This behavior might become the default in the future.
+	// contains name constraints.
 	NameConstraintsWithoutSANs
 	// UnconstrainedName results when a CA certificate contains permitted
 	// name constraints, but leaf certificate contains a name of an
 	// unsupported or unconstrained type.
 	UnconstrainedName
-	// TooManyConstraints results when the number of comparison operations
+	// TooManyConstraints results when the number of comparision operations
 	// needed to check a certificate exceeds the limit set by
 	// VerifyOptions.MaxConstraintComparisions. This limit exists to
 	// prevent pathological certificates can consuming excessive amounts of
@@ -111,12 +102,6 @@ type HostnameError struct {
 func (h HostnameError) Error() string {
 	c := h.Certificate
 
-	if !c.hasSANExtension() && !validHostname(c.Subject.CommonName) &&
-		matchHostnames(toLowerCaseASCII(c.Subject.CommonName), toLowerCaseASCII(h.Host)) {
-		// This would have validated, if it weren't for the validHostname check on Common Name.
-		return "x509: Common Name is not a valid hostname: " + c.Subject.CommonName
-	}
-
 	var valid string
 	if ip := net.ParseIP(h.Host); ip != nil {
 		// Trying to validate an IP
@@ -130,10 +115,10 @@ func (h HostnameError) Error() string {
 			valid += san.String()
 		}
 	} else {
-		if c.commonNameAsHostname() {
-			valid = c.Subject.CommonName
-		} else {
+		if c.hasSANExtension() {
 			valid = strings.Join(c.DNSNames, ", ")
+		} else {
+			valid = c.Subject.CommonName
 		}
 	}
 
@@ -204,7 +189,7 @@ type VerifyOptions struct {
 	KeyUsages []ExtKeyUsage
 	// MaxConstraintComparisions is the maximum number of comparisons to
 	// perform when checking a given certificate's name constraints. If
-	// zero, a sensible default is used. This limit prevents pathological
+	// zero, a sensible default is used. This limit prevents pathalogical
 	// certificates from consuming excessive amounts of CPU time when
 	// validating.
 	MaxConstraintComparisions int
@@ -598,16 +583,17 @@ func (c *Certificate) isValid(certType int, currentChain []*Certificate, opts *V
 		leaf = currentChain[0]
 	}
 
-	checkNameConstraints := (certType == intermediateCertificate || certType == rootCertificate) && c.hasNameConstraints()
-	if checkNameConstraints && leaf.commonNameAsHostname() {
-		// This is the deprecated, legacy case of depending on the commonName as
-		// a hostname. We don't enforce name constraints against the CN, but
-		// VerifyHostname will look for hostnames in there if there are no SANs.
-		// In order to ensure VerifyHostname will not accept an unchecked name,
-		// return an error here.
-		return CertificateInvalidError{c, NameConstraintsWithoutSANs, ""}
-	} else if checkNameConstraints && leaf.hasSANExtension() {
-		err := forEachSAN(leaf.getSANExtension(), func(tag int, data []byte) error {
+	if (certType == intermediateCertificate || certType == rootCertificate) && c.hasNameConstraints() {
+		sanExtension, ok := leaf.getSANExtension()
+		if !ok {
+			// This is the deprecated, legacy case of depending on
+			// the CN as a hostname. Chains modern enough to be
+			// using name constraints should not be depending on
+			// CNs.
+			return CertificateInvalidError{c, NameConstraintsWithoutSANs, ""}
+		}
+
+		err := forEachSAN(sanExtension, func(tag int, data []byte) error {
 			switch tag {
 			case nameTypeEmail:
 				name := string(data)
@@ -874,64 +860,6 @@ nextIntermediate:
 	return
 }
 
-// validHostname returns whether host is a valid hostname that can be matched or
-// matched against according to RFC 6125 2.2, with some leniency to accomodate
-// legacy values.
-func validHostname(host string) bool {
-	host = strings.TrimSuffix(host, ".")
-
-	if len(host) == 0 {
-		return false
-	}
-
-	for i, part := range strings.Split(host, ".") {
-		if part == "" {
-			// Empty label.
-			return false
-		}
-		if i == 0 && part == "*" {
-			// Only allow full left-most wildcards, as those are the only ones
-			// we match, and matching literal '*' characters is probably never
-			// the expected behavior.
-			continue
-		}
-		for j, c := range part {
-			if 'a' <= c && c <= 'z' {
-				continue
-			}
-			if '0' <= c && c <= '9' {
-				continue
-			}
-			if 'A' <= c && c <= 'Z' {
-				continue
-			}
-			if c == '-' && j != 0 {
-				continue
-			}
-			if c == '_' || c == ':' {
-				// Not valid characters in hostnames, but commonly
-				// found in deployments outside the WebPKI.
-				continue
-			}
-			return false
-		}
-	}
-
-	return true
-}
-
-// commonNameAsHostname reports whether the Common Name field should be
-// considered the hostname that the certificate is valid for. This is a legacy
-// behavior, disabled if the Subject Alt Name extension is present.
-//
-// It applies the strict validHostname check to the Common Name field, so that
-// certificates without SANs can still be validated against CAs with name
-// constraints if there is no risk the CN would be matched as a hostname.
-// See NameConstraintsWithoutSANs and issue 24151.
-func (c *Certificate) commonNameAsHostname() bool {
-	return !ignoreCN && !c.hasSANExtension() && validHostname(c.Subject.CommonName)
-}
-
 func matchHostnames(pattern, host string) bool {
 	host = strings.TrimSuffix(host, ".")
 	pattern = strings.TrimSuffix(pattern, ".")
@@ -1012,16 +940,15 @@ func (c *Certificate) VerifyHostname(h string) error {
 
 	lowered := toLowerCaseASCII(h)
 
-	if c.commonNameAsHostname() {
-		if matchHostnames(toLowerCaseASCII(c.Subject.CommonName), lowered) {
-			return nil
-		}
-	} else {
+	if c.hasSANExtension() {
 		for _, match := range c.DNSNames {
 			if matchHostnames(toLowerCaseASCII(match), lowered) {
 				return nil
 			}
 		}
+		// If Subject Alt Name is given, we ignore the common name.
+	} else if matchHostnames(toLowerCaseASCII(c.Subject.CommonName), lowered) {
+		return nil
 	}
 
 	return HostnameError{c, h}

@@ -20,7 +20,6 @@
 // only returns characters that were read with cin.rdbuf()->sbumpc()
 
 // { dg-do run { xfail *-*-* } }
-// { dg-require-fileio "" }
 
 #include <iostream>
 #include <cstdio>

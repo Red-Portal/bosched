@@ -237,11 +237,7 @@ static void
 kill_clobbered_value (rtx x, const_rtx set, void *data)
 {
   struct value_data *const vd = (struct value_data *) data;
-  gcc_assert (GET_CODE (set) != CLOBBER_HIGH || REG_P (x));
-
-  if (GET_CODE (set) == CLOBBER
-      || (GET_CODE (set) == CLOBBER_HIGH
-	  && reg_is_clobbered_by_clobber_high (x, XEXP (set, 0))))
+  if (GET_CODE (set) == CLOBBER)
     kill_value (x, vd);
 }
 
@@ -261,9 +257,7 @@ kill_set_value (rtx x, const_rtx set, void *data)
   struct kill_set_value_data *ksvd = (struct kill_set_value_data *) data;
   if (rtx_equal_p (x, ksvd->ignore_set_reg))
     return;
-
-  gcc_assert (GET_CODE (set) != CLOBBER_HIGH || REG_P (x));
-  if (GET_CODE (set) != CLOBBER && GET_CODE (set) != CLOBBER_HIGH)
+  if (GET_CODE (set) != CLOBBER)
     {
       kill_value (x, ksvd->vd);
       if (REG_P (x))

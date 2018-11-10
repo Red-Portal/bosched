@@ -96,6 +96,22 @@ HARD_REG_SET overrideregs;
 		      ? 0 \
 		      : -(-GET_MODE_SIZE (MODE) | -4) >> 1)))
 
+#define LEGITIMATE_SMALL_DATA_OFFSET_P(X)				\
+  (GET_CODE (X) == CONST						\
+   && GET_CODE (XEXP ((X), 0)) == PLUS					\
+   && GET_CODE (XEXP (XEXP ((X), 0), 0)) == SYMBOL_REF			\
+   && SYMBOL_REF_SMALL_P (XEXP (XEXP ((X), 0), 0))			\
+   && GET_CODE (XEXP(XEXP ((X), 0), 1)) == CONST_INT			\
+   && INTVAL (XEXP (XEXP ((X), 0), 1)) <= g_switch_value)
+
+#define LEGITIMATE_SMALL_DATA_ADDRESS_P(X)				\
+  (GET_CODE (X) == PLUS							\
+     && REG_P (XEXP ((X), 0))						\
+     && REGNO (XEXP ((X), 0)) == SDATA_BASE_REGNUM			\
+     && ((GET_CODE (XEXP ((X), 1)) == SYMBOL_REF			\
+	    && SYMBOL_REF_SMALL_P (XEXP ((X), 1)))			\
+	 || LEGITIMATE_SMALL_DATA_OFFSET_P (XEXP ((X), 1))))
+
 /* Array of valid operand punctuation characters.  */
 char arc_punct_chars[256];
 
@@ -292,60 +308,6 @@ static bool arc_use_by_pieces_infrastructure_p (unsigned HOST_WIDE_INT,
 /* Globally visible information about currently selected cpu.  */
 const arc_cpu_t *arc_selected_cpu;
 
-/* Given a symbol RTX (const (symb <+ const_int>), returns its
-   alignment.  */
-
-static int
-get_symbol_alignment (rtx x)
-{
-  tree decl = NULL_TREE;
-  int align = 0;
-
-  switch (GET_CODE (x))
-    {
-    case SYMBOL_REF:
-      decl = SYMBOL_REF_DECL (x);
-      break;
-    case CONST:
-      return get_symbol_alignment (XEXP (x, 0));
-    case PLUS:
-      gcc_assert (CONST_INT_P (XEXP (x, 1)));
-      return get_symbol_alignment (XEXP (x, 0));
-    default:
-      return 0;
-    }
-
-  if (decl)
-    align = DECL_ALIGN (decl);
-  align = align / BITS_PER_UNIT;
-  return align;
-}
-
-/* Return true if x is ok to be used as a small data address.  */
-
-static bool
-legitimate_small_data_address_p (rtx x)
-{
-  switch (GET_CODE (x))
-    {
-    case CONST:
-      return legitimate_small_data_address_p (XEXP (x, 0));
-    case SYMBOL_REF:
-      return SYMBOL_REF_SMALL_P (x);
-    case PLUS:
-      {
-	bool p0 = (GET_CODE (XEXP (x, 0)) == SYMBOL_REF)
-	  && SYMBOL_REF_SMALL_P (XEXP (x, 0));
-	bool p1 = CONST_INT_P (XEXP (x, 1))
-	  && (INTVAL (XEXP (x, 1)) <= g_switch_value);
-	return p0 && p1;
-      }
-    default:
-      return false;
-    }
-}
-
-/* TRUE if op is an scaled address.  */
 static bool
 legitimate_scaled_address_p (machine_mode mode, rtx op, bool strict)
 {
@@ -390,13 +352,14 @@ legitimate_scaled_address_p (machine_mode mode, rtx op, bool strict)
 	return true;
       return false;
     }
-
-  /* Scalled addresses for sdata is done other places.  */
-  if (legitimate_small_data_address_p (op))
-    return false;
-
   if (CONSTANT_P (XEXP (op, 1)))
+    {
+      /* Scalled addresses for sdata is done other places.  */
+      if (GET_CODE (XEXP (op, 1)) == SYMBOL_REF
+	  && SYMBOL_REF_SMALL_P (XEXP (op, 1)))
+	return false;
       return true;
+    }
 
   return false;
 }
@@ -483,22 +446,6 @@ arc_autovectorize_vector_sizes (vector_sizes *sizes)
     }
 }
 
-
-/* Implements target hook TARGET_SCHED_ISSUE_RATE.  */
-static int
-arc_sched_issue_rate (void)
-{
-  switch (arc_tune)
-    {
-    case TUNE_ARCHS4X:
-    case TUNE_ARCHS4XD:
-      return 3;
-    default:
-      break;
-    }
-  return 1;
-}
-
 /* TARGET_PRESERVE_RELOAD_P is still awaiting patch re-evaluation / review.  */
 static bool arc_preserve_reload_p (rtx in) ATTRIBUTE_UNUSED;
 static rtx arc_delegitimize_address (rtx);
@@ -580,9 +527,6 @@ static rtx arc_legitimize_address_0 (rtx, rtx, machine_mode mode);
 
 #undef  TARGET_SCHED_ADJUST_PRIORITY
 #define TARGET_SCHED_ADJUST_PRIORITY arc_sched_adjust_priority
-
-#undef TARGET_SCHED_ISSUE_RATE
-#define TARGET_SCHED_ISSUE_RATE arc_sched_issue_rate
 
 #undef TARGET_VECTOR_MODE_SUPPORTED_P
 #define TARGET_VECTOR_MODE_SUPPORTED_P arc_vector_mode_supported_p
@@ -953,7 +897,7 @@ arc_init (void)
   /* Warn for unimplemented PIC in pre-ARC700 cores, and disable flag_pic.  */
   if (flag_pic && TARGET_ARC600_FAMILY)
     {
-      warning (0,
+      warning (DK_WARNING,
 	       "PIC is not supported for %s. Generating non-PIC code only..",
 	       arc_cpu_string);
       flag_pic = 0;
@@ -1017,7 +961,7 @@ irq_range (const char *cstr)
   dash = strchr (str, '-');
   if (!dash)
     {
-      warning (OPT_mirq_ctrl_saved_, "missing dash");
+      warning (0, "value of -mirq-ctrl-saved must have form R0-REGx");
       return;
     }
   *dash = '\0';
@@ -1029,7 +973,7 @@ irq_range (const char *cstr)
   first = decode_reg_name (str);
   if (first != 0)
     {
-      warning (OPT_mirq_ctrl_saved_, "first register must be R0");
+      warning (0, "first register must be R0");
       return;
     }
 
@@ -1042,14 +986,13 @@ irq_range (const char *cstr)
 
   if (last < 0)
     {
-      warning (OPT_mirq_ctrl_saved_, "unknown register name: %s", dash + 1);
+      warning (0, "unknown register name: %s", dash + 1);
       return;
     }
 
   if (!(last & 0x01))
     {
-      warning (OPT_mirq_ctrl_saved_,
-	       "last register name %s must be an odd register", dash + 1);
+      warning (0, "last register name %s must be an odd register", dash + 1);
       return;
     }
 
@@ -1057,8 +1000,7 @@ irq_range (const char *cstr)
 
   if (first > last)
     {
-      warning (OPT_mirq_ctrl_saved_,
-	       "%s-%s is an empty range", str, dash + 1);
+      warning (0, "%s-%s is an empty range", str, dash + 1);
       return;
     }
 
@@ -1083,8 +1025,7 @@ irq_range (const char *cstr)
 	  break;
 
 	default:
-	  warning (OPT_mirq_ctrl_saved_,
-		   "unknown register name: %s", str);
+	  warning (0, "unknown register name: %s", str);
 	  return;
 	}
     }
@@ -1169,16 +1110,14 @@ arc_override_options (void)
 	    if (TARGET_V2)
 	      irq_range (opt->arg);
 	    else
-	      warning (OPT_mirq_ctrl_saved_,
-		       "option -mirq-ctrl-saved valid only for ARC v2 processors");
+	      warning (0, "option -mirq-ctrl-saved valid only for ARC v2 processors");
 	    break;
 
 	  case OPT_mrgf_banked_regs_:
 	    if (TARGET_V2)
 	      parse_mrgf_banked_regs_option (opt->arg);
 	    else
-	      warning (OPT_mrgf_banked_regs_,
-		       "option -mrgf-banked-regs valid only for ARC v2 processors");
+	      warning (0, "option -mrgf-banked-regs valid only for ARC v2 processors");
 	    break;
 
 	  default:
@@ -1210,42 +1149,6 @@ arc_override_options (void)
 	}
     }
 
-  /* Check options against architecture options.  Throw an error if
-     option is not allowed.  Extra, check options against default
-     architecture/cpu flags and throw an warning if we find a
-     mismatch.  */
-#define ARC_OPTX(NAME, CODE, VAR, VAL, DOC0, DOC1)		\
-  do {								\
-    if ((!(arc_selected_cpu->arch_info->flags & CODE))		\
-	&& (VAR == VAL))					\
-      error ("Option %s=%s is not available for %s CPU.",	\
-	     DOC0, DOC1, arc_selected_cpu->name);		\
-    if ((arc_selected_cpu->arch_info->dflags & CODE)		\
-	&& (VAR != DEFAULT_##VAR)				\
-	&& (VAR != VAL))					\
-      warning (0, "Option %s is ignored, the default value %s"	\
-	       " is considered for %s CPU.", DOC0, DOC1,	\
-	       arc_selected_cpu->name);				\
- } while (0);
-#define ARC_OPT(NAME, CODE, MASK, DOC)				\
-  do {								\
-    if ((!(arc_selected_cpu->arch_info->flags & CODE))		\
-	&& (target_flags & MASK))				\
-      error ("Option %s is not available for %s CPU",		\
-	     DOC, arc_selected_cpu->name);			\
-    if ((arc_selected_cpu->arch_info->dflags & CODE)		\
-	&& (target_flags_explicit & MASK)			\
-	&& (!(target_flags & MASK)))				\
-      warning (0, "Unset option %s is ignored, it is always"	\
-	       " enabled for %s CPU.", DOC,			\
-	       arc_selected_cpu->name);				\
-  } while (0);
-
-#include "arc-options.def"
-
-#undef ARC_OPTX
-#undef ARC_OPT
-
   /* Set cpu flags accordingly to architecture/selected cpu.  The cpu
      specific flags are set in arc-common.c.  The architecture forces
      the default hardware configurations in, regardless what command
@@ -1259,7 +1162,7 @@ arc_override_options (void)
     if (arc_selected_cpu->arch_info->dflags & CODE)	\
       target_flags |= MASK;				\
   } while (0);
-#define ARC_OPTX(NAME, CODE, VAR, VAL, DOC0, DOC1)	\
+#define ARC_OPTX(NAME, CODE, VAR, VAL, DOC)		\
   do {							\
     if ((arc_selected_cpu->flags & CODE)		\
 	&& (VAR == DEFAULT_##VAR))			\
@@ -1273,15 +1176,29 @@ arc_override_options (void)
 #undef ARC_OPTX
 #undef ARC_OPT
 
-  /* Set extras.  */
-  switch (arc_selected_cpu->extra)
-    {
-    case HAS_LPCOUNT_16:
-      arc_lpcwidth = 16;
-      break;
-    default:
-      break;
-    }
+  /* Check options against architecture options.  Throw an error if
+     option is not allowed.  */
+#define ARC_OPTX(NAME, CODE, VAR, VAL, DOC)			\
+  do {								\
+    if ((VAR == VAL)						\
+	&& (!(arc_selected_cpu->arch_info->flags & CODE)))	\
+      {								\
+	error ("%s is not available for %s architecture",	\
+	       DOC, arc_selected_cpu->arch_info->name);		\
+      }								\
+  } while (0);
+#define ARC_OPT(NAME, CODE, MASK, DOC)				\
+  do {								\
+    if ((target_flags & MASK)					\
+	&& (!(arc_selected_cpu->arch_info->flags & CODE)))	\
+      error ("%s is not available for %s architecture",		\
+	     DOC, arc_selected_cpu->arch_info->name);		\
+  } while (0);
+
+#include "arc-options.def"
+
+#undef ARC_OPTX
+#undef ARC_OPT
 
   /* Set Tune option.  */
   if (arc_tune == ARC_TUNE_NONE)
@@ -1290,22 +1207,36 @@ arc_override_options (void)
   if (arc_size_opt_level == 3)
     optimize_size = 1;
 
+  /* Compact casesi is not a valid option for ARCv2 family.  */
+  if (TARGET_V2)
+    {
+      if (TARGET_COMPACT_CASESI)
+	{
+	  warning (0, "compact-casesi is not applicable to ARCv2");
+	  TARGET_COMPACT_CASESI = 0;
+	}
+    }
+  else if (optimize_size == 1
+	   && !global_options_set.x_TARGET_COMPACT_CASESI)
+    TARGET_COMPACT_CASESI = 1;
+
   if (flag_pic)
     target_flags |= MASK_NO_SDATA_SET;
 
   if (flag_no_common == 255)
     flag_no_common = !TARGET_NO_SDATA_SET;
 
+  /* TARGET_COMPACT_CASESI needs the "q" register class.  */
   if (TARGET_MIXED_CODE)
     TARGET_Q_CLASS = 1;
+  if (!TARGET_Q_CLASS)
+    TARGET_COMPACT_CASESI = 0;
+  if (TARGET_COMPACT_CASESI)
+    TARGET_CASE_VECTOR_PC_RELATIVE = 1;
 
   /* Check for small data option */
   if (!global_options_set.x_g_switch_value && !TARGET_NO_SDATA_SET)
     g_switch_value = TARGET_LL64 ? 8 : 4;
-
-  /* A7 has an issue with delay slots.  */
-  if (TARGET_ARC700 && (arc_tune != ARC_TUNE_ARC7XX))
-    flag_delayed_branch = 0;
 
   /* These need to be done at start up.  It's convenient to do them here.  */
   arc_init ();
@@ -3829,9 +3760,6 @@ arc_add_jli_section (rtx pat)
    reset when we output the scaled address.  */
 static int output_scaled = 0;
 
-/* Set when we force sdata output.  */
-static int output_sdata = 0;
-
 /* Print operand X (an rtx) in assembler syntax to file FILE.
    CODE is a letter or dot (`z' in `%z0') or 0 if no letter was specified.
    For `%' followed by punctuation, CODE is the punctuation and X is null.  */
@@ -4184,24 +4112,24 @@ arc_print_operand (FILE *file, rtx x, int code)
 		  fputs (".as", file);
 		  output_scaled = 1;
 		}
-	      break;
-	    case SYMBOL_REF:
-	    case CONST:
-	      if (legitimate_small_data_address_p (addr)
-		  && GET_MODE_SIZE (GET_MODE (x)) > 1)
+	      else if (LEGITIMATE_SMALL_DATA_ADDRESS_P (addr)
+		       && GET_MODE_SIZE (GET_MODE (x)) > 1)
 		{
-		  int align = get_symbol_alignment (addr);
-		  int mask = 0;
-		  switch (GET_MODE (x))
-		    {
-		    case E_HImode:
-		      mask = 1;
-		      break;
-		    default:
-		      mask = 3;
-		      break;
-		    }
-		  if (align && ((align & mask) == 0))
+		  tree decl = NULL_TREE;
+		  int align = 0;
+		  if (GET_CODE (XEXP (addr, 1)) == SYMBOL_REF)
+		    decl = SYMBOL_REF_DECL (XEXP (addr, 1));
+		  else if (GET_CODE (XEXP (XEXP (XEXP (addr, 1), 0), 0))
+			   == SYMBOL_REF)
+		    decl = SYMBOL_REF_DECL (XEXP (XEXP (XEXP (addr, 1), 0), 0));
+		  if (decl)
+		    align = DECL_ALIGN (decl);
+		  align = align / BITS_PER_UNIT;
+		  if ((GET_MODE_SIZE (GET_MODE (x)) == 2)
+		      && align && ((align & 1) == 0))
+		    fputs (".as", file);
+		  if ((GET_MODE_SIZE (GET_MODE (x)) >= 4)
+		      && align && ((align & 3) == 0))
 		    fputs (".as", file);
 		}
 	      break;
@@ -4320,9 +4248,6 @@ arc_print_operand (FILE *file, rtx x, int code)
 	rtx addr = XEXP (x, 0);
 	int size = GET_MODE_SIZE (GET_MODE (x));
 
-	if (legitimate_small_data_address_p (addr))
-	  output_sdata = 1;
-
 	fputc ('[', file);
 
 	switch (GET_CODE (addr))
@@ -4383,7 +4308,26 @@ arc_print_operand (FILE *file, rtx x, int code)
 		  || XINT (XEXP (XEXP (x, 0), 0), 1) == UNSPEC_TLS_GD)))
 	arc_output_pic_addr_const (file, x, code);
       else
-	output_addr_const (file, x);
+	{
+	  /* FIXME: Dirty way to handle @var@sda+const. Shd be handled
+	     with asm_output_symbol_ref */
+	  if (GET_CODE (x) == CONST && GET_CODE (XEXP (x, 0)) == PLUS)
+	    {
+	      x = XEXP (x, 0);
+	      output_addr_const (file, XEXP (x, 0));
+	      if (GET_CODE (XEXP (x, 0)) == SYMBOL_REF && SYMBOL_REF_SMALL_P (XEXP (x, 0)))
+		fprintf (file, "@sda");
+
+	      if (GET_CODE (XEXP (x, 1)) != CONST_INT
+		  || INTVAL (XEXP (x, 1)) >= 0)
+		fprintf (file, "+");
+	      output_addr_const (file, XEXP (x, 1));
+	    }
+	  else
+	    output_addr_const (file, x);
+	}
+      if (GET_CODE (x) == SYMBOL_REF && SYMBOL_REF_SMALL_P (x))
+	fprintf (file, "@sda");
       break;
     }
 }
@@ -4400,13 +4344,10 @@ arc_print_operand_address (FILE *file , rtx addr)
     case REG :
       fputs (reg_names[REGNO (addr)], file);
       break;
-    case SYMBOL_REF:
-      if (output_sdata)
-	fputs ("gp,", file);
+    case SYMBOL_REF :
       output_addr_const (file, addr);
-      if (output_sdata)
-	fputs ("@sda", file);
-      output_sdata = 0;
+      if (SYMBOL_REF_SMALL_P (addr))
+	fprintf (file, "@sda");
       break;
     case PLUS :
       if (GET_CODE (XEXP (addr, 0)) == MULT)
@@ -5166,8 +5107,7 @@ static void arc_file_start (void)
 	       TARGET_OPTFPE ? 1 : 0);
   if (TARGET_V2)
     asm_fprintf (asm_out_file, "\t.arc_attribute Tag_ARC_CPU_variation, %d\n",
-		 (arc_tune < ARC_TUNE_CORE_3) ? 2 :
-		 (arc_tune == ARC_TUNE_CORE_3 ? 3 : 4));
+		 arc_tune == ARC_TUNE_CORE_3 ? 3 : 2);
 }
 
 /* Implement `TARGET_ASM_FILE_END'.  */
@@ -5546,32 +5486,51 @@ arc_raw_symbolic_reference_mentioned_p (rtx op, bool skip_local)
   return false;
 }
 
-/* The __tls_get_attr symbol.  */
-static GTY(()) rtx arc_tls_symbol;
-
-/* Emit a call to __tls_get_addr.  TI is the argument to this function.
-   RET is an RTX for the return value location.  The entire insn sequence
-   is returned.  */
+/* Get the thread pointer.  */
 
 static rtx
-arc_call_tls_get_addr (rtx ti)
+arc_get_tp (void)
 {
-  rtx arg = gen_rtx_REG (Pmode, R0_REG);
-  rtx ret = gen_rtx_REG (Pmode, R0_REG);
-  rtx fn;
-  rtx_insn *insn;
+   /* If arc_tp_regno has been set, we can use that hard register
+      directly as a base register.  */
+  if (arc_tp_regno != -1)
+    return gen_rtx_REG (Pmode, arc_tp_regno);
 
-  if (!arc_tls_symbol)
-    arc_tls_symbol = init_one_libfunc ("__tls_get_addr");
+  /* Otherwise, call __read_tp.  Copy the result to a pseudo to avoid
+     conflicts with function arguments / results.  */
+  rtx reg = gen_reg_rtx (Pmode);
+  emit_insn (gen_tls_load_tp_soft ());
+  emit_move_insn (reg, gen_rtx_REG (Pmode, R0_REG));
+  return reg;
+}
 
-  emit_move_insn (arg, ti);
-  fn = gen_rtx_MEM (SImode, arc_tls_symbol);
-  insn = emit_call_insn (gen_call_value (ret, fn, const0_rtx));
-  RTL_CONST_CALL_P (insn) = 1;
-  use_reg (&CALL_INSN_FUNCTION_USAGE (insn), ret);
-  use_reg (&CALL_INSN_FUNCTION_USAGE (insn), arg);
+/* Helper to be used by TLS Global dynamic model.  */
 
-  return ret;
+static rtx
+arc_emit_call_tls_get_addr (rtx sym, int reloc, rtx eqv)
+{
+  rtx r0 = gen_rtx_REG (Pmode, R0_REG);
+  rtx call_fusage = NULL_RTX;
+
+  start_sequence ();
+
+  rtx x = arc_unspec_offset (sym, reloc);
+  emit_move_insn (r0, x);
+  use_reg (&call_fusage, r0);
+
+  gcc_assert (reloc == UNSPEC_TLS_GD);
+  rtx call_insn = emit_call_insn (gen_tls_gd_get_addr (sym));
+  /* Should we set RTL_CONST_CALL_P?  We read memory, but not in a
+     way that the application should care.  */
+  RTL_PURE_CALL_P (call_insn) = 1;
+  add_function_usage_to (call_insn, call_fusage);
+
+  rtx_insn *insns = get_insns ();
+  end_sequence ();
+
+  rtx dest = gen_reg_rtx (Pmode);
+  emit_libcall_block (insns, dest, r0, eqv);
+  return dest;
 }
 
 #define DTPOFF_ZERO_SYM ".tdata"
@@ -5582,26 +5541,16 @@ arc_call_tls_get_addr (rtx ti)
 static rtx
 arc_legitimize_tls_address (rtx addr, enum tls_model model)
 {
-  rtx tmp;
-
   if (!flag_pic && model == TLS_MODEL_LOCAL_DYNAMIC)
     model = TLS_MODEL_LOCAL_EXEC;
 
-
-  /* The TP pointer needs to be set.  */
-  gcc_assert (arc_tp_regno != -1);
-
   switch (model)
     {
-    case TLS_MODEL_GLOBAL_DYNAMIC:
-      tmp = gen_reg_rtx (Pmode);
-      emit_move_insn (tmp, arc_unspec_offset (addr, UNSPEC_TLS_GD));
-      return arc_call_tls_get_addr (tmp);
-
     case TLS_MODEL_LOCAL_DYNAMIC:
       rtx base;
       tree decl;
       const char *base_name;
+      rtvec v;
 
       decl = SYMBOL_REF_DECL (addr);
       base_name = DTPOFF_ZERO_SYM;
@@ -5609,21 +5558,31 @@ arc_legitimize_tls_address (rtx addr, enum tls_model model)
 	base_name = ".tbss";
 
       base = gen_rtx_SYMBOL_REF (Pmode, base_name);
-      tmp = gen_reg_rtx (Pmode);
-      emit_move_insn (tmp, arc_unspec_offset (base, UNSPEC_TLS_GD));
-      base = arc_call_tls_get_addr (tmp);
-      return gen_rtx_PLUS (Pmode, force_reg (Pmode, base),
-			   arc_unspec_offset (addr, UNSPEC_TLS_OFF));
+      if (strcmp (base_name, DTPOFF_ZERO_SYM) == 0)
+	{
+	  if (!flag_pic)
+	    goto local_exec;
+	  v = gen_rtvec (1, addr);
+	}
+      else
+	v = gen_rtvec (2, addr, base);
+      addr = gen_rtx_UNSPEC (Pmode, v, UNSPEC_TLS_OFF);
+      addr = gen_rtx_CONST (Pmode, addr);
+      base = arc_legitimize_tls_address (base, TLS_MODEL_GLOBAL_DYNAMIC);
+      return gen_rtx_PLUS (Pmode, force_reg (Pmode, base), addr);
+
+    case TLS_MODEL_GLOBAL_DYNAMIC:
+      return arc_emit_call_tls_get_addr (addr, UNSPEC_TLS_GD, addr);
 
     case TLS_MODEL_INITIAL_EXEC:
       addr = arc_unspec_offset (addr, UNSPEC_TLS_IE);
       addr = copy_to_mode_reg (Pmode, gen_const_mem (Pmode, addr));
-      return gen_rtx_PLUS (Pmode, gen_rtx_REG (Pmode, arc_tp_regno), addr);
+      return gen_rtx_PLUS (Pmode, arc_get_tp (), addr);
 
     case TLS_MODEL_LOCAL_EXEC:
+    local_exec:
       addr = arc_unspec_offset (addr, UNSPEC_TLS_OFF);
-      return gen_rtx_PLUS (Pmode, gen_rtx_REG (Pmode, arc_tp_regno), addr);
-
+      return gen_rtx_PLUS (Pmode, arc_get_tp (), addr);
     default:
       gcc_unreachable ();
     }
@@ -6202,7 +6161,7 @@ arc_legitimate_address_p (machine_mode mode, rtx x, bool strict)
      return true;
   if (legitimate_scaled_address_p (mode, x, strict))
     return true;
-  if (legitimate_small_data_address_p (x))
+  if (LEGITIMATE_SMALL_DATA_ADDRESS_P (x))
      return true;
   if (GET_CODE (x) == CONST_INT && LARGE_INT (INTVAL (x)))
      return true;
@@ -7141,90 +7100,11 @@ arc_invalid_within_doloop (const rtx_insn *insn)
   return NULL;
 }
 
-/* Return the next active insn, skiping the inline assembly code.  */
-
-static rtx_insn *
-arc_active_insn (rtx_insn *insn)
-{
-  rtx_insn *nxt = next_active_insn (insn);
-
-  if (nxt && GET_CODE (PATTERN (nxt)) == ASM_INPUT)
-    nxt = next_active_insn (nxt);
-  return nxt;
-}
-
-/* Search for a sequence made out of two stores and a given number of
-   loads, insert a nop if required.  */
-
-static void
-check_store_cacheline_hazard (void)
-{
-  rtx_insn *insn, *succ0, *insn1;
-  bool found = false;
-
-  for (insn = get_insns (); insn; insn = arc_active_insn (insn))
-    {
-      succ0 = arc_active_insn (insn);
-
-      if (!succ0)
-	return;
-
-      if (!single_set (insn) || !single_set (succ0))
-	continue;
-
-      if ((get_attr_type (insn) != TYPE_STORE)
-	  || (get_attr_type (succ0) != TYPE_STORE))
-	continue;
-
-      /* Found at least two consecutive stores.  Goto the end of the
-	 store sequence.  */
-      for (insn1 = succ0; insn1; insn1 = arc_active_insn (insn1))
-	if (!single_set (insn1) || get_attr_type (insn1) != TYPE_STORE)
-	  break;
-
-      /* Now, check the next two instructions for the following cases:
-         1. next instruction is a LD => insert 2 nops between store
-	    sequence and load.
-	 2. next-next instruction is a LD => inset 1 nop after the store
-	    sequence.  */
-      if (insn1 && single_set (insn1)
-	  && (get_attr_type (insn1) == TYPE_LOAD))
-	{
-	  found = true;
-	  emit_insn_before (gen_nopv (), insn1);
-	  emit_insn_before (gen_nopv (), insn1);
-	}
-      else
-	{
-	  if (insn1 && (get_attr_type (insn1) == TYPE_COMPARE))
-	    {
-	      /* REG_SAVE_NOTE is used by Haifa scheduler, we are in
-		 reorg, so it is safe to reuse it for avoiding the
-		 current compare insn to be part of a BRcc
-		 optimization.  */
-	      add_reg_note (insn1, REG_SAVE_NOTE, GEN_INT (3));
-	    }
-	  insn1 = arc_active_insn (insn1);
-	  if (insn1 && single_set (insn1)
-	      && (get_attr_type (insn1) == TYPE_LOAD))
-	    {
-	      found = true;
-	      emit_insn_before (gen_nopv (), insn1);
-	    }
-	}
-
-      insn = insn1;
-      if (found)
-	found = false;
-    }
-}
-
 /* Return true if a load instruction (CONSUMER) uses the same address as a
    store instruction (PRODUCER).  This function is used to avoid st/ld
    address hazard in ARC700 cores.  */
-
-static bool
-arc_store_addr_hazard_internal_p (rtx_insn* producer, rtx_insn* consumer)
+bool
+arc_store_addr_hazard_p (rtx_insn* producer, rtx_insn* consumer)
 {
   rtx in_set, out_set;
   rtx out_addr, in_addr;
@@ -7272,16 +7152,6 @@ arc_store_addr_hazard_internal_p (rtx_insn* producer, rtx_insn* consumer)
   return false;
 }
 
-/* Return TRUE is we have an store address hazard.  */
-
-bool
-arc_store_addr_hazard_p (rtx_insn* producer, rtx_insn* consumer)
-{
-  if (TARGET_ARC700 && (arc_tune != ARC_TUNE_ARC7XX))
-    return true;
-  return arc_store_addr_hazard_internal_p (producer, consumer);
-}
-
 /* The same functionality as arc_hazard.  It is called in machine
    reorg before any other optimization.  Hence, the NOP size is taken
    into account when doing branch shortening.  */
@@ -7290,7 +7160,6 @@ static void
 workaround_arc_anomaly (void)
 {
   rtx_insn *insn, *succ0;
-  rtx_insn *succ1;
 
   /* For any architecture: call arc_hazard here.  */
   for (insn = get_insns (); insn; insn = NEXT_INSN (insn))
@@ -7302,30 +7171,27 @@ workaround_arc_anomaly (void)
 	}
     }
 
-  if (!TARGET_ARC700)
-    return;
-
-  /* Old A7 are suffering of a cache hazard, and we need to insert two
-     nops between any sequence of stores and a load.  */
-  if (arc_tune != ARC_TUNE_ARC7XX)
-    check_store_cacheline_hazard ();
-
-  for (insn = get_insns (); insn; insn = NEXT_INSN (insn))
+  if (TARGET_ARC700)
     {
-      succ0 = next_real_insn (insn);
-      if (arc_store_addr_hazard_internal_p (insn, succ0))
-	{
-	  emit_insn_after (gen_nopv (), insn);
-	  emit_insn_after (gen_nopv (), insn);
-	  continue;
-	}
+      rtx_insn *succ1;
 
-      /* Avoid adding nops if the instruction between the ST and LD is
-	 a call or jump.  */
-      succ1 = next_real_insn (succ0);
-      if (succ0 && !JUMP_P (succ0) && !CALL_P (succ0)
-	  && arc_store_addr_hazard_internal_p (insn, succ1))
-	emit_insn_after (gen_nopv (), insn);
+      for (insn = get_insns (); insn; insn = NEXT_INSN (insn))
+	{
+	  succ0 = next_real_insn (insn);
+	  if (arc_store_addr_hazard_p (insn, succ0))
+	    {
+	      emit_insn_after (gen_nopv (), insn);
+	      emit_insn_after (gen_nopv (), insn);
+	      continue;
+	    }
+
+	  /* Avoid adding nops if the instruction between the ST and LD is
+	     a call or jump.  */
+	  succ1 = next_real_insn (succ0);
+	  if (succ0 && !JUMP_P (succ0) && !CALL_P (succ0)
+	      && arc_store_addr_hazard_p (insn, succ1))
+	    emit_insn_after (gen_nopv (), insn);
+	}
     }
 }
 
@@ -7385,8 +7251,8 @@ hwloop_optimize (hwloop_info loop)
   int i;
   edge entry_edge;
   basic_block entry_bb, bb;
-  rtx iter_reg;
-  rtx_insn *insn, *seq, *entry_after, *last_insn, *end_label;
+  rtx iter_reg, end_label;
+  rtx_insn *insn, *seq, *entry_after, *last_insn;
   unsigned int length;
   bool need_fix = false;
   rtx lp_reg = gen_rtx_REG (SImode, LP_COUNT);
@@ -7963,14 +7829,10 @@ arc_reorg (void)
 	      if (!link_insn)
 		continue;
 	      else
+		/* Check if this is a data dependency.  */
 		{
-		  /* Check if this is a data dependency.  */
 		  rtx op, cc_clob_rtx, op0, op1, brcc_insn, note;
 		  rtx cmp0, cmp1;
-
-		  /* Make sure we can use it for brcc insns.  */
-		  if (find_reg_note (link_insn, REG_SAVE_NOTE, GEN_INT (3)))
-		    continue;
 
 		  /* Ok this is the set cc. copy args here.  */
 		  op = XEXP (pc_target, 0);
@@ -8173,9 +8035,98 @@ arc_in_small_data_p (const_tree decl)
   return false;
 }
 
+/* Return true if X is a small data address that can be rewritten
+   as a gp+symref.  */
+
+static bool
+arc_rewrite_small_data_p (const_rtx x)
+{
+  if (GET_CODE (x) == CONST)
+    x = XEXP (x, 0);
+
+  if (GET_CODE (x) == PLUS)
+    {
+      if (GET_CODE (XEXP (x, 1)) == CONST_INT)
+	x = XEXP (x, 0);
+    }
+
+  if (GET_CODE (x) == SYMBOL_REF && SYMBOL_REF_SMALL_P (x))
+    {
+      gcc_assert (SYMBOL_REF_TLS_MODEL (x) == 0);
+      return true;
+    }
+  return false;
+}
+
+/* If possible, rewrite OP so that it refers to small data using
+   explicit relocations.  */
+
+static rtx
+arc_rewrite_small_data_1 (rtx op)
+{
+  rtx rgp = gen_rtx_REG (Pmode, SDATA_BASE_REGNUM);
+  op = copy_insn (op);
+  subrtx_ptr_iterator::array_type array;
+  FOR_EACH_SUBRTX_PTR (iter, array, &op, ALL)
+    {
+      rtx *loc = *iter;
+      if (arc_rewrite_small_data_p (*loc))
+	{
+	  *loc = gen_rtx_PLUS (Pmode, rgp, *loc);
+	  iter.skip_subrtxes ();
+	}
+      else if (GET_CODE (*loc) == PLUS
+	       && rtx_equal_p (XEXP (*loc, 0), rgp))
+	iter.skip_subrtxes ();
+    }
+  return op;
+}
+
+rtx
+arc_rewrite_small_data (rtx op)
+{
+  op = arc_rewrite_small_data_1 (op);
+
+  /* Check if we fit small data constraints.  */
+  if (MEM_P (op)
+      && !LEGITIMATE_SMALL_DATA_ADDRESS_P (XEXP (op, 0)))
+    {
+      rtx addr = XEXP (op, 0);
+      rtx tmp = gen_reg_rtx (Pmode);
+      emit_move_insn (tmp, addr);
+      op = replace_equiv_address_nv (op, tmp);
+    }
+  return op;
+}
+
+/* Return true if OP refers to small data symbols directly, not through
+   a PLUS.  */
+
+bool
+small_data_pattern (rtx op, machine_mode)
+{
+  if (GET_CODE (op) == SEQUENCE)
+    return false;
+
+  rtx rgp = gen_rtx_REG (Pmode, SDATA_BASE_REGNUM);
+  subrtx_iterator::array_type array;
+  FOR_EACH_SUBRTX (iter, array, op, ALL)
+    {
+      const_rtx x = *iter;
+      if (GET_CODE (x) == PLUS
+	  && rtx_equal_p (XEXP (x, 0), rgp))
+	iter.skip_subrtxes ();
+      else if (arc_rewrite_small_data_p (x))
+	return true;
+    }
+  return false;
+}
+
 /* Return true if OP is an acceptable memory operand for ARCompact
    16-bit gp-relative load instructions.
-*/
+   op shd look like : [r26, symref@sda]
+   i.e. (mem (plus (reg 26) (symref with smalldata flag set))
+  */
 /* volatile cache option still to be handled.  */
 
 bool
@@ -8183,6 +8134,7 @@ compact_sda_memory_operand (rtx op, machine_mode mode, bool short_p)
 {
   rtx addr;
   int size;
+  tree decl = NULL_TREE;
   int align = 0;
   int mask = 0;
 
@@ -8202,7 +8154,7 @@ compact_sda_memory_operand (rtx op, machine_mode mode, bool short_p)
   /* Decode the address now.  */
   addr = XEXP (op, 0);
 
-  if (!legitimate_small_data_address_p (addr))
+  if (!LEGITIMATE_SMALL_DATA_ADDRESS_P (addr))
     return false;
 
   if (!short_p || size == 1)
@@ -8210,7 +8162,14 @@ compact_sda_memory_operand (rtx op, machine_mode mode, bool short_p)
 
   /* Now check for the alignment, the short loads using gp require the
      addresses to be aligned.  */
-  align = get_symbol_alignment (addr);
+  if (GET_CODE (XEXP (addr, 1)) == SYMBOL_REF)
+    decl = SYMBOL_REF_DECL (XEXP (addr, 1));
+  else if (GET_CODE (XEXP (XEXP (XEXP (addr, 1), 0), 0)) == SYMBOL_REF)
+    decl = SYMBOL_REF_DECL (XEXP (XEXP (XEXP (addr, 1), 0), 0));
+  if (decl)
+    align = DECL_ALIGN (decl);
+  align = align / BITS_PER_UNIT;
+
   switch (mode)
     {
     case E_HImode:
@@ -8684,6 +8643,11 @@ prepare_move_operands (rtx *operands, machine_mode mode)
 	}
     }
 
+  /* We used to do this only for MODE_INT Modes, but addresses to floating
+     point variables may well be in the small data section.  */
+  if (!TARGET_NO_SDATA_SET && small_data_pattern (operands[0], Pmode))
+    operands[0] = arc_rewrite_small_data (operands[0]);
+
   if (mode == SImode && SYMBOLIC_CONST (operands[1]))
     {
       prepare_pic_move (operands, SImode);
@@ -8691,6 +8655,29 @@ prepare_move_operands (rtx *operands, machine_mode mode)
       /* Disable any REG_EQUALs associated with the symref
 	 otherwise the optimization pass undoes the work done
 	 here and references the variable directly.  */
+    }
+
+  if (GET_CODE (operands[0]) != MEM
+      && !TARGET_NO_SDATA_SET
+      && small_data_pattern (operands[1], Pmode))
+    {
+      /* This is to take care of address calculations involving sdata
+	 variables.  */
+      operands[1] = arc_rewrite_small_data (operands[1]);
+
+      emit_insn (gen_rtx_SET (operands[0],operands[1]));
+      /* ??? This note is useless, since it only restates the set itself.
+	 We should rather use the original SYMBOL_REF.  However, there is
+	 the problem that we are lying to the compiler about these
+	 SYMBOL_REFs to start with.  symbol@sda should be encoded specially
+	 so that we can tell it apart from an actual symbol.  */
+      set_unique_reg_note (get_last_insn (), REG_EQUAL, operands[1]);
+
+      /* Take care of the REG_EQUAL note that will be attached to mark the
+	 output reg equal to the initial symbol_ref after this code is
+	 executed.  */
+      emit_move_insn (operands[0], operands[0]);
+      return true;
     }
 
   if (MEM_P (operands[0])
@@ -8733,6 +8720,31 @@ prepare_move_operands (rtx *operands, machine_mode mode)
 	}
     }
 
+  return false;
+}
+
+/* Prepare OPERANDS for an extension using CODE to OMODE.
+   Return true iff the move has been emitted.  */
+
+bool
+prepare_extend_operands (rtx *operands, enum rtx_code code,
+			 machine_mode omode)
+{
+  if (!TARGET_NO_SDATA_SET && small_data_pattern (operands[1], Pmode))
+    {
+      /* This is to take care of address calculations involving sdata
+	 variables.  */
+      operands[1]
+	= gen_rtx_fmt_e (code, omode, arc_rewrite_small_data (operands[1]));
+      emit_insn (gen_rtx_SET (operands[0], operands[1]));
+      set_unique_reg_note (get_last_insn (), REG_EQUAL, operands[1]);
+
+      /* Take care of the REG_EQUAL note that will be attached to mark the
+	 output reg equal to the initial extension after this code is
+	 executed.  */
+      emit_move_insn (operands[0], operands[0]);
+      return true;
+    }
   return false;
 }
 
@@ -9627,8 +9639,7 @@ arc_split_move (rtx *operands)
 
   if (TARGET_LL64
       && ((memory_operand (operands[0], mode)
-	   && (even_register_operand (operands[1], mode)
-	       || satisfies_constraint_Cm3 (operands[1])))
+	   && even_register_operand (operands[1], mode))
 	  || (memory_operand (operands[1], mode)
 	      && even_register_operand (operands[0], mode))))
     {
@@ -9826,19 +9837,18 @@ arc_scheduling_not_expected (void)
   return cfun->machine->arc_reorg_started;
 }
 
-/* Code has a minimum p2 alignment of 1, which we must restore after
-   an ADDR_DIFF_VEC.  */
-
 int
 arc_label_align (rtx_insn *label)
 {
-  if (align_labels.levels[0].log < 1)
+  /* Code has a minimum p2 alignment of 1, which we must restore after an
+     ADDR_DIFF_VEC.  */
+  if (align_labels_log < 1)
     {
       rtx_insn *next = next_nonnote_nondebug_insn (label);
       if (INSN_P (next) && recog_memoized (next) >= 0)
 	return 1;
     }
-  return align_labels.levels[0].log;
+  return align_labels_log;
 }
 
 /* Return true if LABEL is in executable code.  */
@@ -9902,7 +9912,7 @@ arc_return_address_register (unsigned int fn_type)
 
   if (ARC_INTERRUPT_P (fn_type))
     {
-      if ((fn_type & (ARC_FUNCTION_ILINK1 | ARC_FUNCTION_FIRQ)) != 0)
+      if (((fn_type & ARC_FUNCTION_ILINK1) | ARC_FUNCTION_FIRQ) != 0)
         regno = ILINK1_REGNUM;
       else if ((fn_type & ARC_FUNCTION_ILINK2) != 0)
         regno = ILINK2_REGNUM;
@@ -10484,10 +10494,6 @@ compact_memory_operand_p (rtx op, machine_mode mode,
   if (MEM_VOLATILE_P (op) && !TARGET_VOLATILE_CACHE_SET)
     return false;
 
-  /* likewise for uncached types.  */
-  if (arc_is_uncached_mem_p (op))
-    return false;
-
   if (mode == VOIDmode)
     mode = GET_MODE (op);
 
@@ -10771,36 +10777,28 @@ arc_handle_uncached_attribute (tree *node,
 bool
 arc_is_uncached_mem_p (rtx pat)
 {
-  tree attrs = NULL_TREE;
-  tree addr;
+  tree attrs;
+  tree ttype;
+  struct mem_attrs *refattrs;
 
   if (!MEM_P (pat))
     return false;
 
   /* Get the memory attributes.  */
-  addr = MEM_EXPR (pat);
-  if (!addr)
+  refattrs = MEM_ATTRS (pat);
+  if (!refattrs
+      || !refattrs->expr)
     return false;
 
-  /* Get the attributes.  */
-  if (TREE_CODE (addr) == MEM_REF)
-    {
-      attrs = TYPE_ATTRIBUTES (TREE_TYPE (addr));
-      if (lookup_attribute ("uncached", attrs))
-	return true;
+  /* Get the type declaration.  */
+  ttype = TREE_TYPE (refattrs->expr);
+  if (!ttype)
+    return false;
 
-      attrs = TYPE_ATTRIBUTES (TREE_TYPE (TREE_OPERAND (addr, 0)));
-      if (lookup_attribute ("uncached", attrs))
-	return true;
-    }
-
-  /* For COMPONENT_REF, use the FIELD_DECL from tree operand 1.  */
-  if (TREE_CODE (addr) == COMPONENT_REF)
-    {
-      attrs = TYPE_ATTRIBUTES (TREE_TYPE (TREE_OPERAND (addr, 1)));
-      if (lookup_attribute ("uncached", attrs))
-	return true;
-    }
+  /* Get the type attributes.  */
+  attrs = TYPE_ATTRIBUTES (ttype);
+  if (lookup_attribute ("uncached", attrs))
+    return true;
   return false;
 }
 
@@ -10829,7 +10827,7 @@ arc_handle_aux_attribute (tree *node,
 	  tree arg = TREE_VALUE (args);
 	  if (TREE_CODE (arg) != INTEGER_CST)
 	    {
-	      warning (OPT_Wattributes, "%qE attribute allows only an integer "
+	      warning (0, "%qE attribute allows only an integer "
 		       "constant argument", name);
 	      *no_add_attrs = true;
 	    }

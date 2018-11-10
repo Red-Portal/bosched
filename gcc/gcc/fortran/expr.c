@@ -599,7 +599,6 @@ gfc_free_ref_list (gfc_ref *p)
 	  break;
 
 	case REF_COMPONENT:
-	case REF_INQUIRY:
 	  break;
 	}
 
@@ -755,10 +754,6 @@ gfc_copy_ref (gfc_ref *src)
 
     case REF_COMPONENT:
       dest->u.c = src->u.c;
-      break;
-
-    case REF_INQUIRY:
-      dest->u.i = src->u.i;
       break;
 
     case REF_SUBSTRING:
@@ -1696,109 +1691,6 @@ find_substring_ref (gfc_expr *p, gfc_expr **newp)
 }
 
 
-/* Pull an inquiry result out of an expression.  */
-
-static bool
-find_inquiry_ref (gfc_expr *p, gfc_expr **newp)
-{
-  gfc_ref *ref;
-  gfc_ref *inquiry = NULL;
-  gfc_expr *tmp;
-
-  tmp = gfc_copy_expr (p);
-
-  if (tmp->ref && tmp->ref->type == REF_INQUIRY)
-    {
-      inquiry = tmp->ref;
-      tmp->ref = NULL;
-    }
-  else
-    {
-      for (ref = tmp->ref; ref; ref = ref->next)
-	if (ref->next && ref->next->type == REF_INQUIRY)
-	  {
-	    inquiry = ref->next;
-	    ref->next = NULL;
-	  }
-    }
-
-  if (!inquiry)
-    {
-      gfc_free_expr (tmp);
-      return false;
-    }
-
-  gfc_resolve_expr (tmp);
-
-  switch (inquiry->u.i)
-    {
-    case INQUIRY_LEN:
-      if (tmp->ts.type != BT_CHARACTER)
-	goto cleanup;
-
-      if (!gfc_notify_std (GFC_STD_F2003, "LEN part_ref at %C"))
-	goto cleanup;
-
-      if (!tmp->ts.u.cl->length
-	  || tmp->ts.u.cl->length->expr_type != EXPR_CONSTANT)
-	goto cleanup;
-
-      *newp = gfc_copy_expr (tmp->ts.u.cl->length);
-      break;
-
-    case INQUIRY_KIND:
-      if (tmp->ts.type == BT_DERIVED || tmp->ts.type == BT_CLASS)
-	goto cleanup;
-
-      if (!gfc_notify_std (GFC_STD_F2003, "KIND part_ref at %C"))
-	goto cleanup;
-
-      *newp = gfc_get_int_expr (gfc_default_integer_kind,
-				NULL, tmp->ts.kind);
-      break;
-
-    case INQUIRY_RE:
-      if (tmp->ts.type != BT_COMPLEX || tmp->expr_type != EXPR_CONSTANT)
-	goto cleanup;
-
-      if (!gfc_notify_std (GFC_STD_F2008, "RE part_ref at %C"))
-	goto cleanup;
-
-      *newp = gfc_get_constant_expr (BT_REAL, tmp->ts.kind, &tmp->where);
-      mpfr_set ((*newp)->value.real,
-		mpc_realref (p->value.complex), GFC_RND_MODE);
-      break;
-
-    case INQUIRY_IM:
-      if (tmp->ts.type != BT_COMPLEX || tmp->expr_type != EXPR_CONSTANT)
-	goto cleanup;
-
-      if (!gfc_notify_std (GFC_STD_F2008, "IM part_ref at %C"))
-	goto cleanup;
-
-      *newp = gfc_get_constant_expr (BT_REAL, tmp->ts.kind, &tmp->where);
-      mpfr_set ((*newp)->value.real,
-		mpc_imagref (p->value.complex), GFC_RND_MODE);
-      break;
-    }
-
-  if (!(*newp))
-    goto cleanup;
-  else if ((*newp)->expr_type != EXPR_CONSTANT)
-    {
-      gfc_free_expr (*newp);
-      goto cleanup;
-    }
-
-  gfc_free_expr (tmp);
-  return true;
-
-cleanup:
-  gfc_free_expr (tmp);
-  return false;
-}
-
-
 
 /* Simplify a subobject reference of a constructor.  This occurs when
    parameter variable values are substituted.  */
@@ -1807,7 +1699,7 @@ static bool
 simplify_const_ref (gfc_expr *p)
 {
   gfc_constructor *cons, *c;
-  gfc_expr *newp = NULL;
+  gfc_expr *newp;
   gfc_ref *last_ref;
 
   while (p->ref)
@@ -1908,17 +1800,8 @@ simplify_const_ref (gfc_expr *p)
 	  remove_subobject_ref (p, cons);
 	  break;
 
-	case REF_INQUIRY:
-	  if (!find_inquiry_ref (p, &newp))
-	    return false;
-
-	  gfc_replace_expr (p, newp);
-	  gfc_free_ref_list (p->ref);
-	  p->ref = NULL;
-	  break;
-
 	case REF_SUBSTRING:
-	  if (!find_substring_ref (p, &newp))
+  	  if (!find_substring_ref (p, &newp))
 	    return false;
 
 	  gfc_replace_expr (p, newp);
@@ -1935,10 +1818,9 @@ simplify_const_ref (gfc_expr *p)
 /* Simplify a chain of references.  */
 
 static bool
-simplify_ref_chain (gfc_ref *ref, int type, gfc_expr **p)
+simplify_ref_chain (gfc_ref *ref, int type)
 {
   int n;
-  gfc_expr *newp;
 
   for (; ref; ref = ref->next)
     {
@@ -1961,15 +1843,6 @@ simplify_ref_chain (gfc_ref *ref, int type, gfc_expr **p)
 	    return false;
 	  if (!gfc_simplify_expr (ref->u.ss.end, type))
 	    return false;
-	  break;
-
-	case REF_INQUIRY:
-	  if (!find_inquiry_ref (*p, &newp))
-	    return false;
-
-	  gfc_replace_expr (*p, newp);
-	  gfc_free_ref_list ((*p)->ref);
-	  (*p)->ref = NULL;
 	  break;
 
 	default:
@@ -2024,10 +1897,6 @@ simplify_parameter_variable (gfc_expr *p, int type)
   return t;
 }
 
-
-static bool
-scalarize_intrinsic_call (gfc_expr *, bool init_flag);
-
 /* Given an expression, simplify it by collapsing constant
    expressions.  Most simplification takes place when the expression
    tree is being constructed.  If an intrinsic function is simplified
@@ -2051,8 +1920,6 @@ bool
 gfc_simplify_expr (gfc_expr *p, int type)
 {
   gfc_actual_arglist *ap;
-  gfc_intrinsic_sym* isym = NULL;
-
 
   if (p == NULL)
     return true;
@@ -2060,9 +1927,6 @@ gfc_simplify_expr (gfc_expr *p, int type)
   switch (p->expr_type)
     {
     case EXPR_CONSTANT:
-      if (p->ref && p->ref->type == REF_INQUIRY)
-	simplify_ref_chain (p->ref, type, &p);
-      break;
     case EXPR_NULL:
       break;
 
@@ -2088,18 +1952,10 @@ gfc_simplify_expr (gfc_expr *p, int type)
 	  && gfc_intrinsic_func_interface (p, 1) == MATCH_ERROR)
 	return false;
 
-      if (p->expr_type == EXPR_FUNCTION)
-	{
-	  if (p->symtree)
-	    isym = gfc_find_function (p->symtree->n.sym->name);
-	  if (isym && isym->elemental)
-	    scalarize_intrinsic_call (p, false);
-	}
-
       break;
 
     case EXPR_SUBSTRING:
-      if (!simplify_ref_chain (p->ref, type, &p))
+      if (!simplify_ref_chain (p->ref, type))
 	return false;
 
       if (gfc_is_constant_expr (p))
@@ -2161,14 +2017,14 @@ gfc_simplify_expr (gfc_expr *p, int type)
 	}
 
       /* Simplify subcomponent references.  */
-      if (!simplify_ref_chain (p->ref, type, &p))
+      if (!simplify_ref_chain (p->ref, type))
 	return false;
 
       break;
 
     case EXPR_STRUCTURE:
     case EXPR_ARRAY:
-      if (!simplify_ref_chain (p->ref, type, &p))
+      if (!simplify_ref_chain (p->ref, type))
 	return false;
 
       if (!simplify_constructor (p->value.constructor, type))
@@ -2209,7 +2065,7 @@ et0 (gfc_expr *e)
 /* Scalarize an expression for an elemental intrinsic call.  */
 
 static bool
-scalarize_intrinsic_call (gfc_expr *e, bool init_flag)
+scalarize_intrinsic_call (gfc_expr *e)
 {
   gfc_actual_arglist *a, *b;
   gfc_constructor_base ctor;
@@ -2217,15 +2073,6 @@ scalarize_intrinsic_call (gfc_expr *e, bool init_flag)
   gfc_constructor *ci, *new_ctor;
   gfc_expr *expr, *old;
   int n, i, rank[5], array_arg;
-  int errors = 0;
-
-  if (e == NULL)
-    return false;
-
-  a = e->value.function.actual;
-  for (; a; a = a->next)
-    if (a->expr && !gfc_is_constant_expr (a->expr))
-      return false;
 
   /* Find which, if any, arguments are arrays.  Assume that the old
      expression carries the type information and that the first arg
@@ -2260,7 +2107,7 @@ scalarize_intrinsic_call (gfc_expr *e, bool init_flag)
   for (; a; a = a->next)
     {
       /* Check that this is OK for an initialization expression.  */
-      if (a->expr && init_flag && !gfc_check_init_expr (a->expr))
+      if (a->expr && !gfc_check_init_expr (a->expr))
 	goto cleanup;
 
       rank[n] = 0;
@@ -2285,7 +2132,6 @@ scalarize_intrinsic_call (gfc_expr *e, bool init_flag)
       n++;
     }
 
-  gfc_get_errors (NULL, &errors);
 
   /* Using the array argument as the master, step through the array
      calling the function for each element and advancing the array
@@ -2320,8 +2166,7 @@ scalarize_intrinsic_call (gfc_expr *e, bool init_flag)
       /* Simplify the function calls.  If the simplification fails, the
 	 error will be flagged up down-stream or the library will deal
 	 with it.  */
-      if (errors == 0)
-	gfc_simplify_expr (new_ctor->expr, 0);
+      gfc_simplify_expr (new_ctor->expr, 0);
 
       for (i = 0; i < n; i++)
 	if (args[i])
@@ -2639,13 +2484,6 @@ check_transformational (gfc_expr *e)
     "trim", "unpack", NULL
   };
 
-  static const char * const trans_func_f2008[] =  {
-    "all", "any", "count", "dot_product", "matmul", "null", "pack",
-    "product", "repeat", "reshape", "selected_char_kind", "selected_int_kind",
-    "selected_real_kind", "spread", "sum", "transfer", "transpose",
-    "trim", "unpack", "findloc", NULL
-  };
-
   int i;
   const char *name;
   const char *const *functions;
@@ -2656,12 +2494,8 @@ check_transformational (gfc_expr *e)
 
   name = e->symtree->n.sym->name;
 
-  if (gfc_option.allow_std & GFC_STD_F2008)
-    functions = trans_func_f2008;
-  else if (gfc_option.allow_std & GFC_STD_F2003)
-    functions = trans_func_f2003;
-  else
-    functions = trans_func_f95;
+  functions = (gfc_option.allow_std & GFC_STD_F2003)
+		? trans_func_f2003 : trans_func_f95;
 
   /* NULL() is dealt with below.  */
   if (strcmp ("null", name) == 0)
@@ -2806,7 +2640,7 @@ gfc_check_init_expr (gfc_expr *e)
 	   array argument.  */
 	isym = gfc_find_function (e->symtree->n.sym->name);
 	if (isym && isym->elemental
-	    && (t = scalarize_intrinsic_call (e, true)))
+	    && (t = scalarize_intrinsic_call (e)))
 	  break;
       }
 
@@ -3436,22 +3270,14 @@ gfc_check_assign (gfc_expr *lvalue, gfc_expr *rvalue, int conform,
 
   sym = lvalue->symtree->n.sym;
 
-  /* See if this is the component or subcomponent of a pointer and guard
-     against assignment to LEN or KIND part-refs.  */
+  /* See if this is the component or subcomponent of a pointer.  */
   has_pointer = sym->attr.pointer;
   for (ref = lvalue->ref; ref; ref = ref->next)
-    {
-      if (!has_pointer && ref->type == REF_COMPONENT
-	  && ref->u.c.component->attr.pointer)
-        has_pointer = 1;
-      else if (ref->type == REF_INQUIRY
-	       && (ref->u.i == INQUIRY_LEN || ref->u.i == INQUIRY_KIND))
-	{
-	  gfc_error ("Assignment to a LEN or KIND part_ref at %L is not "
-		     "allowed", &lvalue->where);
-	  return false;
-	}
-    }
+    if (ref->type == REF_COMPONENT && ref->u.c.component->attr.pointer)
+      {
+	has_pointer = 1;
+	break;
+      }
 
   /* 12.5.2.2, Note 12.26: The result variable is very similar to any other
      variable local to a function subprogram.  Its existence begins when
@@ -4119,13 +3945,13 @@ gfc_check_pointer_assign (gfc_expr *lvalue, gfc_expr *rvalue)
 	  }
     }
 
-  /* Warn for assignments of contiguous pointers to targets which is not
+  /* Error for assignments of contiguous pointers to targets which is not
      contiguous.  Be lenient in the definition of what counts as
      contiguous.  */
 
   if (lhs_attr.contiguous && !gfc_is_simply_contiguous (rvalue, false, true))
-    gfc_warning (OPT_Wextra, "Assignment to contiguous pointer from "
-		 "non-contiguous target at %L", &rvalue->where);
+    gfc_error ("Assignment to contiguous pointer from non-contiguous "
+	       "target at %L", &rvalue->where);
 
   /* Warn if it is the LHS pointer may lives longer than the RHS target.  */
   if (warn_target_lifetime
@@ -4929,7 +4755,6 @@ gfc_get_full_arrayspec_from_expr (gfc_expr *expr)
 	      continue;
 
 	    case REF_SUBSTRING:
-	    case REF_INQUIRY:
 	      continue;
 
 	    case REF_ARRAY:
@@ -5081,9 +4906,6 @@ gfc_traverse_expr (gfc_expr *expr, gfc_symbol *sym,
 		  return true;
 	      }
 	  break;
-
-	case REF_INQUIRY:
-	  return true;
 
 	default:
 	  gcc_unreachable ();
@@ -5439,7 +5261,6 @@ gfc_is_coarray (gfc_expr *e)
 	break;
 
      case REF_SUBSTRING:
-     case REF_INQUIRY:
 	break;
     }
 

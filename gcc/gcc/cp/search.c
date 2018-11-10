@@ -1227,16 +1227,9 @@ lookup_field_fuzzy_info::fuzzy_lookup_field (tree type)
 
   for (tree field = TYPE_FIELDS (type); field; field = DECL_CHAIN (field))
     {
-      if (m_want_type_p && !DECL_DECLARES_TYPE_P (field))
-	continue;
-
-      if (!DECL_NAME (field))
-	continue;
-
-      if (is_lambda_ignored_entity (field))
-	continue;
-
-      m_candidates.safe_push (DECL_NAME (field));
+      if (!m_want_type_p || DECL_DECLARES_TYPE_P (field))
+	if (DECL_NAME (field))
+	  m_candidates.safe_push (DECL_NAME (field));
     }
 }
 
@@ -1871,12 +1864,12 @@ check_final_overrider (tree overrider, tree basefn)
     /* OK */;
   else if ((CLASS_TYPE_P (over_return) && CLASS_TYPE_P (base_return))
 	   || (TREE_CODE (base_return) == TREE_CODE (over_return)
-	       && INDIRECT_TYPE_P (base_return)))
+	       && POINTER_TYPE_P (base_return)))
     {
       /* Potentially covariant.  */
       unsigned base_quals, over_quals;
 
-      fail = !INDIRECT_TYPE_P (base_return);
+      fail = !POINTER_TYPE_P (base_return);
       if (!fail)
 	{
 	  fail = cp_type_quals (base_return) != cp_type_quals (over_return);
@@ -1911,7 +1904,6 @@ check_final_overrider (tree overrider, tree basefn)
 	/* GNU extension, allow trivial pointer conversions such as
 	   converting to void *, or qualification conversion.  */
 	{
-	  auto_diagnostic_group d;
 	  if (pedwarn (DECL_SOURCE_LOCATION (overrider), 0,
 		       "invalid covariant return type for %q#D", overrider))
 	    inform (DECL_SOURCE_LOCATION (basefn),
@@ -1928,14 +1920,12 @@ check_final_overrider (tree overrider, tree basefn)
     {
       if (fail == 1)
 	{
-	  auto_diagnostic_group d;
 	  error ("invalid covariant return type for %q+#D", overrider);
 	  inform (DECL_SOURCE_LOCATION (basefn),
 		  "overridden function is %q#D", basefn);
 	}
       else
 	{
-	  auto_diagnostic_group d;
 	  error ("conflicting return type specified for %q+#D", overrider);
 	  inform (DECL_SOURCE_LOCATION (basefn),
 		  "overridden function is %q#D", basefn);
@@ -1952,7 +1942,6 @@ check_final_overrider (tree overrider, tree basefn)
 
   if (!comp_except_specs (base_throw, over_throw, ce_derived))
     {
-      auto_diagnostic_group d;
       error ("looser throw specifier for %q+#F", overrider);
       inform (DECL_SOURCE_LOCATION (basefn),
 	      "overridden function is %q#F", basefn);
@@ -1966,7 +1955,6 @@ check_final_overrider (tree overrider, tree basefn)
       && !tx_safe_fn_type_p (base_type)
       && !tx_safe_fn_type_p (over_type))
     {
-      auto_diagnostic_group d;
       error ("conflicting type attributes specified for %q+#D", overrider);
       inform (DECL_SOURCE_LOCATION (basefn),
 	      "overridden function is %q#D", basefn);
@@ -1983,7 +1971,6 @@ check_final_overrider (tree overrider, tree basefn)
       && !lookup_attribute ("transaction_safe_dynamic",
 			    DECL_ATTRIBUTES (basefn)))
     {
-      auto_diagnostic_group d;
       error_at (DECL_SOURCE_LOCATION (overrider),
 		"%qD declared %<transaction_safe_dynamic%>", overrider);
       inform (DECL_SOURCE_LOCATION (basefn),
@@ -1994,7 +1981,6 @@ check_final_overrider (tree overrider, tree basefn)
     {
       if (DECL_DELETED_FN (overrider))
 	{
-	  auto_diagnostic_group d;
 	  error ("deleted function %q+D overriding non-deleted function",
 		 overrider);
 	  inform (DECL_SOURCE_LOCATION (basefn),
@@ -2003,7 +1989,6 @@ check_final_overrider (tree overrider, tree basefn)
 	}
       else
 	{
-	  auto_diagnostic_group d;
 	  error ("non-deleted function %q+D overriding deleted function",
 		 overrider);
 	  inform (DECL_SOURCE_LOCATION (basefn),
@@ -2013,7 +1998,6 @@ check_final_overrider (tree overrider, tree basefn)
     }
   if (DECL_FINAL_P (basefn))
     {
-      auto_diagnostic_group d;
       error ("virtual function %q+D overriding final function", overrider);
       inform (DECL_SOURCE_LOCATION (basefn),
 	      "overridden function is %qD", basefn);
@@ -2098,7 +2082,6 @@ look_for_overrides_r (tree type, tree fndecl)
 	{
 	  /* A static member function cannot match an inherited
 	     virtual member function.  */
-	  auto_diagnostic_group d;
 	  error ("%q+#D cannot be declared", fndecl);
 	  error ("  since %q+#D declared in base class", fn);
 	}

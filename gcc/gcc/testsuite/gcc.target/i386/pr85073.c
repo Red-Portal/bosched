@@ -1,6 +1,6 @@
 /* PR target/85073 */
 /* { dg-do compile } */
-/* { dg-options "-O2 -mbmi -fdisable-tree-sccp" } */
+/* { dg-options "-O2 -mbmi" } */
 
 int
 foo (unsigned x)

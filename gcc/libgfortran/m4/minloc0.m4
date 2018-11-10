@@ -43,6 +43,8 @@ FOREACH_FUNCTION(
     minval = atype_max;
 #endif',
 `#if defined('atype_nan`)
+	}
+      while (0);
       if (unlikely (!fast))
 	{
 	  do
@@ -61,29 +63,16 @@ FOREACH_FUNCTION(
 	  if (likely (fast))
 	    continue;
 	}
-      else
-#endif
-    if (back)
-      do
+      else do
 	{
-	  if (unlikely (*base <= minval))
+#endif
+	  if (*base < minval)
 	    {
 	      minval = *base;
 	      for (n = 0; n < rank; n++)
 		dest[n * dstride] = count[n] + 1;
-	    }
-	  base += sstride[0];
-	}
-      while (++count[0] != extent[0]);
-    else
-      do
-        {
-	  if (unlikely (*base < minval))
-	    {
-	      minval = *base;
-	      for (n = 0; n < rank; n++)
-	        dest[n * dstride] = count[n] + 1;
 	    }')
+
 MASKED_FOREACH_FUNCTION(
 `  atype_name minval;
    int fast = 0;
@@ -93,7 +82,9 @@ MASKED_FOREACH_FUNCTION(
 #else
     minval = atype_max;
 #endif',
-`      if (unlikely (!fast))
+`	}
+      while (0);
+      if (unlikely (!fast))
 	{
 	  do
 	    {
@@ -120,27 +111,14 @@ MASKED_FOREACH_FUNCTION(
 	  if (likely (fast))
 	    continue;
 	}
-        else
-        if (back)
-	  do
+      else do
+	{
+	  if (*mbase && *base < minval)
 	    {
-	      if (unlikely (*mbase && (*base <= minval)))
-	        {
-	      	  minval = *base;
-	      	  for (n = 0; n < rank; n++)
-		    dest[n * dstride] = count[n] + 1;
-	    	}
-		base += sstride[0];
-	    }
-	    while (++count[0] != extent[0]);
-	else
-	  do
-	    {
-	      if (unlikely (*mbase && (*base < minval)))
-		{
-		  minval = *base;
-		  for (n = 0; n < rank; n++)
-		    dest[n * dstride] = count[n] + 1;
-		}')
+	      minval = *base;
+	      for (n = 0; n < rank; n++)
+		dest[n * dstride] = count[n] + 1;
+	    }')
+
 SCALAR_FOREACH_FUNCTION(`0')
 #endif

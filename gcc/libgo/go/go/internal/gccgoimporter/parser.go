@@ -18,7 +18,7 @@ import (
 )
 
 type parser struct {
-	scanner  *scanner.Scanner
+	scanner  scanner.Scanner
 	version  string                    // format version
 	tok      rune                      // current token
 	lit      string                    // literal string; only valid for Ident, Int, String tokens
@@ -27,24 +27,18 @@ type parser struct {
 	pkg      *types.Package            // reference to imported package
 	imports  map[string]*types.Package // package path -> package object
 	typeMap  map[int]types.Type        // type number -> type
-	typeData []string                  // unparsed type data
 	initdata InitData                  // package init priority data
 }
 
 func (p *parser) init(filename string, src io.Reader, imports map[string]*types.Package) {
-	p.scanner = new(scanner.Scanner)
-	p.initScanner(filename, src)
-	p.imports = imports
-	p.typeMap = make(map[int]types.Type)
-}
-
-func (p *parser) initScanner(filename string, src io.Reader) {
 	p.scanner.Init(src)
 	p.scanner.Error = func(_ *scanner.Scanner, msg string) { p.error(msg) }
 	p.scanner.Mode = scanner.ScanIdents | scanner.ScanInts | scanner.ScanFloats | scanner.ScanStrings | scanner.ScanComments | scanner.SkipComments
-	p.scanner.Whitespace = 1<<'\t' | 1<<' '
+	p.scanner.Whitespace = 1<<'\t' | 1<<'\n' | 1<<' '
 	p.scanner.Filename = filename // for good error messages
 	p.next()
+	p.imports = imports
+	p.typeMap = make(map[int]types.Type)
 }
 
 type importError struct {
@@ -77,13 +71,6 @@ func (p *parser) expect(tok rune) string {
 	return lit
 }
 
-func (p *parser) expectEOL() {
-	if p.version == "v1" || p.version == "v2" {
-		p.expect(';')
-	}
-	p.expect('\n')
-}
-
 func (p *parser) expectKeyword(keyword string) {
 	lit := p.expect(scanner.Ident)
 	if lit != keyword {
@@ -109,7 +96,7 @@ func (p *parser) parseUnquotedString() string {
 	buf.WriteString(p.scanner.TokenText())
 	// This loop needs to examine each character before deciding whether to consume it. If we see a semicolon,
 	// we need to let it be consumed by p.next().
-	for ch := p.scanner.Peek(); ch != '\n' && ch != ';' && ch != scanner.EOF && p.scanner.Whitespace&(1<<uint(ch)) == 0; ch = p.scanner.Peek() {
+	for ch := p.scanner.Peek(); ch != ';' && ch != scanner.EOF && p.scanner.Whitespace&(1<<uint(ch)) == 0; ch = p.scanner.Peek() {
 		buf.WriteRune(ch)
 		p.scanner.Next()
 	}
@@ -444,22 +431,19 @@ func (p *parser) parseNamedType(n int) types.Type {
 		nt.SetUnderlying(underlying.Underlying())
 	}
 
-	if p.tok == '\n' {
-		p.next()
-		// collect associated methods
-		for p.tok == scanner.Ident {
-			p.expectKeyword("func")
-			p.expect('(')
-			receiver, _ := p.parseParam(pkg)
-			p.expect(')')
-			name := p.parseName()
-			params, isVariadic := p.parseParamList(pkg)
-			results := p.parseResultList(pkg)
-			p.expectEOL()
+	// collect associated methods
+	for p.tok == scanner.Ident {
+		p.expectKeyword("func")
+		p.expect('(')
+		receiver, _ := p.parseParam(pkg)
+		p.expect(')')
+		name := p.parseName()
+		params, isVariadic := p.parseParamList(pkg)
+		results := p.parseResultList(pkg)
+		p.expect(';')
 
-			sig := types.NewSignature(receiver, params, results, isVariadic)
-			nt.AddMethod(types.NewFunc(token.NoPos, pkg, name, sig))
-		}
+		sig := types.NewSignature(receiver, params, results, isVariadic)
+		nt.AddMethod(types.NewFunc(token.NoPos, pkg, name, sig))
 	}
 
 	return nt
@@ -601,13 +585,13 @@ func (p *parser) parseInterfaceType(pkg *types.Package) types.Type {
 	p.expectKeyword("interface")
 
 	var methods []*types.Func
-	var embeddeds []types.Type
+	var typs []*types.Named
 
 	p.expect('{')
 	for p.tok != '}' && p.tok != scanner.EOF {
 		if p.tok == '?' {
 			p.next()
-			embeddeds = append(embeddeds, p.parseType(pkg))
+			typs = append(typs, p.parseType(pkg).(*types.Named))
 		} else {
 			method := p.parseFunc(pkg)
 			methods = append(methods, method)
@@ -616,7 +600,7 @@ func (p *parser) parseInterfaceType(pkg *types.Package) types.Type {
 	}
 	p.expect('}')
 
-	return types.NewInterfaceType(methods, embeddeds)
+	return types.NewInterface(methods, typs)
 }
 
 // PointerType = "*" ("any" | Type) .
@@ -726,9 +710,6 @@ func (p *parser) parseType(pkg *types.Package) (t types.Type) {
 		n := p.parseInt()
 
 		if p.tok == '>' {
-			if len(p.typeData) > 0 && p.typeMap[int(n)] == nil {
-				p.parseSavedType(pkg, int(n))
-			}
 			t = p.typeMap[int(n)]
 		} else {
 			t = p.parseTypeDefinition(pkg, int(n))
@@ -748,67 +729,6 @@ func (p *parser) parseType(pkg *types.Package) (t types.Type) {
 	return
 }
 
-// Types = "types" maxp1 exportedp1 (offset length)* .
-func (p *parser) parseTypes(pkg *types.Package) {
-	maxp1 := p.parseInt()
-	exportedp1 := p.parseInt()
-
-	type typeOffset struct {
-		offset int
-		length int
-	}
-	var typeOffsets []typeOffset
-
-	total := 0
-	for i := 1; i < int(maxp1); i++ {
-		len := int(p.parseInt())
-		typeOffsets = append(typeOffsets, typeOffset{total, len})
-		total += len
-	}
-
-	// We should now have p.tok pointing to the final newline.
-	// The next runes from the scanner should be the type data.
-
-	var sb strings.Builder
-	for sb.Len() < total {
-		r := p.scanner.Next()
-		if r == scanner.EOF {
-			p.error("unexpected EOF")
-		}
-		sb.WriteRune(r)
-	}
-	allTypeData := sb.String()
-
-	p.typeData = []string{""} // type 0, unused
-	for _, to := range typeOffsets {
-		p.typeData = append(p.typeData, allTypeData[to.offset:to.offset+to.length])
-	}
-
-	for i := 1; i < int(exportedp1); i++ {
-		p.parseSavedType(pkg, i)
-	}
-}
-
-// parseSavedType parses one saved type definition.
-func (p *parser) parseSavedType(pkg *types.Package, i int) {
-	defer func(s *scanner.Scanner, tok rune, lit string) {
-		p.scanner = s
-		p.tok = tok
-		p.lit = lit
-	}(p.scanner, p.tok, p.lit)
-
-	p.scanner = new(scanner.Scanner)
-	p.initScanner(p.scanner.Filename, strings.NewReader(p.typeData[i]))
-	p.expectKeyword("type")
-	id := int(p.parseInt())
-	if id != i {
-		p.errorf("type ID mismatch: got %d, want %d", id, i)
-	}
-	if p.typeMap[i] == nil {
-		p.typeMap[i] = p.parseTypeDefinition(pkg, i)
-	}
-}
-
 // PackageInit = unquotedString unquotedString int .
 func (p *parser) parsePackageInit() PackageInit {
 	name := p.parseUnquotedString()
@@ -820,12 +740,11 @@ func (p *parser) parsePackageInit() PackageInit {
 	return PackageInit{Name: name, InitFunc: initfunc, Priority: priority}
 }
 
-// Throw away tokens until we see a newline or ';'.
-// If we see a '<', attempt to parse as a type.
+// Throw away tokens until we see a ';'. If we see a '<', attempt to parse as a type.
 func (p *parser) discardDirectiveWhileParsingTypes(pkg *types.Package) {
 	for {
 		switch p.tok {
-		case '\n', ';':
+		case ';':
 			return
 		case '<':
 			p.parseType(pkg)
@@ -844,7 +763,7 @@ func (p *parser) maybeCreatePackage() {
 	}
 }
 
-// InitDataDirective = ( "v1" | "v2" | "v3" ) ";" |
+// InitDataDirective = ( "v1" | "v2" ) ";" |
 //                     "priority" int ";" |
 //                     "init" { PackageInit } ";" |
 //                     "checksum" unquotedString ";" .
@@ -855,32 +774,31 @@ func (p *parser) parseInitDataDirective() {
 	}
 
 	switch p.lit {
-	case "v1", "v2", "v3":
+	case "v1", "v2":
 		p.version = p.lit
 		p.next()
 		p.expect(';')
-		p.expect('\n')
 
 	case "priority":
 		p.next()
 		p.initdata.Priority = int(p.parseInt())
-		p.expectEOL()
+		p.expect(';')
 
 	case "init":
 		p.next()
-		for p.tok != '\n' && p.tok != ';' && p.tok != scanner.EOF {
+		for p.tok != ';' && p.tok != scanner.EOF {
 			p.initdata.Inits = append(p.initdata.Inits, p.parsePackageInit())
 		}
-		p.expectEOL()
+		p.expect(';')
 
 	case "init_graph":
 		p.next()
 		// The graph data is thrown away for now.
-		for p.tok != '\n' && p.tok != ';' && p.tok != scanner.EOF {
+		for p.tok != ';' && p.tok != scanner.EOF {
 			p.parseInt()
 			p.parseInt()
 		}
-		p.expectEOL()
+		p.expect(';')
 
 	case "checksum":
 		// Don't let the scanner try to parse the checksum as a number.
@@ -890,7 +808,7 @@ func (p *parser) parseInitDataDirective() {
 		p.scanner.Mode &^= scanner.ScanInts | scanner.ScanFloats
 		p.next()
 		p.parseUnquotedString()
-		p.expectEOL()
+		p.expect(';')
 
 	default:
 		p.errorf("unexpected identifier: %q", p.lit)
@@ -902,7 +820,6 @@ func (p *parser) parseInitDataDirective() {
 //             "pkgpath" unquotedString ";" |
 //             "prefix" unquotedString ";" |
 //             "import" unquotedString unquotedString string ";" |
-//             "indirectimport" unquotedString unquotedstring ";" |
 //             "func" Func ";" |
 //             "type" Type ";" |
 //             "var" Var ";" |
@@ -914,29 +831,29 @@ func (p *parser) parseDirective() {
 	}
 
 	switch p.lit {
-	case "v1", "v2", "v3", "priority", "init", "init_graph", "checksum":
+	case "v1", "v2", "priority", "init", "init_graph", "checksum":
 		p.parseInitDataDirective()
 
 	case "package":
 		p.next()
 		p.pkgname = p.parseUnquotedString()
 		p.maybeCreatePackage()
-		if p.version != "v1" && p.tok != '\n' && p.tok != ';' {
+		if p.version == "v2" && p.tok != ';' {
 			p.parseUnquotedString()
 			p.parseUnquotedString()
 		}
-		p.expectEOL()
+		p.expect(';')
 
 	case "pkgpath":
 		p.next()
 		p.pkgpath = p.parseUnquotedString()
 		p.maybeCreatePackage()
-		p.expectEOL()
+		p.expect(';')
 
 	case "prefix":
 		p.next()
 		p.pkgpath = p.parseUnquotedString()
-		p.expectEOL()
+		p.expect(';')
 
 	case "import":
 		p.next()
@@ -944,19 +861,7 @@ func (p *parser) parseDirective() {
 		pkgpath := p.parseUnquotedString()
 		p.getPkg(pkgpath, pkgname)
 		p.parseString()
-		p.expectEOL()
-
-	case "indirectimport":
-		p.next()
-		pkgname := p.parseUnquotedString()
-		pkgpath := p.parseUnquotedString()
-		p.getPkg(pkgpath, pkgname)
-		p.expectEOL()
-
-	case "types":
-		p.next()
-		p.parseTypes(p.pkg)
-		p.expectEOL()
+		p.expect(';')
 
 	case "func":
 		p.next()
@@ -964,24 +869,24 @@ func (p *parser) parseDirective() {
 		if fun != nil {
 			p.pkg.Scope().Insert(fun)
 		}
-		p.expectEOL()
+		p.expect(';')
 
 	case "type":
 		p.next()
 		p.parseType(p.pkg)
-		p.expectEOL()
+		p.expect(';')
 
 	case "var":
 		p.next()
 		v := p.parseVar(p.pkg)
 		p.pkg.Scope().Insert(v)
-		p.expectEOL()
+		p.expect(';')
 
 	case "const":
 		p.next()
 		c := p.parseConst(p.pkg)
 		p.pkg.Scope().Insert(c)
-		p.expectEOL()
+		p.expect(';')
 
 	default:
 		p.errorf("unexpected identifier: %q", p.lit)
@@ -1000,4 +905,11 @@ func (p *parser) parsePackage() *types.Package {
 	}
 	p.pkg.MarkComplete()
 	return p.pkg
+}
+
+// InitData = { InitDataDirective } .
+func (p *parser) parseInitData() {
+	for p.tok != scanner.EOF {
+		p.parseInitDataDirective()
+	}
 }

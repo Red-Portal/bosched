@@ -1,5 +1,4 @@
 ! { dg-do compile }
-! { dg-additional-options "-std=legacy" }
 ! { dg-require-effective-target vect_double }
       SUBROUTINE CALC2
       IMPLICIT REAL*8	(A-H, O-Z)

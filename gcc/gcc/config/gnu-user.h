@@ -26,6 +26,9 @@ a copy of the GCC Runtime Library Exception along with this program;
 see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 <http://www.gnu.org/licenses/>.  */
 
+/* Don't assume anything about the header files.  */
+#define NO_IMPLICIT_EXTERN_C
+
 #undef ASM_APP_ON
 #define ASM_APP_ON "#APP\n"
 
@@ -135,7 +138,7 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 
 #undef LINK_GCC_C_SEQUENCE_SPEC
 #define LINK_GCC_C_SEQUENCE_SPEC \
-  "%{static|static-pie:--start-group} %G %{!nolibc:%L} \
+  "%{static|static-pie:--start-group} %G %L \
    %{static|static-pie:--end-group}%{!static:%{!static-pie:%G}}"
 
 /* Use --as-needed -lgcc_s for eh support.  */

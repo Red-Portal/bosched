@@ -21,8 +21,8 @@ import (
 // change the behavior of these methods; use Read or ReadMsgIP
 // instead.
 
-// BUG(mikio): On JS, NaCl and Plan 9, methods and functions related
-// to IPConn are not implemented.
+// BUG(mikio): On NaCl and Plan 9, the ReadMsgIP and
+// WriteMsgIP methods of IPConn are not implemented.
 
 // BUG(mikio): On Windows, the File method of IPConn is not
 // implemented.
@@ -209,11 +209,7 @@ func newIPConn(fd *netFD) *IPConn { return &IPConn{conn{fd}} }
 // If the IP field of raddr is nil or an unspecified IP address, the
 // local system is assumed.
 func DialIP(network string, laddr, raddr *IPAddr) (*IPConn, error) {
-	if raddr == nil {
-		return nil, &OpError{Op: "dial", Net: network, Source: laddr.opAddr(), Addr: nil, Err: errMissingAddress}
-	}
-	sd := &sysDialer{network: network, address: raddr.String()}
-	c, err := sd.dialIP(context.Background(), laddr, raddr)
+	c, err := dialIP(context.Background(), network, laddr, raddr)
 	if err != nil {
 		return nil, &OpError{Op: "dial", Net: network, Source: laddr.opAddr(), Addr: raddr.opAddr(), Err: err}
 	}
@@ -228,11 +224,7 @@ func DialIP(network string, laddr, raddr *IPAddr) (*IPConn, error) {
 // ListenIP listens on all available IP addresses of the local system
 // except multicast IP addresses.
 func ListenIP(network string, laddr *IPAddr) (*IPConn, error) {
-	if laddr == nil {
-		laddr = &IPAddr{}
-	}
-	sl := &sysListener{network: network, address: laddr.String()}
-	c, err := sl.listenIP(context.Background(), laddr)
+	c, err := listenIP(context.Background(), network, laddr)
 	if err != nil {
 		return nil, &OpError{Op: "listen", Net: network, Source: nil, Addr: laddr.opAddr(), Err: err}
 	}

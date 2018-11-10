@@ -2,7 +2,7 @@
 
 package body Frame_Overflow is
 
-   function -- { dg-error "exceeds" }
+   function -- { dg-error "too large" }
      Set_In (Bitmap : Bitmap_T; Bitpos : Bitpos_Range_T)  return Bitmap_T
    is
       Result: Bitmap_T := Bitmap;
@@ -11,7 +11,7 @@ package body Frame_Overflow is
       return Result;
    end;
 
-   function -- { dg-error "exceeds" }
+   function -- { dg-error "too large" }
      Negate (Bitmap : Bitmap_T) return Bitmap_T
    is
       Result: Bitmap_T;

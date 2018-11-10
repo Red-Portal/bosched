@@ -122,4 +122,3 @@ AM_MAKEFLAGS = \
 
 MAKEOVERRIDES =
 
-include $(top_srcdir)/../../multilib.am

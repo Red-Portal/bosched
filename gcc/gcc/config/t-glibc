@@ -19,7 +19,3 @@
 glibc-c.o: config/glibc-c.c
 	$(COMPILE) $<
 	$(POSTCOMPILE)
-
-glibc-d.o: config/glibc-d.c
-	$(COMPILE) $<
-	$(POSTCOMPILE)

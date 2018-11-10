@@ -107,7 +107,7 @@ func (x *Index) Read(r io.Reader) error {
 
 	// allocate space
 	if 2*n < cap(x.data) || cap(x.data) < n {
-		// new data is significantly smaller or larger than
+		// new data is significantly smaller or larger then
 		// existing buffers - allocate new ones
 		x.data = make([]byte, n)
 		x.sa = make([]int, n)

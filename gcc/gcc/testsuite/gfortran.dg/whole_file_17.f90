@@ -1,5 +1,5 @@
 ! { dg-do compile }
-! { dg-options "-pedantic" }
+! { dg-options "-pedantic -fwhole-file" }
 !
 ! PR fortran/30668
 !

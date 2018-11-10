@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build !js
-
 package net
 
 import (
@@ -144,9 +142,8 @@ const (
 // In some environments, the slow IPs may be explicitly unreachable, and fail
 // more quickly than expected. This test hook prevents dialTCP from returning
 // before the deadline.
-func slowDialTCP(ctx context.Context, network string, laddr, raddr *TCPAddr) (*TCPConn, error) {
-	sd := &sysDialer{network: network, address: raddr.String()}
-	c, err := sd.doDialTCP(ctx, laddr, raddr)
+func slowDialTCP(ctx context.Context, net string, laddr, raddr *TCPAddr) (*TCPConn, error) {
+	c, err := doDialTCP(ctx, net, laddr, raddr)
 	if ParseIP(slowDst4).Equal(raddr.IP) || ParseIP(slowDst6).Equal(raddr.IP) {
 		// Wait for the deadline, or indefinitely if none exists.
 		<-ctx.Done()
@@ -298,12 +295,12 @@ func TestDialParallel(t *testing.T) {
 			FallbackDelay: fallbackDelay,
 		}
 		startTime := time.Now()
-		sd := &sysDialer{
+		dp := &dialParam{
 			Dialer:  d,
 			network: "tcp",
 			address: "?",
 		}
-		c, err := sd.dialParallel(context.Background(), primaries, fallbacks)
+		c, err := dialParallel(context.Background(), dp, primaries, fallbacks)
 		elapsed := time.Since(startTime)
 
 		if c != nil {
@@ -334,7 +331,7 @@ func TestDialParallel(t *testing.T) {
 			wg.Done()
 		}()
 		startTime = time.Now()
-		c, err = sd.dialParallel(ctx, primaries, fallbacks)
+		c, err = dialParallel(ctx, dp, primaries, fallbacks)
 		if c != nil {
 			c.Close()
 		}
@@ -470,14 +467,13 @@ func TestDialParallelSpuriousConnection(t *testing.T) {
 		// Now ignore the provided context (which will be canceled) and use a
 		// different one to make sure this completes with a valid connection,
 		// which we hope to be closed below:
-		sd := &sysDialer{network: net, address: raddr.String()}
-		return sd.doDialTCP(context.Background(), laddr, raddr)
+		return doDialTCP(context.Background(), net, laddr, raddr)
 	}
 
 	d := Dialer{
 		FallbackDelay: fallbackDelay,
 	}
-	sd := &sysDialer{
+	dp := &dialParam{
 		Dialer:  d,
 		network: "tcp",
 		address: "?",
@@ -492,7 +488,7 @@ func TestDialParallelSpuriousConnection(t *testing.T) {
 	}
 
 	// dialParallel returns one connection (and closes the other.)
-	c, err := sd.dialParallel(context.Background(), makeAddr("127.0.0.1"), makeAddr("::1"))
+	c, err := dialParallel(context.Background(), dp, makeAddr("127.0.0.1"), makeAddr("::1"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -753,8 +749,9 @@ func TestDialCancel(t *testing.T) {
 	switch testenv.Builder() {
 	case "linux-arm64-buildlet":
 		t.Skip("skipping on linux-arm64-buildlet; incompatible network config? issue 15191")
+	case "":
+		testenv.MustHaveExternalNetwork(t)
 	}
-	mustHaveExternalNetwork(t)
 
 	if runtime.GOOS == "nacl" {
 		// nacl doesn't have external network access.
@@ -900,7 +897,9 @@ func TestCancelAfterDial(t *testing.T) {
 // if the machine has halfway configured IPv6 such that it can bind on
 // "::" not connect back to that same address.
 func TestDialListenerAddr(t *testing.T) {
-	mustHaveExternalNetwork(t)
+	if testenv.Builder() == "" {
+		testenv.MustHaveExternalNetwork(t)
+	}
 	ln, err := Listen("tcp", ":0")
 	if err != nil {
 		t.Fatal(err)
@@ -912,65 +911,4 @@ func TestDialListenerAddr(t *testing.T) {
 		t.Fatalf("for addr %q, dial error: %v", addr, err)
 	}
 	c.Close()
-}
-
-func TestDialerControl(t *testing.T) {
-	switch runtime.GOOS {
-	case "nacl", "plan9":
-		t.Skipf("not supported on %s", runtime.GOOS)
-	}
-
-	t.Run("StreamDial", func(t *testing.T) {
-		for _, network := range []string{"tcp", "tcp4", "tcp6", "unix", "unixpacket"} {
-			if !testableNetwork(network) {
-				continue
-			}
-			ln, err := newLocalListener(network)
-			if err != nil {
-				t.Error(err)
-				continue
-			}
-			defer ln.Close()
-			d := Dialer{Control: controlOnConnSetup}
-			c, err := d.Dial(network, ln.Addr().String())
-			if err != nil {
-				t.Error(err)
-				continue
-			}
-			c.Close()
-		}
-	})
-	t.Run("PacketDial", func(t *testing.T) {
-		for _, network := range []string{"udp", "udp4", "udp6", "unixgram"} {
-			if !testableNetwork(network) {
-				continue
-			}
-			c1, err := newLocalPacketListener(network)
-			if err != nil {
-				t.Error(err)
-				continue
-			}
-			if network == "unixgram" {
-				defer os.Remove(c1.LocalAddr().String())
-			}
-			defer c1.Close()
-			d := Dialer{Control: controlOnConnSetup}
-			c2, err := d.Dial(network, c1.LocalAddr().String())
-			if err != nil {
-				t.Error(err)
-				continue
-			}
-			c2.Close()
-		}
-	})
-}
-
-// mustHaveExternalNetwork is like testenv.MustHaveExternalNetwork
-// except that it won't skip testing on non-iOS builders.
-func mustHaveExternalNetwork(t *testing.T) {
-	t.Helper()
-	ios := runtime.GOOS == "darwin" && (runtime.GOARCH == "arm" || runtime.GOARCH == "arm64")
-	if testenv.Builder() == "" || ios {
-		testenv.MustHaveExternalNetwork(t)
-	}
 }

@@ -18,7 +18,7 @@ var compositeWhiteList = flag.Bool("compositewhitelist", true, "use composite wh
 
 func init() {
 	register("composites",
-		"check that composite literals of types from imported packages use field-keyed elements",
+		"check that composite literals used field-keyed elements",
 		checkUnkeyedLiteral,
 		compositeLit)
 }
@@ -38,19 +38,11 @@ func checkUnkeyedLiteral(f *File, node ast.Node) {
 		// skip whitelisted types
 		return
 	}
-	under := typ.Underlying()
-	for {
-		ptr, ok := under.(*types.Pointer)
-		if !ok {
-			break
-		}
-		under = ptr.Elem().Underlying()
-	}
-	if _, ok := under.(*types.Struct); !ok {
+	if _, ok := typ.Underlying().(*types.Struct); !ok {
 		// skip non-struct composite literals
 		return
 	}
-	if isLocalType(f, typ) {
+	if isLocalType(f, typeName) {
 		// allow unkeyed locally defined composite literal
 		return
 	}
@@ -71,16 +63,20 @@ func checkUnkeyedLiteral(f *File, node ast.Node) {
 	f.Badf(cl.Pos(), "%s composite literal uses unkeyed fields", typeName)
 }
 
-func isLocalType(f *File, typ types.Type) bool {
-	switch x := typ.(type) {
-	case *types.Struct:
+func isLocalType(f *File, typeName string) bool {
+	if strings.HasPrefix(typeName, "struct{") {
 		// struct literals are local types
 		return true
-	case *types.Pointer:
-		return isLocalType(f, x.Elem())
-	case *types.Named:
-		// names in package foo are local to foo_test too
-		return strings.TrimSuffix(x.Obj().Pkg().Path(), "_test") == strings.TrimSuffix(f.pkg.path, "_test")
 	}
-	return false
+
+	pkgname := f.pkg.path
+	if strings.HasPrefix(typeName, pkgname+".") {
+		return true
+	}
+
+	// treat types as local inside test packages with _test name suffix
+	if strings.HasSuffix(pkgname, "_test") {
+		pkgname = pkgname[:len(pkgname)-len("_test")]
+	}
+	return strings.HasPrefix(typeName, pkgname+".")
 }

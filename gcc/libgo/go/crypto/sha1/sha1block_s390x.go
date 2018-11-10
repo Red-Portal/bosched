@@ -6,6 +6,9 @@
 
 package sha1
 
-import "internal/cpu"
+// featureCheck reports whether the CPU supports the
+// SHA-1 compute intermediate message digest (KIMD)
+// function code.
+func featureCheck() bool
 
-var useAsm = cpu.S390X.HasSHA1
+var useAsm = featureCheck()

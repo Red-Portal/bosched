@@ -69,13 +69,8 @@ func systemstack(fn func()) {
 	}
 }
 
-var badsystemstackMsg = "fatal: systemstack called from unexpected goroutine"
-
-//go:nosplit
-//go:nowritebarrierrec
 func badsystemstack() {
-	sp := stringStructOf(&badsystemstackMsg)
-	write(2, sp.str, int32(sp.len))
+	throw("systemstack called from unexpected goroutine")
 }
 
 // memclrNoHeapPointers clears n bytes starting at ptr.
@@ -132,7 +127,7 @@ func fastrand() uint32 {
 //go:nosplit
 func fastrandn(n uint32) uint32 {
 	// This is similar to fastrand() % n, but faster.
-	// See https://lemire.me/blog/2016/06/27/a-fast-alternative-to-the-modulo-reduction/
+	// See http://lemire.me/blog/2016/06/27/a-fast-alternative-to-the-modulo-reduction/
 	return uint32(uint64(fastrand()) * uint64(n) >> 32)
 }
 
@@ -203,21 +198,27 @@ func publicationBarrier()
 
 // getcallerpc returns the program counter (PC) of its caller's caller.
 // getcallersp returns the stack pointer (SP) of its caller's caller.
-// The implementation may be a compiler intrinsic; there is not
-// necessarily code implementing this on every platform.
+// argp must be a pointer to the caller's first function argument.
+// The implementation may or may not use argp, depending on
+// the architecture. The implementation may be a compiler
+// intrinsic; there is not necessarily code implementing this
+// on every platform.
 //
 // For example:
 //
 //	func f(arg1, arg2, arg3 int) {
 //		pc := getcallerpc()
-//		sp := getcallersp()
+//		sp := getcallersp(unsafe.Pointer(&arg1))
 //	}
 //
 // These two lines find the PC and SP immediately following
 // the call to f (where f will return).
 //
 // The call to getcallerpc and getcallersp must be done in the
-// frame being asked about.
+// frame being asked about. It would not be correct for f to pass &arg1
+// to another function g and let g call getcallerpc/getcallersp.
+// The call inside g might return information about g's caller or
+// information about f's caller or complete garbage.
 //
 // The result of getcallersp is correct at the time of the return,
 // but it may be invalidated by any subsequent call to a function
@@ -229,7 +230,7 @@ func publicationBarrier()
 func getcallerpc() uintptr
 
 //go:noescape
-func getcallersp() uintptr // implemented as an intrinsic on all platforms
+func getcallersp(argp unsafe.Pointer) uintptr
 
 func asmcgocall(fn, arg unsafe.Pointer) int32 {
 	throw("asmcgocall")
@@ -294,6 +295,12 @@ func setIsCgo() {
 }
 
 // For gccgo, to communicate from the C code to the Go code.
+//go:linkname setCpuidECX runtime.setCpuidECX
+func setCpuidECX(v uint32) {
+	cpuid_ecx = v
+}
+
+// For gccgo, to communicate from the C code to the Go code.
 //go:linkname setSupportAES runtime.setSupportAES
 func setSupportAES(v bool) {
 	support_aes = v
@@ -302,9 +309,9 @@ func setSupportAES(v bool) {
 // Here for gccgo.
 func errno() int
 
-// For gccgo these are written in C.
-func entersyscall()
-func entersyscallblock()
+// Temporary for gccgo until we port proc.go.
+func entersyscall(int32)
+func entersyscallblock(int32)
 
 // For gccgo to call from C code, so that the C code and the Go code
 // can share the memstats variable for now.
@@ -330,9 +337,6 @@ func getSiginfo(*_siginfo_t, unsafe.Pointer) (sigaddr uintptr, sigpc uintptr)
 
 // Implemented in C for gccgo.
 func dumpregs(*_siginfo_t, unsafe.Pointer)
-
-// Implemented in C for gccgo.
-func setRandomNumber(uint32)
 
 // Temporary for gccgo until we port proc.go.
 //go:linkname getsched runtime.getsched
@@ -424,15 +428,6 @@ type bitvector struct {
 	bytedata *uint8
 }
 
-// ptrbit returns the i'th bit in bv.
-// ptrbit is less efficient than iterating directly over bitvector bits,
-// and should only be used in non-performance-critical code.
-// See adjustpointers for an example of a high-efficiency walk of a bitvector.
-func (bv *bitvector) ptrbit(i uintptr) uint8 {
-	b := *(addb(bv.bytedata, i/8))
-	return (b >> (i % 8)) & 1
-}
-
 // bool2int returns 0 if x is false or 1 if x is true.
 func bool2int(x bool) int {
 	if x {
@@ -440,10 +435,3 @@ func bool2int(x bool) int {
 	}
 	return 0
 }
-
-// abort crashes the runtime in situations where even throw might not
-// work. In general it should do something a debugger will recognize
-// (e.g., an INT3 on x86). A crash in abort is recognized by the
-// signal handler, which will attempt to tear down the runtime
-// immediately.
-func abort()

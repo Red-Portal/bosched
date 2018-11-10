@@ -5,7 +5,6 @@
 package pe
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -14,9 +13,8 @@ import (
 // cstring converts ASCII byte sequence b to string.
 // It stops once it finds 0 or reaches end of b.
 func cstring(b []byte) string {
-	i := bytes.IndexByte(b, 0)
-	if i == -1 {
-		i = len(b)
+	var i int
+	for i = 0; i < len(b) && b[i] != 0; i++ {
 	}
 	return string(b[:i])
 }

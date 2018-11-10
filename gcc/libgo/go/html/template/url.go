@@ -37,15 +37,15 @@ func urlFilter(args ...interface{}) string {
 	if t == contentTypeURL {
 		return s
 	}
-	if !isSafeURL(s) {
+	if !isSafeUrl(s) {
 		return "#" + filterFailsafe
 	}
 	return s
 }
 
-// isSafeURL is true if s is a relative URL or if URL has a protocol in
+// isSafeUrl is true if s is a relative URL or if URL has a protocol in
 // (http, https, mailto).
-func isSafeURL(s string) bool {
+func isSafeUrl(s string) bool {
 	if i := strings.IndexRune(s, ':'); i >= 0 && !strings.ContainsRune(s[:i], '/') {
 
 		protocol := s[:i]
@@ -79,16 +79,16 @@ func urlProcessor(norm bool, args ...interface{}) string {
 		norm = true
 	}
 	var b bytes.Buffer
-	if processURLOnto(s, norm, &b) {
+	if processUrlOnto(s, norm, &b) {
 		return b.String()
 	}
 	return s
 }
 
-// processURLOnto appends a normalized URL corresponding to its input to b
+// processUrlOnto appends a normalized URL corresponding to its input to b
 // and returns true if the appended content differs from s.
-func processURLOnto(s string, norm bool, b *bytes.Buffer) bool {
-	b.Grow(len(s) + 16)
+func processUrlOnto(s string, norm bool, b *bytes.Buffer) bool {
+	b.Grow(b.Cap() + len(s) + 16)
 	written := 0
 	// The byte loop below assumes that all URLs use UTF-8 as the
 	// content-encoding. This is similar to the URI to IRI encoding scheme
@@ -152,7 +152,7 @@ func srcsetFilterAndEscaper(args ...interface{}) string {
 		// Normalizing gets rid of all HTML whitespace
 		// which separate the image URL from its metadata.
 		var b bytes.Buffer
-		if processURLOnto(s, true, &b) {
+		if processUrlOnto(s, true, &b) {
 			s = b.String()
 		}
 		// Additionally, commas separate one source from another.
@@ -173,43 +173,43 @@ func srcsetFilterAndEscaper(args ...interface{}) string {
 }
 
 // Derived from https://play.golang.org/p/Dhmj7FORT5
-const htmlSpaceAndASCIIAlnumBytes = "\x00\x36\x00\x00\x01\x00\xff\x03\xfe\xff\xff\x07\xfe\xff\xff\x07"
+const htmlSpaceAndAsciiAlnumBytes = "\x00\x36\x00\x00\x01\x00\xff\x03\xfe\xff\xff\x07\xfe\xff\xff\x07"
 
-// isHTMLSpace is true iff c is a whitespace character per
+// isHtmlSpace is true iff c is a whitespace character per
 // https://infra.spec.whatwg.org/#ascii-whitespace
-func isHTMLSpace(c byte) bool {
-	return (c <= 0x20) && 0 != (htmlSpaceAndASCIIAlnumBytes[c>>3]&(1<<uint(c&0x7)))
+func isHtmlSpace(c byte) bool {
+	return (c <= 0x20) && 0 != (htmlSpaceAndAsciiAlnumBytes[c>>3]&(1<<uint(c&0x7)))
 }
 
-func isHTMLSpaceOrASCIIAlnum(c byte) bool {
-	return (c < 0x80) && 0 != (htmlSpaceAndASCIIAlnumBytes[c>>3]&(1<<uint(c&0x7)))
+func isHtmlSpaceOrAsciiAlnum(c byte) bool {
+	return (c < 0x80) && 0 != (htmlSpaceAndAsciiAlnumBytes[c>>3]&(1<<uint(c&0x7)))
 }
 
 func filterSrcsetElement(s string, left int, right int, b *bytes.Buffer) {
 	start := left
-	for start < right && isHTMLSpace(s[start]) {
-		start++
+	for start < right && isHtmlSpace(s[start]) {
+		start += 1
 	}
 	end := right
 	for i := start; i < right; i++ {
-		if isHTMLSpace(s[i]) {
+		if isHtmlSpace(s[i]) {
 			end = i
 			break
 		}
 	}
-	if url := s[start:end]; isSafeURL(url) {
+	if url := s[start:end]; isSafeUrl(url) {
 		// If image metadata is only spaces or alnums then
 		// we don't need to URL normalize it.
 		metadataOk := true
 		for i := end; i < right; i++ {
-			if !isHTMLSpaceOrASCIIAlnum(s[i]) {
+			if !isHtmlSpaceOrAsciiAlnum(s[i]) {
 				metadataOk = false
 				break
 			}
 		}
 		if metadataOk {
 			b.WriteString(s[left:start])
-			processURLOnto(url, true, b)
+			processUrlOnto(url, true, b)
 			b.WriteString(s[end:right])
 			return
 		}

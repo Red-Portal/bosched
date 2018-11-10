@@ -4,6 +4,5 @@
 struct A
 {
     template<typename T>
-    static void* operator new(T) {}  // { dg-error "invalid template" }
-// { dg-error "18:.operator new. takes type .size_t." "first" { target *-*-* } .-1 }
+    static void* operator new(T) {} // { dg-error "first parameter|invalid template" }
 };

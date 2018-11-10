@@ -19,13 +19,7 @@
 
 // { dg-do compile }
 
-#if _GLIBCXX_DEBUG
-# include <debug/string>
-using namespace __gnu_debug;
-#else
-# include <string>
-using namespace std;
-#endif
+#include <string>
 
 namespace N
 {
@@ -42,7 +36,7 @@ namespace N
 
 int main()
 { 
-  basic_string<N::X> s(5, N::X());
+  std::basic_string<N::X> s(5, N::X());
 
   s.erase(s.begin());
   s.erase(s.begin(), s.end());

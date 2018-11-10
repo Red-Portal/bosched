@@ -23,12 +23,8 @@
 
 // { dg-do compile { target c++11 } }
 
-using __gnu_test::ExplicitConsAlloc;
-
 // libstdc++/50118
 template class std::unordered_map<int, int, std::hash<int>, std::equal_to<int>,
-				  ExplicitConsAlloc<std::pair<const int, int>>>;
-#ifndef __STRICT_ANSI__
+				  __gnu_test::ExplicitConsAlloc<int>>;
 template class std::unordered_map<int, int, std::hash<int>, std::equal_to<int>,
-				  ExplicitConsAlloc<char>>;
-#endif
+				  __gnu_test::ExplicitConsAlloc<char>>;

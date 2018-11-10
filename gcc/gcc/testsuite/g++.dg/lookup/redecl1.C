@@ -1,7 +1,7 @@
 // PR c++/14668
 
-class A {}; // { dg-message "declared here" }
+class A {}; // { dg-error "" }
 class B { 
-  static A *A; // { dg-error "changes meaning" }
+  static A *A; // { dg-error "" }
 }; 
 A *B::A = 0;

@@ -447,9 +447,10 @@ func TestEscapingNilNonemptyInterfaces(t *testing.T) {
 	testData := struct{ E error }{} // any non-empty interface here will do; error is just ready at hand
 	tmpl.Execute(got, testData)
 
-	// A non-empty interface should print like an empty interface.
+	// Use this data instead of just hard-coding "&lt;nil&gt;" to avoid
+	// dependencies on the html escaper and the behavior of fmt w.r.t. nil.
 	want := new(bytes.Buffer)
-	data := struct{ E interface{} }{}
+	data := struct{ E string }{E: fmt.Sprint(nil)}
 	tmpl.Execute(want, data)
 
 	if !bytes.Equal(want.Bytes(), got.Bytes()) {

@@ -27,17 +27,8 @@
 #include "new"
  
 _GLIBCXX_WEAK_DEFINITION void*
-operator new[] (std::size_t sz, const std::nothrow_t&) noexcept
+operator new[] (std::size_t sz, const std::nothrow_t& nothrow)
+  _GLIBCXX_USE_NOEXCEPT
 {
-  // _GLIBCXX_RESOLVE_LIB_DEFECTS
-  // 206. operator new(size_t, nothrow) may become unlinked to ordinary
-  // operator new if ordinary version replaced
-  __try
-    {
-      return ::operator new[](sz);
-    }
-  __catch (...)
-    {
-      return nullptr;
-    }
+  return ::operator new(sz, nothrow);
 }

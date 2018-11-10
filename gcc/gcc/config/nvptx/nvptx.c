@@ -79,7 +79,6 @@
 
 #define WORKAROUND_PTXJIT_BUG 1
 #define WORKAROUND_PTXJIT_BUG_2 1
-#define WORKAROUND_PTXJIT_BUG_3 1
 
 /* The various PTX memory areas an object might reside in.  */
 enum nvptx_data_area
@@ -3990,140 +3989,6 @@ bb_first_real_insn (basic_block bb)
 }
 #endif
 
-/* Return true if INSN needs neutering.  */
-
-static bool
-needs_neutering_p (rtx_insn *insn)
-{
-  if (!INSN_P (insn))
-    return false;
-
-  switch (recog_memoized (insn))
-    {
-    case CODE_FOR_nvptx_fork:
-    case CODE_FOR_nvptx_forked:
-    case CODE_FOR_nvptx_joining:
-    case CODE_FOR_nvptx_join:
-    case CODE_FOR_nvptx_barsync:
-      return false;
-    default:
-      return true;
-    }
-}
-
-/* Verify position of VECTOR_{JUMP,LABEL} and WORKER_{JUMP,LABEL} in FROM.  */
-
-static bool
-verify_neutering_jumps (basic_block from,
-			rtx_insn *vector_jump, rtx_insn *worker_jump,
-			rtx_insn *vector_label, rtx_insn *worker_label)
-{
-  basic_block bb = from;
-  rtx_insn *insn = BB_HEAD (bb);
-  bool seen_worker_jump = false;
-  bool seen_vector_jump = false;
-  bool seen_worker_label = false;
-  bool seen_vector_label = false;
-  bool worker_neutered = false;
-  bool vector_neutered = false;
-  while (true)
-    {
-      if (insn == worker_jump)
-	{
-	  seen_worker_jump = true;
-	  worker_neutered = true;
-	  gcc_assert (!vector_neutered);
-	}
-      else if (insn == vector_jump)
-	{
-	  seen_vector_jump = true;
-	  vector_neutered = true;
-	}
-      else if (insn == worker_label)
-	{
-	  seen_worker_label = true;
-	  gcc_assert (worker_neutered);
-	  worker_neutered = false;
-	}
-      else if (insn == vector_label)
-	{
-	  seen_vector_label = true;
-	  gcc_assert (vector_neutered);
-	  vector_neutered = false;
-	}
-      else if (INSN_P (insn))
-	switch (recog_memoized (insn))
-	  {
-	  case CODE_FOR_nvptx_barsync:
-	    gcc_assert (!vector_neutered && !worker_neutered);
-	    break;
-	  default:
-	    break;
-	  }
-
-      if (insn != BB_END (bb))
-	insn = NEXT_INSN (insn);
-      else if (JUMP_P (insn) && single_succ_p (bb)
-	       && !seen_vector_jump && !seen_worker_jump)
-	{
-	  bb = single_succ (bb);
-	  insn = BB_HEAD (bb);
-	}
-      else
-	break;
-    }
-
-  gcc_assert (!(vector_jump && !seen_vector_jump));
-  gcc_assert (!(worker_jump && !seen_worker_jump));
-
-  if (seen_vector_label || seen_worker_label)
-    {
-      gcc_assert (!(vector_label && !seen_vector_label));
-      gcc_assert (!(worker_label && !seen_worker_label));
-
-      return true;
-    }
-
-  return false;
-}
-
-/* Verify position of VECTOR_LABEL and WORKER_LABEL in TO.  */
-
-static void
-verify_neutering_labels (basic_block to, rtx_insn *vector_label,
-			 rtx_insn *worker_label)
-{
-  basic_block bb = to;
-  rtx_insn *insn = BB_END (bb);
-  bool seen_worker_label = false;
-  bool seen_vector_label = false;
-  while (true)
-    {
-      if (insn == worker_label)
-	{
-	  seen_worker_label = true;
-	  gcc_assert (!seen_vector_label);
-	}
-      else if (insn == vector_label)
-	seen_vector_label = true;
-      else if (INSN_P (insn))
-	switch (recog_memoized (insn))
-	  {
-	  case CODE_FOR_nvptx_barsync:
-	    gcc_assert (!seen_vector_label && !seen_worker_label);
-	    break;
-	  }
-
-      if (insn != BB_HEAD (bb))
-	insn = PREV_INSN (insn);
-      else
-	break;
-    }
-
-  gcc_assert (!(vector_label && !seen_vector_label));
-  gcc_assert (!(worker_label && !seen_worker_label));
-}
-
 /* Single neutering according to MASK.  FROM is the incoming block and
    TO is the outgoing block.  These may be the same block. Insert at
    start of FROM:
@@ -4149,7 +4014,9 @@ nvptx_single (unsigned mask, basic_block from, basic_block to)
   while (true)
     {
       /* Find first insn of from block.  */
-      while (head != BB_END (from) && !needs_neutering_p (head))
+      while (head != BB_END (from)
+	     && (!INSN_P (head)
+		 || recog_memoized (head) == CODE_FOR_nvptx_barsync))
 	head = NEXT_INSN (head);
 
       if (from == to)
@@ -4190,8 +4057,21 @@ nvptx_single (unsigned mask, basic_block from, basic_block to)
   if (tail == head)
     {
       /* If this is empty, do nothing.  */
-      if (!head || !needs_neutering_p (head))
+      if (!head || !INSN_P (head))
 	return;
+
+      /* If this is a dummy insn, do nothing.  */
+      switch (recog_memoized (head))
+	{
+	default:
+	  break;
+	case CODE_FOR_nvptx_barsync:
+	case CODE_FOR_nvptx_fork:
+	case CODE_FOR_nvptx_forked:
+	case CODE_FOR_nvptx_joining:
+	case CODE_FOR_nvptx_join:
+	  return;
+	}
 
       if (cond_branch)
 	{
@@ -4209,15 +4089,11 @@ nvptx_single (unsigned mask, basic_block from, basic_block to)
   unsigned mode;
   rtx_insn *before = tail;
   rtx_insn *neuter_start = NULL;
-  rtx_insn *worker_label = NULL, *vector_label = NULL;
-  rtx_insn *worker_jump = NULL, *vector_jump = NULL;
   for (mode = GOMP_DIM_WORKER; mode <= GOMP_DIM_VECTOR; mode++)
     if (GOMP_DIM_MASK (mode) & skip_mask)
       {
 	rtx_code_label *label = gen_label_rtx ();
 	rtx pred = cfun->machine->axis_predicate[mode - GOMP_DIM_WORKER];
-	rtx_insn **mode_jump = mode == GOMP_DIM_VECTOR ? &vector_jump : &worker_jump;
-	rtx_insn **mode_label = mode == GOMP_DIM_VECTOR ? &vector_label : &worker_label;
 
 	if (!pred)
 	  {
@@ -4234,27 +4110,17 @@ nvptx_single (unsigned mask, basic_block from, basic_block to)
 	  neuter_start = emit_insn_after (br, neuter_start);
 	else
 	  neuter_start = emit_insn_before (br, head);
-	*mode_jump = neuter_start;
 
 	LABEL_NUSES (label)++;
-	rtx_insn *label_insn;
 	if (tail_branch)
-	  {
-	    label_insn = emit_label_before (label, before);
-	    before = label_insn;
-	  }
+	  before = emit_label_before (label, before);
 	else
 	  {
-	    label_insn = emit_label_after (label, tail);
+	    rtx_insn *label_insn = emit_label_after (label, tail);
 	    if ((mode == GOMP_DIM_VECTOR || mode == GOMP_DIM_WORKER)
 		&& CALL_P (tail) && find_reg_note (tail, REG_NORETURN, NULL))
 	      emit_insn_after (gen_exit (), label_insn);
 	  }
-
-	if (mode == GOMP_DIM_VECTOR)
-	  vector_label = label_insn;
-	else
-	  worker_label = label_insn;
       }
 
   /* Now deal with propagating the branch condition.  */
@@ -4354,11 +4220,6 @@ nvptx_single (unsigned mask, basic_block from, basic_block to)
 				 UNSPEC_BR_UNIFIED);
       validate_change (tail, recog_data.operand_loc[0], unsp, false);
     }
-
-  bool seen_label = verify_neutering_jumps (from, vector_jump, worker_jump,
-					    vector_label, worker_label);
-  if (!seen_label)
-    verify_neutering_labels (to, vector_label, worker_label);
 }
 
 /* PAR is a parallel that is being skipped in its entirety according to
@@ -4648,50 +4509,6 @@ prevent_branch_around_nothing (void)
   }
 #endif
 
-#ifdef WORKAROUND_PTXJIT_BUG_3
-/* Insert two membar.cta insns inbetween two subsequent bar.sync insns.  This
-   works around a hang observed at driver version 390.48 for sm_50.  */
-
-static void
-workaround_barsyncs (void)
-{
-  bool seen_barsync = false;
-  for (rtx_insn *insn = get_insns (); insn; insn = NEXT_INSN (insn))
-    {
-      if (INSN_P (insn) && recog_memoized (insn) == CODE_FOR_nvptx_barsync)
-	{
-	  if (seen_barsync)
-	    {
-	      emit_insn_before (gen_nvptx_membar_cta (), insn);
-	      emit_insn_before (gen_nvptx_membar_cta (), insn);
-	    }
-
-	  seen_barsync = true;
-	  continue;
-	}
-
-      if (!seen_barsync)
-	continue;
-
-      if (NOTE_P (insn) || DEBUG_INSN_P (insn))
-	continue;
-      else if (INSN_P (insn))
-	switch (recog_memoized (insn))
-	  {
-	  case CODE_FOR_nvptx_fork:
-	  case CODE_FOR_nvptx_forked:
-	  case CODE_FOR_nvptx_joining:
-	  case CODE_FOR_nvptx_join:
-	    continue;
-	  default:
-	    break;
-	  }
-
-      seen_barsync = false;
-    }
-}
-#endif
-
 /* PTX-specific reorganization
    - Split blocks at fork and join instructions
    - Compute live registers
@@ -4773,10 +4590,6 @@ nvptx_reorg (void)
 
 #if WORKAROUND_PTXJIT_BUG_2
   prevent_branch_around_nothing ();
-#endif
-
-#ifdef WORKAROUND_PTXJIT_BUG_3
-  workaround_barsyncs ();
 #endif
 
   regstat_free_n_sets_and_refs ();
@@ -4931,10 +4744,7 @@ nvptx_file_start (void)
 {
   fputs ("// BEGIN PREAMBLE\n", asm_out_file);
   fputs ("\t.version\t3.1\n", asm_out_file);
-  if (TARGET_SM35)
-    fputs ("\t.target\tsm_35\n", asm_out_file);
-  else
-    fputs ("\t.target\tsm_30\n", asm_out_file);
+  fputs ("\t.target\tsm_30\n", asm_out_file);
   fprintf (asm_out_file, "\t.address_size %d\n", GET_MODE_BITSIZE (Pmode));
   fputs ("// END PREAMBLE\n", asm_out_file);
 }
@@ -5168,7 +4978,7 @@ nvptx_expand_builtin (tree exp, rtx target, rtx ARG_UNUSED (subtarget),
 /* Define dimension sizes for known hardware.  */
 #define PTX_VECTOR_LENGTH 32
 #define PTX_WORKER_LENGTH 32
-#define PTX_DEFAULT_RUNTIME_DIM 0 /* Defer to runtime.  */
+#define PTX_GANG_DEFAULT  0 /* Defer to runtime.  */
 
 /* Implement TARGET_SIMT_VF target hook: number of threads in a warp.  */
 
@@ -5217,9 +5027,9 @@ nvptx_goacc_validate_dims (tree decl, int dims[], int fn_level)
     {
       dims[GOMP_DIM_VECTOR] = PTX_VECTOR_LENGTH;
       if (dims[GOMP_DIM_WORKER] < 0)
-	dims[GOMP_DIM_WORKER] = PTX_DEFAULT_RUNTIME_DIM;
+	dims[GOMP_DIM_WORKER] = PTX_WORKER_LENGTH;
       if (dims[GOMP_DIM_GANG] < 0)
-	dims[GOMP_DIM_GANG] = PTX_DEFAULT_RUNTIME_DIM;
+	dims[GOMP_DIM_GANG] = PTX_GANG_DEFAULT;
       changed = true;
     }
 
@@ -5233,6 +5043,9 @@ nvptx_dim_limit (int axis)
 {
   switch (axis)
     {
+    case GOMP_DIM_WORKER:
+      return PTX_WORKER_LENGTH;
+
     case GOMP_DIM_VECTOR:
       return PTX_VECTOR_LENGTH;
 
@@ -6050,9 +5863,6 @@ nvptx_can_change_mode_class (machine_mode, machine_mode, reg_class_t)
 
 #undef TARGET_CAN_CHANGE_MODE_CLASS
 #define TARGET_CAN_CHANGE_MODE_CLASS nvptx_can_change_mode_class
-
-#undef TARGET_HAVE_SPECULATION_SAFE_VALUE
-#define TARGET_HAVE_SPECULATION_SAFE_VALUE speculation_safe_value_not_needed
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 

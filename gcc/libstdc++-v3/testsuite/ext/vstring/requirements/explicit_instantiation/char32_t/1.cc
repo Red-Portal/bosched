@@ -1,4 +1,5 @@
 // { dg-do compile { target c++11 } }
+// { dg-require-cstdint "" }
 // { dg-require-string-conversions "" }
 
 // Copyright (C) 2008-2018 Free Software Foundation, Inc.

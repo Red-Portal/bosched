@@ -7,8 +7,6 @@ void f (void)
 /* { dg-begin-multiline-output "" }
    __builtin_printf ("%i", "");
                       ~^   ~~
-                       |   |
-                       int char *
                       %s
    { dg-end-multiline-output "" } */
 }

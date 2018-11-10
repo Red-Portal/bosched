@@ -1,47 +1,3 @@
-<<<<<<< HEAD
-2018-10-31  Joseph Myers  <joseph@codesourcery.com>
-
-	PR bootstrap/82856
-	* configure.ac: Remove AC_PREREQ.
-	* aclocal.m4, configure: Regenerate.
-
-2018-10-16  Rasmus Villemoes  <rv@rasmusvillemoes.dk>
-
-	* inclhack.def (AAB_vxworks_regs_vxtypes): Add unconditional
-	include of vxCpu.h, guard include of vxTypesOld.h by
-	!_ASMLANGUAGE.
-	* fixincl.x: Regenerate.
-
-2018-09-03  Rasmus Villemoes  <rv@rasmusvillemoes.dk>
-
-	* inclhack.def (vxworks_ioctl_macro): Remove parentheses from
-	expansion of ioctl macro.
-	* fixincl.x: Regenerate.
-
-2018-07-23  David Edelsohn  <dje.gcc@gmail.com>
-
-	* inclhack.def (aix_unistd): New.
-	* fixincl.x: Regenerate.
-	* tests/base/unistd.h [AIX_UNISTD_CHECK]: New test.
-
-2018-06-27  Rasmus Villemoes  <rv@rasmusvillemoes.dk>
-
-	* tests/base/ioLib.h [VXWORKS_IOLIB_INCLUDE_UNISTD_CHECK]: Add
-	missing hunk.
-
-2018-06-12    Rasmus Villemoes <rasmus.villemoes@prevas.dk>
-
-	* genfixes: exit 1 when autogen not found.
-	* genfixes: Remove some redundant code.
-	* genfixes: Update URL to autogen source code.
-
-	* inclhack.def: Fix fixup for assert.h on vxworks.
-	* fixincl.x: Regenerate.
-
-2018-05-25  Rasmus Villemoes  <rasmus.villemoes@prevas.dk>
-
-	* inclhack.def (vxworks_iolib_include_unistd): New fix.
-=======
 2018-07-26  Release Manager
 
 	* GCC 8.2.0 released.
@@ -49,7 +5,6 @@
 2018-05-02  Release Manager
 
 	* GCC 8.1.0 released.
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
 
 2018-04-18  David Malcolm  <dmalcolm@redhat.com>
 
@@ -1285,7 +1240,7 @@
 	* tests/base/math.h: Update.
 
 2007-01-05  Bruce Korb <bkorb@gnu.org>, 
-	    Daniel Franke <franke.daniel@gmail.com>
+            Daniel Franke <franke.daniel@gmail.com>
 
 	PR target/30008
 	* fixincl.tpl (List): separate file name patterns with a NUL byte instead
@@ -1501,7 +1456,7 @@
 	* fixincl.c: Don't include <sys/wait.h> if SEPARATE_FIX_PROC.
 
 2005-05-19  Eric Botcazou  <ebotcazou@libertysurf.fr>
-	    Joseph S. Myers  <joseph@codesourcery.com>
+            Joseph S. Myers  <joseph@codesourcery.com>
 
 	PR target/19933
 	PR target/21315

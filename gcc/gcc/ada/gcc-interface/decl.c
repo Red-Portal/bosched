@@ -52,19 +52,23 @@
 #include "ada-tree.h"
 #include "gigi.h"
 
-/* The "stdcall" convention is really supported on 32-bit x86/Windows only.
-   The following macro is a helper to avoid having to check for a Windows
-   specific attribute throughout this unit.  */
+/* "stdcall" and "thiscall" conventions should be processed in a specific way
+   on 32-bit x86/Windows only.  The macros below are helpers to avoid having
+   to check for a Windows specific attribute throughout this unit.  */
 
 #if TARGET_DLLIMPORT_DECL_ATTRIBUTES
 #ifdef TARGET_64BIT
 #define Has_Stdcall_Convention(E) \
   (!TARGET_64BIT && Convention (E) == Convention_Stdcall)
+#define Has_Thiscall_Convention(E) \
+  (!TARGET_64BIT && is_cplusplus_method (E))
 #else
 #define Has_Stdcall_Convention(E) (Convention (E) == Convention_Stdcall)
+#define Has_Thiscall_Convention(E) (is_cplusplus_method (E))
 #endif
 #else
 #define Has_Stdcall_Convention(E) 0
+#define Has_Thiscall_Convention(E) 0
 #endif
 
 #define STDCALL_PREFIX "_imp__"
@@ -119,9 +123,6 @@ typedef struct variant_desc_d {
 
   /* The type of the variant after transformation.  */
   tree new_type;
-
-  /* The auxiliary data.  */
-  tree aux;
 } variant_desc;
 
 
@@ -269,9 +270,7 @@ static bool intrin_profiles_compatible_p (intrin_binding_t *);
 tree
 gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, bool definition)
 {
-  /* The construct that declared the entity.  */
-  const Node_Id gnat_decl = Declaration_Node (gnat_entity);
-  /* The kind of the entity.  */
+  /* Contains the kind of the input GNAT node.  */
   const Entity_Kind kind = Ekind (gnat_entity);
   /* True if this is a type.  */
   const bool is_type = IN (kind, Type_Kind);
@@ -282,8 +281,6 @@ gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, bool definition)
   /* True if this entity is to be considered as imported.  */
   const bool imported_p
     = (Is_Imported (gnat_entity) && No (Address_Clause (gnat_entity)));
-  /* True if this entity has a foreign convention.  */
-  const bool foreign = Has_Foreign_Convention (gnat_entity);
   /* For a type, contains the equivalent GNAT node to be used in gigi.  */
   Entity_Id gnat_equiv_type = Empty;
   /* Temporary used to walk the GNAT tree.  */
@@ -428,10 +425,11 @@ gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, bool definition)
 	      || Is_Public (gnat_entity));
 
   /* Get the name of the entity and set up the line number and filename of
-     the original definition for use in any decl we make.  Make sure we do
-     not inherit another source location.  */
+     the original definition for use in any decl we make.  Make sure we do not
+     inherit another source location.  */
   gnu_entity_name = get_entity_name (gnat_entity);
-  if (!renaming_from_instantiation_p (gnat_entity))
+  if (Sloc (gnat_entity) != No_Location
+      && !renaming_from_instantiation_p (gnat_entity))
     Sloc_to_locus (Sloc (gnat_entity), &input_location);
 
   /* For cases when we are not defining (i.e., we are referencing from
@@ -576,7 +574,7 @@ gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, bool definition)
       if (definition
 	  && !gnu_expr
 	  && No (Address_Clause (gnat_entity))
-	  && !No_Initialization (gnat_decl)
+	  && !No_Initialization (Declaration_Node (gnat_entity))
 	  && No (Renamed_Object (gnat_entity)))
 	{
 	  gnu_decl = error_mark_node;
@@ -609,18 +607,11 @@ gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, bool definition)
 	 may contain N_Expression_With_Actions nodes and thus declarations of
 	 objects from other units that we need to discard.  */
       if (!definition
-<<<<<<< HEAD
-	  && !No_Initialization (gnat_decl)
-	  && !Is_Dispatch_Table_Entity (gnat_entity)
-	  && Present (gnat_temp = Expression (gnat_decl))
-	  && Nkind (gnat_temp) != N_Allocator)
-=======
 	  && !No_Initialization (Declaration_Node (gnat_entity))
 	  && !Is_Dispatch_Table_Entity (gnat_entity)
 	  && Present (gnat_temp = Expression (Declaration_Node (gnat_entity)))
 	  && Nkind (gnat_temp) != N_Allocator
 	  && (!type_annotate_only || Compile_Time_Known_Value (gnat_temp)))
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
 	gnu_expr = gnat_to_gnu_external (gnat_temp);
 
       /* ... fall through ... */
@@ -639,8 +630,9 @@ gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, bool definition)
 	     && !(kind == E_Variable
 		  && Present (Linker_Section_Pragma (gnat_entity)))
 	     && !Treat_As_Volatile (gnat_entity)
-	     && (((Nkind (gnat_decl) == N_Object_Declaration)
-		  && Present (Expression (gnat_decl)))
+	     && (((Nkind (Declaration_Node (gnat_entity))
+		   == N_Object_Declaration)
+		  && Present (Expression (Declaration_Node (gnat_entity))))
 		 || Present (Renamed_Object (gnat_entity))
 		 || imported_p));
 	bool inner_const_flag = const_flag;
@@ -654,7 +646,7 @@ gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, bool definition)
 	bool used_by_ref = false;
 	tree gnu_ext_name = NULL_TREE;
 	tree renamed_obj = NULL_TREE;
-	tree gnu_ada_size = NULL_TREE;
+	tree gnu_object_size;
 
 	/* We need to translate the renamed object even though we are only
 	   referencing the renaming.  But it may contain a call for which
@@ -670,7 +662,8 @@ gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, bool definition)
 	  }
 
 	/* Get the type after elaborating the renamed object.  */
-	if (foreign && Is_Descendant_Of_Address (Underlying_Type (gnat_type)))
+	if (Has_Foreign_Convention (gnat_entity)
+	    && Is_Descendant_Of_Address (Underlying_Type (gnat_type)))
 	  gnu_type = ptr_type_node;
 	else
 	  {
@@ -759,9 +752,8 @@ gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, bool definition)
 	  {
 	    if (gnu_expr && kind == E_Constant)
 	      {
-		gnu_size = TYPE_SIZE (TREE_TYPE (gnu_expr));
-		gnu_ada_size = TYPE_ADA_SIZE (TREE_TYPE (gnu_expr));
-		if (CONTAINS_PLACEHOLDER_P (gnu_size))
+		tree size = TYPE_SIZE (TREE_TYPE (gnu_expr));
+		if (CONTAINS_PLACEHOLDER_P (size))
 		  {
 		    /* If the initializing expression is itself a constant,
 		       despite having a nominal type with self-referential
@@ -773,38 +765,27 @@ gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, bool definition)
 			&& (TREE_READONLY (TREE_OPERAND (gnu_expr, 0))
 			    || DECL_READONLY_ONCE_ELAB
 			       (TREE_OPERAND (gnu_expr, 0))))
-		      {
-			gnu_size = DECL_SIZE (TREE_OPERAND (gnu_expr, 0));
-			gnu_ada_size = gnu_size;
-		      }
+		      gnu_size = DECL_SIZE (TREE_OPERAND (gnu_expr, 0));
 		    else
-		      {
-			gnu_size
-			  = SUBSTITUTE_PLACEHOLDER_IN_EXPR (gnu_size,
-							    gnu_expr);
-			gnu_ada_size
-			  = SUBSTITUTE_PLACEHOLDER_IN_EXPR (gnu_ada_size,
-							    gnu_expr);
-		      }
+		      gnu_size
+			= SUBSTITUTE_PLACEHOLDER_IN_EXPR (size, gnu_expr);
 		  }
+		else
+		  gnu_size = size;
 	      }
 	    /* We may have no GNU_EXPR because No_Initialization is
 	       set even though there's an Expression.  */
 	    else if (kind == E_Constant
-		     && Nkind (gnat_decl) == N_Object_Declaration
-		     && Present (Expression (gnat_decl)))
-	      {
-		tree gnu_expr_type
-		  = gnat_to_gnu_type (Etype (Expression (gnat_decl)));
-		gnu_size = TYPE_SIZE (gnu_expr_type);
-		gnu_ada_size = TYPE_ADA_SIZE (gnu_expr_type);
-	      }
+		     && (Nkind (Declaration_Node (gnat_entity))
+			 == N_Object_Declaration)
+		     && Present (Expression (Declaration_Node (gnat_entity))))
+	      gnu_size
+		= TYPE_SIZE (gnat_to_gnu_type
+			     (Etype
+			      (Expression (Declaration_Node (gnat_entity)))));
 	    else
 	      {
 		gnu_size = max_size (TYPE_SIZE (gnu_type), true);
-		/* We can be called on unconstrained arrays in this mode.  */
-		if (!type_annotate_only)
-		  gnu_ada_size = max_size (TYPE_ADA_SIZE (gnu_type), true);
 		mutable_p = true;
 	      }
 
@@ -920,20 +901,13 @@ gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, bool definition)
 	/* Make a new type with the desired size and alignment, if needed.
 	   But do not take into account alignment promotions to compute the
 	   size of the object.  */
-	tree gnu_object_size = gnu_size ? gnu_size : TYPE_SIZE (gnu_type);
+	gnu_object_size = gnu_size ? gnu_size : TYPE_SIZE (gnu_type);
 	if (gnu_size || align > 0)
 	  {
 	    tree orig_type = gnu_type;
 
 	    gnu_type = maybe_pad_type (gnu_type, gnu_size, align, gnat_entity,
 				       false, false, definition, true);
-
-	    /* If the nominal subtype of the object is unconstrained and its
-	       size is not fixed, compute the Ada size from the Ada size of
-	       the subtype and/or the expression; this will make it possible
-	       for gnat_type_max_size to easily compute a maximum size.  */
-	    if (gnu_ada_size && gnu_size && !TREE_CONSTANT (gnu_size))
-	      SET_TYPE_ADA_SIZE (gnu_type, gnu_ada_size);
 
 	    /* If a padding record was made, declare it now since it will
 	       never be declared otherwise.  This is necessary to ensure
@@ -1154,10 +1128,10 @@ gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, bool definition)
 	if (definition && Present (Address_Clause (gnat_entity)))
 	  {
 	    const Node_Id gnat_clause = Address_Clause (gnat_entity);
-	    const Node_Id gnat_address = Expression (gnat_clause);
-	    tree gnu_address = present_gnu_tree (gnat_entity)
-			       ? TREE_OPERAND (get_gnu_tree (gnat_entity), 0)
-			       : gnat_to_gnu (gnat_address);
+	    Node_Id gnat_address = Expression (gnat_clause);
+	    tree gnu_address
+	      = present_gnu_tree (gnat_entity)
+		? get_gnu_tree (gnat_entity) : gnat_to_gnu (gnat_address);
 
 	    save_gnu_tree (gnat_entity, NULL_TREE, false);
 
@@ -1623,10 +1597,6 @@ gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, bool definition)
 	  tree gnu_list = NULL_TREE;
 	  Entity_Id gnat_literal;
 
-	  /* Boolean types with foreign convention have precision 1.  */
-	  if (is_boolean && foreign)
-	    esize = 1;
-
 	  gnu_type = make_node (is_boolean ? BOOLEAN_TYPE : ENUMERAL_TYPE);
 	  TYPE_PRECISION (gnu_type) = esize;
 	  TYPE_UNSIGNED (gnu_type) = is_unsigned;
@@ -1807,15 +1777,6 @@ gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, bool definition)
 	  && Is_Bit_Packed_Array (Original_Array_Type (gnat_entity)))
 	esize = UI_To_Int (RM_Size (gnat_entity));
 
-      /* Boolean types with foreign convention have precision 1.  */
-      if (Is_Boolean_Type (gnat_entity) && foreign)
-	{
-	  gnu_type = make_node (BOOLEAN_TYPE);
-	  TYPE_PRECISION (gnu_type) = 1;
-	  TYPE_UNSIGNED (gnu_type) = 1;
-	  set_min_and_max_values_for_integral_type (gnu_type, 1, UNSIGNED);
-	  layout_type (gnu_type);
-	}
       /* First subtypes of Character are treated as Character; otherwise
 	 this should be an unsigned type if the base type is unsigned or
 	 if the lower bound is constant and non-negative or if the type
@@ -1825,7 +1786,7 @@ gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, bool definition)
 	 conversions to it and gives more leeway to the optimizer; but
 	 this means that we will need to explicitly test for this case
 	 when we change the representation based on the RM size.  */
-      else if (kind == E_Enumeration_Subtype
+      if (kind == E_Enumeration_Subtype
 	  && No (First_Literal (Etype (gnat_entity)))
 	  && Esize (gnat_entity) == RM_Size (gnat_entity)
 	  && esize == CHAR_TYPE_SIZE
@@ -1850,9 +1811,8 @@ gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, bool definition)
 					 gnat_entity, "U", definition, true,
 					 debug_info_p));
 
-      if (TREE_CODE (gnu_type) == INTEGER_TYPE)
-	TYPE_BIASED_REPRESENTATION_P (gnu_type)
-	  = Has_Biased_Representation (gnat_entity);
+      TYPE_BIASED_REPRESENTATION_P (gnu_type)
+	= Has_Biased_Representation (gnat_entity);
 
       /* Do the same processing for Character subtypes as for types.  */
       if (TYPE_STRING_FLAG (TREE_TYPE (gnu_type)))
@@ -1916,6 +1876,10 @@ gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, bool definition)
 			    UI_To_gnu (RM_Size (gnat_entity), bitsizetype));
 	  TYPE_PACKED_ARRAY_TYPE_P (gnu_type) = 1;
 
+	  /* Strip the ___XP suffix for standard DWARF.  */
+	  if (gnat_encodings == DWARF_GNAT_ENCODINGS_MINIMAL)
+	    gnu_entity_name = TYPE_NAME (gnu_type);
+
 	  /* Create a stripped-down declaration, mainly for debugging.  */
 	  create_type_decl (gnu_entity_name, gnu_type, true, debug_info_p,
 			    gnat_entity);
@@ -1955,6 +1919,7 @@ gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, bool definition)
 
 	  /* We will output additional debug info manually below.  */
 	  finish_record_type (gnu_type, gnu_field, 2, false);
+	  compute_record_mode (gnu_type);
 	  TYPE_JUSTIFIED_MODULAR_P (gnu_type) = 1;
 
 	  if (debug_info_p)
@@ -2676,6 +2641,17 @@ gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, bool definition)
 		set_nonaliased_component_on_array_type (gnu_type);
 	    }
 
+	  /* Strip the ___XP suffix for standard DWARF.  */
+	  if (Is_Packed_Array_Impl_Type (gnat_entity)
+	      && gnat_encodings == DWARF_GNAT_ENCODINGS_MINIMAL)
+	    {
+	      Entity_Id gnat_original_array_type
+		= Underlying_Type (Original_Array_Type (gnat_entity));
+
+	      gnu_entity_name
+		= get_entity_name (gnat_original_array_type);
+	    }
+
 	  /* Attach the TYPE_STUB_DECL in case we have a parallel type.  */
 	  TYPE_STUB_DECL (gnu_type)
 	    = create_type_stub_decl (gnu_entity_name, gnu_type);
@@ -2801,10 +2777,13 @@ gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, bool definition)
 	     array subtypes the same alias set.  */
 	  relate_alias_sets (gnu_type, gnu_base_type, ALIAS_SET_COPY);
 
-	  /* If this is a packed type implemented specially, then replace our
-	     type with the implementation type.  */
+	  /* If this is a packed type, make this type the same as the packed
+	     array type, but do some adjusting in the type first.  */
 	  if (Present (Packed_Array_Impl_Type (gnat_entity)))
 	    {
+	      Entity_Id gnat_index;
+	      tree gnu_inner;
+
 	      /* First finish the type we had been making so that we output
 		 debugging information for it.  */
 	      process_attributes (&gnu_type, &attr_list, false, gnat_entity);
@@ -2819,24 +2798,26 @@ gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, bool definition)
 		 That's sort of "morally" true and will make it possible for
 		 the debugger to look it up by name in DWARF, which is needed
 		 in order to decode the packed array type.  */
-	      tree gnu_tmp_decl
+	      gnu_decl
 		= create_type_decl (gnu_entity_name, gnu_type,
 				    !Comes_From_Source (Etype (gnat_entity))
 				    && artificial_p, debug_info_p,
 				    gnat_entity);
+
 	      /* Save it as our equivalent in case the call below elaborates
 		 this type again.  */
-	      save_gnu_tree (gnat_entity, gnu_tmp_decl, false);
+	      save_gnu_tree (gnat_entity, gnu_decl, false);
 
-	      gnu_type
-		= gnat_to_gnu_type (Packed_Array_Impl_Type (gnat_entity));
+	      gnu_decl
+		= gnat_to_gnu_entity (Packed_Array_Impl_Type (gnat_entity),
+				      NULL_TREE, false);
+	      this_made_decl = true;
+	      gnu_type = TREE_TYPE (gnu_decl);
 	      save_gnu_tree (gnat_entity, NULL_TREE, false);
+	      save_gnu_tree (gnat_entity, gnu_decl, false);
+	      saved = true;
 
-	      /* Set the ___XP suffix for GNAT encodings.  */
-	      if (gnat_encodings != DWARF_GNAT_ENCODINGS_MINIMAL)
-		gnu_entity_name = DECL_NAME (TYPE_NAME (gnu_type));
-
-	      tree gnu_inner = gnu_type;
+	      gnu_inner = gnu_type;
 	      while (TREE_CODE (gnu_inner) == RECORD_TYPE
 		     && (TYPE_JUSTIFIED_MODULAR_P (gnu_inner)
 			 || TYPE_PADDING_P (gnu_inner)))
@@ -2873,7 +2854,7 @@ gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, bool definition)
 		      gcc_checking_assert (!TYPE_ACTUAL_BOUNDS (gnu_inner));
 		    }
 
-		  for (Entity_Id gnat_index = First_Index (gnat_entity);
+		  for (gnat_index = First_Index (gnat_entity);
 		       Present (gnat_index);
 		       gnat_index = Next_Index (gnat_index))
 		    SET_TYPE_ACTUAL_BOUNDS
@@ -2963,19 +2944,23 @@ gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, bool definition)
        the tree.  */
 
     case E_Record_Type:
+      if (Has_Complex_Representation (gnat_entity))
+	{
+	  gnu_type
+	    = build_complex_type
+	      (get_unpadded_type
+	       (Etype (Defining_Entity
+		       (First (Component_Items
+			       (Component_List
+				(Type_Definition
+				 (Declaration_Node (gnat_entity)))))))));
+
+	  break;
+	}
+
       {
-	Node_Id record_definition = Type_Definition (gnat_decl);
-
-	if (Has_Complex_Representation (gnat_entity))
-	  {
-	    const Node_Id first_component
-	      = First (Component_Items (Component_List (record_definition)));
-	    tree gnu_component_type
-	      = get_unpadded_type (Etype (Defining_Entity (first_component)));
-	    gnu_type = build_complex_type (gnu_component_type);
-	    break;
-	  }
-
+	Node_Id full_definition = Declaration_Node (gnat_entity);
+	Node_Id record_definition = Type_Definition (full_definition);
 	Node_Id gnat_constr;
 	Entity_Id gnat_field, gnat_parent_type;
 	tree gnu_field, gnu_field_list = NULL_TREE;
@@ -3332,15 +3317,6 @@ gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, bool definition)
 				  debug_info_p, false,
 				  all_rep ? NULL_TREE : bitsize_zero_node,
 				  NULL);
-
-	    /* Empty classes have the size of a storage unit in C++.  */
-	    if (TYPE_SIZE (gnu_type) == bitsize_zero_node
-		&& Convention (gnat_entity) == Convention_CPP)
-	      {
-		TYPE_SIZE (gnu_type) = bitsize_unit_node;
-		TYPE_SIZE_UNIT (gnu_type) = size_one_node;
-		compute_record_mode (gnu_type);
-	      }
 
 	    /* If there are entities in the chain corresponding to components
 	       that we did not elaborate, ensure we elaborate their types if
@@ -3985,11 +3961,17 @@ gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, bool definition)
 	    (&attr_list, ATTR_MACHINE_ATTRIBUTE,
 	     get_identifier ("stdcall"), NULL_TREE,
 	     gnat_entity);
+	else if (Has_Thiscall_Convention (gnat_entity))
+	  prepend_one_attribute
+	    (&attr_list, ATTR_MACHINE_ATTRIBUTE,
+	     get_identifier ("thiscall"), NULL_TREE,
+	     gnat_entity);
 
 	/* If we should request stack realignment for a foreign convention
 	   subprogram, do so.  Note that this applies to task entry points
 	   in particular.  */
-	if (FOREIGN_FORCE_REALIGN_STACK && foreign)
+	if (FOREIGN_FORCE_REALIGN_STACK
+	    && Has_Foreign_Convention (gnat_entity))
 	  prepend_one_attribute
 	    (&attr_list, ATTR_MACHINE_ATTRIBUTE,
 	     get_identifier ("force_align_arg_pointer"), NULL_TREE,
@@ -4165,8 +4147,7 @@ gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, bool definition)
 	 part of the associated body so they need to be translated.  */
       if (type_annotate_only && gnat_equiv_type == gnat_entity)
 	{
-	  if (definition
-	      && Has_Discriminants (gnat_entity)
+	  if (Has_Discriminants (gnat_entity)
 	      && Root_Type (gnat_entity) == gnat_entity)
 	    {
 	      tree gnu_field_list = NULL_TREE;
@@ -4839,12 +4820,11 @@ get_unpadded_type (Entity_Id gnat_entity)
 /* Return whether the E_Subprogram_Type/E_Function/E_Procedure GNAT_ENTITY is
    a C++ imported method or equivalent.
 
-   We use the predicate to find out whether we need to use METHOD_TYPE instead
-   of FUNCTION_TYPE for GNAT_ENTITY for the sake compatibility with C++.  This
-   in turn determines whether the "thiscall" calling convention is used by the
-   back-end for GNAT_ENTITY on 32-bit x86/Windows.  */
+   We use the predicate on 32-bit x86/Windows to find out whether we need to
+   use the "thiscall" calling convention for GNAT_ENTITY.  This convention is
+   used for C++ methods (functions with METHOD_TYPE) by the back-end.  */
 
-static bool
+bool
 is_cplusplus_method (Entity_Id gnat_entity)
 {
   /* A constructor is a method on the C++ side.  We deal with it now because
@@ -4858,15 +4838,15 @@ is_cplusplus_method (Entity_Id gnat_entity)
   if (Convention (gnat_entity) != Convention_CPP)
     return false;
 
-  /* And that the type of the first parameter (indirectly) has it too, but
-     we make an exception for Interfaces because they need not be imported.  */
+  /* And that the type of the first parameter (indirectly) has it too.  */
   Entity_Id gnat_first = First_Formal (gnat_entity);
   if (No (gnat_first))
     return false;
+
   Entity_Id gnat_type = Etype (gnat_first);
   if (Is_Access_Type (gnat_type))
     gnat_type = Directly_Designated_Type (gnat_type);
-  if (Convention (gnat_type) != Convention_CPP && !Is_Interface (gnat_type))
+  if (Convention (gnat_type) != Convention_CPP)
     return false;
 
   /* This is the main case: a C++ virtual method imported as a primitive
@@ -5136,43 +5116,6 @@ gnat_to_gnu_component_type (Entity_Id gnat_array, bool definition,
   return gnu_type;
 }
 
-/* Return whether TYPE requires that formal parameters of TYPE be initialized
-   when they are Out parameters passed by copy.
-
-   This just implements the set of conditions listed in RM 6.4.1(12).  */
-
-static bool
-type_requires_init_of_formal (Entity_Id type)
-{
-  type = Underlying_Type (type);
-
-  if (Is_Access_Type (type))
-    return true;
-
-  if (Is_Scalar_Type (type))
-    return Has_Default_Aspect (type);
-
-  if (Is_Array_Type (type))
-    return Has_Default_Aspect (type)
-	   || type_requires_init_of_formal (Component_Type (type));
-
-  if (Is_Record_Type (type))
-    for (Entity_Id field = First_Entity (type);
-	 Present (field);
-	 field = Next_Entity (field))
-      {
-	if (Ekind (field) == E_Discriminant && !Is_Unchecked_Union (type))
-	  return true;
-
-	if (Ekind (field) == E_Component
-	    && (Present (Expression (Parent (field)))
-		|| type_requires_init_of_formal (Etype (field))))
-	  return true;
-      }
-
-  return false;
-}
-
 /* Return a GCC tree for a parameter corresponding to GNAT_PARAM, to be placed
    in the parameter list of GNAT_SUBPROG.  GNU_PARAM_TYPE is the GCC tree for
    the type of the parameter.  FIRST is true if this is the first parameter in
@@ -5187,6 +5130,7 @@ static tree
 gnat_to_gnu_param (Entity_Id gnat_param, tree gnu_param_type, bool first,
 		   Entity_Id gnat_subprog, bool *cico)
 {
+  Entity_Id gnat_param_type = Etype (gnat_param);
   Mechanism_Type mech = Mechanism (gnat_param);
   tree gnu_param_name = get_entity_name (gnat_param);
   bool foreign = Has_Foreign_Convention (gnat_subprog);
@@ -5278,6 +5222,7 @@ gnat_to_gnu_param (Entity_Id gnat_param, tree gnu_param_type, bool first,
 	     && TYPE_MULTI_ARRAY_P (TREE_TYPE (gnu_param_type)))
 	gnu_param_type = TREE_TYPE (gnu_param_type);
 
+      by_component_ptr = true;
       gnu_param_type = TREE_TYPE (gnu_param_type);
 
       if (ro_param)
@@ -5285,21 +5230,12 @@ gnat_to_gnu_param (Entity_Id gnat_param, tree gnu_param_type, bool first,
 	  = change_qualified_type (gnu_param_type, TYPE_QUAL_CONST);
 
       gnu_param_type = build_pointer_type (gnu_param_type);
-      by_component_ptr = true;
     }
 
   /* Fat pointers are passed as thin pointers for foreign conventions.  */
   else if (foreign && TYPE_IS_FAT_POINTER_P (gnu_param_type))
     gnu_param_type
       = make_type_from_size (gnu_param_type, size_int (POINTER_SIZE), 0);
-
-  /* Use a pointer type for the "this" pointer of C++ constructors.  */
-  else if (Chars (gnat_param) == Name_uInit && Is_Constructor (gnat_subprog))
-    {
-      gcc_assert (mech == By_Reference);
-      gnu_param_type = build_pointer_type (gnu_param_type);
-      by_ref = true;
-    }
 
   /* If we were requested or muss pass by reference, do so.
      If we were requested to pass by copy, do so.
@@ -5338,18 +5274,34 @@ gnat_to_gnu_param (Entity_Id gnat_param, tree gnu_param_type, bool first,
   if (mech == By_Copy && (by_ref || by_component_ptr))
     post_error ("?cannot pass & by copy", gnat_param);
 
-  /* If this is an Out parameter that isn't passed by reference and whose
-     type doesn't require the initialization of formals, we don't make a
-     PARM_DECL for it.  Instead, it will be a VAR_DECL created when we
-     process the procedure, so just return its type here.  Likewise for
-     the _Init parameter of an initialization procedure or the special
-     parameter of a valued procedure, never pass them in.  */
+  /* If this is an Out parameter that isn't passed by reference and isn't
+     a pointer or aggregate, we don't make a PARM_DECL for it.  Instead,
+     it will be a VAR_DECL created when we process the procedure, so just
+     return its type.  For the special parameter of a valued procedure,
+     never pass it in.
+
+     An exception is made to cover the RM-6.4.1 rule requiring "by copy"
+     Out parameters with discriminants or implicit initial values to be
+     handled like In Out parameters.  These type are normally built as
+     aggregates, hence passed by reference, except for some packed arrays
+     which end up encoded in special integer types.  Note that scalars can
+     be given implicit initial values using the Default_Value aspect.
+
+     The exception we need to make is then for packed arrays of records
+     with discriminants or implicit initial values.  We have no light/easy
+     way to check for the latter case, so we merely check for packed arrays
+     of records.  This may lead to useless copy-in operations, but in very
+     rare cases only, as these would be exceptions in a set of already
+     exceptional situations.  */
   if (Ekind (gnat_param) == E_Out_Parameter
       && !by_ref
-      && !by_component_ptr
-      && (!type_requires_init_of_formal (Etype (gnat_param))
-	  || Is_Init_Proc (gnat_subprog)
-	  || by_return))
+      && (by_return
+	  || (!POINTER_TYPE_P (gnu_param_type)
+	      && !AGGREGATE_TYPE_P (gnu_param_type)
+	      && !Has_Default_Aspect (gnat_param_type)))
+      && !(Is_Array_Type (gnat_param_type)
+	   && Is_Packed (gnat_param_type)
+	   && Is_Composite_Type (Component_Type (gnat_param_type))))
     return gnu_param_type;
 
   gnu_param = create_param_decl (gnu_param_name, gnu_param_type);
@@ -5449,7 +5401,7 @@ update_profile (Entity_Id gnat_subprog)
   if (DECL_P (gnu_type))
     {
       /* Builtins cannot have their address taken so we can reset them.  */
-      gcc_assert (fndecl_built_in_p (gnu_type));
+      gcc_assert (DECL_BUILT_IN (gnu_type));
       save_gnu_tree (gnat_subprog, NULL_TREE, false);
       save_gnu_tree (gnat_subprog, gnu_type, false);
       return;
@@ -5584,7 +5536,6 @@ gnat_to_gnu_subprog_type (Entity_Id gnat_subprog, bool definition,
 			  bool debug_info_p, tree *param_list)
 {
   const Entity_Kind kind = Ekind (gnat_subprog);
-  const bool method_p = is_cplusplus_method (gnat_subprog);
   Entity_Id gnat_return_type = Etype (gnat_subprog);
   Entity_Id gnat_param;
   tree gnu_type = present_gnu_tree (gnat_subprog)
@@ -5604,15 +5555,14 @@ gnat_to_gnu_subprog_type (Entity_Id gnat_subprog, bool definition,
   /* Fields in return type of procedure with copy-in copy-out parameters.  */
   tree gnu_field_list = NULL_TREE;
   /* The semantics of "pure" in Ada essentially matches that of "const"
-     or "pure" in GCC.  In particular, both properties are orthogonal
-     to the "nothrow" property if the EH circuitry is explicit in the
-     internal representation of the middle-end.  If we are to completely
+     in the back-end.  In particular, both properties are orthogonal to
+     the "nothrow" property if the EH circuitry is explicit in the
+     internal representation of the back-end.  If we are to completely
      hide the EH circuitry from it, we need to declare that calls to pure
      Ada subprograms that can throw have side effects since they can
-     trigger an "abnormal" transfer of control flow; therefore, they can
-     be neither "const" nor "pure" in the GCC sense.  */
+     trigger an "abnormal" transfer of control flow; thus they can be
+     neither "const" nor "pure" in the back-end sense.  */
   bool const_flag = (Back_End_Exceptions () && Is_Pure (gnat_subprog));
-  bool pure_flag = false;
   bool return_by_direct_ref_p = false;
   bool return_by_invisi_ref_p = false;
   bool return_unconstrained_p = false;
@@ -5626,7 +5576,7 @@ gnat_to_gnu_subprog_type (Entity_Id gnat_subprog, bool definition,
     gnu_return_type = void_type_node;
 
   else if (gnu_type
-	   && FUNC_OR_METHOD_TYPE_P (gnu_type)
+	   && TREE_CODE (gnu_type) == FUNCTION_TYPE
 	   && !TYPE_IS_DUMMY_P (TREE_TYPE (gnu_type)))
     {
       gnu_return_type = TREE_TYPE (gnu_type);
@@ -5771,7 +5721,7 @@ gnat_to_gnu_subprog_type (Entity_Id gnat_subprog, bool definition,
      Similarly, if the function returns an unconstrained type, then the
      function will allocate the return value on the secondary stack and
      thus calls to it cannot be CSE'ed, lest the stack be reclaimed.  */
-  if (VOID_TYPE_P (gnu_return_type) || return_unconstrained_p)
+  if (TREE_CODE (gnu_return_type) == VOID_TYPE || return_unconstrained_p)
     const_flag = false;
 
   /* Loop over the parameters and get their associated GCC tree.  While doing
@@ -5890,23 +5840,16 @@ gnat_to_gnu_subprog_type (Entity_Id gnat_subprog, bool definition,
 	{
 	  gnu_param_type_list
 	    = tree_cons (NULL_TREE, gnu_param_type, gnu_param_type_list);
-	  DECL_CHAIN (gnu_param) = gnu_param_list;
-	  gnu_param_list = gnu_param;
+	  gnu_param_list = chainon (gnu_param, gnu_param_list);
 	  save_gnu_tree (gnat_param, gnu_param, false);
 
-	  /* A pure function in the Ada sense which takes an access parameter
-	     may modify memory through it and thus need be considered neither
-	     const nor pure in the GCC sense.  Likewise it if takes a by-ref
-	     In Out or Out parameter.  But if it takes a by-ref In parameter,
-	     then it may only read memory through it and can be considered
-	     pure in the GCC sense.  */
-	  if ((const_flag || pure_flag)
-	      && (POINTER_TYPE_P (gnu_param_type)
-		  || TYPE_IS_FAT_POINTER_P (gnu_param_type)))
-	    {
-	      const_flag = false;
-	      pure_flag = DECL_POINTS_TO_READONLY_P (gnu_param);
-	    }
+	  /* If a parameter is a pointer, a function may modify memory through
+	     it and thus shouldn't be considered a const function.   Also, the
+	     memory may be modified between two calls, so they can't be CSE'ed.
+	     The latter case also handles by-ref parameters.  */
+	  if (POINTER_TYPE_P (gnu_param_type)
+	      || TYPE_IS_FAT_POINTER_P (gnu_param_type))
+	    const_flag = false;
 	}
 
       /* If the parameter uses the copy-in copy-out mechanism, allocate a field
@@ -6004,37 +5947,18 @@ gnat_to_gnu_subprog_type (Entity_Id gnat_subprog, bool definition,
   /* The lists have been built in reverse.  */
   gnu_param_type_list = nreverse (gnu_param_type_list);
   gnu_param_type_list = chainon (gnu_param_type_list, void_list_node);
-  gnu_param_list = nreverse (gnu_param_list);
+  *param_list = nreverse (gnu_param_list);
   gnu_cico_list = nreverse (gnu_cico_list);
-
-  /* Turn imported C++ constructors into their callable form as done in the
-     front-end, i.e. add the "this" pointer and void the return type.  */
-  if (method_p
-      && Is_Constructor (gnat_subprog)
-      && !VOID_TYPE_P (gnu_return_type))
-    {
-      tree gnu_param_type
-	= build_pointer_type (gnat_to_gnu_profile_type (gnat_return_type));
-      tree gnu_param_name = get_identifier (Get_Name_String (Name_uInit));
-      tree gnu_param
-	= build_decl (input_location, PARM_DECL, gnu_param_name,
-		      gnu_param_type);
-      gnu_param_type_list
-	= tree_cons (NULL_TREE, gnu_param_type, gnu_param_type_list);
-      DECL_CHAIN (gnu_param) = gnu_param_list;
-      gnu_param_list = gnu_param;
-      gnu_return_type = void_type_node;
-    }
 
   /* If the profile is incomplete, we only set the (temporary) return and
      parameter types; otherwise, we build the full type.  In either case,
      we reuse an already existing GCC tree that we built previously here.  */
   if (incomplete_profile_p)
     {
-      if (gnu_type && FUNC_OR_METHOD_TYPE_P (gnu_type))
+      if (gnu_type && TREE_CODE (gnu_type) == FUNCTION_TYPE)
 	;
       else
-	gnu_type = make_node (method_p ? METHOD_TYPE : FUNCTION_TYPE);
+	gnu_type = make_node (FUNCTION_TYPE);
       TREE_TYPE (gnu_type) = gnu_return_type;
       TYPE_ARG_TYPES (gnu_type) = gnu_param_type_list;
       TYPE_RETURN_UNCONSTRAINED_P (gnu_type) = return_unconstrained_p;
@@ -6043,16 +5967,10 @@ gnat_to_gnu_subprog_type (Entity_Id gnat_subprog, bool definition,
     }
   else
     {
-      if (gnu_type && FUNC_OR_METHOD_TYPE_P (gnu_type))
+      if (gnu_type && TREE_CODE (gnu_type) == FUNCTION_TYPE)
 	{
 	  TREE_TYPE (gnu_type) = gnu_return_type;
 	  TYPE_ARG_TYPES (gnu_type) = gnu_param_type_list;
-	  if (method_p)
-	    {
-	      tree gnu_basetype = TREE_TYPE (TREE_VALUE (gnu_param_type_list));
-	      TYPE_METHOD_BASETYPE (gnu_type)
-		= TYPE_MAIN_VARIANT (gnu_basetype);
-	    }
 	  TYPE_CI_CO_LIST (gnu_type) = gnu_cico_list;
 	  TYPE_RETURN_UNCONSTRAINED_P (gnu_type) = return_unconstrained_p;
 	  TYPE_RETURN_BY_DIRECT_REF_P (gnu_type) = return_by_direct_ref_p;
@@ -6062,16 +5980,8 @@ gnat_to_gnu_subprog_type (Entity_Id gnat_subprog, bool definition,
 	}
       else
 	{
-	  if (method_p)
-	    {
-	      tree gnu_basetype = TREE_TYPE (TREE_VALUE (gnu_param_type_list));
-	      gnu_type
-		= build_method_type_directly (gnu_basetype, gnu_return_type,
-					      TREE_CHAIN (gnu_param_type_list));
-	    }
-	  else
-	    gnu_type
-	      = build_function_type (gnu_return_type, gnu_param_type_list);
+	  gnu_type
+	    = build_function_type (gnu_return_type, gnu_param_type_list);
 
 	  /* GNU_TYPE may be shared since GCC hashes types.  Unshare it if it
 	     has a different TYPE_CI_CO_LIST or flags.  */
@@ -6090,9 +6000,6 @@ gnat_to_gnu_subprog_type (Entity_Id gnat_subprog, bool definition,
 
       if (const_flag)
 	gnu_type = change_qualified_type (gnu_type, TYPE_QUAL_CONST);
-
-      if (pure_flag)
-	gnu_type = change_qualified_type (gnu_type, TYPE_QUAL_RESTRICT);
 
       if (No_Return (gnat_subprog))
 	gnu_type = change_qualified_type (gnu_type, TYPE_QUAL_VOLATILE);
@@ -6131,8 +6038,6 @@ gnat_to_gnu_subprog_type (Entity_Id gnat_subprog, bool definition,
 	    post_error ("?gcc intrinsic not found for&!", gnat_subprog);
 	}
     }
-
-  *param_list = gnu_param_list;
 
   return gnu_type;
 }
@@ -6809,21 +6714,12 @@ choices_to_gnu (tree gnu_operand, Node_Id gnat_choices)
 	gnu_test
 	  = build_binary_op (EQ_EXPR, boolean_type_node, gnu_operand, gnu_low,
 			     true);
-<<<<<<< HEAD
       else
 	gnu_test = boolean_true_node;
 
       if (gnu_result == boolean_false_node)
 	gnu_result = gnu_test;
       else
-=======
-      else
-	gnu_test = boolean_true_node;
-
-      if (gnu_result == boolean_false_node)
-	gnu_result = gnu_test;
-      else
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
 	gnu_result
 	  = build_binary_op (TRUTH_ORIF_EXPR, boolean_type_node, gnu_result,
 			     gnu_test, true);
@@ -7304,28 +7200,6 @@ compare_field_bitpos (const PTR rt1, const PTR rt2)
     = tree_int_cst_compare (bit_position (field1), bit_position (field2));
 
   return ret ? ret : (int) (DECL_UID (field1) - DECL_UID (field2));
-}
-
-/* Sort the LIST of fields in reverse order of increasing position.  */
-
-static tree
-reverse_sort_field_list (tree list)
-{
-  const int len = list_length (list);
-  tree *field_arr = XALLOCAVEC (tree, len);
-
-  for (int i = 0; list; list = DECL_CHAIN (list), i++)
-    field_arr[i] = list;
-
-  qsort (field_arr, len, sizeof (tree), compare_field_bitpos);
-
-  for (int i = 0; i < len; i++)
-    {
-      DECL_CHAIN (field_arr[i]) = list;
-      list = field_arr[i];
-    }
-
-  return list;
 }
 
 /* Reverse function from gnat_to_gnu_field: return the GNAT field present in
@@ -8163,23 +8037,7 @@ components_to_record (Node_Id gnat_component_list, Entity_Id gnat_record_type,
 
   /* Chain the variant part at the end of the field list.  */
   if (gnu_variant_part)
-    {
-      /* We make an exception if the variant part is at offset 0, has a fixed
-	 size, and there is a single rep'ed field placed after it because, in
-	 this case, there is an obvious order of increasing position.  */
-      if (variants_have_rep
-	  && TREE_CODE (DECL_SIZE_UNIT (gnu_variant_part)) == INTEGER_CST
-	  && gnu_rep_list
-	  && gnu_field_list == gnu_rep_list
-	  && !tree_int_cst_lt (DECL_FIELD_OFFSET (gnu_rep_list),
-			       DECL_SIZE_UNIT (gnu_variant_part)))
-	{
-	  DECL_CHAIN (gnu_variant_part) = gnu_field_list;
-	  gnu_field_list = gnu_variant_part;
-	}
-      else
-	gnu_field_list = chainon (gnu_field_list, gnu_variant_part);
-    }
+    gnu_field_list = chainon (gnu_field_list, gnu_variant_part);
 
   if (cancel_alignment)
     SET_TYPE_ALIGN (gnu_record_type, 0);
@@ -8289,9 +8147,9 @@ annotate_value (tree gnu_size)
     case MIN_EXPR:		tcode = Min_Expr; break;
     case MAX_EXPR:		tcode = Max_Expr; break;
     case ABS_EXPR:		tcode = Abs_Expr; break;
-    case TRUTH_ANDIF_EXPR:
+    case TRUTH_ANDIF_EXPR:	tcode = Truth_Andif_Expr; break;
+    case TRUTH_ORIF_EXPR:	tcode = Truth_Orif_Expr; break;
     case TRUTH_AND_EXPR:	tcode = Truth_And_Expr; break;
-    case TRUTH_ORIF_EXPR:
     case TRUTH_OR_EXPR:		tcode = Truth_Or_Expr; break;
     case TRUTH_XOR_EXPR:	tcode = Truth_Xor_Expr; break;
     case TRUTH_NOT_EXPR:	tcode = Truth_Not_Expr; break;
@@ -8471,8 +8329,7 @@ annotate_rep (Entity_Id gnat_entity, tree gnu_type)
 				       gnu_list);
 	if (t)
 	  {
-	    tree offset = TREE_VEC_ELT (TREE_VALUE (t), 0);
-	    tree bit_offset = TREE_VEC_ELT (TREE_VALUE (t), 2);
+	    tree parent_offset;
 
 	    /* If we are just annotating types and the type is tagged, the tag
 	       and the parent components are not generated by the front-end so
@@ -8482,46 +8339,31 @@ annotate_rep (Entity_Id gnat_entity, tree gnu_type)
 		&& Is_Tagged_Type (gnat_entity)
 		&& No (Component_Clause (gnat_field)))
 	      {
-		tree parent_bit_offset;
-
 		/* For a component appearing in the current extension, the
 		   offset is the size of the parent.  */
 		if (Is_Derived_Type (gnat_entity)
 		    && Original_Record_Component (gnat_field) == gnat_field)
-		  parent_bit_offset
+		  parent_offset
 		    = UI_To_gnu (Esize (Etype (Base_Type (gnat_entity))),
 				 bitsizetype);
 		else
-		  parent_bit_offset = bitsize_int (POINTER_SIZE);
+		  parent_offset = bitsize_int (POINTER_SIZE);
 
 		if (TYPE_FIELDS (gnu_type))
-		  parent_bit_offset
-		    = round_up (parent_bit_offset,
+		  parent_offset
+		    = round_up (parent_offset,
 				DECL_ALIGN (TYPE_FIELDS (gnu_type)));
-
-		offset
-		  = size_binop (PLUS_EXPR, offset,
-				fold_convert (sizetype,
-					      size_binop (TRUNC_DIV_EXPR,
-							  parent_bit_offset,
-							  bitsize_unit_node)));
 	      }
-
-	    /* If the field has a variable offset, also compute the normalized
-	       position since it's easier to do on trees here than to deduce
-	       it from the annotated expression of Component_Bit_Offset.  */
-	    if (TREE_CODE (offset) != INTEGER_CST)
-	      {
-		normalize_offset (&offset, &bit_offset, BITS_PER_UNIT);
-		Set_Normalized_Position (gnat_field,
-					 annotate_value (offset));
-		Set_Normalized_First_Bit (gnat_field,
-					  annotate_value (bit_offset));
-	      }
+	    else
+	      parent_offset = bitsize_zero_node;
 
 	    Set_Component_Bit_Offset
 	      (gnat_field,
-	       annotate_value (bit_from_pos (offset, bit_offset)));
+	       annotate_value
+		 (size_binop (PLUS_EXPR,
+			      bit_from_pos (TREE_VEC_ELT (TREE_VALUE (t), 0),
+					    TREE_VEC_ELT (TREE_VALUE (t), 2)),
+			      parent_offset)));
 
 	    Set_Esize (gnat_field,
 		       annotate_value (DECL_SIZE (TREE_PURPOSE (t))));
@@ -8530,27 +8372,19 @@ annotate_rep (Entity_Id gnat_entity, tree gnu_type)
 	  {
 	    /* If there is no entry, this is an inherited component whose
 	       position is the same as in the parent type.  */
-	    Entity_Id gnat_orig = Original_Record_Component (gnat_field);
+	    Entity_Id gnat_orig_field = Original_Record_Component (gnat_field);
 
 	    /* If we are just annotating types, discriminants renaming those of
 	       the parent have no entry so deal with them specifically.  */
 	    if (type_annotate_only
-		&& gnat_orig == gnat_field
+		&& gnat_orig_field == gnat_field
 		&& Ekind (gnat_field) == E_Discriminant)
-	      gnat_orig = Corresponding_Discriminant (gnat_field);
-
-	    if (Known_Normalized_Position (gnat_orig))
-	      {
-		Set_Normalized_Position (gnat_field,
-					 Normalized_Position (gnat_orig));
-		Set_Normalized_First_Bit (gnat_field,
-					  Normalized_First_Bit (gnat_orig));
-	      }
+	      gnat_orig_field = Corresponding_Discriminant (gnat_field);
 
 	    Set_Component_Bit_Offset (gnat_field,
-				      Component_Bit_Offset (gnat_orig));
+				      Component_Bit_Offset (gnat_orig_field));
 
-	    Set_Esize (gnat_field, Esize (gnat_orig));
+	    Set_Esize (gnat_field, Esize (gnat_orig_field));
 	  }
       }
 }
@@ -8669,8 +8503,7 @@ build_variant_list (tree qual_union_type, vec<subst_pair> subst_list,
       if (!integer_zerop (qual))
 	{
 	  tree variant_type = TREE_TYPE (gnu_field), variant_subpart;
-	  variant_desc v
-	    = { variant_type, gnu_field, qual, NULL_TREE, NULL_TREE };
+	  variant_desc v = { variant_type, gnu_field, qual, NULL_TREE };
 
 	  gnu_list.safe_push (v);
 
@@ -9444,6 +9277,7 @@ create_variant_part_from (tree old_variant_part,
 
       /* Finish up the new variant and create the field.  */
       finish_record_type (new_variant, nreverse (field_list), 2, debug_info_p);
+      compute_record_mode (new_variant);
       create_type_decl (TYPE_NAME (new_variant), new_variant, true,
 			debug_info_p, Empty);
 
@@ -9461,6 +9295,7 @@ create_variant_part_from (tree old_variant_part,
      reverse the field list because VARIANT_LIST has been traversed in reverse
      order.  */
   finish_record_type (new_union_type, union_field_list, 2, debug_info_p);
+  compute_record_mode (new_union_type);
   create_type_decl (TYPE_NAME (new_union_type), new_union_type, true,
 		    debug_info_p, Empty);
 
@@ -9558,8 +9393,7 @@ copy_and_substitute_in_layout (Entity_Id gnat_new_type,
 {
   const bool is_subtype = (Ekind (gnat_new_type) == E_Record_Subtype);
   tree gnu_field_list = NULL_TREE;
-  tree gnu_variable_field_list = NULL_TREE;
-  bool selected_variant;
+  bool selected_variant, all_constant_pos = true;
   vec<variant_desc> gnu_variant_list;
 
   /* Look for REP and variant parts in the old type.  */
@@ -9643,7 +9477,6 @@ copy_and_substitute_in_layout (Entity_Id gnat_new_type,
         tree gnu_context = DECL_CONTEXT (gnu_old_field);
 	tree gnu_field, gnu_field_type, gnu_size, gnu_pos;
 	tree gnu_cont_type, gnu_last = NULL_TREE;
-	variant_desc *v = NULL;
 
 	/* If the type is the same, retrieve the GCC type from the
 	   old field to take into account possible adjustments.  */
@@ -9692,6 +9525,7 @@ copy_and_substitute_in_layout (Entity_Id gnat_new_type,
 	  gnu_cont_type = gnu_new_type;
 	else
 	  {
+	    variant_desc *v;
 	    unsigned int i;
 	    tree rep_part;
 
@@ -9704,7 +9538,7 @@ copy_and_substitute_in_layout (Entity_Id gnat_new_type,
 	    if (v)
 	      gnu_cont_type = selected_variant ? gnu_new_type : v->new_type;
 	    else
-	      /* The front-end may pass us zombie components if it fails to
+	      /* The front-end may pass us "ghost" components if it fails to
 		 recognize that a constrain statically selects a particular
 		 variant.  Discard them.  */
 	      continue;
@@ -9720,16 +9554,8 @@ copy_and_substitute_in_layout (Entity_Id gnat_new_type,
 	/* If the context is a variant, put it in the new variant directly.  */
 	if (gnu_cont_type != gnu_new_type)
 	  {
-	    if (TREE_CODE (gnu_pos) == INTEGER_CST)
-	      {
-		DECL_CHAIN (gnu_field) = TYPE_FIELDS (gnu_cont_type);
-		TYPE_FIELDS (gnu_cont_type) = gnu_field;
-	      }
-	    else
-	      {
-		DECL_CHAIN (gnu_field) = v->aux;
-		v->aux = gnu_field;
-	      }
+	    DECL_CHAIN (gnu_field) = TYPE_FIELDS (gnu_cont_type);
+	    TYPE_FIELDS (gnu_cont_type) = gnu_field;
 	  }
 
 	/* To match the layout crafted in components_to_record, if this is
@@ -9748,18 +9574,12 @@ copy_and_substitute_in_layout (Entity_Id gnat_new_type,
 	/* Otherwise, put it after the other fields.  */
 	else
 	  {
-	    if (TREE_CODE (gnu_pos) == INTEGER_CST)
-	      {
-		DECL_CHAIN (gnu_field) = gnu_field_list;
-		gnu_field_list = gnu_field;
-		if (!gnu_last)
-		  gnu_last = gnu_field;
-	      }
-	    else
-	      {
-		DECL_CHAIN (gnu_field) = gnu_variable_field_list;
-		gnu_variable_field_list = gnu_field;
-	      }
+	    DECL_CHAIN (gnu_field) = gnu_field_list;
+	    gnu_field_list = gnu_field;
+	    if (!gnu_last)
+	      gnu_last = gnu_field;
+	    if (TREE_CODE (gnu_pos) != INTEGER_CST)
+	      all_constant_pos = false;
 	  }
 
 	/* For a stored discriminant in a derived type, replace the field.  */
@@ -9772,32 +9592,31 @@ copy_and_substitute_in_layout (Entity_Id gnat_new_type,
 	  save_gnu_tree (gnat_field, gnu_field, false);
       }
 
-  /* Put the fields with fixed position in order of increasing position.  */
-  if (gnu_field_list)
-    gnu_field_list = reverse_sort_field_list (gnu_field_list);
+  /* If there is no variant list or a selected variant and the fields all have
+     constant position, put them in order of increasing position to match that
+     of constant CONSTRUCTORs.  */
+  if ((!gnu_variant_list.exists () || selected_variant) && all_constant_pos)
+    {
+      const int len = list_length (gnu_field_list);
+      tree *field_arr = XALLOCAVEC (tree, len), t = gnu_field_list;
 
-  /* Put the fields with variable position at the end.  */
-  if (gnu_variable_field_list)
-    gnu_field_list = chainon (gnu_variable_field_list, gnu_field_list);
+      for (int i = 0; t; t = DECL_CHAIN (t), i++)
+	field_arr[i] = t;
+
+      qsort (field_arr, len, sizeof (tree), compare_field_bitpos);
+
+      gnu_field_list = NULL_TREE;
+      for (int i = 0; i < len; i++)
+	{
+	  DECL_CHAIN (field_arr[i]) = gnu_field_list;
+	  gnu_field_list = field_arr[i];
+	}
+    }
 
   /* If there is a variant list and no selected variant, we need to create the
      nest of variant parts from the old nest.  */
-  if (gnu_variant_list.exists () && !selected_variant)
+  else if (gnu_variant_list.exists () && !selected_variant)
     {
-      variant_desc *v;
-      unsigned int i;
-
-      /* Same processing as above for the fields of each variant.  */
-      FOR_EACH_VEC_ELT (gnu_variant_list, i, v)
-	{
-	  if (TYPE_FIELDS (v->new_type))
-	    TYPE_FIELDS (v->new_type)
-	      = reverse_sort_field_list (TYPE_FIELDS (v->new_type));
-	  if (v->aux)
-	    TYPE_FIELDS (v->new_type)
-	      = chainon (v->aux, TYPE_FIELDS (v->new_type));
-	}
-
       tree new_variant_part
 	= create_variant_part_from (gnu_variant_part, gnu_variant_list,
 				    gnu_new_type, gnu_pos_list,
@@ -9809,10 +9628,17 @@ copy_and_substitute_in_layout (Entity_Id gnat_new_type,
   gnu_variant_list.release ();
   gnu_subst_list.release ();
 
+  gnu_field_list = nreverse (gnu_field_list);
+
   /* If NEW_TYPE is a subtype, it inherits all the attributes from OLD_TYPE.
      Otherwise sizes and alignment must be computed independently.  */
-  finish_record_type (gnu_new_type, nreverse (gnu_field_list),
-		      is_subtype ? 2 : 1, debug_info_p);
+  if (is_subtype)
+    {
+      finish_record_type (gnu_new_type, gnu_field_list, 2, debug_info_p);
+      compute_record_mode (gnu_new_type);
+    }
+  else
+    finish_record_type (gnu_new_type, gnu_field_list, 1, debug_info_p);
 
   /* Now go through the entities again looking for Itypes that we have not yet
      elaborated (e.g. Etypes of fields that have Original_Components).  */
@@ -9931,7 +9757,6 @@ substitute_in_type (tree t, tree f, tree r)
       return build_complex_type (nt);
 
     case FUNCTION_TYPE:
-    case METHOD_TYPE:
       /* These should never show up here.  */
       gcc_unreachable ();
 

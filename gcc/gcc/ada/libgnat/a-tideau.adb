@@ -227,7 +227,7 @@ package body Ada.Text_IO.Decimal_Aux is
    end Puts_Dec;
 
    --------------
-   -- Puts_LLD --
+   -- Puts_Dec --
    --------------
 
    procedure Puts_LLD

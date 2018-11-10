@@ -27,15 +27,14 @@ void
 test01()
 {
   using namespace std::experimental::filesystem;
-  using string_type = std::basic_string<path::value_type>;
-  const string_type s{ 'a', 'b', 'c' };
+  const std::string s = "abc";
   path p(s);
 
   VERIFY( p.native() == s );
   VERIFY( p.c_str() == s );
-  VERIFY( static_cast<string_type>(p) == s );
+  VERIFY( static_cast<std::string>(p) == s );
 
-  string_type s2 = p; // implicit conversion
+  std::string s2 = p; // implicit conversion
   VERIFY( s2 == p.native() );
 }
 

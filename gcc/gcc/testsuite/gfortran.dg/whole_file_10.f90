@@ -1,4 +1,5 @@
 ! { dg-do compile }
+! { dg-options "-fwhole-file" }
 ! Test the fix for the fifth problem in PR40011, where the
 ! entries were not resolved, resulting in a segfault.
 !

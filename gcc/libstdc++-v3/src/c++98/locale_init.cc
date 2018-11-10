@@ -201,6 +201,7 @@ namespace
   fake_messages_w messages_w;
 #endif
 
+#ifdef _GLIBCXX_USE_C99_STDINT_TR1
   typedef char fake_codecvt_c16[sizeof(codecvt<char16_t, char, mbstate_t>)]
   __attribute__ ((aligned(__alignof__(codecvt<char16_t, char, mbstate_t>))));
   fake_codecvt_c16 codecvt_c16;
@@ -208,6 +209,7 @@ namespace
   typedef char fake_codecvt_c32[sizeof(codecvt<char32_t, char, mbstate_t>)]
   __attribute__ ((aligned(__alignof__(codecvt<char32_t, char, mbstate_t>))));
   fake_codecvt_c32 codecvt_c32;
+#endif
 
   // Storage for "C" locale caches.
   typedef char fake_num_cache_c[sizeof(std::__numpunct_cache<char>)]
@@ -257,7 +259,9 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     //   fall back to lock protected access to both _S_global and
     //   its reference count.
     _M_impl = _S_global;
-    if (_M_impl != _S_classic)
+    if (_M_impl == _S_classic)
+      _M_impl->_M_add_reference();
+    else
       {
         __gnu_cxx::__scoped_lock sentry(get_locale_mutex());
         _S_global->_M_add_reference();
@@ -273,8 +277,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     {
       __gnu_cxx::__scoped_lock sentry(get_locale_mutex());
       __old = _S_global;
-      if (__other._M_impl != _S_classic)
-	__other._M_impl->_M_add_reference();
+      __other._M_impl->_M_add_reference();
       _S_global = __other._M_impl;
       const string __other_name = __other.name();
       if (__other_name != "*")
@@ -283,7 +286,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
     // Reference count sanity check: one reference removed for the
     // subsition of __other locale, one added by return-by-value. Net
-    // difference: zero. When the returned locale object's destructor
+    // difference: zero. When the returned locale object's destrutor
     // is called, then the reference count is decremented and possibly
     // destroyed.
     return locale(__old);
@@ -326,7 +329,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     &std::ctype<wchar_t>::id,
     &codecvt<wchar_t, char, mbstate_t>::id,
 #endif
-#if _GLIBCXX_NUM_UNICODE_FACETS != 0
+#ifdef _GLIBCXX_USE_C99_STDINT_TR1
     &codecvt<char16_t, char, mbstate_t>::id,
     &codecvt<char32_t, char, mbstate_t>::id,
 #endif
@@ -533,7 +536,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     _M_init_facet(new (&messages_w) std::messages<wchar_t>(1));
 #endif
 
-#if _GLIBCXX_NUM_UNICODE_FACETS != 0
+#ifdef _GLIBCXX_USE_C99_STDINT_TR1
     _M_init_facet(new (&codecvt_c16) codecvt<char16_t, char, mbstate_t>(1));
     _M_init_facet(new (&codecvt_c32) codecvt<char32_t, char, mbstate_t>(1));
 #endif

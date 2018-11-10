@@ -1,5 +1,8 @@
+/* PR tree-optimization/29738.  We used not to realize that "i" can never
+   become nonzero.  */
+
 /* { dg-do compile } */
-/* { dg-options "-O2 -fdump-tree-fre1 -fdump-tree-optimized" } */
+/* { dg-options "-O2 -fdump-tree-optimized" } */
 
 int i;
 
@@ -13,7 +16,5 @@ void bar (void)
       foo ();
 }
 
-/* Everything except for the "i = 0" assignment should get removed.  Value
-   numbering already figures out the if in the loop is never true.  */
-/* { dg-final { scan-tree-dump-times "foo" 0 "fre1" } } */
-/* { dg-final { scan-tree-dump-times "if" 0 "optimized" } } */
+/* Everything except for the "i = 0" assignment should get removed.  */
+/* { dg-final { scan-tree-dump-times "if" 0 "optimized" { xfail *-*-* } } } */

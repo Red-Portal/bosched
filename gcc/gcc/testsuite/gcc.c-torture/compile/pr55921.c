@@ -1,5 +1,4 @@
 /* PR tree-optimization/55921 */
-/* { dg-skip-if "Not enough registers" { "pdp11-*-*" } } */
 
 typedef union
 {

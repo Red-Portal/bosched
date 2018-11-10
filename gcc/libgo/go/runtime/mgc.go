@@ -219,7 +219,7 @@ func gcenable() {
 	memstats.enablegc = true // now that runtime is initialized, GC is okay
 }
 
-//go:linkname setGCPercent runtime..z2fdebug.setGCPercent
+//go:linkname setGCPercent runtime_debug.setGCPercent
 func setGCPercent(in int32) (out int32) {
 	lock(&mheap_.lock)
 	out = gcpercent
@@ -232,10 +232,21 @@ func setGCPercent(in int32) (out int32) {
 	gcSetTriggerRatio(memstats.triggerRatio)
 	unlock(&mheap_.lock)
 
-	// If we just disabled GC, wait for any concurrent GC mark to
+	// If we just disabled GC, wait for any concurrent GC to
 	// finish so we always return with no GC running.
 	if in < 0 {
-		gcWaitOnMark(atomic.Load(&work.cycles))
+		// Disable phase transitions.
+		lock(&work.sweepWaiters.lock)
+		if gcphase == _GCmark {
+			// GC is active. Wait until we reach sweeping.
+			gp := getg()
+			gp.schedlink = work.sweepWaiters.head
+			work.sweepWaiters.head.set(gp)
+			goparkunlock(&work.sweepWaiters.lock, "wait for GC cycle", traceEvGoBlock, 1)
+		} else {
+			// GC isn't active.
+			unlock(&work.sweepWaiters.lock)
+		}
 	}
 
 	return out
@@ -1080,10 +1091,21 @@ func GC() {
 	// GC may move ahead on its own. For example, when we block
 	// until mark termination N, we may wake up in cycle N+2.
 
-	// Wait until the current sweep termination, mark, and mark
-	// termination complete.
+	gp := getg()
+
+	// Prevent the GC phase or cycle count from changing.
+	lock(&work.sweepWaiters.lock)
 	n := atomic.Load(&work.cycles)
-	gcWaitOnMark(n)
+	if gcphase == _GCmark {
+		// Wait until sweep termination, mark, and mark
+		// termination of cycle N complete.
+		gp.schedlink = work.sweepWaiters.head
+		work.sweepWaiters.head.set(gp)
+		goparkunlock(&work.sweepWaiters.lock, "wait for GC cycle", traceEvGoBlock, 1)
+	} else {
+		// We're in sweep N already.
+		unlock(&work.sweepWaiters.lock)
+	}
 
 	// We're now in sweep N or later. Trigger GC cycle N+1, which
 	// will first finish sweep N if necessary and then enter sweep
@@ -1091,7 +1113,14 @@ func GC() {
 	gcStart(gcBackgroundMode, gcTrigger{kind: gcTriggerCycle, n: n + 1})
 
 	// Wait for mark termination N+1 to complete.
-	gcWaitOnMark(n + 1)
+	lock(&work.sweepWaiters.lock)
+	if gcphase == _GCmark && atomic.Load(&work.cycles) == n+1 {
+		gp.schedlink = work.sweepWaiters.head
+		work.sweepWaiters.head.set(gp)
+		goparkunlock(&work.sweepWaiters.lock, "wait for GC cycle", traceEvGoBlock, 1)
+	} else {
+		unlock(&work.sweepWaiters.lock)
+	}
 
 	// Finish sweep N+1 before returning. We do this both to
 	// complete the cycle and because runtime.GC() is often used
@@ -1126,32 +1155,6 @@ func GC() {
 		mProf_PostSweep()
 	}
 	releasem(mp)
-}
-
-// gcWaitOnMark blocks until GC finishes the Nth mark phase. If GC has
-// already completed this mark phase, it returns immediately.
-func gcWaitOnMark(n uint32) {
-	for {
-		// Disable phase transitions.
-		lock(&work.sweepWaiters.lock)
-		nMarks := atomic.Load(&work.cycles)
-		if gcphase != _GCmark {
-			// We've already completed this cycle's mark.
-			nMarks++
-		}
-		if nMarks > n {
-			// We're done.
-			unlock(&work.sweepWaiters.lock)
-			return
-		}
-
-		// Wait until sweep termination, mark, and mark
-		// termination of cycle N complete.
-		gp := getg()
-		gp.schedlink = work.sweepWaiters.head
-		work.sweepWaiters.head.set(gp)
-		goparkunlock(&work.sweepWaiters.lock, waitReasonWaitForGCCycle, traceEvGoBlock, 1)
-	}
 }
 
 // gcMode indicates how concurrent a GC cycle should be.
@@ -1528,7 +1531,7 @@ func gcMarkTermination(nextTriggerRatio float64) {
 	_g_.m.traceback = 2
 	gp := _g_.m.curg
 	casgstatus(gp, _Grunning, _Gwaiting)
-	gp.waitreason = waitReasonGarbageCollection
+	gp.waitreason = "garbage collection"
 
 	// Run gc on the g0 stack. We do this so that the g stack
 	// we're currently running on will no longer change. Cuts
@@ -1797,7 +1800,7 @@ func gcBgMarkWorker(_p_ *p) {
 				}
 			}
 			return true
-		}, unsafe.Pointer(park), waitReasonGCWorkerIdle, traceEvGoBlock, 0)
+		}, unsafe.Pointer(park), "GC worker (idle)", traceEvGoBlock, 0)
 
 		// Loop until the P dies and disassociates this
 		// worker (the P may later be reused, in which case

@@ -144,8 +144,8 @@ matmul_i16_avx (gfc_array_i16 * const restrict retarray,
 	  arg_extent = GFC_DESCRIPTOR_EXTENT(b,1);
 	  ret_extent = GFC_DESCRIPTOR_EXTENT(retarray,0);
 	  if (arg_extent != ret_extent)
-	    runtime_error ("Array bound mismatch for dimension 1 of "
-	    		   "array (%ld/%ld) ",
+	    runtime_error ("Incorrect extent in return array in"
+			   " MATMUL intrinsic: is %ld, should be %ld",
 			   (long int) ret_extent, (long int) arg_extent);
 	}
       else if (GFC_DESCRIPTOR_RANK (b) == 1)
@@ -153,8 +153,8 @@ matmul_i16_avx (gfc_array_i16 * const restrict retarray,
 	  arg_extent = GFC_DESCRIPTOR_EXTENT(a,0);
 	  ret_extent = GFC_DESCRIPTOR_EXTENT(retarray,0);
 	  if (arg_extent != ret_extent)
-	    runtime_error ("Array bound mismatch for dimension 1 of "
-	    		   "array (%ld/%ld) ",
+	    runtime_error ("Incorrect extent in return array in"
+			   " MATMUL intrinsic: is %ld, should be %ld",
 			   (long int) ret_extent, (long int) arg_extent);
 	}
       else
@@ -162,15 +162,17 @@ matmul_i16_avx (gfc_array_i16 * const restrict retarray,
 	  arg_extent = GFC_DESCRIPTOR_EXTENT(a,0);
 	  ret_extent = GFC_DESCRIPTOR_EXTENT(retarray,0);
 	  if (arg_extent != ret_extent)
-	    runtime_error ("Array bound mismatch for dimension 1 of "
-	    		   "array (%ld/%ld) ",
+	    runtime_error ("Incorrect extent in return array in"
+			   " MATMUL intrinsic for dimension 1:"
+			   " is %ld, should be %ld",
 			   (long int) ret_extent, (long int) arg_extent);
 
 	  arg_extent = GFC_DESCRIPTOR_EXTENT(b,1);
 	  ret_extent = GFC_DESCRIPTOR_EXTENT(retarray,1);
 	  if (arg_extent != ret_extent)
-	    runtime_error ("Array bound mismatch for dimension 2 of "
-	    		   "array (%ld/%ld) ",
+	    runtime_error ("Incorrect extent in return array in"
+			   " MATMUL intrinsic for dimension 2:"
+			   " is %ld, should be %ld",
 			   (long int) ret_extent, (long int) arg_extent);
 	}
     }
@@ -211,9 +213,7 @@ matmul_i16_avx (gfc_array_i16 * const restrict retarray,
   if (count != GFC_DESCRIPTOR_EXTENT(b,0))
     {
       if (count > 0 || GFC_DESCRIPTOR_EXTENT(b,0) > 0)
-	runtime_error ("Incorrect extent in argument B in MATMUL intrinsic "
-		       "in dimension 1: is %ld, should be %ld",
-		       (long int) GFC_DESCRIPTOR_EXTENT(b,0), (long int) count);
+	runtime_error ("dimension of array B incorrect in MATMUL intrinsic");
     }
 
   if (GFC_DESCRIPTOR_RANK (b) == 1)
@@ -258,18 +258,7 @@ matmul_i16_avx (gfc_array_i16 * const restrict retarray,
       if (lda > 0 && ldb > 0 && ldc > 0 && m > 1 && n > 1 && k > 1)
 	{
 	  assert (gemm != NULL);
-	  const char *transa, *transb;
-	  if (try_blas & 2)
-	    transa = "C";
-	  else
-	    transa = axstride == 1 ? "N" : "T";
-
-	  if (try_blas & 4)
-	    transb = "C";
-	  else
-	    transb = bxstride == 1 ? "N" : "T";
-
-	  gemm (transa, transb , &m,
+	  gemm (axstride == 1 ? "N" : "T", bxstride == 1 ? "N" : "T", &m,
 		&n, &k,	&one, abase, &lda, bbase, &ldb, &zero, dest,
 		&ldc, 1, 1);
 	  return;
@@ -712,8 +701,8 @@ matmul_i16_avx2 (gfc_array_i16 * const restrict retarray,
 	  arg_extent = GFC_DESCRIPTOR_EXTENT(b,1);
 	  ret_extent = GFC_DESCRIPTOR_EXTENT(retarray,0);
 	  if (arg_extent != ret_extent)
-	    runtime_error ("Array bound mismatch for dimension 1 of "
-	    		   "array (%ld/%ld) ",
+	    runtime_error ("Incorrect extent in return array in"
+			   " MATMUL intrinsic: is %ld, should be %ld",
 			   (long int) ret_extent, (long int) arg_extent);
 	}
       else if (GFC_DESCRIPTOR_RANK (b) == 1)
@@ -721,8 +710,8 @@ matmul_i16_avx2 (gfc_array_i16 * const restrict retarray,
 	  arg_extent = GFC_DESCRIPTOR_EXTENT(a,0);
 	  ret_extent = GFC_DESCRIPTOR_EXTENT(retarray,0);
 	  if (arg_extent != ret_extent)
-	    runtime_error ("Array bound mismatch for dimension 1 of "
-	    		   "array (%ld/%ld) ",
+	    runtime_error ("Incorrect extent in return array in"
+			   " MATMUL intrinsic: is %ld, should be %ld",
 			   (long int) ret_extent, (long int) arg_extent);
 	}
       else
@@ -730,15 +719,17 @@ matmul_i16_avx2 (gfc_array_i16 * const restrict retarray,
 	  arg_extent = GFC_DESCRIPTOR_EXTENT(a,0);
 	  ret_extent = GFC_DESCRIPTOR_EXTENT(retarray,0);
 	  if (arg_extent != ret_extent)
-	    runtime_error ("Array bound mismatch for dimension 1 of "
-	    		   "array (%ld/%ld) ",
+	    runtime_error ("Incorrect extent in return array in"
+			   " MATMUL intrinsic for dimension 1:"
+			   " is %ld, should be %ld",
 			   (long int) ret_extent, (long int) arg_extent);
 
 	  arg_extent = GFC_DESCRIPTOR_EXTENT(b,1);
 	  ret_extent = GFC_DESCRIPTOR_EXTENT(retarray,1);
 	  if (arg_extent != ret_extent)
-	    runtime_error ("Array bound mismatch for dimension 2 of "
-	    		   "array (%ld/%ld) ",
+	    runtime_error ("Incorrect extent in return array in"
+			   " MATMUL intrinsic for dimension 2:"
+			   " is %ld, should be %ld",
 			   (long int) ret_extent, (long int) arg_extent);
 	}
     }
@@ -779,9 +770,7 @@ matmul_i16_avx2 (gfc_array_i16 * const restrict retarray,
   if (count != GFC_DESCRIPTOR_EXTENT(b,0))
     {
       if (count > 0 || GFC_DESCRIPTOR_EXTENT(b,0) > 0)
-	runtime_error ("Incorrect extent in argument B in MATMUL intrinsic "
-		       "in dimension 1: is %ld, should be %ld",
-		       (long int) GFC_DESCRIPTOR_EXTENT(b,0), (long int) count);
+	runtime_error ("dimension of array B incorrect in MATMUL intrinsic");
     }
 
   if (GFC_DESCRIPTOR_RANK (b) == 1)
@@ -826,18 +815,7 @@ matmul_i16_avx2 (gfc_array_i16 * const restrict retarray,
       if (lda > 0 && ldb > 0 && ldc > 0 && m > 1 && n > 1 && k > 1)
 	{
 	  assert (gemm != NULL);
-	  const char *transa, *transb;
-	  if (try_blas & 2)
-	    transa = "C";
-	  else
-	    transa = axstride == 1 ? "N" : "T";
-
-	  if (try_blas & 4)
-	    transb = "C";
-	  else
-	    transb = bxstride == 1 ? "N" : "T";
-
-	  gemm (transa, transb , &m,
+	  gemm (axstride == 1 ? "N" : "T", bxstride == 1 ? "N" : "T", &m,
 		&n, &k,	&one, abase, &lda, bbase, &ldb, &zero, dest,
 		&ldc, 1, 1);
 	  return;
@@ -1280,8 +1258,8 @@ matmul_i16_avx512f (gfc_array_i16 * const restrict retarray,
 	  arg_extent = GFC_DESCRIPTOR_EXTENT(b,1);
 	  ret_extent = GFC_DESCRIPTOR_EXTENT(retarray,0);
 	  if (arg_extent != ret_extent)
-	    runtime_error ("Array bound mismatch for dimension 1 of "
-	    		   "array (%ld/%ld) ",
+	    runtime_error ("Incorrect extent in return array in"
+			   " MATMUL intrinsic: is %ld, should be %ld",
 			   (long int) ret_extent, (long int) arg_extent);
 	}
       else if (GFC_DESCRIPTOR_RANK (b) == 1)
@@ -1289,8 +1267,8 @@ matmul_i16_avx512f (gfc_array_i16 * const restrict retarray,
 	  arg_extent = GFC_DESCRIPTOR_EXTENT(a,0);
 	  ret_extent = GFC_DESCRIPTOR_EXTENT(retarray,0);
 	  if (arg_extent != ret_extent)
-	    runtime_error ("Array bound mismatch for dimension 1 of "
-	    		   "array (%ld/%ld) ",
+	    runtime_error ("Incorrect extent in return array in"
+			   " MATMUL intrinsic: is %ld, should be %ld",
 			   (long int) ret_extent, (long int) arg_extent);
 	}
       else
@@ -1298,15 +1276,17 @@ matmul_i16_avx512f (gfc_array_i16 * const restrict retarray,
 	  arg_extent = GFC_DESCRIPTOR_EXTENT(a,0);
 	  ret_extent = GFC_DESCRIPTOR_EXTENT(retarray,0);
 	  if (arg_extent != ret_extent)
-	    runtime_error ("Array bound mismatch for dimension 1 of "
-	    		   "array (%ld/%ld) ",
+	    runtime_error ("Incorrect extent in return array in"
+			   " MATMUL intrinsic for dimension 1:"
+			   " is %ld, should be %ld",
 			   (long int) ret_extent, (long int) arg_extent);
 
 	  arg_extent = GFC_DESCRIPTOR_EXTENT(b,1);
 	  ret_extent = GFC_DESCRIPTOR_EXTENT(retarray,1);
 	  if (arg_extent != ret_extent)
-	    runtime_error ("Array bound mismatch for dimension 2 of "
-	    		   "array (%ld/%ld) ",
+	    runtime_error ("Incorrect extent in return array in"
+			   " MATMUL intrinsic for dimension 2:"
+			   " is %ld, should be %ld",
 			   (long int) ret_extent, (long int) arg_extent);
 	}
     }
@@ -1347,9 +1327,7 @@ matmul_i16_avx512f (gfc_array_i16 * const restrict retarray,
   if (count != GFC_DESCRIPTOR_EXTENT(b,0))
     {
       if (count > 0 || GFC_DESCRIPTOR_EXTENT(b,0) > 0)
-	runtime_error ("Incorrect extent in argument B in MATMUL intrinsic "
-		       "in dimension 1: is %ld, should be %ld",
-		       (long int) GFC_DESCRIPTOR_EXTENT(b,0), (long int) count);
+	runtime_error ("dimension of array B incorrect in MATMUL intrinsic");
     }
 
   if (GFC_DESCRIPTOR_RANK (b) == 1)
@@ -1394,18 +1372,7 @@ matmul_i16_avx512f (gfc_array_i16 * const restrict retarray,
       if (lda > 0 && ldb > 0 && ldc > 0 && m > 1 && n > 1 && k > 1)
 	{
 	  assert (gemm != NULL);
-	  const char *transa, *transb;
-	  if (try_blas & 2)
-	    transa = "C";
-	  else
-	    transa = axstride == 1 ? "N" : "T";
-
-	  if (try_blas & 4)
-	    transb = "C";
-	  else
-	    transb = bxstride == 1 ? "N" : "T";
-
-	  gemm (transa, transb , &m,
+	  gemm (axstride == 1 ? "N" : "T", bxstride == 1 ? "N" : "T", &m,
 		&n, &k,	&one, abase, &lda, bbase, &ldb, &zero, dest,
 		&ldc, 1, 1);
 	  return;
@@ -1862,8 +1829,8 @@ matmul_i16_vanilla (gfc_array_i16 * const restrict retarray,
 	  arg_extent = GFC_DESCRIPTOR_EXTENT(b,1);
 	  ret_extent = GFC_DESCRIPTOR_EXTENT(retarray,0);
 	  if (arg_extent != ret_extent)
-	    runtime_error ("Array bound mismatch for dimension 1 of "
-	    		   "array (%ld/%ld) ",
+	    runtime_error ("Incorrect extent in return array in"
+			   " MATMUL intrinsic: is %ld, should be %ld",
 			   (long int) ret_extent, (long int) arg_extent);
 	}
       else if (GFC_DESCRIPTOR_RANK (b) == 1)
@@ -1871,8 +1838,8 @@ matmul_i16_vanilla (gfc_array_i16 * const restrict retarray,
 	  arg_extent = GFC_DESCRIPTOR_EXTENT(a,0);
 	  ret_extent = GFC_DESCRIPTOR_EXTENT(retarray,0);
 	  if (arg_extent != ret_extent)
-	    runtime_error ("Array bound mismatch for dimension 1 of "
-	    		   "array (%ld/%ld) ",
+	    runtime_error ("Incorrect extent in return array in"
+			   " MATMUL intrinsic: is %ld, should be %ld",
 			   (long int) ret_extent, (long int) arg_extent);
 	}
       else
@@ -1880,15 +1847,17 @@ matmul_i16_vanilla (gfc_array_i16 * const restrict retarray,
 	  arg_extent = GFC_DESCRIPTOR_EXTENT(a,0);
 	  ret_extent = GFC_DESCRIPTOR_EXTENT(retarray,0);
 	  if (arg_extent != ret_extent)
-	    runtime_error ("Array bound mismatch for dimension 1 of "
-	    		   "array (%ld/%ld) ",
+	    runtime_error ("Incorrect extent in return array in"
+			   " MATMUL intrinsic for dimension 1:"
+			   " is %ld, should be %ld",
 			   (long int) ret_extent, (long int) arg_extent);
 
 	  arg_extent = GFC_DESCRIPTOR_EXTENT(b,1);
 	  ret_extent = GFC_DESCRIPTOR_EXTENT(retarray,1);
 	  if (arg_extent != ret_extent)
-	    runtime_error ("Array bound mismatch for dimension 2 of "
-	    		   "array (%ld/%ld) ",
+	    runtime_error ("Incorrect extent in return array in"
+			   " MATMUL intrinsic for dimension 2:"
+			   " is %ld, should be %ld",
 			   (long int) ret_extent, (long int) arg_extent);
 	}
     }
@@ -1929,9 +1898,7 @@ matmul_i16_vanilla (gfc_array_i16 * const restrict retarray,
   if (count != GFC_DESCRIPTOR_EXTENT(b,0))
     {
       if (count > 0 || GFC_DESCRIPTOR_EXTENT(b,0) > 0)
-	runtime_error ("Incorrect extent in argument B in MATMUL intrinsic "
-		       "in dimension 1: is %ld, should be %ld",
-		       (long int) GFC_DESCRIPTOR_EXTENT(b,0), (long int) count);
+	runtime_error ("dimension of array B incorrect in MATMUL intrinsic");
     }
 
   if (GFC_DESCRIPTOR_RANK (b) == 1)
@@ -1976,18 +1943,7 @@ matmul_i16_vanilla (gfc_array_i16 * const restrict retarray,
       if (lda > 0 && ldb > 0 && ldc > 0 && m > 1 && n > 1 && k > 1)
 	{
 	  assert (gemm != NULL);
-	  const char *transa, *transb;
-	  if (try_blas & 2)
-	    transa = "C";
-	  else
-	    transa = axstride == 1 ? "N" : "T";
-
-	  if (try_blas & 4)
-	    transb = "C";
-	  else
-	    transb = bxstride == 1 ? "N" : "T";
-
-	  gemm (transa, transb , &m,
+	  gemm (axstride == 1 ? "N" : "T", bxstride == 1 ? "N" : "T", &m,
 		&n, &k,	&one, abase, &lda, bbase, &ldb, &zero, dest,
 		&ldc, 1, 1);
 	  return;
@@ -2504,8 +2460,8 @@ matmul_i16 (gfc_array_i16 * const restrict retarray,
 	  arg_extent = GFC_DESCRIPTOR_EXTENT(b,1);
 	  ret_extent = GFC_DESCRIPTOR_EXTENT(retarray,0);
 	  if (arg_extent != ret_extent)
-	    runtime_error ("Array bound mismatch for dimension 1 of "
-	    		   "array (%ld/%ld) ",
+	    runtime_error ("Incorrect extent in return array in"
+			   " MATMUL intrinsic: is %ld, should be %ld",
 			   (long int) ret_extent, (long int) arg_extent);
 	}
       else if (GFC_DESCRIPTOR_RANK (b) == 1)
@@ -2513,8 +2469,8 @@ matmul_i16 (gfc_array_i16 * const restrict retarray,
 	  arg_extent = GFC_DESCRIPTOR_EXTENT(a,0);
 	  ret_extent = GFC_DESCRIPTOR_EXTENT(retarray,0);
 	  if (arg_extent != ret_extent)
-	    runtime_error ("Array bound mismatch for dimension 1 of "
-	    		   "array (%ld/%ld) ",
+	    runtime_error ("Incorrect extent in return array in"
+			   " MATMUL intrinsic: is %ld, should be %ld",
 			   (long int) ret_extent, (long int) arg_extent);
 	}
       else
@@ -2522,15 +2478,17 @@ matmul_i16 (gfc_array_i16 * const restrict retarray,
 	  arg_extent = GFC_DESCRIPTOR_EXTENT(a,0);
 	  ret_extent = GFC_DESCRIPTOR_EXTENT(retarray,0);
 	  if (arg_extent != ret_extent)
-	    runtime_error ("Array bound mismatch for dimension 1 of "
-	    		   "array (%ld/%ld) ",
+	    runtime_error ("Incorrect extent in return array in"
+			   " MATMUL intrinsic for dimension 1:"
+			   " is %ld, should be %ld",
 			   (long int) ret_extent, (long int) arg_extent);
 
 	  arg_extent = GFC_DESCRIPTOR_EXTENT(b,1);
 	  ret_extent = GFC_DESCRIPTOR_EXTENT(retarray,1);
 	  if (arg_extent != ret_extent)
-	    runtime_error ("Array bound mismatch for dimension 2 of "
-	    		   "array (%ld/%ld) ",
+	    runtime_error ("Incorrect extent in return array in"
+			   " MATMUL intrinsic for dimension 2:"
+			   " is %ld, should be %ld",
 			   (long int) ret_extent, (long int) arg_extent);
 	}
     }
@@ -2571,9 +2529,7 @@ matmul_i16 (gfc_array_i16 * const restrict retarray,
   if (count != GFC_DESCRIPTOR_EXTENT(b,0))
     {
       if (count > 0 || GFC_DESCRIPTOR_EXTENT(b,0) > 0)
-	runtime_error ("Incorrect extent in argument B in MATMUL intrinsic "
-		       "in dimension 1: is %ld, should be %ld",
-		       (long int) GFC_DESCRIPTOR_EXTENT(b,0), (long int) count);
+	runtime_error ("dimension of array B incorrect in MATMUL intrinsic");
     }
 
   if (GFC_DESCRIPTOR_RANK (b) == 1)
@@ -2618,18 +2574,7 @@ matmul_i16 (gfc_array_i16 * const restrict retarray,
       if (lda > 0 && ldb > 0 && ldc > 0 && m > 1 && n > 1 && k > 1)
 	{
 	  assert (gemm != NULL);
-	  const char *transa, *transb;
-	  if (try_blas & 2)
-	    transa = "C";
-	  else
-	    transa = axstride == 1 ? "N" : "T";
-
-	  if (try_blas & 4)
-	    transb = "C";
-	  else
-	    transb = bxstride == 1 ? "N" : "T";
-
-	  gemm (transa, transb , &m,
+	  gemm (axstride == 1 ? "N" : "T", bxstride == 1 ? "N" : "T", &m,
 		&n, &k,	&one, abase, &lda, bbase, &ldb, &zero, dest,
 		&ldc, 1, 1);
 	  return;

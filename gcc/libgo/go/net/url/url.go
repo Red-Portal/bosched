@@ -11,6 +11,7 @@ package url
 // contain references to issue numbers with details.
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"sort"
@@ -158,26 +159,13 @@ func shouldEscape(c byte, mode encoding) bool {
 		}
 	}
 
-	if mode == encodeFragment {
-		// RFC 3986 §2.2 allows not escaping sub-delims. A subset of sub-delims are
-		// included in reserved from RFC 2396 §2.2. The remaining sub-delims do not
-		// need to be escaped. To minimize potential breakage, we apply two restrictions:
-		// (1) we always escape sub-delims outside of the fragment, and (2) we always
-		// escape single quote to avoid breaking callers that had previously assumed that
-		// single quotes would be escaped. See issue #19917.
-		switch c {
-		case '!', '(', ')', '*':
-			return false
-		}
-	}
-
 	// Everything else must be escaped.
 	return true
 }
 
 // QueryUnescape does the inverse transformation of QueryEscape,
 // converting each 3-byte encoded substring of the form "%AB" into the
-// hex-decoded byte 0xAB.
+// hex-decoded byte 0xAB. It also converts '+' into ' ' (space).
 // It returns an error if any % is not followed by two hexadecimal
 // digits.
 func QueryUnescape(s string) (string, error) {
@@ -186,8 +174,9 @@ func QueryUnescape(s string) (string, error) {
 
 // PathUnescape does the inverse transformation of PathEscape,
 // converting each 3-byte encoded substring of the form "%AB" into the
-// hex-decoded byte 0xAB. It returns an error if any % is not followed
-// by two hexadecimal digits.
+// hex-decoded byte 0xAB. It also converts '+' into ' ' (space).
+// It returns an error if any % is not followed by two hexadecimal
+// digits.
 //
 // PathUnescape is identical to QueryUnescape except that it does not
 // unescape '+' to ' ' (space).
@@ -749,7 +738,7 @@ func validOptionalPort(port string) bool {
 //	- if u.RawQuery is empty, ?query is omitted.
 //	- if u.Fragment is empty, #fragment is omitted.
 func (u *URL) String() string {
-	var buf strings.Builder
+	var buf bytes.Buffer
 	if u.Scheme != "" {
 		buf.WriteString(u.Scheme)
 		buf.WriteByte(':')
@@ -890,7 +879,7 @@ func (v Values) Encode() string {
 	if v == nil {
 		return ""
 	}
-	var buf strings.Builder
+	var buf bytes.Buffer
 	keys := make([]string, 0, len(v))
 	for k := range v {
 		keys = append(keys, k)
@@ -898,13 +887,12 @@ func (v Values) Encode() string {
 	sort.Strings(keys)
 	for _, k := range keys {
 		vs := v[k]
-		keyEscaped := QueryEscape(k)
+		prefix := QueryEscape(k) + "="
 		for _, v := range vs {
 			if buf.Len() > 0 {
 				buf.WriteByte('&')
 			}
-			buf.WriteString(keyEscaped)
-			buf.WriteByte('=')
+			buf.WriteString(prefix)
 			buf.WriteString(QueryEscape(v))
 		}
 	}
@@ -965,7 +953,7 @@ func (u *URL) Parse(ref string) (*URL, error) {
 }
 
 // ResolveReference resolves a URI reference to an absolute URI from
-// an absolute base URI u, per RFC 3986 Section 5.2. The URI reference
+// an absolute base URI, per RFC 3986 Section 5.2.  The URI reference
 // may be relative or absolute. ResolveReference always returns a new
 // URL instance, even if the returned URL is identical to either the
 // base or reference. If ref is an absolute URL, then ResolveReference

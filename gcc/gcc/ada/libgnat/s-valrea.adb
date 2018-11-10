@@ -342,7 +342,7 @@ package body System.Val_Real is
       --  For base 10, use power of ten table, repeatedly if necessary
 
       elsif Scale > 0 then
-         while Scale > Maxpow and then Uval'Valid loop
+         while Scale > Maxpow loop
             Uval := Uval * Powten (Maxpow);
             Scale := Scale - Maxpow;
          end loop;
@@ -350,21 +350,18 @@ package body System.Val_Real is
          --  Note that we still know that Scale > 0, since the loop
          --  above leaves Scale in the range 1 .. Maxpow.
 
-         if Uval'Valid then
-            Uval := Uval * Powten (Scale);
-         end if;
+         Uval := Uval * Powten (Scale);
 
       elsif Scale < 0 then
-         while (-Scale) > Maxpow and then Uval'Valid loop
+         while (-Scale) > Maxpow loop
             Uval := Uval / Powten (Maxpow);
             Scale := Scale + Maxpow;
          end loop;
 
          --  Note that we still know that Scale < 0, since the loop
          --  above leaves Scale in the range -Maxpow .. -1.
-         if Uval'Valid then
-            Uval := Uval / Powten (-Scale);
-         end if;
+
+         Uval := Uval / Powten (-Scale);
       end if;
 
       --  Here is where we check for a bad based number

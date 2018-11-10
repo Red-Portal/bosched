@@ -17,11 +17,11 @@
 #include "sanitizer_common.h"
 #include "sanitizer_flags.h"
 #include "sanitizer_platform_limits_netbsd.h"
-#include "sanitizer_platform_limits_openbsd.h"
 #include "sanitizer_platform_limits_posix.h"
-#include "sanitizer_platform_limits_solaris.h"
 #include "sanitizer_posix.h"
 #include "sanitizer_procmaps.h"
+#include "sanitizer_stacktrace.h"
+#include "sanitizer_symbolizer.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -39,7 +39,7 @@
 #if SANITIZER_FREEBSD
 // The MAP_NORESERVE define has been removed in FreeBSD 11.x, and even before
 // that, it was never implemented.  So just define it to zero.
-#undef MAP_NORESERVE
+#undef  MAP_NORESERVE
 #define MAP_NORESERVE 0
 #endif
 
@@ -60,29 +60,19 @@ void ReleaseMemoryPagesToOS(uptr beg, uptr end) {
   uptr beg_aligned = RoundUpTo(beg, page_size);
   uptr end_aligned = RoundDownTo(end, page_size);
   if (beg_aligned < end_aligned)
-    // In the default Solaris compilation environment, madvise() is declared
-    // to take a caddr_t arg; casting it to void * results in an invalid
-    // conversion error, so use char * instead.
-    madvise((char *)beg_aligned, end_aligned - beg_aligned,
-            SANITIZER_MADVISE_DONTNEED);
+    madvise((void*)beg_aligned, end_aligned - beg_aligned, MADV_DONTNEED);
 }
 
-bool NoHugePagesInRegion(uptr addr, uptr size) {
+void NoHugePagesInRegion(uptr addr, uptr size) {
 #ifdef MADV_NOHUGEPAGE  // May not be defined on old systems.
-  return madvise((void *)addr, size, MADV_NOHUGEPAGE) == 0;
-#else
-  return true;
+  madvise((void *)addr, size, MADV_NOHUGEPAGE);
 #endif  // MADV_NOHUGEPAGE
 }
 
-bool DontDumpShadowMemory(uptr addr, uptr length) {
-#if defined(MADV_DONTDUMP)
-  return madvise((void *)addr, length, MADV_DONTDUMP) == 0;
-#elif defined(MADV_NOCORE)
-  return madvise((void *)addr, length, MADV_NOCORE) == 0;
-#else
-  return true;
-#endif  // MADV_DONTDUMP
+void DontDumpShadowMemory(uptr addr, uptr length) {
+#ifdef MADV_DONTDUMP
+  madvise((void *)addr, length, MADV_DONTDUMP);
+#endif
 }
 
 static rlim_t getlim(int res) {
@@ -221,7 +211,6 @@ void InstallDeadlySignalHandlers(SignalHandlerType handler) {
   MaybeInstallSigaction(SIGABRT, handler);
   MaybeInstallSigaction(SIGFPE, handler);
   MaybeInstallSigaction(SIGILL, handler);
-  MaybeInstallSigaction(SIGTRAP, handler);
 }
 
 bool SignalContext::IsStackOverflow() const {
@@ -234,9 +223,7 @@ bool SignalContext::IsStackOverflow() const {
   // take it into account.
   bool IsStackAccess = addr >= (sp & ~0xFFF) && addr < sp + 0xFFFF;
 #else
-  // Let's accept up to a page size away from top of stack. Things like stack
-  // probing can trigger accesses with such large offsets.
-  bool IsStackAccess = addr + GetPageSizeCached() > sp && addr < sp + 0xFFFF;
+  bool IsStackAccess = addr + 512 > sp && addr < sp + 0xFFFF;
 #endif
 
 #if __powerpc__
@@ -296,12 +283,16 @@ bool IsAccessibleMemoryRange(uptr beg, uptr size) {
   return result;
 }
 
-void PlatformPrepareForSandboxing(__sanitizer_sandbox_arguments *args) {
+void PrepareForSandboxing(__sanitizer_sandbox_arguments *args) {
   // Some kinds of sandboxes may forbid filesystem access, so we won't be able
   // to read the file mappings from /proc/self/maps. Luckily, neither the
   // process will be able to load additional libraries, so it's fine to use the
   // cached mappings.
   MemoryMappingLayout::CacheMemoryMappings();
+  // Same for /proc/self/exe in the symbolizer.
+#if !SANITIZER_GO
+  Symbolizer::GetOrInit()->PrepareForSandboxing();
+#endif
 }
 
 #if SANITIZER_ANDROID || SANITIZER_GO
@@ -326,7 +317,7 @@ int GetNamedMappingFd(const char *name, uptr size) {
 }
 #endif
 
-bool MmapFixedNoReserve(uptr fixed_addr, uptr size, const char *name) {
+void *MmapFixedNoReserve(uptr fixed_addr, uptr size, const char *name) {
   int fd = name ? GetNamedMappingFd(name, size) : -1;
   unsigned flags = MAP_PRIVATE | MAP_FIXED | MAP_NORESERVE;
   if (fd == -1) flags |= MAP_ANON;
@@ -336,48 +327,12 @@ bool MmapFixedNoReserve(uptr fixed_addr, uptr size, const char *name) {
                          RoundUpTo(size, PageSize), PROT_READ | PROT_WRITE,
                          flags, fd, 0);
   int reserrno;
-  if (internal_iserror(p, &reserrno)) {
+  if (internal_iserror(p, &reserrno))
     Report("ERROR: %s failed to "
            "allocate 0x%zx (%zd) bytes at address %zx (errno: %d)\n",
            SanitizerToolName, size, size, fixed_addr, reserrno);
-    return false;
-  }
   IncreaseTotalMmap(size);
-  return true;
-}
-
-uptr ReservedAddressRange::Init(uptr size, const char *name, uptr fixed_addr) {
-  // We don't pass `name` along because, when you enable `decorate_proc_maps`
-  // AND actually use a named mapping AND are using a sanitizer intercepting
-  // `open` (e.g. TSAN, ESAN), then you'll get a failure during initialization.
-  // TODO(flowerhack): Fix the implementation of GetNamedMappingFd to solve
-  // this problem.
-  base_ = fixed_addr ? MmapFixedNoAccess(fixed_addr, size) : MmapNoAccess(size);
-  size_ = size;
-  name_ = name;
-  (void)os_handle_;  // unsupported
-  return reinterpret_cast<uptr>(base_);
-}
-
-// Uses fixed_addr for now.
-// Will use offset instead once we've implemented this function for real.
-uptr ReservedAddressRange::Map(uptr fixed_addr, uptr size) {
-  return reinterpret_cast<uptr>(MmapFixedOrDieOnFatalError(fixed_addr, size));
-}
-
-uptr ReservedAddressRange::MapOrDie(uptr fixed_addr, uptr size) {
-  return reinterpret_cast<uptr>(MmapFixedOrDie(fixed_addr, size));
-}
-
-void ReservedAddressRange::Unmap(uptr addr, uptr size) {
-  CHECK_LE(size, size_);
-  if (addr == reinterpret_cast<uptr>(base_))
-    // If we unmap the whole range, just null out the base.
-    base_ = (size == size_) ? nullptr : reinterpret_cast<void*>(addr + size);
-  else
-    CHECK_EQ(addr + size, reinterpret_cast<uptr>(base_) + size_);
-  size_ -= size;
-  UnmapOrDie(reinterpret_cast<void*>(addr), size);
+  return (void *)p;
 }
 
 void *MmapFixedNoAccess(uptr fixed_addr, uptr size, const char *name) {

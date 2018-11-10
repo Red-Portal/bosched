@@ -34,20 +34,16 @@ test01()
 
   path pp = p;
   pp /= p;
-  VERIFY( pp.string() == "/foo/bar/foo/bar" );
+  VERIFY( pp.native() == "/foo/bar/foo/bar" );
 
   path q("baz");
 
   path qq = q;
   qq /= q;
-#if defined(__MINGW32__) || defined(__MINGW64__)
-  VERIFY( qq.string() == "baz\\baz" );
-#else
-  VERIFY( qq.string() == "baz/baz" );
-#endif
+  VERIFY( qq.native() == "baz/baz" );
 
   q /= p;
-  VERIFY( q.string() == "baz/foo/bar" );
+  VERIFY( q.native() == "baz/foo/bar" );
 
   path r = "";
   r /= path();
@@ -58,7 +54,7 @@ test01()
 
   path s = "dir/";
   s /= path("/file");
-  VERIFY( s.string() == "dir//file" );
+  VERIFY( s.native() == "dir//file" );
 }
 
 int

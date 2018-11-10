@@ -26,17 +26,13 @@
 
 #if HAVE_IFUNC
 
-unsigned int __libat_feat1;
+unsigned int libat_feat1_ecx, libat_feat1_edx;
 
-unsigned int
-__libat_feat1_init (void)
+static void __attribute__((constructor))
+init_cpuid (void)
 {
-  unsigned int eax, ebx, ecx, edx;
-  FEAT1_REGISTER = 0;
-  __get_cpuid (1, &eax, &ebx, &ecx, &edx);
-  /* See the load in load_feat1.  */
-  __atomic_store_n (&__libat_feat1, FEAT1_REGISTER, __ATOMIC_RELAXED);
-  return FEAT1_REGISTER;
+  unsigned int eax, ebx;
+  __get_cpuid (1, &eax, &ebx, &libat_feat1_ecx, &libat_feat1_edx);
 }
 
 #endif /* HAVE_IFUNC */

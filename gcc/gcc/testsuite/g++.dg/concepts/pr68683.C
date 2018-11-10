@@ -1,5 +1,4 @@
-// { dg-do compile { target c++17 } }
-// { dg-options "-fconcepts" }
+// { dg-options "-std=c++17 -fconcepts" }
 
 template <typename, typename>
 struct is_same {

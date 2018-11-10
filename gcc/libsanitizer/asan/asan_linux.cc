@@ -11,12 +11,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "sanitizer_common/sanitizer_platform.h"
-#if SANITIZER_FREEBSD || SANITIZER_LINUX || SANITIZER_NETBSD || \
-    SANITIZER_SOLARIS
+#if SANITIZER_FREEBSD || SANITIZER_LINUX || SANITIZER_NETBSD
 
 #include "asan_interceptors.h"
 #include "asan_internal.h"
-#include "asan_premap_shadow.h"
 #include "asan_thread.h"
 #include "sanitizer_common/sanitizer_flags.h"
 #include "sanitizer_common/sanitizer_freebsd.h"
@@ -30,7 +28,6 @@
 #include <sys/types.h>
 #include <dlfcn.h>
 #include <fcntl.h>
-#include <limits.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -40,11 +37,7 @@
 #include <sys/link_elf.h>
 #endif
 
-#if SANITIZER_SOLARIS
-#include <link.h>
-#endif
-
-#if SANITIZER_ANDROID || SANITIZER_FREEBSD || SANITIZER_SOLARIS
+#if SANITIZER_ANDROID || SANITIZER_FREEBSD
 #include <ucontext.h>
 extern "C" void* _DYNAMIC;
 #elif SANITIZER_NETBSD
@@ -86,51 +79,9 @@ void *AsanDoesNotSupportStaticLinkage() {
   return &_DYNAMIC;  // defined in link.h
 }
 
-static void UnmapFromTo(uptr from, uptr to) {
-  CHECK(to >= from);
-  if (to == from) return;
-  uptr res = internal_munmap(reinterpret_cast<void *>(from), to - from);
-  if (UNLIKELY(internal_iserror(res))) {
-    Report(
-        "ERROR: AddresSanitizer failed to unmap 0x%zx (%zd) bytes at address "
-        "%p\n",
-        to - from, to - from, from);
-    CHECK("unable to unmap" && 0);
-  }
-}
-
-#if ASAN_PREMAP_SHADOW
-uptr FindPremappedShadowStart() {
-  uptr granularity = GetMmapGranularity();
-  uptr shadow_start = reinterpret_cast<uptr>(&__asan_shadow);
-  uptr premap_shadow_size = PremapShadowSize();
-  uptr shadow_size = RoundUpTo(kHighShadowEnd, granularity);
-  // We may have mapped too much. Release extra memory.
-  UnmapFromTo(shadow_start + shadow_size, shadow_start + premap_shadow_size);
-  return shadow_start;
-}
-#endif
-
 uptr FindDynamicShadowStart() {
-#if ASAN_PREMAP_SHADOW
-  if (!PremapShadowFailed())
-    return FindPremappedShadowStart();
-#endif
-
-  uptr granularity = GetMmapGranularity();
-  uptr alignment = granularity * 8;
-  uptr left_padding = granularity;
-  uptr shadow_size = RoundUpTo(kHighShadowEnd, granularity);
-  uptr map_size = shadow_size + left_padding + alignment;
-
-  uptr map_start = (uptr)MmapNoAccess(map_size);
-  CHECK_NE(map_start, ~(uptr)0);
-
-  uptr shadow_start = RoundUpTo(map_start + left_padding, alignment);
-  UnmapFromTo(map_start, shadow_start - left_padding);
-  UnmapFromTo(shadow_start + shadow_size, map_start + map_size);
-
-  return shadow_start;
+  UNREACHABLE("FindDynamicShadowStart is not available");
+  return 0;
 }
 
 void AsanApplyToGlobals(globals_op_fptr op, const void *needle) {
@@ -144,9 +95,6 @@ void AsanCheckIncompatibleRT() {}
 #else
 static int FindFirstDSOCallback(struct dl_phdr_info *info, size_t size,
                                 void *data) {
-  VReport(2, "info->dlpi_name = %s\tinfo->dlpi_addr = %p\n",
-          info->dlpi_name, info->dlpi_addr);
-
   // Continue until the first dynamic library is found
   if (!info->dlpi_name || info->dlpi_name[0] == 0)
     return 0;
@@ -155,19 +103,13 @@ static int FindFirstDSOCallback(struct dl_phdr_info *info, size_t size,
   if (internal_strncmp(info->dlpi_name, "linux-", sizeof("linux-") - 1) == 0)
     return 0;
 
-#if SANITIZER_FREEBSD || SANITIZER_NETBSD
+#if SANITIZER_NETBSD
   // Ignore first entry (the main program)
   char **p = (char **)data;
   if (!(*p)) {
     *p = (char *)-1;
     return 0;
   }
-#endif
-
-#if SANITIZER_SOLARIS
-  // Ignore executable on Solaris
-  if (info->dlpi_addr == 0)
-    return 0;
 #endif
 
   *(const char **)data = info->dlpi_name;
@@ -213,7 +155,7 @@ void AsanCheckIncompatibleRT() {
       // the functions in dynamic ASan runtime instead of the functions in
       // system libraries, causing crashes later in ASan initialization.
       MemoryMappingLayout proc_maps(/*cache_enabled*/true);
-      char filename[PATH_MAX];
+      char filename[128];
       MemoryMappedSegment segment(filename, sizeof(filename));
       while (proc_maps.Next(&segment)) {
         if (IsDynamicRTName(segment.filename)) {
@@ -248,5 +190,4 @@ void *AsanDlSymNext(const char *sym) {
 
 } // namespace __asan
 
-#endif  // SANITIZER_FREEBSD || SANITIZER_LINUX || SANITIZER_NETBSD ||
-        // SANITIZER_SOLARIS
+#endif  // SANITIZER_FREEBSD || SANITIZER_LINUX || SANITIZER_NETBSD

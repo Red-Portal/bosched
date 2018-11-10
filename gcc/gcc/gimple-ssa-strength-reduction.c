@@ -1775,7 +1775,7 @@ find_candidates_dom_walker::before_dom_children (basic_block bb)
     {
       gimple *gs = gsi_stmt (gsi);
 
-      if (stmt_could_throw_p (cfun, gs))
+      if (stmt_could_throw_p (gs))
 	continue;
 
       if (gimple_vuse (gs) && gimple_assign_single_p (gs))
@@ -3402,7 +3402,7 @@ insert_initializers (slsr_cand_t c)
 	      fputs ("Using existing initializer: ", dump_file);
 	      print_gimple_stmt (dump_file,
 				 SSA_NAME_DEF_STMT (incr_vec[i].initializer),
-				 0, TDF_NONE);
+				 0, 0);
 	    }
 	  continue;
 	}

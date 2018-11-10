@@ -54,8 +54,7 @@ static void AsanDie() {
       UnmapOrDie((void*)kLowShadowBeg, kMidMemBeg - kLowShadowBeg);
       UnmapOrDie((void*)kMidMemEnd, kHighShadowEnd - kMidMemEnd);
     } else {
-      if (kHighShadowEnd)
-        UnmapOrDie((void*)kLowShadowBeg, kHighShadowEnd - kLowShadowBeg);
+      UnmapOrDie((void*)kLowShadowBeg, kHighShadowEnd - kLowShadowBeg);
     }
   }
 }
@@ -64,14 +63,8 @@ static void AsanCheckFailed(const char *file, int line, const char *cond,
                             u64 v1, u64 v2) {
   Report("AddressSanitizer CHECK failed: %s:%d \"%s\" (0x%zx, 0x%zx)\n", file,
          line, cond, (uptr)v1, (uptr)v2);
-
-  // Print a stack trace the first time we come here. Otherwise, we probably
-  // failed a CHECK during symbolization.
-  static atomic_uint32_t num_calls;
-  if (atomic_fetch_add(&num_calls, 1, memory_order_relaxed) == 0) {
-    PRINT_CURRENT_STACK_CHECK();
-  }
-
+  // FIXME: check for infinite recursion without a thread-local counter here.
+  PRINT_CURRENT_STACK_CHECK();
   Die();
 }
 
@@ -145,8 +138,6 @@ ASAN_REPORT_ERROR_N(load, false)
 ASAN_REPORT_ERROR_N(store, true)
 
 #define ASAN_MEMORY_ACCESS_CALLBACK_BODY(type, is_write, size, exp_arg, fatal) \
-    if (SANITIZER_MYRIAD2 && !AddrIsInMem(addr) && !AddrIsInShadow(addr))      \
-      return;                                                                  \
     uptr sp = MEM_TO_SHADOW(addr);                                             \
     uptr s = size <= SHADOW_GRANULARITY ? *reinterpret_cast<u8 *>(sp)          \
                                         : *reinterpret_cast<u16 *>(sp);        \
@@ -313,24 +304,20 @@ static void asan_atexit() {
 }
 
 static void InitializeHighMemEnd() {
-#if !SANITIZER_MYRIAD2
 #if !ASAN_FIXED_MAPPING
-  kHighMemEnd = GetMaxUserVirtualAddress();
+  kHighMemEnd = GetMaxVirtualAddress();
   // Increase kHighMemEnd to make sure it's properly
   // aligned together with kHighMemBeg:
   kHighMemEnd |= SHADOW_GRANULARITY * GetMmapGranularity() - 1;
 #endif  // !ASAN_FIXED_MAPPING
   CHECK_EQ((kHighMemBeg % GetMmapGranularity()), 0);
-#endif  // !SANITIZER_MYRIAD2
 }
 
 void PrintAddressSpaceLayout() {
-  if (kHighMemBeg) {
-    Printf("|| `[%p, %p]` || HighMem    ||\n",
-           (void*)kHighMemBeg, (void*)kHighMemEnd);
-    Printf("|| `[%p, %p]` || HighShadow ||\n",
-           (void*)kHighShadowBeg, (void*)kHighShadowEnd);
-  }
+  Printf("|| `[%p, %p]` || HighMem    ||\n",
+         (void*)kHighMemBeg, (void*)kHighMemEnd);
+  Printf("|| `[%p, %p]` || HighShadow ||\n",
+         (void*)kHighShadowBeg, (void*)kHighShadowEnd);
   if (kMidMemBeg) {
     Printf("|| `[%p, %p]` || ShadowGap3 ||\n",
            (void*)kShadowGap3Beg, (void*)kShadowGap3End);
@@ -349,14 +336,11 @@ void PrintAddressSpaceLayout() {
     Printf("|| `[%p, %p]` || LowMem     ||\n",
            (void*)kLowMemBeg, (void*)kLowMemEnd);
   }
-  Printf("MemToShadow(shadow): %p %p",
+  Printf("MemToShadow(shadow): %p %p %p %p",
          (void*)MEM_TO_SHADOW(kLowShadowBeg),
-         (void*)MEM_TO_SHADOW(kLowShadowEnd));
-  if (kHighMemBeg) {
-    Printf(" %p %p",
-           (void*)MEM_TO_SHADOW(kHighShadowBeg),
-           (void*)MEM_TO_SHADOW(kHighShadowEnd));
-  }
+         (void*)MEM_TO_SHADOW(kLowShadowEnd),
+         (void*)MEM_TO_SHADOW(kHighShadowBeg),
+         (void*)MEM_TO_SHADOW(kHighShadowEnd));
   if (kMidMemBeg) {
     Printf(" %p %p",
            (void*)MEM_TO_SHADOW(kMidShadowBeg),
@@ -388,7 +372,6 @@ static void AsanInitInternal() {
   asan_init_is_running = true;
 
   CacheBinaryName();
-  CheckASLR();
 
   // Initialize flags. This must be done early, because most of the
   // initialization steps look at flags().
@@ -422,7 +405,6 @@ static void AsanInitInternal() {
   MaybeReexec();
 
   // Setup internal allocator callback.
-  SetLowLevelAllocateMinAlignment(SHADOW_GRANULARITY);
   SetLowLevelAllocateCallback(OnLowLevelAllocate);
 
   InitializeAsanInterceptors();
@@ -541,9 +523,6 @@ void NOINLINE __asan_handle_no_return() {
   if (curr_thread) {
     top = curr_thread->stack_top();
     bottom = ((uptr)&local_stack - PageSize) & ~(PageSize - 1);
-  } else if (SANITIZER_RTEMS) {
-    // Give up On RTEMS.
-    return;
   } else {
     CHECK(!SANITIZER_FUCHSIA);
     // If we haven't seen this thread, try asking the OS for stack bounds.

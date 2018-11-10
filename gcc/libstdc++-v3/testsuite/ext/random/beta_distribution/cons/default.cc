@@ -23,7 +23,6 @@
 
 #include <ext/random>
 #include <testsuite_hooks.h>
-#include <testsuite_common_types.h>
 
 void
 test01()
@@ -35,16 +34,8 @@ test01()
   VERIFY( u.max() == 1.0 );
 }
 
-void
-test02()
-{
-  __gnu_test::implicitly_default_constructible test;
-  test.operator()<__gnu_cxx::beta_distribution<>>();
-  test.operator()<__gnu_cxx::beta_distribution<>::param_type>();
-}
-
 int main()
 {
   test01();
-  test02();
+  return 0;
 }

@@ -40,6 +40,8 @@
 #include <bits/locale_classes.h>
 #include <bits/codecvt.h>
 
+#ifdef _GLIBCXX_USE_C99_STDINT_TR1
+
 namespace std _GLIBCXX_VISIBILITY(default)
 {
 _GLIBCXX_BEGIN_NAMESPACE_VERSION
@@ -172,6 +174,8 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace
 
-#endif // C++11
+#endif // _GLIBCXX_USE_C99_STDINT_TR1
+
+#endif
 
 #endif /* _GLIBCXX_CODECVT */

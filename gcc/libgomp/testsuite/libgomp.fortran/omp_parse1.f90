@@ -1,6 +1,4 @@
 ! { dg-do run }
-! { dg-options "-std=legacy" }
-
 use omp_lib
   call test_parallel
   call test_do

@@ -1406,8 +1406,6 @@ var EqualFoldTests = []struct {
 	{"abcdefghijK", "abcdefghij\u212A", true},
 	{"abcdefghijkz", "abcdefghij\u212Ay", false},
 	{"abcdefghijKz", "abcdefghij\u212Ay", false},
-	{"1", "2", false},
-	{"utf-8", "US-ASCII", false},
 }
 
 func TestEqualFold(t *testing.T) {
@@ -1417,16 +1415,6 @@ func TestEqualFold(t *testing.T) {
 		}
 		if out := EqualFold(tt.t, tt.s); out != tt.out {
 			t.Errorf("EqualFold(%#q, %#q) = %v, want %v", tt.t, tt.s, out, tt.out)
-		}
-	}
-}
-
-func BenchmarkEqualFold(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		for _, tt := range EqualFoldTests {
-			if out := EqualFold(tt.s, tt.t); out != tt.out {
-				b.Fatal("wrong result")
-			}
 		}
 	}
 }

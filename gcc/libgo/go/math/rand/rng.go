@@ -12,16 +12,19 @@ package rand
  */
 
 const (
-	rngLen   = 607
-	rngTap   = 273
-	rngMax   = 1 << 63
-	rngMask  = rngMax - 1
-	int32max = (1 << 31) - 1
+	_LEN  = 607
+	_TAP  = 273
+	_MAX  = 1 << 63
+	_MASK = _MAX - 1
+	_A    = 48271
+	_M    = (1 << 31) - 1
+	_Q    = 44488
+	_R    = 3399
 )
 
 var (
-	// rngCooked used for seeding. See gen_cooked.go for details.
-	rngCooked [rngLen]int64 = [...]int64{
+	// Used for seeding. See gen_cooked.go for details.
+	rng_cooked [_LEN]int64 = [...]int64{
 		-4181792142133755926, -4576982950128230565, 1395769623340756751, 5333664234075297259,
 		-6347679516498800754, 9033628115061424579, 7143218595135194537, 4812947590706362721,
 		7937252194349799378, 5307299880338848416, 8209348851763925077, -7107630437535961764,
@@ -178,24 +181,18 @@ var (
 )
 
 type rngSource struct {
-	tap  int           // index into vec
-	feed int           // index into vec
-	vec  [rngLen]int64 // current feedback register
+	tap  int         // index into vec
+	feed int         // index into vec
+	vec  [_LEN]int64 // current feedback register
 }
 
 // seed rng x[n+1] = 48271 * x[n] mod (2**31 - 1)
 func seedrand(x int32) int32 {
-	const (
-		A = 48271
-		Q = 44488
-		R = 3399
-	)
-
-	hi := x / Q
-	lo := x % Q
-	x = A*lo - R*hi
+	hi := x / _Q
+	lo := x % _Q
+	x = _A*lo - _R*hi
 	if x < 0 {
-		x += int32max
+		x += _M
 	}
 	return x
 }
@@ -203,18 +200,18 @@ func seedrand(x int32) int32 {
 // Seed uses the provided seed value to initialize the generator to a deterministic state.
 func (rng *rngSource) Seed(seed int64) {
 	rng.tap = 0
-	rng.feed = rngLen - rngTap
+	rng.feed = _LEN - _TAP
 
-	seed = seed % int32max
+	seed = seed % _M
 	if seed < 0 {
-		seed += int32max
+		seed += _M
 	}
 	if seed == 0 {
 		seed = 89482311
 	}
 
 	x := int32(seed)
-	for i := -20; i < rngLen; i++ {
+	for i := -20; i < _LEN; i++ {
 		x = seedrand(x)
 		if i >= 0 {
 			var u int64
@@ -223,7 +220,7 @@ func (rng *rngSource) Seed(seed int64) {
 			u ^= int64(x) << 20
 			x = seedrand(x)
 			u ^= int64(x)
-			u ^= rngCooked[i]
+			u ^= rng_cooked[i]
 			rng.vec[i] = u
 		}
 	}
@@ -231,19 +228,19 @@ func (rng *rngSource) Seed(seed int64) {
 
 // Int63 returns a non-negative pseudo-random 63-bit integer as an int64.
 func (rng *rngSource) Int63() int64 {
-	return int64(rng.Uint64() & rngMask)
+	return int64(rng.Uint64() & _MASK)
 }
 
 // Uint64 returns a non-negative pseudo-random 64-bit integer as an uint64.
 func (rng *rngSource) Uint64() uint64 {
 	rng.tap--
 	if rng.tap < 0 {
-		rng.tap += rngLen
+		rng.tap += _LEN
 	}
 
 	rng.feed--
 	if rng.feed < 0 {
-		rng.feed += rngLen
+		rng.feed += _LEN
 	}
 
 	x := rng.vec[rng.feed] + rng.vec[rng.tap]

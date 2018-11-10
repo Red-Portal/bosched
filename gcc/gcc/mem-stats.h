@@ -169,7 +169,7 @@ struct mem_usage
   {
     return (m_allocated == second.m_allocated
 	    && m_peak == second.m_peak
-	    && m_times == second.m_times);
+	    && m_allocated == second.m_allocated);
   }
 
   /* Comparison operator.  */

@@ -26,7 +26,5 @@
 // libstdc++/50118
 template class std::unordered_set<int, std::hash<int>, std::equal_to<int>,
 				  __gnu_test::ExplicitConsAlloc<int>>;
-#ifndef __STRICT_ANSI__
 template class std::unordered_set<int, std::hash<int>, std::equal_to<int>,
 				  __gnu_test::ExplicitConsAlloc<char>>;
-#endif

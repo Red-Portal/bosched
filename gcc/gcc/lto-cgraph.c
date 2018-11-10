@@ -37,6 +37,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "pass_manager.h"
 #include "ipa-utils.h"
 #include "omp-offload.h"
+#include "ipa-chkp.h"
 #include "stringpool.h"
 #include "attribs.h"
 
@@ -539,10 +540,8 @@ lto_output_node (struct lto_simple_output_block *ob, struct cgraph_node *node,
   bp_pack_value (&bp, node->thunk.thunk_p, 1);
   bp_pack_value (&bp, node->parallelized_function, 1);
   bp_pack_enum (&bp, ld_plugin_symbol_resolution,
-	        LDPR_NUM_KNOWN,
-		/* When doing incremental link, we will get new resolution
-		   info next time we process the file.  */
-		flag_incremental_link ? LDPR_UNKNOWN : node->resolution);
+	        LDPR_NUM_KNOWN, node->resolution);
+  bp_pack_value (&bp, node->instrumentation_clone, 1);
   bp_pack_value (&bp, node->split_part, 1);
   streamer_write_bitpack (&bp);
   streamer_write_data_stream (ob->main_stream, section, strlen (section) + 1);
@@ -556,13 +555,15 @@ lto_output_node (struct lto_simple_output_block *ob, struct cgraph_node *node,
 	  + (node->thunk.add_pointer_bounds_args != 0) * 8);
       streamer_write_uhwi_stream (ob->main_stream, node->thunk.fixed_offset);
       streamer_write_uhwi_stream (ob->main_stream, node->thunk.virtual_value);
-      streamer_write_uhwi_stream (ob->main_stream, node->thunk.indirect_offset);
     }
   streamer_write_hwi_stream (ob->main_stream, node->profile_id);
   if (DECL_STATIC_CONSTRUCTOR (node->decl))
     streamer_write_hwi_stream (ob->main_stream, node->get_init_priority ());
   if (DECL_STATIC_DESTRUCTOR (node->decl))
     streamer_write_hwi_stream (ob->main_stream, node->get_fini_priority ());
+
+  if (node->instrumentation_clone)
+    lto_output_fn_decl_index (ob->decl_state, ob->main_stream, node->orig_decl);
 }
 
 /* Output the varpool NODE to OB. 
@@ -694,14 +695,39 @@ lto_output_ref (struct lto_simple_output_block *ob, struct ipa_ref *ref,
 static void
 output_profile_summary (struct lto_simple_output_block *ob)
 {
+  unsigned h_ix;
+  struct bitpack_d bp;
+
   if (profile_info)
     {
       /* We do not output num and run_max, they are not used by
          GCC profile feedback and they are difficult to merge from multiple
          units.  */
-      unsigned runs = (profile_info->runs);
-      streamer_write_uhwi_stream (ob->main_stream, runs);
+      gcc_assert (profile_info->runs);
+      streamer_write_uhwi_stream (ob->main_stream, profile_info->runs);
+      streamer_write_gcov_count_stream (ob->main_stream, profile_info->sum_max);
 
+      /* sum_all is needed for computing the working set with the
+         histogram.  */
+      streamer_write_gcov_count_stream (ob->main_stream, profile_info->sum_all);
+
+      /* Create and output a bitpack of non-zero histogram entries indices.  */
+      bp = bitpack_create (ob->main_stream);
+      for (h_ix = 0; h_ix < GCOV_HISTOGRAM_SIZE; h_ix++)
+        bp_pack_value (&bp, profile_info->histogram[h_ix].num_counters > 0, 1);
+      streamer_write_bitpack (&bp);
+      /* Now stream out only those non-zero entries.  */
+      for (h_ix = 0; h_ix < GCOV_HISTOGRAM_SIZE; h_ix++)
+        {
+          if (!profile_info->histogram[h_ix].num_counters)
+            continue;
+          streamer_write_gcov_count_stream (ob->main_stream,
+                                      profile_info->histogram[h_ix].num_counters);
+          streamer_write_gcov_count_stream (ob->main_stream,
+                                      profile_info->histogram[h_ix].min_value);
+          streamer_write_gcov_count_stream (ob->main_stream,
+                                      profile_info->histogram[h_ix].cum_value);
+         }
       /* IPA-profile computes hot bb threshold based on cumulated
 	 whole program profile.  We need to stream it down to ltrans.  */
        if (flag_wpa)
@@ -746,11 +772,33 @@ output_refs (lto_symtab_encoder_t encoder)
     {
       symtab_node *node = lto_symtab_encoder_deref (encoder, i);
 
-      /* IPA_REF_ALIAS references are always preserved
+      /* IPA_REF_ALIAS and IPA_REF_CHKP references are always preserved
 	 in the boundary.  Alias node can't have other references and
 	 can be always handled as if it's not in the boundary.  */
       if (!node->alias && !lto_symtab_encoder_in_partition_p (encoder, node))
-	continue;
+	{
+	  cgraph_node *cnode = dyn_cast <cgraph_node *> (node);
+	  /* Output IPA_REF_CHKP reference.  */
+	  if (cnode
+	      && cnode->instrumented_version
+	      && !cnode->instrumentation_clone)
+	    {
+	      for (int i = 0; node->iterate_reference (i, ref); i++)
+		if (ref->use == IPA_REF_CHKP)
+		  {
+		    if (lto_symtab_encoder_lookup (encoder, ref->referred)
+			!= LCC_NOT_FOUND)
+		      {
+			int nref = lto_symtab_encoder_lookup (encoder, node);
+			streamer_write_gcov_count_stream (ob->main_stream, 1);
+			streamer_write_uhwi_stream (ob->main_stream, nref);
+			lto_output_ref (ob, ref, encoder);
+		      }
+		    break;
+		  }
+	    }
+	  continue;
+	}
 
       count = node->ref_list.nreferences ();
       if (count)
@@ -862,7 +910,8 @@ compute_ltrans_boundary (lto_symtab_encoder_t in_encoder)
 	      && (((vnode->ctor_useable_for_folding_p ()
 		   && (!DECL_VIRTUAL_P (vnode->decl)
 		       || !flag_wpa
-		       || flag_ltrans_devirtualize)))))
+		       || flag_ltrans_devirtualize))
+		  || POINTER_BOUNDS_P (vnode->decl))))
 	    {
 	      lto_set_symtab_encoder_encode_initializer (encoder, vnode);
 	      create_references (encoder, vnode);
@@ -1152,6 +1201,7 @@ input_overwrite_node (struct lto_file_decl_data *file_data,
   node->parallelized_function = bp_unpack_value (bp, 1);
   node->resolution = bp_unpack_enum (bp, ld_plugin_symbol_resolution,
 				     LDPR_NUM_KNOWN);
+  node->instrumentation_clone = bp_unpack_value (bp, 1);
   node->split_part = bp_unpack_value (bp, 1);
   gcc_assert (flag_ltrans
 	      || (!node->in_other_partition
@@ -1242,9 +1292,9 @@ input_node (struct lto_file_decl_data *file_data,
      have already been read will have their tag stored in the 'aux'
      field.  Since built-in functions can be referenced in multiple
      functions, they are expected to be read more than once.  */
-  if (node->aux && !fndecl_built_in_p (node->decl))
+  if (node->aux && !DECL_BUILT_IN (node->decl))
     internal_error ("bytecode stream: found multiple instances of cgraph "
-		    "node with uid %d", node->get_uid ());
+		    "node with uid %d", node->uid);
 
   node->tp_first_run = streamer_read_uhwi (ib);
 
@@ -1272,12 +1322,10 @@ input_node (struct lto_file_decl_data *file_data,
       int type = streamer_read_uhwi (ib);
       HOST_WIDE_INT fixed_offset = streamer_read_uhwi (ib);
       HOST_WIDE_INT virtual_value = streamer_read_uhwi (ib);
-      HOST_WIDE_INT indirect_offset = streamer_read_uhwi (ib);
 
       node->thunk.fixed_offset = fixed_offset;
-      node->thunk.virtual_value = virtual_value;
-      node->thunk.indirect_offset = indirect_offset;
       node->thunk.this_adjusting = (type & 2);
+      node->thunk.virtual_value = virtual_value;
       node->thunk.virtual_offset_p = (type & 4);
       node->thunk.add_pointer_bounds_args = (type & 8);
     }
@@ -1288,6 +1336,13 @@ input_node (struct lto_file_decl_data *file_data,
     node->set_init_priority (streamer_read_hwi (ib));
   if (DECL_STATIC_DESTRUCTOR (node->decl))
     node->set_fini_priority (streamer_read_hwi (ib));
+
+  if (node->instrumentation_clone)
+    {
+      decl_index = streamer_read_uhwi (ib);
+      fn_decl = lto_file_decl_data_get_fn_decl (file_data, decl_index);
+      node->orig_decl = fn_decl;
+    }
 
   return node;
 }
@@ -1530,6 +1585,35 @@ input_cgraph_1 (struct lto_file_decl_data *file_data,
 	      = dyn_cast<cgraph_node *> (nodes[ref]);
 	  else
 	    cnode->global.inlined_to = NULL;
+
+	  /* Compute instrumented_version.  */
+	  if (cnode->instrumentation_clone)
+	    {
+	      gcc_assert (cnode->orig_decl);
+
+	      cnode->instrumented_version = cgraph_node::get (cnode->orig_decl);
+	      if (cnode->instrumented_version)
+		{
+		  /* We may have multiple nodes for a single function which
+		     will be merged later.  To have a proper merge we need
+		     to keep instrumentation_version reference between nodes
+		     consistent: each instrumented_version reference should
+		     have proper reverse reference.  Thus don't break existing
+		     instrumented_version reference if it already exists.  */
+		  if (cnode->instrumented_version->instrumented_version)
+		    cnode->instrumented_version = NULL;
+		  else
+		    cnode->instrumented_version->instrumented_version = cnode;
+		}
+
+	      /* Restore decl names reference except for wrapper functions.  */
+	      if (!chkp_wrap_function (cnode->orig_decl))
+		{
+		  tree name = DECL_ASSEMBLER_NAME (cnode->decl);
+		  IDENTIFIER_TRANSPARENT_ALIAS (name) = 1;
+		  TREE_CHAIN (name) = DECL_ASSEMBLER_NAME (cnode->orig_decl);
+		}
+	    }
 	}
 
       ref = (int) (intptr_t) node->same_comdat_group;
@@ -1569,16 +1653,46 @@ input_refs (struct lto_input_block *ib,
     }
 }
 	    
+
+static struct gcov_ctr_summary lto_gcov_summary;
+
 /* Input profile_info from IB.  */
 static void
 input_profile_summary (struct lto_input_block *ib,
 		       struct lto_file_decl_data *file_data)
 {
+  unsigned h_ix;
+  struct bitpack_d bp;
   unsigned int runs = streamer_read_uhwi (ib);
   if (runs)
     {
       file_data->profile_info.runs = runs;
+      file_data->profile_info.sum_max = streamer_read_gcov_count (ib);
+      file_data->profile_info.sum_all = streamer_read_gcov_count (ib);
 
+      memset (file_data->profile_info.histogram, 0,
+              sizeof (gcov_bucket_type) * GCOV_HISTOGRAM_SIZE);
+      /* Input the bitpack of non-zero histogram indices.  */
+      bp = streamer_read_bitpack (ib);
+      /* Read in and unpack the full bitpack, flagging non-zero
+         histogram entries by setting the num_counters non-zero.  */
+      for (h_ix = 0; h_ix < GCOV_HISTOGRAM_SIZE; h_ix++)
+        {
+          file_data->profile_info.histogram[h_ix].num_counters
+              = bp_unpack_value (&bp, 1);
+        }
+      for (h_ix = 0; h_ix < GCOV_HISTOGRAM_SIZE; h_ix++)
+        {
+          if (!file_data->profile_info.histogram[h_ix].num_counters)
+            continue;
+
+          file_data->profile_info.histogram[h_ix].num_counters
+              = streamer_read_gcov_count (ib);
+          file_data->profile_info.histogram[h_ix].min_value
+              = streamer_read_gcov_count (ib);
+          file_data->profile_info.histogram[h_ix].cum_value
+              = streamer_read_gcov_count (ib);
+        }
       /* IPA-profile computes hot bb threshold based on cumulated
 	 whole program profile.  We need to stream it down to ltrans.  */
       if (flag_ltrans)
@@ -1593,10 +1707,13 @@ static void
 merge_profile_summaries (struct lto_file_decl_data **file_data_vec)
 {
   struct lto_file_decl_data *file_data;
-  unsigned int j;
+  unsigned int j, h_ix;
   gcov_unsigned_t max_runs = 0;
   struct cgraph_node *node;
   struct cgraph_edge *edge;
+  gcov_type saved_sum_all = 0;
+  gcov_ctr_summary *saved_profile_info = 0;
+  int saved_scale = 0;
 
   /* Find unit with maximal number of runs.  If we ever get serious about
      roundoff errors, we might also consider computing smallest common
@@ -1617,8 +1734,70 @@ merge_profile_summaries (struct lto_file_decl_data **file_data_vec)
       return;
     }
 
-  profile_info = XCNEW (gcov_summary);
-  profile_info->runs = max_runs;
+  profile_info = &lto_gcov_summary;
+  lto_gcov_summary.runs = max_runs;
+  lto_gcov_summary.sum_max = 0;
+  memset (lto_gcov_summary.histogram, 0,
+          sizeof (gcov_bucket_type) * GCOV_HISTOGRAM_SIZE);
+
+  /* Rescale all units to the maximal number of runs.
+     sum_max can not be easily merged, as we have no idea what files come from
+     the same run.  We do not use the info anyway, so leave it 0.  */
+  for (j = 0; (file_data = file_data_vec[j]) != NULL; j++)
+    if (file_data->profile_info.runs)
+      {
+	int scale = GCOV_COMPUTE_SCALE (max_runs,
+                                        file_data->profile_info.runs);
+	lto_gcov_summary.sum_max
+            = MAX (lto_gcov_summary.sum_max,
+                   apply_scale (file_data->profile_info.sum_max, scale));
+	lto_gcov_summary.sum_all
+            = MAX (lto_gcov_summary.sum_all,
+                   apply_scale (file_data->profile_info.sum_all, scale));
+        /* Save a pointer to the profile_info with the largest
+           scaled sum_all and the scale for use in merging the
+           histogram.  */
+        if (!saved_profile_info
+            || lto_gcov_summary.sum_all > saved_sum_all)
+          {
+            saved_profile_info = &file_data->profile_info;
+            saved_sum_all = lto_gcov_summary.sum_all;
+            saved_scale = scale;
+          }
+      }
+
+  gcc_assert (saved_profile_info);
+
+  /* Scale up the histogram from the profile that had the largest
+     scaled sum_all above.  */
+  for (h_ix = 0; h_ix < GCOV_HISTOGRAM_SIZE; h_ix++)
+    {
+      /* Scale up the min value as we did the corresponding sum_all
+         above. Use that to find the new histogram index.  */
+      gcov_type scaled_min
+          = apply_scale (saved_profile_info->histogram[h_ix].min_value,
+                         saved_scale);
+      /* The new index may be shared with another scaled histogram entry,
+         so we need to account for a non-zero histogram entry at new_ix.  */
+      unsigned new_ix = gcov_histo_index (scaled_min);
+      lto_gcov_summary.histogram[new_ix].min_value
+          = (lto_gcov_summary.histogram[new_ix].num_counters
+             ? MIN (lto_gcov_summary.histogram[new_ix].min_value, scaled_min)
+             : scaled_min);
+      /* Some of the scaled counter values would ostensibly need to be placed
+         into different (larger) histogram buckets, but we keep things simple
+         here and place the scaled cumulative counter value in the bucket
+         corresponding to the scaled minimum counter value.  */
+      lto_gcov_summary.histogram[new_ix].cum_value
+          += apply_scale (saved_profile_info->histogram[h_ix].cum_value,
+                          saved_scale);
+      lto_gcov_summary.histogram[new_ix].num_counters
+          += saved_profile_info->histogram[h_ix].num_counters;
+    }
+
+  /* Watch roundoff errors.  */
+  if (lto_gcov_summary.sum_max < max_runs)
+    lto_gcov_summary.sum_max = max_runs;
 
   /* If merging already happent at WPA time, we are done.  */
   if (flag_ltrans)
@@ -1696,6 +1875,10 @@ input_symtab (void)
     }
 
   merge_profile_summaries (file_data_vec);
+
+  if (!flag_auto_profile)
+    get_working_sets ();
+
 
   /* Clear out the aux field that was used to store enough state to
      tell which nodes should be overwritten.  */

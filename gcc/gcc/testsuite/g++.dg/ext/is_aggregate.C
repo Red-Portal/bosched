@@ -61,8 +61,6 @@ struct K { int a, b; virtual void foo (); };
 struct L : virtual public A { int d, e; };
 struct M : protected A { int d, e; };
 struct N : private A { int d, e; };
-struct O { O () = delete; int a, b, c; };
-struct P { P () = default; int a, b, c; };
 typedef int T;
 typedef float U;
 typedef int V __attribute__((vector_size (4 * sizeof (int))));
@@ -96,13 +94,6 @@ main ()
   assert (NTEST (L));
   assert (NTEST (M));
   assert (NTEST (N));
-#if __cplusplus > 201703L
-  assert (NTEST (O));
-  assert (NTEST (P));
-#else
-  assert (PTEST (O));
-  assert (PTEST (P));
-#endif
   assert (PTEST (int[]));
   assert (PTEST (double[]));
   assert (PTEST (T[2]));
@@ -123,6 +114,4 @@ main ()
   assert (PTEST (L[]));
   assert (PTEST (M[6]));
   assert (PTEST (N[]));
-  assert (PTEST (O[]));
-  assert (PTEST (P[]));
 }

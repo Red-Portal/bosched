@@ -14,23 +14,23 @@ func (c *TCPConn) readFrom(r io.Reader) (int64, error) {
 	return genericReadFrom(c, r)
 }
 
-func (sd *sysDialer) dialTCP(ctx context.Context, laddr, raddr *TCPAddr) (*TCPConn, error) {
+func dialTCP(ctx context.Context, net string, laddr, raddr *TCPAddr) (*TCPConn, error) {
 	if testHookDialTCP != nil {
-		return testHookDialTCP(ctx, sd.network, laddr, raddr)
+		return testHookDialTCP(ctx, net, laddr, raddr)
 	}
-	return sd.doDialTCP(ctx, laddr, raddr)
+	return doDialTCP(ctx, net, laddr, raddr)
 }
 
-func (sd *sysDialer) doDialTCP(ctx context.Context, laddr, raddr *TCPAddr) (*TCPConn, error) {
-	switch sd.network {
+func doDialTCP(ctx context.Context, net string, laddr, raddr *TCPAddr) (*TCPConn, error) {
+	switch net {
 	case "tcp", "tcp4", "tcp6":
 	default:
-		return nil, UnknownNetworkError(sd.network)
+		return nil, UnknownNetworkError(net)
 	}
 	if raddr == nil {
 		return nil, errMissingAddress
 	}
-	fd, err := dialPlan9(ctx, sd.network, laddr, raddr)
+	fd, err := dialPlan9(ctx, net, laddr, raddr)
 	if err != nil {
 		return nil, err
 	}
@@ -69,8 +69,8 @@ func (ln *TCPListener) file() (*os.File, error) {
 	return f, nil
 }
 
-func (sl *sysListener) listenTCP(ctx context.Context, laddr *TCPAddr) (*TCPListener, error) {
-	fd, err := listenPlan9(ctx, sl.network, laddr)
+func listenTCP(ctx context.Context, network string, laddr *TCPAddr) (*TCPListener, error) {
+	fd, err := listenPlan9(ctx, network, laddr)
 	if err != nil {
 		return nil, err
 	}

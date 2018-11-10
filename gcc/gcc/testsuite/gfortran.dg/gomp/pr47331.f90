@@ -1,6 +1,6 @@
 ! PR fortran/47331
 ! { dg-do compile }
-! { dg-options "-fopenmp" }
+! { dg-options "-fopenmp -fwhole-file" }
 
 subroutine foo
   !$omp parallel

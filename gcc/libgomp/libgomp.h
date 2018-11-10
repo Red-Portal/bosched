@@ -44,7 +44,6 @@
 #include "config.h"
 #include "gstdint.h"
 #include "libgomp-plugin.h"
-#include "gomp-constants.h"
 
 #ifdef HAVE_PTHREAD_H
 #include <pthread.h>
@@ -138,17 +137,7 @@ enum gomp_schedule_type
   GFS_STATIC,
   GFS_DYNAMIC,
   GFS_GUIDED,
-  GFS_AUTO,
-
-  FS_AF,
-  Fs_FAC2,
-  FS_FSS,
-  FS_TSS,
-  FS_CSS,
-  FS_QSS,
-  BO_FSS,
-  BO_CSS,
-  BO_QSS,
+  GFS_AUTO
 };
 
 struct gomp_doacross_work_share
@@ -196,9 +185,7 @@ struct gomp_work_share
      If this is a SECTIONS construct, this value will always be DYNAMIC.  */
   enum gomp_schedule_type sched;
 
-    double param;
-
-    int mode;
+  int mode;
 
   union {
     struct {
@@ -380,7 +367,6 @@ extern unsigned int gomp_num_teams_var;
 extern int gomp_debug_var;
 extern int goacc_device_num;
 extern char *goacc_device_type;
-extern int goacc_default_dims[GOMP_DIM_MAX];
 
 enum gomp_task_kind
 {
@@ -865,8 +851,6 @@ struct splay_tree_key_s {
   uintptr_t tgt_offset;
   /* Reference count.  */
   uintptr_t refcount;
-  /* Dynamic reference count.  */
-  uintptr_t dynamic_refcount;
   /* Pointer to the original mapping of "omp declare target link" object.  */
   splay_tree_key link_key;
 };
@@ -1005,9 +989,7 @@ enum gomp_map_vars_kind
 };
 
 extern void gomp_acc_insert_pointer (size_t, void **, size_t *, void *);
-extern void gomp_acc_remove_pointer (void *, size_t, bool, int, int, int);
-extern void gomp_acc_declare_allocate (bool, size_t, void **, size_t *,
-				       unsigned short *);
+extern void gomp_acc_remove_pointer (void *, bool, int, int);
 
 extern struct target_mem_desc *gomp_map_vars (struct gomp_device_descr *,
 					      size_t, void **, void **,
@@ -1017,16 +999,15 @@ extern void gomp_unmap_vars (struct target_mem_desc *, bool);
 extern void gomp_init_device (struct gomp_device_descr *);
 extern void gomp_free_memmap (struct splay_tree_s *);
 extern void gomp_unload_device (struct gomp_device_descr *);
-extern bool gomp_remove_var (struct gomp_device_descr *, splay_tree_key);
 
 /* work.c */
 
 extern void gomp_init_work_share (struct gomp_work_share *, bool, unsigned);
 extern void gomp_fini_work_share (struct gomp_work_share *);
 extern bool gomp_work_share_start (bool);
-extern void gomp_work_share_end (unsigned long long);
-extern bool gomp_work_share_end_cancel (unsigned long long);
-extern void gomp_work_share_end_nowait (unsigned long long);
+extern void gomp_work_share_end (void);
+extern bool gomp_work_share_end_cancel (void);
+extern void gomp_work_share_end_nowait (void);
 
 static inline void
 gomp_work_share_init_done (void)

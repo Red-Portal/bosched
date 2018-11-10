@@ -14,6 +14,8 @@ import (
 	"unsafe"
 )
 
+type MyBuffer bytes.Buffer
+
 func TestImplicitMapConversion(t *testing.T) {
 	// Test implicit conversions in MapIndex and SetMapIndex.
 	{
@@ -100,7 +102,10 @@ func TestImplicitMapConversion(t *testing.T) {
 	}
 	{
 		// convert identical underlying types
-		type MyBuffer bytes.Buffer
+		// TODO(rsc): Should be able to define MyBuffer here.
+		// 6l prints very strange messages about .this.Bytes etc
+		// when we do that though, so MyBuffer is defined
+		// at top level.
 		m := make(map[*MyBuffer]*bytes.Buffer)
 		mv := ValueOf(m)
 		b1 := new(MyBuffer)

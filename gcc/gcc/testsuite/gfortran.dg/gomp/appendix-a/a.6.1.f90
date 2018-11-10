@@ -1,5 +1,4 @@
 ! { dg-do compile }
-! { dg-additional-options "-std=legacy" }
 
       SUBROUTINE WORK(I, J)
       INTEGER I,J

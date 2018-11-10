@@ -360,8 +360,6 @@ Unless specified otherwise below, they are also available in later modes
 <entry><filename class="headerfile">ctgmath</filename></entry>
 <entry><filename class="headerfile">cuchar</filename></entry>
 <entry namest="c4" nameend="c5"/>
-<<<<<<< HEAD
-=======
 </row>
 </tbody>
 </tgroup>
@@ -386,71 +384,12 @@ Unless specified otherwise below, it is also available in later modes
 <tbody>
 <row>
 <entry><filename class="headerfile">shared_mutex</filename></entry>
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
 </row>
 </tbody>
 </tgroup>
 </table>
 
 <para>
-<<<<<<< HEAD
-<xref linkend="table.cxx14_headers"/> shows the C++14 include file.
-This is available in C++14 compilation
-mode, i.e. <literal>-std=c++14</literal> or <literal>-std=gnu++14</literal>.
-Including this header in C++98/03 mode or C++11 will not result in
-compilation errors, but will not define anything.
-Unless specified otherwise below, it is also available in later modes
-(C++17 etc).
-</para>
-
-<para/>
-<table frame="all" xml:id="table.cxx14_headers">
-<title>C++ 2014 Library Header</title>
-
-<tgroup cols="1" align="left" colsep="1" rowsep="1">
-<colspec colname="c1"/>
-<tbody>
-<row>
-<entry><filename class="headerfile">shared_mutex</filename></entry>
-</row>
-</tbody>
-</tgroup>
-</table>
-
-<para>
-<xref linkend="table.cxx17_headers"/> shows the C++17 include files.
-These are available in C++17 compilation
-mode, i.e. <literal>-std=c++17</literal> or <literal>-std=gnu++17</literal>.
-Including these headers in earlier modes will not result in
-compilation errors, but will not define anything.
-Unless specified otherwise below, they are also available in later modes
-(C++20 etc).
-</para>
-
-<para/>
-<table frame="all" xml:id="table.cxx17_headers">
-<title>C++ 2017 Library Headers</title>
-
-<tgroup cols="5" align="left" colsep="1" rowsep="1">
-<colspec colname="c1"/>
-<colspec colname="c2"/>
-<colspec colname="c3"/>
-<colspec colname="c4"/>
-<colspec colname="c5"/>
-<tbody>
-<row>
-<entry><filename class="headerfile">any</filename></entry>
-<entry><filename class="headerfile">charconv</filename></entry>
-<entry><filename class="headerfile">execution</filename></entry>
-<entry><filename class="headerfile">filesystem</filename></entry>
-<entry><filename class="headerfile">memory_resource</filename></entry>
-</row>
-<row>
-<entry><filename class="headerfile">optional</filename></entry>
-<entry><filename class="headerfile">string_view</filename></entry>
-<entry><filename class="headerfile">variant</filename></entry>
-<entry namest="c4" nameend="c5"/>
-=======
 <xref linkend="table.cxx17_headers"/> shows the C++17 include files.
 These are available in C++17 compilation
 mode, i.e. <literal>-std=c++17</literal> or <literal>-std=gnu++17</literal>.
@@ -481,75 +420,11 @@ Unless specified otherwise below, they are also available in later modes
 <row>
 <entry><filename class="headerfile">variant</filename></entry>
 <entry namest="c2" nameend="c5"/>
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
 </row>
 </tbody>
 </tgroup>
 </table>
 
-<<<<<<< HEAD
-<para>
-<xref linkend="table.cxx20_headers"/>
-shows the C++2a include files.
-These are available in C++2a compilation
-mode, i.e. <literal>-std=c++2a</literal> or <literal>-std=gnu++2a</literal>.
-Including these headers in earlier modes will not result in
-compilation errors, but will not define anything.
-<!--
-Unless specified otherwise below, they are also available in later modes
-(C++23 etc).
--->
-</para>
-
-<para/>
-<table frame="all" xml:id="table.cxx20_headers">
-<title>C++ 2020 Library Headers</title>
-
-<tgroup cols="2" align="left" colsep="1" rowsep="1">
-<colspec colname="c1"/>
-<colspec colname="c2"/>
-<!--
-<colspec colname="c3"/>
-<colspec colname="c4"/>
-<colspec colname="c5"/>
--->
-<tbody>
-<row>
-<entry><filename class="headerfile">bit</filename></entry>
-<entry><filename class="headerfile">version</filename></entry>
-</row>
-<!-- TODO compare, concepts, contract, span, syncstream -->
-</tbody>
-</tgroup>
-</table>
-
-<para>
-  The following headers have been removed in the C++2a working draft.
-  They are still available when using this implementation, but in future
-  they might start to produce warnings or errors when included in C++2a mode.
-  Programs that intend to be portable should not include them.
-</para>
-
-<table frame="all" xml:id="table.cxx20_deprheaders">
-<title>C++ 2020 Obsolete Headers</title>
-
-<tgroup cols="5" align="left" colsep="1" rowsep="1">
-<colspec colname="c1"/>
-<colspec colname="c2"/>
-<colspec colname="c3"/>
-<colspec colname="c4"/>
-<colspec colname="c5"/>
-<tbody>
-<row>
-<entry><filename class="headerfile">ccomplex</filename></entry>
-<entry><filename class="headerfile">ciso646</filename></entry>
-<entry><filename class="headerfile">cstdalign</filename></entry>
-<entry><filename class="headerfile">cstdbool</filename></entry>
-<entry><filename class="headerfile">ctgmath</filename></entry>
-</row>
-</tbody>
-</tgroup>
-</table>
 
 <para>
 <xref linkend="table.filesystemts_headers"/>,
@@ -568,26 +443,6 @@ compilation errors, but will not define anything.
 <colspec colname="c1"/>
 <tbody>
 <row>
-=======
-
-<para>
-<xref linkend="table.filesystemts_headers"/>,
-shows the additional include file define by the
-File System Technical Specification, ISO/IEC TS 18822.
-This is available in C++11 and later compilation modes.
-Including this header in earlier modes will not result in
-compilation errors, but will not define anything.
-</para>
-
-<para/>
-<table frame="all" xml:id="table.filesystemts_headers">
-<title>File System TS Header</title>
-
-<tgroup cols="1" align="left" colsep="1" rowsep="1">
-<colspec colname="c1"/>
-<tbody>
-<row>
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
 <entry><filename class="headerfile">experimental/filesystem</filename></entry>
 </row>
 </tbody>

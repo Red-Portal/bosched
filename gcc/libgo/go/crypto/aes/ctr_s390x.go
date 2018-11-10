@@ -8,7 +8,6 @@ package aes
 
 import (
 	"crypto/cipher"
-	"crypto/internal/subtle"
 	"unsafe"
 )
 
@@ -67,11 +66,9 @@ func (c *aesctr) refill() {
 }
 
 func (c *aesctr) XORKeyStream(dst, src []byte) {
-	if len(dst) < len(src) {
-		panic("crypto/cipher: output smaller than input")
-	}
-	if subtle.InexactOverlap(dst[:len(src)], src) {
-		panic("crypto/cipher: invalid buffer overlap")
+	if len(src) > 0 {
+		// Assert len(dst) >= len(src)
+		_ = dst[len(src)-1]
 	}
 	for len(src) > 0 {
 		if len(c.buffer) == 0 {

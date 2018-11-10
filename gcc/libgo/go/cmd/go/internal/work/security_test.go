@@ -58,7 +58,6 @@ var goodCompilerFlags = [][]string{
 	{"-I", "世界"},
 	{"-framework", "Chocolate"},
 	{"-x", "c"},
-	{"-v"},
 }
 
 var badCompilerFlags = [][]string{
@@ -137,7 +136,6 @@ var goodLinkerFlags = [][]string{
 	{"-l", "世界"},
 	{"-L", "framework"},
 	{"-framework", "Chocolate"},
-	{"-v"},
 	{"-Wl,-framework", "-Wl,Chocolate"},
 	{"-Wl,-framework,Chocolate"},
 	{"-Wl,-unresolved-symbols=ignore-all"},

@@ -7,18 +7,20 @@
 package types
 
 import (
+	"fmt"
 	"go/ast"
 	"go/constant"
 	"go/token"
 	"sort"
 )
 
-func (check *Checker) funcBody(decl *declInfo, name string, sig *Signature, body *ast.BlockStmt, iota constant.Value) {
+func (check *Checker) funcBody(decl *declInfo, name string, sig *Signature, body *ast.BlockStmt) {
 	if trace {
-		check.trace(body.Pos(), "--- %s: %s", name, sig)
-		defer func() {
-			check.trace(body.End(), "--- <end>")
-		}()
+		if name == "" {
+			name = "<function literal>"
+		}
+		fmt.Printf("--- %s: %s {\n", name, sig)
+		defer fmt.Println("--- <end>")
 	}
 
 	// set function scope extent
@@ -34,7 +36,6 @@ func (check *Checker) funcBody(decl *declInfo, name string, sig *Signature, body
 	check.context = context{
 		decl:  decl,
 		scope: sig.scope,
-		iota:  iota,
 		sig:   sig,
 	}
 	check.indent = 0
@@ -51,6 +52,8 @@ func (check *Checker) funcBody(decl *declInfo, name string, sig *Signature, body
 
 	// spec: "Implementation restriction: A compiler may make it illegal to
 	// declare a variable inside a function body if the variable is never used."
+	// (One could check each scope after use, but that distributes this check
+	// over several places because CloseScope is not always called explicitly.)
 	check.usage(sig.scope)
 }
 
@@ -69,7 +72,7 @@ func (check *Checker) usage(scope *Scope) {
 	}
 
 	for _, scope := range scope.children {
-		// Don't go inside function literal scopes a second time;
+		// Don't go inside closure scopes a second time;
 		// they are handled explicitly by funcBody.
 		if !scope.isFunc {
 			check.usage(scope)
@@ -291,6 +294,10 @@ L:
 
 // stmt typechecks statement s.
 func (check *Checker) stmt(ctxt stmtContext, s ast.Stmt) {
+	// statements cannot use iota in general
+	// (constant declarations set it explicitly)
+	assert(check.iota == nil)
+
 	// statements must end with the same top scope as they started with
 	if debug {
 		defer func(scope *Scope) {
@@ -301,9 +308,6 @@ func (check *Checker) stmt(ctxt stmtContext, s ast.Stmt) {
 			assert(scope == check.scope)
 		}(check.scope)
 	}
-
-	// process collected function literals before scope changes
-	defer check.processDelayed(len(check.delayed))
 
 	inner := ctxt &^ (fallthroughOk | finalSwitchCase)
 	switch s := s.(type) {
@@ -436,7 +440,7 @@ func (check *Checker) stmt(ctxt stmtContext, s ast.Stmt) {
 				// list in a "return" statement if a different entity (constant, type, or variable)
 				// with the same name as a result parameter is in scope at the place of the return."
 				for _, obj := range res.vars {
-					if alt := check.lookup(obj.name); alt != nil && alt != obj {
+					if _, alt := check.scope.LookupParent(obj.name, check.pos); alt != nil && alt != obj {
 						check.errorf(s.Pos(), "result parameter %s not in scope at return", obj.name)
 						check.errorf(alt.Pos(), "\tinner declaration of %s", obj)
 						// ok to continue

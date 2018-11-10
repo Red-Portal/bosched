@@ -1483,16 +1483,6 @@ refs_may_alias_p_1 (ao_ref *ref1, ao_ref *ref2, bool tbaa_p)
 				 ao_ref_alias_set (ref2)))
     return false;
 
-  /* If the reference is based on a pointer that points to memory
-     that may not be written to then the other reference cannot possibly
-     clobber it.  */
-  if ((TREE_CODE (TREE_OPERAND (base2, 0)) == SSA_NAME
-       && SSA_NAME_POINTS_TO_READONLY_MEMORY (TREE_OPERAND (base2, 0)))
-      || (ind1_p
-	  && TREE_CODE (TREE_OPERAND (base1, 0)) == SSA_NAME
-	  && SSA_NAME_POINTS_TO_READONLY_MEMORY (TREE_OPERAND (base1, 0))))
-    return false;
-
   /* Dispatch to the pointer-vs-decl or pointer-vs-pointer disambiguators.  */
   if (var1_p && ind2_p)
     return indirect_ref_may_alias_decl_p (ref2->ref, base2,
@@ -1519,21 +1509,21 @@ refs_may_alias_p_1 (ao_ref *ref1, ao_ref *ref2, bool tbaa_p)
 }
 
 static bool
-refs_may_alias_p (tree ref1, ao_ref *ref2, bool tbaa_p)
+refs_may_alias_p (tree ref1, ao_ref *ref2)
 {
   ao_ref r1;
   ao_ref_init (&r1, ref1);
-  return refs_may_alias_p_1 (&r1, ref2, tbaa_p);
+  return refs_may_alias_p_1 (&r1, ref2, true);
 }
 
 bool
-refs_may_alias_p (tree ref1, tree ref2, bool tbaa_p)
+refs_may_alias_p (tree ref1, tree ref2)
 {
   ao_ref r1, r2;
   bool res;
   ao_ref_init (&r1, ref1);
   ao_ref_init (&r2, ref2);
-  res = refs_may_alias_p_1 (&r1, &r2, tbaa_p);
+  res = refs_may_alias_p_1 (&r1, &r2, true);
   if (res)
     ++alias_stats.refs_may_alias_p_may_alias;
   else
@@ -1569,7 +1559,7 @@ refs_output_dependent_p (tree store1, tree store2)
    otherwise return false.  */
 
 static bool
-ref_maybe_used_by_call_p_1 (gcall *call, ao_ref *ref, bool tbaa_p)
+ref_maybe_used_by_call_p_1 (gcall *call, ao_ref *ref)
 {
   tree base, callee;
   unsigned i;
@@ -1870,7 +1860,7 @@ process_args:
 	{
 	  ao_ref r;
 	  ao_ref_init (&r, op);
-	  if (refs_may_alias_p_1 (&r, ref, tbaa_p))
+	  if (refs_may_alias_p_1 (&r, ref, true))
 	    return true;
 	}
     }
@@ -1879,10 +1869,10 @@ process_args:
 }
 
 static bool
-ref_maybe_used_by_call_p (gcall *call, ao_ref *ref, bool tbaa_p)
+ref_maybe_used_by_call_p (gcall *call, ao_ref *ref)
 {
   bool res;
-  res = ref_maybe_used_by_call_p_1 (call, ref, tbaa_p);
+  res = ref_maybe_used_by_call_p_1 (call, ref);
   if (res)
     ++alias_stats.ref_maybe_used_by_call_p_may_alias;
   else
@@ -1895,7 +1885,7 @@ ref_maybe_used_by_call_p (gcall *call, ao_ref *ref, bool tbaa_p)
    true, otherwise return false.  */
 
 bool
-ref_maybe_used_by_stmt_p (gimple *stmt, ao_ref *ref, bool tbaa_p)
+ref_maybe_used_by_stmt_p (gimple *stmt, ao_ref *ref)
 {
   if (is_gimple_assign (stmt))
     {
@@ -1911,17 +1901,17 @@ ref_maybe_used_by_stmt_p (gimple *stmt, ao_ref *ref, bool tbaa_p)
 	  || gimple_assign_rhs_code (stmt) == CONSTRUCTOR)
 	return false;
 
-      return refs_may_alias_p (rhs, ref, tbaa_p);
+      return refs_may_alias_p (rhs, ref);
     }
   else if (is_gimple_call (stmt))
-    return ref_maybe_used_by_call_p (as_a <gcall *> (stmt), ref, tbaa_p);
+    return ref_maybe_used_by_call_p (as_a <gcall *> (stmt), ref);
   else if (greturn *return_stmt = dyn_cast <greturn *> (stmt))
     {
       tree retval = gimple_return_retval (return_stmt);
       if (retval
 	  && TREE_CODE (retval) != SSA_NAME
 	  && !is_gimple_min_invariant (retval)
-	  && refs_may_alias_p (retval, ref, tbaa_p))
+	  && refs_may_alias_p (retval, ref))
 	return true;
       /* If ref escapes the function then the return acts as a use.  */
       tree base = ao_ref_base (ref);
@@ -1939,11 +1929,11 @@ ref_maybe_used_by_stmt_p (gimple *stmt, ao_ref *ref, bool tbaa_p)
 }
 
 bool
-ref_maybe_used_by_stmt_p (gimple *stmt, tree ref, bool tbaa_p)
+ref_maybe_used_by_stmt_p (gimple *stmt, tree ref)
 {
   ao_ref r;
   ao_ref_init (&r, ref);
-  return ref_maybe_used_by_stmt_p (stmt, &r, tbaa_p);
+  return ref_maybe_used_by_stmt_p (stmt, &r);
 }
 
 /* If the call in statement CALL may clobber the memory reference REF
@@ -1999,14 +1989,6 @@ call_may_clobber_ref_p_1 (gcall *call, ao_ref *ref)
 	 treat as may-def.  */
       && (TREE_READONLY (base)
 	  || !is_global_var (base)))
-    return false;
-
-  /* If the reference is based on a pointer that points to memory
-     that may not be written to then the call cannot possibly clobber it.  */
-  if ((TREE_CODE (base) == MEM_REF
-       || TREE_CODE (base) == TARGET_MEM_REF)
-      && TREE_CODE (TREE_OPERAND (base, 0)) == SSA_NAME
-      && SSA_NAME_POINTS_TO_READONLY_MEMORY (TREE_OPERAND (base, 0)))
     return false;
 
   callee = gimple_call_fndecl (call);
@@ -2263,7 +2245,7 @@ call_may_clobber_ref_p (gcall *call, tree ref)
    otherwise return false.  */
 
 bool
-stmt_may_clobber_ref_p_1 (gimple *stmt, ao_ref *ref, bool tbaa_p)
+stmt_may_clobber_ref_p_1 (gimple *stmt, ao_ref *ref)
 {
   if (is_gimple_call (stmt))
     {
@@ -2273,7 +2255,7 @@ stmt_may_clobber_ref_p_1 (gimple *stmt, ao_ref *ref, bool tbaa_p)
 	{
 	  ao_ref r;
 	  ao_ref_init (&r, lhs);
-	  if (refs_may_alias_p_1 (ref, &r, tbaa_p))
+	  if (refs_may_alias_p_1 (ref, &r, true))
 	    return true;
 	}
 
@@ -2286,7 +2268,7 @@ stmt_may_clobber_ref_p_1 (gimple *stmt, ao_ref *ref, bool tbaa_p)
 	{
 	  ao_ref r;
 	  ao_ref_init (&r, lhs);
-	  return refs_may_alias_p_1 (ref, &r, tbaa_p);
+	  return refs_may_alias_p_1 (ref, &r, true);
 	}
     }
   else if (gimple_code (stmt) == GIMPLE_ASM)
@@ -2296,11 +2278,11 @@ stmt_may_clobber_ref_p_1 (gimple *stmt, ao_ref *ref, bool tbaa_p)
 }
 
 bool
-stmt_may_clobber_ref_p (gimple *stmt, tree ref, bool tbaa_p)
+stmt_may_clobber_ref_p (gimple *stmt, tree ref)
 {
   ao_ref r;
   ao_ref_init (&r, ref);
-  return stmt_may_clobber_ref_p_1 (stmt, &r, tbaa_p);
+  return stmt_may_clobber_ref_p_1 (stmt, &r);
 }
 
 /* Return true if store1 and store2 described by corresponding tuples
@@ -2396,7 +2378,7 @@ stmt_kills_ref_p (gimple *stmt, ao_ref *ref)
 	 ???  We only need to care about the RHS throwing.  For aggregate
 	 assignments or similar calls and non-call exceptions the LHS
 	 might throw as well.  */
-      && !stmt_can_throw_internal (cfun, stmt))
+      && !stmt_can_throw_internal (stmt))
     {
       tree lhs = gimple_get_lhs (stmt);
       /* If LHS is literally a base of the access we are done.  */
@@ -2740,14 +2722,7 @@ next:;
       if (arg1 == arg0)
 	;
       else if (! maybe_skip_until (phi, arg0, ref, arg1, cnt, visited,
-				   abort_on_visited,
-				   /* Do not translate when walking over
-				      backedges.  */
-				   dominated_by_p
-				     (CDI_DOMINATORS,
-				      gimple_bb (SSA_NAME_DEF_STMT (arg1)),
-				      phi_bb)
-				   ? NULL : translate, data))
+				   abort_on_visited, translate, data))
 	return NULL_TREE;
     }
 
@@ -2808,14 +2783,7 @@ walk_non_aliased_vuses (ao_ref *ref, tree vuse,
 	break;
 
       if (valueize)
-	{
-	  vuse = valueize (vuse);
-	  if (!vuse)
-	    {
-	      res = NULL;
-	      break;
-	    }
-	}
+	vuse = valueize (vuse);
       def_stmt = SSA_NAME_DEF_STMT (vuse);
       if (gimple_nop_p (def_stmt))
 	break;

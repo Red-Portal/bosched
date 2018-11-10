@@ -1,4 +1,4 @@
-! { dg-do run { xfail i?86-*-freebsd* } }
+! { dg-do run }
 
 program test_underflow_control
   use ieee_arithmetic

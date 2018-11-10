@@ -420,6 +420,9 @@ package System.OS_Interface is
       abstime : access timespec) return int;
    pragma Import (C, pthread_cond_timedwait, "pthread_cond_timedwait");
 
+   Relative_Timed_Wait : constant Boolean := False;
+   --  pthread_cond_timedwait requires an absolute delay time
+
    --------------------------
    -- POSIX.1c  Section 13 --
    --------------------------
@@ -450,8 +453,8 @@ package System.OS_Interface is
    pragma Import (C, pthread_setschedparam, "pthread_setschedparam");
 
    function pthread_attr_setscope
-     (Unused_attr            : access pthread_attr_t;
-      Unused_contentionscope : int) return int is (0);
+     (attr            : access pthread_attr_t;
+      contentionscope : int) return int is (0);
    --  pthread_attr_setscope is not implemented in production mode
 
    function pthread_attr_setinheritsched

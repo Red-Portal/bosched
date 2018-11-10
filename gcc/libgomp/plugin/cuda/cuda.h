@@ -44,7 +44,6 @@ typedef void *CUevent;
 typedef void *CUfunction;
 typedef void *CUlinkState;
 typedef void *CUmodule;
-typedef size_t (*CUoccupancyB2DSize)(int);
 typedef void *CUstream;
 
 typedef enum {
@@ -89,7 +88,6 @@ typedef enum {
   CU_JIT_INFO_LOG_BUFFER_SIZE_BYTES = 4,
   CU_JIT_ERROR_LOG_BUFFER = 5,
   CU_JIT_ERROR_LOG_BUFFER_SIZE_BYTES = 6,
-  CU_JIT_OPTIMIZATION_LEVEL = 7,
   CU_JIT_LOG_VERBOSE = 12
 } CUjit_option;
 
@@ -171,8 +169,6 @@ CUresult cuModuleGetGlobal (CUdeviceptr *, size_t *, CUmodule, const char *);
 CUresult cuModuleLoad (CUmodule *, const char *);
 CUresult cuModuleLoadData (CUmodule *, const void *);
 CUresult cuModuleUnload (CUmodule);
-CUresult cuOccupancyMaxPotentialBlockSize(int *, int *, CUfunction,
-					  CUoccupancyB2DSize, size_t, int);
 CUresult cuStreamCreate (CUstream *, unsigned);
 #define cuStreamDestroy cuStreamDestroy_v2
 CUresult cuStreamDestroy (CUstream);

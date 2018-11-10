@@ -366,7 +366,7 @@ download_prerequisites installs.
 @item MPFR Library version 2.4.2 (or later)
 
 Necessary to build GCC@.  It can be downloaded from
-@uref{https://www.mpfr.org}.  If an MPFR source distribution is found
+@uref{http://www.mpfr.org/}.  If an MPFR source distribution is found
 in a subdirectory of your GCC sources named @file{mpfr}, it will be
 built together with GCC.  Alternatively, if MPFR is already installed
 but it is not in your default library search path, the
@@ -378,7 +378,7 @@ download_prerequisites installs.
 @item MPC Library version 0.8.1 (or later)
 
 Necessary to build GCC@.  It can be downloaded from
-@uref{http://www.multiprecision.org/mpc/}.  If an MPC source distribution
+@uref{http://www.multiprecision.org/}.  If an MPC source distribution
 is found in a subdirectory of your GCC sources named @file{mpc}, it
 will be built together with GCC.  Alternatively, if MPC is already
 installed but it is not in your default library search path, the
@@ -401,13 +401,13 @@ search path.
 
 @heading Tools/packages necessary for modifying GCC
 @table @asis
-@item autoconf version 2.69
+@item autoconf version 2.64
 @itemx GNU m4 version 1.4.6 (or later)
 
 Necessary when modifying @file{configure.ac}, @file{aclocal.m4}, etc.@:
 to regenerate @file{configure} and @file{config.in} files.
 
-@item automake version 1.15.1
+@item automake version 1.11.6
 
 Necessary when modifying a @file{Makefile.am} file to regenerate its
 associated @file{Makefile.in}.
@@ -418,9 +418,12 @@ file.  Specifically this applies to the @file{gcc}, @file{intl},
 as any of their subdirectories.
 
 For directories that use automake, GCC requires the latest release in
-the 1.15 series, which is currently 1.15.1.  When regenerating a directory
-to a newer version, please update all the directories using an older 1.15
+the 1.11 series, which is currently 1.11.6.  When regenerating a directory
+to a newer version, please update all the directories using an older 1.11
 to the latest released version.
+
+Note that @command{automake} 1.11.6 is incompatible with
+@command{perl} version 5.6.26.
 
 @item gettext version 0.14.5 (or later)
 
@@ -918,7 +921,7 @@ only for the listed packages.  For other packages, only static libraries
 will be built.  Package names currently recognized in the GCC tree are
 @samp{libgcc} (also known as @samp{gcc}), @samp{libstdc++} (not
 @samp{libstdc++-v3}), @samp{libffi}, @samp{zlib}, @samp{boehm-gc},
-@samp{ada}, @samp{libada}, @samp{libgo}, @samp{libobjc}, and @samp{libphobos}.
+@samp{ada}, @samp{libada}, @samp{libgo}, and @samp{libobjc}.
 Note @samp{libiberty} does not support shared libraries at all.
 
 Use @option{--disable-shared} to build only static libraries.  Note that
@@ -1041,10 +1044,6 @@ virtual calls in verifiable mode at all.  However the libvtv library will
 still be built (see @option{--disable-libvtv} to turn off building libvtv).
 @option{--disable-vtable-verify} is the default.
 
-@item --disable-gcov
-Specify that the run-time library used for coverage analysis
-and associated host tools should not be built.
-
 @item --disable-multilib
 Specify that multiple target
 libraries to support different target variants, calling
@@ -1073,8 +1072,8 @@ sysv, aix.
 @itemx --without-multilib-list
 Specify what multilibs to build.  @var{list} is a comma separated list of
 values, possibly consisting of a single value.  Currently only implemented
-for arm*-*-*, riscv*-*-*, sh*-*-* and x86-64-*-linux*.  The accepted
-values and meaning for each target is given below.
+for arm*-*-*, sh*-*-* and x86-64-*-linux*.  The accepted values and meaning
+for each target is given below.
 
 @table @code
 @item arm*-*-*
@@ -1128,13 +1127,6 @@ and @code{rmprofile}.
 @code{-mfloat-abi=softfp}@*
 @code{-mfloat-abi=hard}
 @end multitable
-
-@item riscv*-*-*
-@var{list} is a single ABI name.  The target architecture must be either
-@code{rv32gc} or @code{rv64gc}.  This will build a single multilib for the
-specified architecture and ABI pair.  If @code{--with-multilib-list} is not
-given, then a default set of multilibs is selected based on the value of
-@option{--target}.  This is usually a large set of multilibs.
 
 @item sh*-*-*
 @var{list} is a comma separated list of CPU names.  These must be of the
@@ -1411,11 +1403,6 @@ These features are extensions to the traditional
 SVR4-based MIPS ABIs and require support from GNU binutils
 and the runtime C library.
 
-@item --with-stack-clash-protection-guard-size=@var{size}
-On certain targets this option sets the default stack clash protection guard
-size as a power of two in bytes.  On AArch64 @var{size} is required to be either
-12 (4KB) or 16 (64KB).
-
 @item --enable-__cxa_atexit
 Define if you want to use __cxa_atexit, rather than atexit, to
 register C++ destructors for local statics and global objects.
@@ -1619,12 +1606,12 @@ their runtime libraries should be built.  For a list of valid values for
 grep ^language= */config-lang.in
 @end smallexample
 Currently, you can use any of the following:
-@code{all}, @code{default}, @code{ada}, @code{c}, @code{c++}, @code{d},
-@code{fortran}, @code{go}, @code{jit}, @code{lto}, @code{objc}, @code{obj-c++}.
+@code{all}, @code{default}, @code{ada}, @code{c}, @code{c++}, @code{fortran},
+@code{go}, @code{jit}, @code{lto}, @code{objc}, @code{obj-c++}.
 Building the Ada compiler has special requirements, see below.
 If you do not pass this flag, or specify the option @code{default}, then the
 default languages available in the @file{gcc} sub-tree will be configured.
-Ada, D, Go, Jit, and Objective-C++ are not default languages.  LTO is not a
+Ada, Go, Jit, and Objective-C++ are not default languages.  LTO is not a
 default language, but is built by default because @option{--enable-lto} is
 enabled by default.  The other languages are default languages.  If
 @code{all} is specified, then all available languages are built.  An
@@ -1730,14 +1717,6 @@ Using the GNU Compiler Collection (GCC)},
 @ifhtml
 See ``i386 and x86-64 Options'' in the main manual
 @end ifhtml
-
-@item --enable-large-address-aware
-The @option{--enable-large-address-aware} option arranges for MinGW
-executables to be linked using the @option{--large-address-aware}
-option, that enables the use of more than 2GB of memory.  If GCC is
-configured with this option, its effects can be reversed by passing the
-@option{-Wl,--disable-large-address-aware} option to the so-configured
-compiler driver.
 
 @item --enable-win32-registry
 @itemx --enable-win32-registry=@var{key}
@@ -2768,7 +2747,7 @@ on a simulator as described at @uref{http://gcc.gnu.org/simtest-howto.html}.
 
 In order to run sets of tests selectively, there are targets
 @samp{make check-gcc} and language specific @samp{make check-c},
-@samp{make check-c++}, @samp{make check-d} @samp{make check-fortran},
+@samp{make check-c++}, @samp{make check-fortran},
 @samp{make check-ada}, @samp{make check-objc}, @samp{make check-obj-c++},
 @samp{make check-lto}
 in the @file{gcc} subdirectory of the object directory.  You can also
@@ -4405,11 +4384,9 @@ supported as cross-compilation target only.
 @c alone is too unspecific and must be avoided.
 @anchor{x-x-solaris2}
 @heading *-*-solaris2*
-Support for Solaris 10 has been obsoleted in GCC 9, but can still be
-enabled by configuring with @option{--enable-obsolete}.  Support will be
-removed in GCC 10.  Support for Solaris 9 has been removed in GCC 5.
-Support for Solaris 8 has been removed in GCC 4.8.  Support for Solaris
-7 has been removed in GCC 4.6.
+Support for Solaris 9 has been removed in GCC 5.  Support for Solaris
+8 has been removed in GCC 4.8.  Support for Solaris 7 has been removed
+in GCC 4.6.
 
 Sun does not ship a C compiler with Solaris 2 before Solaris 10, though
 you can download the Sun Studio compilers for free.  In Solaris 10 and

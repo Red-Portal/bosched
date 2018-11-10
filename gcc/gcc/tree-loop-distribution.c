@@ -90,6 +90,7 @@ along with GCC; see the file COPYING3.  If not see
 	data reuse.  */
 
 #include "config.h"
+#define INCLUDE_ALGORITHM /* stable_sort */
 #include "system.h"
 #include "coretypes.h"
 #include "backend.h"
@@ -1921,8 +1922,7 @@ pg_add_dependence_edges (struct graph *rdg, int dir,
 	      if (DDR_NUM_DIST_VECTS (ddr) != 1)
 		this_dir = 2;
 	      /* If the overlap is exact preserve stmt order.  */
-	      else if (lambda_vector_zerop (DDR_DIST_VECT (ddr, 0),
-					    DDR_NB_LOOPS (ddr)))
+	      else if (lambda_vector_zerop (DDR_DIST_VECT (ddr, 0), 1))
 		;
 	      /* Else as the distance vector is lexicographic positive swap
 		 the dependence direction.  */
@@ -2268,26 +2268,21 @@ break_alias_scc_partitions (struct graph *rdg,
 	  for (j = 0; partitions->iterate (j, &first); ++j)
 	    if (pg->vertices[j].component == i)
 	      break;
-
-	  bool same_type = true, all_builtins = partition_builtin_p (first);
 	  for (++j; partitions->iterate (j, &partition); ++j)
 	    {
 	      if (pg->vertices[j].component != i)
 		continue;
 
+	      /* Note we Merge partitions of parallel type on purpose, though
+		 the result partition is sequential.  The reason is vectorizer
+		 can do more accurate runtime alias check in this case.  Also
+		 it results in more conservative distribution.  */
 	      if (first->type != partition->type)
 		{
-		  same_type = false;
+		  bitmap_clear_bit (sccs_to_merge, i);
 		  break;
 		}
-	      all_builtins &= partition_builtin_p (partition);
 	    }
-	  /* Merge SCC if all partitions in SCC have the same type, though the
-	     result partition is sequential, because vectorizer can do better
-	     runtime alias check.  One expecption is all partitions in SCC are
-	     builtins.  */
-	  if (!same_type || all_builtins)
-	    bitmap_clear_bit (sccs_to_merge, i);
 	}
 
       /* Initialize callback data for traversing.  */
@@ -2463,8 +2458,7 @@ compute_alias_check_pairs (struct loop *loop, vec<ddr_p> *alias_ddrs,
    checks and version LOOP under condition of these runtime alias checks.  */
 
 static void
-version_loop_by_alias_check (vec<struct partition *> *partitions,
-			     struct loop *loop, vec<ddr_p> *alias_ddrs)
+version_loop_by_alias_check (struct loop *loop, vec<ddr_p> *alias_ddrs)
 {
   profile_probability prob;
   basic_block cond_bb;
@@ -2487,25 +2481,9 @@ version_loop_by_alias_check (vec<struct partition *> *partitions,
 				      is_gimple_val, NULL_TREE);
 
   /* Depend on vectorizer to fold IFN_LOOP_DIST_ALIAS.  */
-  bool cancelable_p = flag_tree_loop_vectorize;
-  if (cancelable_p)
+  if (flag_tree_loop_vectorize)
     {
-      unsigned i = 0;
-      struct partition *partition;
-      for (; partitions->iterate (i, &partition); ++i)
-	if (!partition_builtin_p (partition))
-	  break;
-
-     /* If all partitions are builtins, distributing it would be profitable and
-	we don't want to cancel the runtime alias checks.  */
-      if (i == partitions->length ())
-	cancelable_p = false;
-    }
-
-  /* Generate internal function call for loop distribution alias check if the
-     runtime alias check should be cancelable.  */
-  if (cancelable_p)
-    {
+      /* Generate internal function call for loop distribution alias check.  */
       call_stmt = gimple_build_call_internal (IFN_LOOP_DIST_ALIAS,
 					      2, NULL_TREE, cond_expr);
       lhs = make_ssa_name (boolean_type_node);
@@ -2561,14 +2539,12 @@ version_for_distribution_p (vec<struct partition *> *partitions,
 
 /* Compare base offset of builtin mem* partitions P1 and P2.  */
 
-static int
-offset_cmp (const void *vp1, const void *vp2)
+static bool
+offset_cmp (struct partition *p1, struct partition *p2)
 {
-  struct partition *p1 = *(struct partition *const *) vp1;
-  struct partition *p2 = *(struct partition *const *) vp2;
-  unsigned HOST_WIDE_INT o1 = p1->builtin->dst_base_offset;
-  unsigned HOST_WIDE_INT o2 = p2->builtin->dst_base_offset;
-  return (o2 < o1) - (o1 < o2);
+  gcc_assert (p1 != NULL && p1->builtin != NULL);
+  gcc_assert (p2 != NULL && p2->builtin != NULL);
+  return p1->builtin->dst_base_offset < p2->builtin->dst_base_offset;
 }
 
 /* Fuse adjacent memset builtin PARTITIONS if possible.  This is a special
@@ -2620,8 +2596,8 @@ fuse_memset_builtins (vec<struct partition *> *partitions)
 	}
 
       /* Stable sort is required in order to avoid breaking dependence.  */
-      gcc_stablesort (&(*partitions)[i], j - i, sizeof (*partitions)[i],
-		      offset_cmp);
+      std::stable_sort (&(*partitions)[i],
+			&(*partitions)[i] + j - i, offset_cmp);
       /* Continue with next partition.  */
       i = j;
     }
@@ -2907,7 +2883,7 @@ distribute_loop (struct loop *loop, vec<gimple *> stmts,
     }
 
   if (version_for_distribution_p (&partitions, &alias_ddrs))
-    version_loop_by_alias_check (&partitions, loop, &alias_ddrs);
+    version_loop_by_alias_check (loop, &alias_ddrs);
 
   if (dump_file && (dump_flags & TDF_DETAILS))
     {
@@ -3119,7 +3095,7 @@ pass_loop_distribution::execute (function *fun)
 	    break;
 
 	  const char *str = loop->inner ? " nest" : "";
-	  dump_user_location_t loc = find_loop_location (loop);
+	  location_t loc = find_loop_location (loop);
 	  if (!cd)
 	    {
 	      calculate_dominance_info (CDI_DOMINATORS);

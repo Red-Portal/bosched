@@ -196,7 +196,8 @@ can_alias_cdtor (tree fn)
   /* ??? Why not use aliases with -frepo?  */
   if (flag_use_repository)
     return false;
-  gcc_assert (DECL_MAYBE_IN_CHARGE_CDTOR_P (fn));
+  gcc_assert (DECL_MAYBE_IN_CHARGE_CONSTRUCTOR_P (fn)
+	      || DECL_MAYBE_IN_CHARGE_DESTRUCTOR_P (fn));
   /* Don't use aliases for weak/linkonce definitions unless we can put both
      symbols in the same COMDAT group.  */
   return (DECL_INTERFACE_KNOWN (fn)
@@ -441,7 +442,8 @@ maybe_clone_body (tree fn)
   bool need_alias = false;
 
   /* We only clone constructors and destructors.  */
-  if (!DECL_MAYBE_IN_CHARGE_CDTOR_P (fn))
+  if (!DECL_MAYBE_IN_CHARGE_CONSTRUCTOR_P (fn)
+      && !DECL_MAYBE_IN_CHARGE_DESTRUCTOR_P (fn))
     return 0;
 
   populate_clone_array (fn, fns);

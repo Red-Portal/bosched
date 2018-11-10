@@ -16,7 +16,7 @@ import (
 	"unsafe"
 )
 
-//go:linkname runtime_debug_WriteHeapDump runtime..z2fdebug.WriteHeapDump
+//go:linkname runtime_debug_WriteHeapDump runtime_debug.WriteHeapDump
 func runtime_debug_WriteHeapDump(fd uintptr) {
 	stopTheWorld("write heap dump")
 
@@ -184,7 +184,7 @@ func dumptype(t *_type) {
 	dumpint(uint64(uintptr(unsafe.Pointer(t))))
 	dumpint(uint64(t.size))
 	if x := t.uncommontype; x == nil || t.pkgPath == nil || *t.pkgPath == "" {
-		dumpstr(t.string())
+		dumpstr(*t.string)
 	} else {
 		pkgpathstr := *t.pkgPath
 		pkgpath := stringStructOf(&pkgpathstr)
@@ -233,8 +233,9 @@ type childInfo struct {
 
 // dump kinds & offsets of interesting fields in bv
 func dumpbv(cbv *bitvector, offset uintptr) {
-	for i := uintptr(0); i < uintptr(cbv.n); i++ {
-		if cbv.ptrbit(i) == 1 {
+	bv := gobv(*cbv)
+	for i := uintptr(0); i < bv.n; i++ {
+		if bv.bytedata[i/8]>>(i%8)&1 == 1 {
 			dumpint(fieldKindPtr)
 			dumpint(uint64(offset + i*sys.PtrSize))
 		}
@@ -253,7 +254,7 @@ func dumpgoroutine(gp *g) {
 	dumpbool(isSystemGoroutine(gp))
 	dumpbool(false) // isbackground
 	dumpint(uint64(gp.waitsince))
-	dumpstr(gp.waitreason.String())
+	dumpstr(gp.waitreason)
 	dumpint(0)
 	dumpint(uint64(uintptr(unsafe.Pointer(gp.m))))
 	dumpint(uint64(uintptr(unsafe.Pointer(gp._defer))))
@@ -371,26 +372,8 @@ func dumpparams() {
 		dumpbool(true) // big-endian ptrs
 	}
 	dumpint(sys.PtrSize)
-	var arenaStart, arenaEnd uintptr
-	for i1 := range mheap_.arenas {
-		if mheap_.arenas[i1] == nil {
-			continue
-		}
-		for i, ha := range mheap_.arenas[i1] {
-			if ha == nil {
-				continue
-			}
-			base := arenaBase(arenaIdx(i1)<<arenaL1Shift | arenaIdx(i))
-			if arenaStart == 0 || base < arenaStart {
-				arenaStart = base
-			}
-			if base+heapArenaBytes > arenaEnd {
-				arenaEnd = base + heapArenaBytes
-			}
-		}
-	}
-	dumpint(uint64(arenaStart))
-	dumpint(uint64(arenaEnd))
+	dumpint(uint64(mheap_.arena_start))
+	dumpint(uint64(mheap_.arena_used))
 	dumpstr(sys.GOARCH)
 	dumpstr(sys.Goexperiment)
 	dumpint(uint64(ncpu))
@@ -526,7 +509,7 @@ func mdump() {
 func writeheapdump_m(fd uintptr) {
 	_g_ := getg()
 	casgstatus(_g_.m.curg, _Grunning, _Gwaiting)
-	_g_.waitreason = waitReasonDumpingHeap
+	_g_.waitreason = "dumping heap"
 
 	// Update stats so we can dump them.
 	// As a side effect, flushes all the MCaches so the MSpan.freelist

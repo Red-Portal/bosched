@@ -114,7 +114,6 @@ package body System.Object_Reader is
       end record;
 
       SHF_ALLOC : constant := 2;
-      SHF_EXECINSTR : constant := 4;
 
       type Symtab_Entry32 is record
          St_Name  : uint32;  --  Name (string table index)
@@ -553,7 +552,7 @@ package body System.Object_Reader is
                  Offset (SHdr.Sh_Offset),
                  uint64 (SHdr.Sh_Addr),
                  uint64 (SHdr.Sh_Size),
-                 (SHdr.Sh_Flags and SHF_EXECINSTR) /= 0);
+                 (SHdr.Sh_Flags and SHF_ALLOC) /= 0);
       end Get_Section;
 
       ------------------------
@@ -1680,11 +1679,11 @@ package body System.Object_Reader is
       end if;
    end Get_Section;
 
-   ----------------------
-   -- Get_Xcode_Bounds --
-   ----------------------
+   -----------------------
+   -- Get_Memory_Bounds --
+   -----------------------
 
-   procedure Get_Xcode_Bounds
+   procedure Get_Memory_Bounds
      (Obj   : in out Object_File;
       Low, High : out uint64) is
       Sec : Object_Section;
@@ -1693,11 +1692,9 @@ package body System.Object_Reader is
       Low := uint64'Last;
       High := uint64'First;
 
-      --  Now find the lowest and highest offsets
-      --  attached to executable code sections
       for Idx in 1 .. Num_Sections (Obj) loop
          Sec := Get_Section (Obj, Idx - 1);
-         if Sec.Flag_Xcode then
+         if Sec.Flag_Alloc then
             if Sec.Addr < Low then
                Low := Sec.Addr;
             end if;
@@ -1706,7 +1703,7 @@ package body System.Object_Reader is
             end if;
          end if;
       end loop;
-   end Get_Xcode_Bounds;
+   end Get_Memory_Bounds;
 
    ----------
    -- Name --

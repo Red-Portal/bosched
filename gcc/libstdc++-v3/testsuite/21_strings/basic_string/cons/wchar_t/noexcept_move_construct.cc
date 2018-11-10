@@ -23,8 +23,4 @@
 
 typedef std::wstring wstype;
 
-// True except for COW strings with _GLIBCXX_FULLY_DYNAMIC_STRING:
 static_assert(std::is_nothrow_move_constructible<wstype>::value, "Error");
-
-// True for std::allocator because is_always_equal, but not true in general:
-static_assert(std::is_nothrow_move_assignable<wstype>::value, "lwg 2063");

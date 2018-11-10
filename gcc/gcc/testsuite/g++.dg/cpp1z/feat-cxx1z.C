@@ -1,5 +1,4 @@
-// { dg-do compile { target c++17 } }
-// { dg-options "-I${srcdir}/g++.dg/cpp1y -I${srcdir}/g++.dg/cpp1y/testinc" }
+// { dg-options "-std=c++17 -I${srcdir}/g++.dg/cpp1y -I${srcdir}/g++.dg/cpp1y/testinc" }
 
 //  C++98 features:
 
@@ -359,8 +358,8 @@
 
 #ifndef __cpp_deduction_guides
 #  error "__cpp_deduction_guides"
-#elif __cpp_deduction_guides != 201703
-#  error "__cpp_deduction_guides != 201703"
+#elif __cpp_deduction_guides != 201611
+#  error "__cpp_deduction_guides != 201611"
 #endif
 
 #ifndef __cpp_if_constexpr

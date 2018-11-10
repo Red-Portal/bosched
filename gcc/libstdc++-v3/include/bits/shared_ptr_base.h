@@ -534,7 +534,6 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     public:
       using __allocator_type = __alloc_rebind<_Alloc, _Sp_counted_ptr_inplace>;
 
-      // Alloc parameter is not a reference so doesn't alias anything in __args
       template<typename... _Args>
 	_Sp_counted_ptr_inplace(_Alloc __a, _Args&&... __args)
 	: _M_impl(__a)
@@ -654,7 +653,8 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	  typename _Sp_cp_type::__allocator_type __a2(__a);
 	  auto __guard = std::__allocate_guarded(__a2);
 	  _Sp_cp_type* __mem = __guard.get();
-	  ::new (__mem) _Sp_cp_type(__a, std::forward<_Args>(__args)...);
+	  ::new (__mem) _Sp_cp_type(std::move(__a),
+				    std::forward<_Args>(__args)...);
 	  _M_pi = __mem;
 	  __guard = nullptr;
 	}
@@ -1501,6 +1501,22 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     inline bool
     operator>=(nullptr_t, const __shared_ptr<_Tp, _Lp>& __a) noexcept
     { return !(nullptr < __a); }
+
+  template<typename _Sp>
+    struct _Sp_less : public binary_function<_Sp, _Sp, bool>
+    {
+      bool
+      operator()(const _Sp& __lhs, const _Sp& __rhs) const noexcept
+      {
+	typedef typename _Sp::element_type element_type;
+	return std::less<element_type*>()(__lhs.get(), __rhs.get());
+      }
+    };
+
+  template<typename _Tp, _Lock_policy _Lp>
+    struct less<__shared_ptr<_Tp, _Lp>>
+    : public _Sp_less<__shared_ptr<_Tp, _Lp>>
+    { };
 
   // 20.7.2.2.8 shared_ptr specialized algorithms.
   template<typename _Tp, _Lock_policy _Lp>

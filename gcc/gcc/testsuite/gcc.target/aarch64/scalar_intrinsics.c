@@ -627,14 +627,6 @@ test_vqabss_s32 (int32_t a)
   return vqabss_s32 (a);
 }
 
-/* { dg-final { scan-assembler-times "\\tneg\\tx\[0-9\]+" 1 } } */
-
-int64_t
-test_vnegd_s64 (int64_t a)
-{
-  return vnegd_s64 (a);
-}
-
 /* { dg-final { scan-assembler-times "\\tsqneg\\tb\[0-9\]+" 1 } } */
 
 int8_t

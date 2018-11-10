@@ -47,17 +47,20 @@
 #if !_GLIBCXX_USE_UTIMENSAT && _GLIBCXX_HAVE_UTIME_H
 # include <utime.h> // utime
 #endif
-#ifdef _GLIBCXX_FILESYSTEM_IS_WINDOWS
-# include <windows.h>
-#endif
 
 #define _GLIBCXX_BEGIN_NAMESPACE_FILESYSTEM \
   namespace experimental { namespace filesystem {
 #define _GLIBCXX_END_NAMESPACE_FILESYSTEM } }
 #include "ops-common.h"
 
+#ifdef _GLIBCXX_FILESYSTEM_IS_WINDOWS
+# undef utime
+# define utime _wutime
+# undef chmod
+# define chmod _wchmod
+#endif
+
 namespace fs = std::experimental::filesystem;
-namespace posix = std::filesystem::__gnu_posix;
 
 fs::path
 fs::absolute(const path& p, const path& base)
@@ -106,7 +109,7 @@ namespace
     void operator()(void* p) const { ::free(p); }
   };
 
-  using char_ptr = std::unique_ptr<fs::path::value_type[], free_as_in_malloc>;
+  using char_ptr = std::unique_ptr<char[], free_as_in_malloc>;
 }
 
 fs::path
@@ -119,8 +122,7 @@ fs::canonical(const path& p, const path& base, error_code& ec)
   char_ptr buf{ nullptr };
 # if _XOPEN_VERSION < 700
   // Not safe to call realpath(path, NULL)
-  using char_type = fs::path::value_type;
-  buf.reset( (char_type*)::malloc(PATH_MAX * sizeof(char_type)) );
+  buf.reset( (char*)::malloc(PATH_MAX) );
 # endif
   if (char* rp = ::realpath(pa.c_str(), buf.get()))
     {
@@ -239,13 +241,12 @@ namespace
   using std::filesystem::is_set;
 
 #ifdef _GLIBCXX_HAVE_SYS_STAT_H
-  using posix::stat_type;
+  typedef struct ::stat stat_type;
 
   using std::filesystem::is_not_found_errno;
   using std::filesystem::file_time;
   using std::filesystem::do_copy_file;
 #endif // _GLIBCXX_HAVE_SYS_STAT_H
-
 } // namespace
 
 void
@@ -262,15 +263,15 @@ fs::copy(const path& from, const path& to, copy_options options,
   // _GLIBCXX_RESOLVE_LIB_DEFECTS
   // 2681. filesystem::copy() cannot copy symlinks
   if (use_lstat || copy_symlinks
-      ? posix::lstat(from.c_str(), &from_st)
-      : posix::stat(from.c_str(), &from_st))
+      ? ::lstat(from.c_str(), &from_st)
+      : ::stat(from.c_str(), &from_st))
     {
       ec.assign(errno, std::generic_category());
       return;
     }
   if (use_lstat
-      ? posix::lstat(to.c_str(), &to_st)
-      : posix::stat(to.c_str(), &to_st))
+      ? ::lstat(to.c_str(), &to_st)
+      : ::stat(to.c_str(), &to_st))
     {
       if (!is_not_found_errno(errno))
 	{
@@ -458,8 +459,8 @@ namespace
   {
     bool created = false;
 #ifdef _GLIBCXX_HAVE_SYS_STAT_H
-    posix::mode_t mode = static_cast<std::underlying_type_t<fs::perms>>(perm);
-    if (posix::mkdir(p.c_str(), mode))
+    ::mode_t mode = static_cast<std::underlying_type_t<fs::perms>>(perm);
+    if (::mkdir(p.c_str(), mode))
       {
 	const int err = errno;
 	if (err != EEXIST || !is_directory(p, ec))
@@ -512,7 +513,7 @@ fs::create_directory(const path& p, const path& attributes,
 {
 #ifdef _GLIBCXX_HAVE_SYS_STAT_H
   stat_type st;
-  if (posix::stat(attributes.c_str(), &st))
+  if (::stat(attributes.c_str(), &st))
     {
       ec.assign(errno, std::generic_category());
       return false;
@@ -561,16 +562,11 @@ void
 fs::create_hard_link(const path& to, const path& new_hard_link,
 		     error_code& ec) noexcept
 {
-#ifdef _GLIBCXX_HAVE_LINK
+#ifdef _GLIBCXX_HAVE_UNISTD_H
   if (::link(to.c_str(), new_hard_link.c_str()))
     ec.assign(errno, std::generic_category());
   else
     ec.clear();
-#elif defined _GLIBCXX_FILESYSTEM_IS_WINDOWS
-  if (CreateHardLinkW(new_hard_link.c_str(), to.c_str(), NULL))
-    ec.clear();
-  else
-    ec.assign((int)GetLastError(), generic_category());
 #else
   ec = std::make_error_code(std::errc::not_supported);
 #endif
@@ -590,7 +586,7 @@ void
 fs::create_symlink(const path& to, const path& new_symlink,
 		   error_code& ec) noexcept
 {
-#ifdef _GLIBCXX_HAVE_SYMLINK
+#ifdef _GLIBCXX_HAVE_UNISTD_H
   if (::symlink(to.c_str(), new_symlink.c_str()))
     ec.assign(errno, std::generic_category());
   else
@@ -599,6 +595,7 @@ fs::create_symlink(const path& to, const path& new_symlink,
   ec = std::make_error_code(std::errc::not_supported);
 #endif
 }
+
 
 fs::path
 fs::current_path()
@@ -615,8 +612,8 @@ fs::current_path(error_code& ec)
 {
   path p;
 #ifdef _GLIBCXX_HAVE_UNISTD_H
-#if defined __GLIBC__ || defined _GLIBCXX_FILESYSTEM_IS_WINDOWS
-  if (char_ptr cwd = char_ptr{posix::getcwd(nullptr, 0)})
+#ifdef __GLIBC__
+  if (char_ptr cwd = char_ptr{::getcwd(nullptr, 0)})
     {
       p.assign(cwd.get());
       ec.clear();
@@ -624,7 +621,6 @@ fs::current_path(error_code& ec)
   else
     ec.assign(errno, std::generic_category());
 #else
-#ifdef _PC_PATH_MAX
   long path_max = pathconf(".", _PC_PATH_MAX);
   size_t size;
   if (path_max == -1)
@@ -633,15 +629,9 @@ fs::current_path(error_code& ec)
       size = 10240;
   else
       size = path_max;
-#elif defined(PATH_MAX)
-  size_t size = PATH_MAX;
-#else
-  size_t size = 1024;
-#endif
   for (char_ptr buf; p.empty(); size *= 2)
     {
-      using char_type = fs::path::value_type;
-      buf.reset((char_type*)malloc(size * sizeof(char_type)));
+      buf.reset((char*)malloc(size));
       if (buf)
 	{
 	  if (getcwd(buf.get(), size))
@@ -681,7 +671,7 @@ void
 fs::current_path(const path& p, error_code& ec) noexcept
 {
 #ifdef _GLIBCXX_HAVE_UNISTD_H
-  if (posix::chdir(p.c_str()))
+  if (::chdir(p.c_str()))
     ec.assign(errno, std::generic_category());
   else
     ec.clear();
@@ -708,14 +698,14 @@ fs::equivalent(const path& p1, const path& p2, error_code& ec) noexcept
   int err = 0;
   file_status s1, s2;
   stat_type st1, st2;
-  if (posix::stat(p1.c_str(), &st1) == 0)
+  if (::stat(p1.c_str(), &st1) == 0)
     s1 = make_file_status(st1);
   else if (is_not_found_errno(errno))
     s1.type(file_type::not_found);
   else
     err = errno;
 
-  if (posix::stat(p2.c_str(), &st2) == 0)
+  if (::stat(p2.c_str(), &st2) == 0)
     s2 = make_file_status(st2);
   else if (is_not_found_errno(errno))
     s2.type(file_type::not_found);
@@ -765,7 +755,7 @@ namespace
     {
 #ifdef _GLIBCXX_HAVE_SYS_STAT_H
       stat_type st;
-      if (posix::stat(p.c_str(), &st))
+      if (::stat(p.c_str(), &st))
 	{
 	  ec.assign(errno, std::generic_category());
 	  return deflt;
@@ -815,7 +805,7 @@ fs::hard_link_count(const path& p)
 std::uintmax_t
 fs::hard_link_count(const path& p, error_code& ec) noexcept
 {
-  return do_stat(p, ec, std::mem_fn(&stat_type::st_nlink),
+  return do_stat(p, ec, std::mem_fn(&stat::st_nlink),
 		 static_cast<uintmax_t>(-1));
 }
 
@@ -891,11 +881,11 @@ fs::last_write_time(const path& p __attribute__((__unused__)),
   else
     ec.clear();
 #elif _GLIBCXX_HAVE_UTIME_H
-  posix::utimbuf times;
+  ::utimbuf times;
   times.modtime = s.count();
   times.actime = do_stat(p, ec, [](const auto& st) { return st.st_atime; },
 			 times.modtime);
-  if (posix::utime(p.c_str(), &times))
+  if (::utime(p.c_str(), &times))
     ec.assign(errno, std::generic_category());
   else
     ec.clear();
@@ -948,7 +938,7 @@ fs::permissions(const path& p, perms prms, error_code& ec) noexcept
 #else
   if (nofollow && is_symlink(st))
     ec = std::make_error_code(std::errc::operation_not_supported);
-  else if (posix::chmod(p.c_str(), static_cast<mode_t>(prms)))
+  else if (::chmod(p.c_str(), static_cast<mode_t>(prms)))
     err = errno;
 #endif
 
@@ -968,10 +958,10 @@ fs::read_symlink(const path& p)
   return tgt;
 }
 
-fs::path fs::read_symlink(const path& p [[gnu::unused]], error_code& ec)
+fs::path fs::read_symlink(const path& p, error_code& ec)
 {
   path result;
-#if defined(_GLIBCXX_HAVE_READLINK) && defined(_GLIBCXX_HAVE_SYS_STAT_H)
+#ifdef _GLIBCXX_HAVE_SYS_STAT_H
   stat_type st;
   if (::lstat(p.c_str(), &st))
     {
@@ -1025,19 +1015,6 @@ fs::remove(const path& p)
 bool
 fs::remove(const path& p, error_code& ec) noexcept
 {
-#ifdef _GLIBCXX_FILESYSTEM_IS_WINDOWS
-  if (exists(symlink_status(p, ec)))
-    {
-      if ((is_directory(p, ec) && RemoveDirectoryW(p.c_str()))
-	  || DeleteFileW(p.c_str()))
-	{
-	  ec.clear();
-	  return true;
-	}
-      else if (!ec)
-	ec.assign((int)GetLastError(), generic_category());
-    }
-#else
   if (::remove(p.c_str()) == 0)
     {
       ec.clear();
@@ -1047,7 +1024,6 @@ fs::remove(const path& p, error_code& ec) noexcept
     ec.clear();
   else
     ec.assign(errno, std::generic_category());
-#endif
   return false;
 }
 
@@ -1101,7 +1077,7 @@ fs::rename(const path& from, const path& to)
 void
 fs::rename(const path& from, const path& to, error_code& ec) noexcept
 {
-  if (posix::rename(from.c_str(), to.c_str()))
+  if (::rename(from.c_str(), to.c_str()))
     ec.assign(errno, std::generic_category());
   else
     ec.clear();
@@ -1122,7 +1098,7 @@ fs::resize_file(const path& p, uintmax_t size, error_code& ec) noexcept
 #ifdef _GLIBCXX_HAVE_UNISTD_H
   if (size > static_cast<uintmax_t>(std::numeric_limits<off_t>::max()))
     ec.assign(EINVAL, std::generic_category());
-  else if (posix::truncate(p.c_str(), size))
+  else if (::truncate(p.c_str(), size))
     ec.assign(errno, std::generic_category());
   else
     ec.clear();
@@ -1150,12 +1126,6 @@ fs::space(const path& p, error_code& ec) noexcept
     static_cast<uintmax_t>(-1),
     static_cast<uintmax_t>(-1)
   };
-<<<<<<< HEAD
-#if _GLIBCXX_FILESYSTEM_IS_WINDOWS
-  path dir = absolute(p);
-  dir.remove_filename();
-  auto str = dir.c_str();
-=======
 #ifdef _GLIBCXX_HAVE_SYS_STATVFS_H
   struct ::statvfs f;
   if (::statvfs(p.c_str(), &f))
@@ -1170,11 +1140,9 @@ fs::space(const path& p, error_code& ec) noexcept
       };
       ec.clear();
     }
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
 #else
-  auto str = p.c_str();
+  ec = std::make_error_code(std::errc::not_supported);
 #endif
-  std::filesystem::do_space(str, info.capacity, info.free, info.available, ec);
   return info;
 }
 
@@ -1184,7 +1152,7 @@ fs::status(const fs::path& p, error_code& ec) noexcept
 {
   file_status status;
   stat_type st;
-  if (posix::stat(p.c_str(), &st))
+  if (::stat(p.c_str(), &st))
     {
       int err = errno;
       ec.assign(err, std::generic_category());
@@ -1208,7 +1176,7 @@ fs::symlink_status(const fs::path& p, std::error_code& ec) noexcept
 {
   file_status status;
   stat_type st;
-  if (posix::lstat(p.c_str(), &st))
+  if (::lstat(p.c_str(), &st))
     {
       int err = errno;
       ec.assign(err, std::generic_category());
@@ -1283,38 +1251,27 @@ fs::path fs::temp_directory_path()
 
 fs::path fs::temp_directory_path(error_code& ec)
 {
-  path p;
 #ifdef _GLIBCXX_FILESYSTEM_IS_WINDOWS
-  unsigned len = 1024;
-  std::wstring buf;
-  do
-    {
-      buf.resize(len);
-      len = GetTempPathW(buf.size(), buf.data());
-    } while (len > buf.size());
-
-  if (len == 0)
-    {
-      ec.assign((int)GetLastError(), std::system_category());
-      return p;
-    }
-  buf.resize(len);
-  p = std::move(buf);
+  ec = std::make_error_code(std::errc::not_supported);
+  return {}; // TODO
 #else
   const char* tmpdir = nullptr;
   const char* env[] = { "TMPDIR", "TMP", "TEMP", "TEMPDIR", nullptr };
   for (auto e = env; tmpdir == nullptr && *e != nullptr; ++e)
     tmpdir = ::getenv(*e);
-  p = tmpdir ? tmpdir : "/tmp";
+  path p = tmpdir ? tmpdir : "/tmp";
   auto st = status(p, ec);
-  if (ec)
-    p.clear();
-  else if (!is_directory(st))
+  if (!ec)
     {
-      p.clear();
-      ec = std::make_error_code(std::errc::not_a_directory);
+      if (is_directory(st))
+	{
+	  ec.clear();
+	  return p;
+	}
+      else
+	ec = std::make_error_code(std::errc::not_a_directory);
     }
+  return {};
 #endif
-  return p;
 }
 

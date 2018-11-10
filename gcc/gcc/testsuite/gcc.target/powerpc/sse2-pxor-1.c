@@ -1,9 +1,6 @@
 /* { dg-do run } */
 /* { dg-options "-O3 -mpower8-vector -Wno-psabi" } */
-<<<<<<< HEAD
-=======
 /* { dg-require-effective-target lp64 } */
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
 /* { dg-require-effective-target p8vector_hw } */
 
 #ifndef CHECK_H

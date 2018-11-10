@@ -1,5 +1,6 @@
 // { dg-options "-std=gnu++17" }
 // { dg-do run { target c++17 } }
+// { dg-require-cstdint "" }
 
 // Copyright (C) 2017-2018 Free Software Foundation, Inc.
 //

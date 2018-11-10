@@ -1,6 +1,5 @@
 // PR c++/72415
-// { dg-do compile { target c++17 } }
-// { dg-options "-fconcepts" }
+// { dg-options "-std=c++17 -fconcepts" }
 
 template<int... Indices>
 struct indices {};

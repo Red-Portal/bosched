@@ -1,21 +1,3 @@
-<<<<<<< HEAD
-2018-10-31  Joseph Myers  <joseph@codesourcery.com>
-
-	PR bootstrap/82856
-	* configure.ac: Remove AC_PREREQ.
-	* Makefile.in, aclocal.m4, configure: Regenerate.
-
-2018-05-04  Pekka Jääskeläinen  <pekka.jaaskelainen@parmance.com>
-
-	* include/internal/phsa-rt.h: Whitespace cleanup.
-	* include/internal/workitems.h: Store work item ID data to easily
-	accessible locations.
-	* rt/workitems.c: Same.
-
-2018-05-04  Pekka Jääskeläinen  <pekka.jaaskelainen@parmance.com>
-
-	* rt/workitems.c: Fix an alloca stack underflow.
-=======
 2018-07-26  Release Manager
 
 	* GCC 8.2.0 released.
@@ -23,7 +5,6 @@
 2018-05-02  Release Manager
 
 	* GCC 8.1.0 released.
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
 
 2018-04-18  David Malcolm  <dmalcolm@redhat.com>
 

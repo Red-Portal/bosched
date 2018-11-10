@@ -25,11 +25,9 @@
 using __gnu_test::propagating_allocator;
 using __gnu_test::counter_type;
 
-typedef std::pair<const counter_type, counter_type> value_type;
-
 void test01()
 {
-  typedef propagating_allocator<value_type, false> alloc_type;
+  typedef propagating_allocator<counter_type, false> alloc_type;
   typedef __gnu_test::counter_type_hasher hash;
   typedef std::unordered_multimap<counter_type, counter_type, hash,
 				  std::equal_to<counter_type>,
@@ -56,7 +54,7 @@ void test01()
 
 void test02()
 {
-  typedef propagating_allocator<value_type, true> alloc_type;
+  typedef propagating_allocator<counter_type, true> alloc_type;
   typedef __gnu_test::counter_type_hasher hash;
   typedef std::unordered_multimap<counter_type, counter_type, hash,
 				  std::equal_to<counter_type>,

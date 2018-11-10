@@ -29,7 +29,7 @@
 
 _GLIBCXX_WEAK_DEFINITION void*
 operator new[] (std::size_t sz, std::align_val_t al, const std::nothrow_t&)
-  noexcept
+  _GLIBCXX_USE_NOEXCEPT
 {
   __try
     {
@@ -37,6 +37,6 @@ operator new[] (std::size_t sz, std::align_val_t al, const std::nothrow_t&)
     }
   __catch(...)
     {
-      return nullptr;
+      return 0;
     }
 }

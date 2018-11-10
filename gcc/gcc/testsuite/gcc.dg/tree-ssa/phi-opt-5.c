@@ -1,5 +1,5 @@
 /* { dg-do compile } */
-/* { dg-options "-O1 -ffinite-math-only -fno-signed-zeros -fdump-tree-phiopt" } */
+/* { dg-options "-O1 -ffinite-math-only -fno-signed-zeros -fdump-tree-phiopt1" } */
 
 float repl1 (float varx)
 {
@@ -16,11 +16,8 @@ float repl1 (float varx)
    varx_4 = MIN_EXPR <1.0e+0, varx_2>;
    varx_5 = MAX_EXPR <varx_4, 0.0>;  */  
 
-/* phiopt1 confused by predictors.  */
-/* { dg-final { scan-tree-dump "varx.*MIN_EXPR.*1\\.0" "phiopt1" { xfail *-*-* } } } */
-/* { dg-final { scan-tree-dump "varx.*MAX_EXPR.*0\\.0" "phiopt1" { xfail *-*-* } } } */
-/* { dg-final { scan-tree-dump "varx.*MIN_EXPR.*1\\.0" "phiopt2"} } */
-/* { dg-final { scan-tree-dump "varx.*MAX_EXPR.*0\\.0" "phiopt2"} } */
+/* { dg-final { scan-tree-dump "varx.*MIN_EXPR.*1\\.0" "phiopt1"} } */
+/* { dg-final { scan-tree-dump "varx.*MAX_EXPR.*0\\.0" "phiopt1"} } */
 
 float repl2 (float vary)
 {
@@ -37,11 +34,8 @@ float repl2 (float vary)
    vary_4 = MAX_EXPR <0.0, vary_2>;
    vary_5 = MIN_EXPR <vary_4, 1.0e+0>;  */
 
-/* phiopt1 confused by predictors.  */
-/* { dg-final { scan-tree-dump "vary.*MAX_EXPR.*0\\.0" "phiopt1" { xfail *-*-* } } } */
-/* { dg-final { scan-tree-dump "vary.*MIN_EXPR.*1\\.0" "phiopt1" { xfail *-*-* } } } */
-/* { dg-final { scan-tree-dump "vary.*MAX_EXPR.*0\\.0" "phiopt2"} } */
-/* { dg-final { scan-tree-dump "vary.*MIN_EXPR.*1\\.0" "phiopt2"} } */
+/* { dg-final { scan-tree-dump "vary.*MAX_EXPR.*0\\.0" "phiopt1"} } */
+/* { dg-final { scan-tree-dump "vary.*MIN_EXPR.*1\\.0" "phiopt1"} } */
 
 float repl3 (float varz, float vara, float varb)
 {
@@ -60,7 +54,5 @@ float repl3 (float varz, float vara, float varb)
 <L1>:;
   vara_6 = MAX_EXPR <varb_5, varz_2>;  */
 
-/* phiopt1 confused by predictors.  */
-/* { dg-final { scan-tree-dump "vara.*MAX_EXPR" "phiopt1" { xfail *-*-* } } } */
-/* { dg-final { scan-tree-dump "if .*varz" "phiopt2"} } */
-/* { dg-final { scan-tree-dump "vara.*MAX_EXPR" "phiopt2"} } */
+/* { dg-final { scan-tree-dump "if .*varz" "phiopt1"} } */
+/* { dg-final { scan-tree-dump "vara.*MAX_EXPR" "phiopt1"} } */

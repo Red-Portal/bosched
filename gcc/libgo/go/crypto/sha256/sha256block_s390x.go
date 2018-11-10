@@ -6,6 +6,9 @@
 
 package sha256
 
-import "internal/cpu"
+// featureCheck reports whether the CPU supports the
+// SHA256 compute intermediate message digest (KIMD)
+// function code.
+func featureCheck() bool
 
-var useAsm = cpu.S390X.HasSHA256
+var useAsm = featureCheck()

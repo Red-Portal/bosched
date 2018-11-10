@@ -390,6 +390,7 @@ int_mode_for_mode (machine_mode mode)
     case MODE_VECTOR_ACCUM:
     case MODE_VECTOR_UFRACT:
     case MODE_VECTOR_UACCUM:
+    case MODE_POINTER_BOUNDS:
       return int_mode_for_size (GET_MODE_BITSIZE (mode), 0);
 
     case MODE_RANDOM:
@@ -755,24 +756,22 @@ layout_decl (tree decl, unsigned int known_align)
     DECL_SIZE_UNIT (decl) = variable_size (DECL_SIZE_UNIT (decl));
 
   /* If requested, warn about definitions of large data objects.  */
-  if ((code == PARM_DECL || (code == VAR_DECL && !DECL_NONLOCAL_FRAME (decl)))
-      && !DECL_EXTERNAL (decl))
+  if (warn_larger_than
+      && (code == VAR_DECL || code == PARM_DECL)
+      && ! DECL_EXTERNAL (decl))
     {
       tree size = DECL_SIZE_UNIT (decl);
 
-      if (size != 0 && TREE_CODE (size) == INTEGER_CST)
+      if (size != 0 && TREE_CODE (size) == INTEGER_CST
+	  && compare_tree_int (size, larger_than_size) > 0)
 	{
-	  /* -Wlarger-than= argument of HOST_WIDE_INT_MAX is treated
-	     as if PTRDIFF_MAX had been specified, with the value
-	     being that on the target rather than the host.  */
-	  unsigned HOST_WIDE_INT max_size = warn_larger_than_size;
-	  if (max_size == HOST_WIDE_INT_MAX)
-	    max_size = tree_to_shwi (TYPE_MAX_VALUE (ptrdiff_type_node));
+	  int size_as_int = TREE_INT_CST_LOW (size);
 
-	  if (compare_tree_int (size, max_size) > 0)
-	    warning (OPT_Wlarger_than_, "size of %q+D %E bytes exceeds "
-		     "maximum object size %wu",
-		     decl, size, max_size);
+	  if (compare_tree_int (size, size_as_int) == 0)
+	    warning (OPT_Wlarger_than_, "size of %q+D is %d bytes", decl, size_as_int);
+	  else
+	    warning (OPT_Wlarger_than_, "size of %q+D is larger than %wd bytes",
+                     decl, larger_than_size);
 	}
     }
 
@@ -1846,11 +1845,9 @@ compute_record_mode (tree type)
   /* If we only have one real field; use its mode if that mode's size
      matches the type's size.  This only applies to RECORD_TYPE.  This
      does not apply to unions.  */
-  poly_uint64 type_size;
-  if (TREE_CODE (type) == RECORD_TYPE
-      && mode != VOIDmode
-      && poly_int_tree_p (TYPE_SIZE (type), &type_size)
-      && known_eq (GET_MODE_BITSIZE (mode), type_size))
+  if (TREE_CODE (type) == RECORD_TYPE && mode != VOIDmode
+      && tree_fits_uhwi_p (TYPE_SIZE (type))
+      && known_eq (GET_MODE_BITSIZE (mode), tree_to_uhwi (TYPE_SIZE (type))))
     ;
   else
     mode = mode_for_size_tree (TYPE_SIZE (type), MODE_INT, 1).else_blk ();
@@ -2395,6 +2392,11 @@ layout_type (tree type)
       SET_TYPE_ALIGN (type, 1);
       TYPE_USER_ALIGN (type) = 0;
       SET_TYPE_MODE (type, VOIDmode);
+      break;
+
+    case POINTER_BOUNDS_TYPE:
+      TYPE_SIZE (type) = bitsize_int (GET_MODE_BITSIZE (TYPE_MODE (type)));
+      TYPE_SIZE_UNIT (type) = size_int (GET_MODE_SIZE (TYPE_MODE (type)));
       break;
 
     case OFFSET_TYPE:

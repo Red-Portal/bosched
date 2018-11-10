@@ -89,6 +89,19 @@ func TestCgoExternalThreadSIGPROF(t *testing.T) {
 	switch runtime.GOOS {
 	case "plan9", "windows":
 		t.Skipf("no pthreads on %s", runtime.GOOS)
+	case "darwin":
+		if runtime.GOARCH != "arm" && runtime.GOARCH != "arm64" {
+			// static constructor needs external linking, but we don't support
+			// external linking on OS X 10.6.
+			out, err := exec.Command("uname", "-r").Output()
+			if err != nil {
+				t.Fatalf("uname -r failed: %v", err)
+			}
+			// OS X 10.6 == Darwin 10.x
+			if strings.HasPrefix(string(out), "10.") {
+				t.Skipf("no external linking on OS X 10.6")
+			}
+		}
 	}
 	if runtime.GOARCH == "ppc64" {
 		// TODO(austin) External linking not implemented on
@@ -239,12 +252,8 @@ func TestCgoCCodeSIGPROF(t *testing.T) {
 
 func TestCgoCrashTraceback(t *testing.T) {
 	t.Parallel()
-	switch platform := runtime.GOOS + "/" + runtime.GOARCH; platform {
-	case "darwin/amd64":
-	case "linux/amd64":
-	case "linux/ppc64le":
-	default:
-		t.Skipf("not yet supported on %s", platform)
+	if runtime.GOOS != "linux" || (runtime.GOARCH != "amd64" && runtime.GOARCH != "ppc64le") {
+		t.Skipf("not yet supported on %s/%s", runtime.GOOS, runtime.GOARCH)
 	}
 	if runtime.Compiler == "gccgo" {
 		t.Skip("gccgo does not have SetCgoTraceback")
@@ -343,7 +352,7 @@ func TestCgoPprofThreadNoTraceback(t *testing.T) {
 }
 
 func TestRaceProf(t *testing.T) {
-	if (runtime.GOOS != "linux" && runtime.GOOS != "freebsd") || runtime.GOARCH != "amd64" {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
 		t.Skipf("not yet supported on %s/%s", runtime.GOOS, runtime.GOARCH)
 	}
 	if runtime.Compiler == "gccgo" {
@@ -375,7 +384,7 @@ func TestRaceProf(t *testing.T) {
 
 func TestRaceSignal(t *testing.T) {
 	t.Parallel()
-	if (runtime.GOOS != "linux" && runtime.GOOS != "freebsd") || runtime.GOARCH != "amd64" {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
 		t.Skipf("not yet supported on %s/%s", runtime.GOOS, runtime.GOARCH)
 	}
 
@@ -503,21 +512,5 @@ func TestCgoTracebackSigpanic(t *testing.T) {
 	nowant := "unexpected return pc"
 	if strings.Contains(got, nowant) {
 		t.Fatalf("failure incorrectly contains %q. output:\n%s\n", nowant, got)
-	}
-}
-
-// Test that C code called via cgo can use large Windows thread stacks
-// and call back in to Go without crashing. See issue #20975.
-//
-// See also TestBigStackCallbackSyscall.
-func TestBigStackCallbackCgo(t *testing.T) {
-	if runtime.GOOS != "windows" {
-		t.Skip("skipping windows specific test")
-	}
-	t.Parallel()
-	got := runTestProg(t, "testprogcgo", "BigStack")
-	want := "OK\n"
-	if got != want {
-		t.Errorf("expected %q got %v", want, got)
 	}
 }

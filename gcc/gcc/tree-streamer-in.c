@@ -30,6 +30,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-streamer.h"
 #include "cgraph.h"
 #include "builtins.h"
+#include "ipa-chkp.h"
 #include "gomp-constants.h"
 #include "stringpool.h"
 #include "attribs.h"
@@ -398,6 +399,7 @@ static void
 unpack_ts_block_value_fields (struct data_in *data_in,
 			      struct bitpack_d *bp, tree expr)
 {
+  BLOCK_ABSTRACT (expr) = (unsigned) bp_unpack_value (bp, 1);
   /* BLOCK_NUMBER is recomputed.  */
   stream_input_location (&BLOCK_SOURCE_LOCATION (expr), bp, data_in);
 }
@@ -529,7 +531,14 @@ streamer_read_tree_bitfields (struct lto_input_block *ib,
     unpack_ts_translation_unit_decl_value_fields (data_in, &bp, expr);
 
   if (CODE_CONTAINS_STRUCT (code, TS_OPTIMIZATION))
-    cl_optimization_stream_in (data_in, &bp, TREE_OPTIMIZATION (expr));
+    cl_optimization_stream_in (&bp, TREE_OPTIMIZATION (expr));
+
+  if (CODE_CONTAINS_STRUCT (code, TS_BINFO))
+    {
+      unsigned HOST_WIDE_INT length = bp_unpack_var_len_unsigned (&bp);
+      if (length > 0)
+	vec_safe_grow (BINFO_BASE_ACCESSES (expr), length);
+    }
 
   if (CODE_CONTAINS_STRUCT (code, TS_CONSTRUCTOR))
     {
@@ -720,9 +729,11 @@ lto_input_ts_decl_common_tree_pointers (struct lto_input_block *ib,
    file being read.  */
 
 static void
-lto_input_ts_decl_non_common_tree_pointers (struct lto_input_block *,
-					    struct data_in *, tree)
+lto_input_ts_decl_non_common_tree_pointers (struct lto_input_block *ib,
+					    struct data_in *data_in, tree expr)
 {
+  if (TREE_CODE (expr) == TYPE_DECL)
+    DECL_ORIGINAL_TYPE (expr) = stream_read_tree (ib, data_in);
 }
 
 
@@ -757,6 +768,7 @@ lto_input_ts_field_decl_tree_pointers (struct lto_input_block *ib,
   DECL_BIT_FIELD_TYPE (expr) = stream_read_tree (ib, data_in);
   DECL_BIT_FIELD_REPRESENTATIVE (expr) = stream_read_tree (ib, data_in);
   DECL_FIELD_BIT_OFFSET (expr) = stream_read_tree (ib, data_in);
+  DECL_FCONTEXT (expr) = stream_read_tree (ib, data_in);
 }
 
 
@@ -768,6 +780,7 @@ static void
 lto_input_ts_function_decl_tree_pointers (struct lto_input_block *ib,
 					  struct data_in *data_in, tree expr)
 {
+  DECL_VINDEX (expr) = stream_read_tree (ib, data_in);
   /* DECL_STRUCT_FUNCTION is loaded on demand by cgraph_get_body.  */
   DECL_FUNCTION_PERSONALITY (expr) = stream_read_tree (ib, data_in);
 #ifndef ACCEL_COMPILER
@@ -818,6 +831,7 @@ lto_input_ts_type_common_tree_pointers (struct lto_input_block *ib,
   TYPE_CONTEXT (expr) = stream_read_tree (ib, data_in);
   /* TYPE_CANONICAL gets re-computed during type merging.  */
   TYPE_CANONICAL (expr) = NULL_TREE;
+  TYPE_STUB_DECL (expr) = stream_read_tree (ib, data_in);
 }
 
 /* Read all pointer fields in the TS_TYPE_NON_COMMON structure of EXPR
@@ -914,6 +928,11 @@ lto_input_ts_block_tree_pointers (struct lto_input_block *ib,
   BLOCK_VARS (expr) = streamer_read_chain (ib, data_in);
 
   BLOCK_SUPERCONTEXT (expr) = stream_read_tree (ib, data_in);
+
+  /* Stream BLOCK_ABSTRACT_ORIGIN and BLOCK_SOURCE_LOCATION for
+     the limited cases we can handle - those that represent inlined
+     function scopes.  For the rest them on the floor instead of ICEing in
+     dwarf2out.c.  */
   BLOCK_ABSTRACT_ORIGIN (expr) = stream_read_tree (ib, data_in);
   /* Do not stream BLOCK_NONLOCALIZED_VARS.  We cannot handle debug information
      for early inlined BLOCKs so drop it on the floor instead of ICEing in
@@ -951,6 +970,7 @@ static void
 lto_input_ts_binfo_tree_pointers (struct lto_input_block *ib,
 				  struct data_in *data_in, tree expr)
 {
+  unsigned i;
   tree t;
 
   /* Note that the number of slots in EXPR was read in
@@ -968,10 +988,17 @@ lto_input_ts_binfo_tree_pointers (struct lto_input_block *ib,
 
   BINFO_OFFSET (expr) = stream_read_tree (ib, data_in);
   BINFO_VTABLE (expr) = stream_read_tree (ib, data_in);
+  BINFO_VPTR_FIELD (expr) = stream_read_tree (ib, data_in);
 
-  /* Do not walk BINFO_INHERITANCE_CHAIN, BINFO_SUBVTT_INDEX,
-     BINFO_BASE_ACCESSES and BINFO_VPTR_INDEX; these are used by C++ FE
-     only.  */
+  /* The vector of BINFO_BASE_ACCESSES is pre-allocated during
+     unpacking the bitfield section.  */
+  for (i = 0; i < vec_safe_length (BINFO_BASE_ACCESSES (expr)); i++)
+    {
+      tree a = stream_read_tree (ib, data_in);
+      (*BINFO_BASE_ACCESSES (expr))[i] = a;
+    }
+  /* Do not walk BINFO_INHERITANCE_CHAIN, BINFO_SUBVTT_INDEX
+     and BINFO_VPTR_INDEX; these are used by C++ FE only.  */
 }
 
 

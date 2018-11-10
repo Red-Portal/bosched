@@ -34,9 +34,6 @@ class Gcc_linemap : public Linemap
   std::string
   to_string(Location);
 
-  std::string
-  location_file(Location);
-
   int
   location_line(Location);
 
@@ -96,16 +93,7 @@ Gcc_linemap::to_string(Location location)
   return ss.str();
 }
 
-// Return the file name for a given location.
-
-std::string
-Gcc_linemap::location_file(Location loc)
-{
-  return LOCATION_FILE(loc.gcc_location());
-}
-
-// Return the line number for a given location.
-
+// Return the line number for a given location (for debugging dumps)
 int
 Gcc_linemap::location_line(Location loc)
 {

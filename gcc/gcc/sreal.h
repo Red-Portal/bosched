@@ -20,7 +20,8 @@ along with GCC; see the file COPYING3.  If not see
 #ifndef GCC_SREAL_H
 #define GCC_SREAL_H
 
-#define SREAL_PART_BITS 31
+/* SREAL_PART_BITS has to be an even number.  */
+#define SREAL_PART_BITS 32
 
 #define UINT64_BITS	64
 
@@ -44,9 +45,9 @@ public:
   sreal () : m_sig (-1), m_exp (-1) {}
 
   /* Construct a sreal.  */
-  sreal (int64_t sig, int exp = 0)
+  sreal (int64_t sig, int exp = 0) : m_sig (sig), m_exp (exp)
   {
-    normalize (sig, exp);
+    normalize ();
   }
 
   void dump (FILE *) const;
@@ -129,14 +130,14 @@ public:
   }
 
 private:
-  inline void normalize (int64_t new_sig, signed int new_exp);
-  inline void normalize_up (int64_t new_sig, signed int new_exp);
-  inline void normalize_down (int64_t new_sig, signed int new_exp);
+  inline void normalize ();
+  inline void normalize_up ();
+  inline void normalize_down ();
   void shift_right (int amount);
   static sreal signedless_plus (const sreal &a, const sreal &b, bool negative);
   static sreal signedless_minus (const sreal &a, const sreal &b, bool negative);
 
-  int32_t m_sig;			/* Significant.  */
+  int64_t m_sig;			/* Significant.  */
   signed int m_exp;			/* Exponent.  */
 };
 
@@ -198,24 +199,23 @@ inline sreal operator>> (const sreal &a, int exp)
    Make this separate method so inliner can handle hot path better.  */
 
 inline void
-sreal::normalize_up (int64_t new_sig, signed int new_exp)
+sreal::normalize_up ()
 {
-  unsigned HOST_WIDE_INT sig = absu_hwi (new_sig);
+  unsigned HOST_WIDE_INT sig = absu_hwi (m_sig);
   int shift = SREAL_PART_BITS - 2 - floor_log2 (sig);
 
   gcc_checking_assert (shift > 0);
   sig <<= shift;
-  new_exp -= shift;
+  m_exp -= shift;
   gcc_checking_assert (sig <= SREAL_MAX_SIG && sig >= SREAL_MIN_SIG);
 
   /* Check underflow.  */
-  if (new_exp < -SREAL_MAX_EXP)
+  if (m_exp < -SREAL_MAX_EXP)
     {
-      new_exp = -SREAL_MAX_EXP;
+      m_exp = -SREAL_MAX_EXP;
       sig = 0;
     }
-  m_exp = new_exp;
-  if (SREAL_SIGN (new_sig) == -1)
+  if (SREAL_SIGN (m_sig) == -1)
     m_sig = -sig;
   else
     m_sig = sig;
@@ -226,16 +226,16 @@ sreal::normalize_up (int64_t new_sig, signed int new_exp)
    Make this separate method so inliner can handle hot path better.  */
 
 inline void
-sreal::normalize_down (int64_t new_sig, signed int new_exp)
+sreal::normalize_down ()
 {
   int last_bit;
-  unsigned HOST_WIDE_INT sig = absu_hwi (new_sig);
+  unsigned HOST_WIDE_INT sig = absu_hwi (m_sig);
   int shift = floor_log2 (sig) - SREAL_PART_BITS + 2;
 
   gcc_checking_assert (shift > 0);
   last_bit = (sig >> (shift-1)) & 1;
   sig >>= shift;
-  new_exp += shift;
+  m_exp += shift;
   gcc_checking_assert (sig <= SREAL_MAX_SIG && sig >= SREAL_MIN_SIG);
 
   /* Round the number.  */
@@ -243,17 +243,16 @@ sreal::normalize_down (int64_t new_sig, signed int new_exp)
   if (sig > SREAL_MAX_SIG)
     {
       sig >>= 1;
-      new_exp++;
+      m_exp++;
     }
 
   /* Check overflow.  */
-  if (new_exp > SREAL_MAX_EXP)
+  if (m_exp > SREAL_MAX_EXP)
     {
-      new_exp = SREAL_MAX_EXP;
+      m_exp = SREAL_MAX_EXP;
       sig = SREAL_MAX_SIG;
     }
-  m_exp = new_exp;
-  if (SREAL_SIGN (new_sig) == -1)
+  if (SREAL_SIGN (m_sig) == -1)
     m_sig = -sig;
   else
     m_sig = sig;
@@ -262,24 +261,16 @@ sreal::normalize_down (int64_t new_sig, signed int new_exp)
 /* Normalize *this; the hot path.  */
 
 inline void
-sreal::normalize (int64_t new_sig, signed int new_exp)
+sreal::normalize ()
 {
-  unsigned HOST_WIDE_INT sig = absu_hwi (new_sig);
+  unsigned HOST_WIDE_INT sig = absu_hwi (m_sig);
 
   if (sig == 0)
-    {
-      m_sig = 0;
-      m_exp = -SREAL_MAX_EXP;
-    }
+    m_exp = -SREAL_MAX_EXP;
   else if (sig > SREAL_MAX_SIG)
-    normalize_down (new_sig, new_exp);
+    normalize_down ();
   else if (sig < SREAL_MIN_SIG)
-    normalize_up (new_sig, new_exp);
-  else
-    {
-      m_sig = new_sig;
-      m_exp = new_exp;
-    }
+    normalize_up ();
 }
 
 #endif

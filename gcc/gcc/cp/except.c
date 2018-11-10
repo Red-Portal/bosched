@@ -301,12 +301,12 @@ initialize_handler_parm (tree decl, tree exp)
      adjusted by value from __cxa_begin_catch.  Others are returned by
      reference.  */
   init_type = TREE_TYPE (decl);
-  if (!INDIRECT_TYPE_P (init_type))
+  if (!POINTER_TYPE_P (init_type))
     init_type = build_reference_type (init_type);
 
   /* Since pointers are passed by value, initialize a reference to
      pointer catch parm with the address of the temporary.  */
-  if (TYPE_REF_P (init_type)
+  if (TREE_CODE (init_type) == REFERENCE_TYPE
       && TYPE_PTR_P (TREE_TYPE (init_type)))
     exp = cp_build_addr_expr (exp, tf_warning_or_error);
 
@@ -676,9 +676,12 @@ build_throw (tree exp)
 	  /* Under C++0x [12.8/16 class.copy], a thrown lvalue is sometimes
 	     treated as an rvalue for the purposes of overload resolution
 	     to favor move constructors over copy constructors.  */
-	  if (treat_lvalue_as_rvalue_p (exp, /*parm_ok*/false)
+	  if (/* Must be a local, automatic variable.  */
+	      VAR_P (exp)
+	      && DECL_CONTEXT (exp) == current_function_decl
+	      && ! TREE_STATIC (exp)
 	      /* The variable must not have the `volatile' qualifier.  */
-	      && !CP_TYPE_VOLATILE_P (TREE_TYPE (exp)))
+	      && !(cp_type_quals (TREE_TYPE (exp)) & TYPE_QUAL_VOLATILE))
 	    {
 	      tree moved = move (exp);
 	      exp_vec = make_tree_vector_single (moved);
@@ -799,7 +802,7 @@ complete_ptr_ref_or_void_ptr_p (tree type, tree from)
 
   /* Or a pointer or ref to one, or cv void *.  */
   is_ptr = TYPE_PTR_P (type);
-  if (is_ptr || TYPE_REF_P (type))
+  if (is_ptr || TREE_CODE (type) == REFERENCE_TYPE)
     {
       tree core = TREE_TYPE (type);
 
@@ -843,7 +846,7 @@ is_admissible_throw_operand_or_catch_parameter (tree t, bool is_throw)
   else if (abstract_virtuals_error (is_throw ? ACU_THROW : ACU_CATCH, type))
     return false;
   else if (!is_throw
-	   && TYPE_REF_P (type)
+	   && TREE_CODE (type) == REFERENCE_TYPE
 	   && TYPE_REF_IS_RVALUE (type))
     {
       error ("cannot declare catch parameter to be of rvalue "
@@ -1021,7 +1024,7 @@ check_noexcept_r (tree *tp, int * /*walk_subtrees*/, void * /*data*/)
          We could use TREE_NOTHROW (t) for !TREE_PUBLIC fns, though... */
       tree fn = cp_get_callee (t);
       tree type = TREE_TYPE (fn);
-      gcc_assert (INDIRECT_TYPE_P (type));
+      gcc_assert (POINTER_TYPE_P (type));
       type = TREE_TYPE (type);
 
       STRIP_NOPS (fn);
@@ -1187,7 +1190,7 @@ type_throw_all_p (const_tree type)
    constant-expression of EXPR.  COMPLAIN is as for tsubst.  */
 
 tree
-build_noexcept_spec (tree expr, tsubst_flags_t complain)
+build_noexcept_spec (tree expr, int complain)
 {
   /* This isn't part of the signature, so don't bother trying to evaluate
      it until instantiation.  */

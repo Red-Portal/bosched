@@ -182,7 +182,7 @@ class line_event
 {
  public:
   line_event (int start, int next, int len) : m_start (start),
-    m_delta (len - (next - start)) {}
+    m_next (next), m_delta (len - (next - start)) {}
 
   int get_effective_column (int orig_column) const
   {
@@ -194,6 +194,7 @@ class line_event
 
  private:
   int m_start;
+  int m_next;
   int m_delta;
 };
 
@@ -421,10 +422,12 @@ edited_file::print_content (pretty_printer *pp)
 	el->print_content (pp);
       else
 	{
-	  char_span line = location_get_source_line (m_filename, line_num);
+	  int len;
+	  const char *line
+	    = location_get_source_line (m_filename, line_num, &len);
 	  if (!line)
 	    return false;
-	  for (size_t i = 0; i < line.length (); i++)
+	  for (int i = 0; i < len; i++)
 	    pp_character (pp, line[i]);
 	}
       if (line_num < line_count)
@@ -540,8 +543,10 @@ edited_file::print_diff_hunk (pretty_printer *pp, int old_start_of_hunk,
       else
 	{
 	  /* Unchanged line.  */
-	  char_span old_line = location_get_source_line (m_filename, line_num);
-	  print_diff_line (pp, ' ', old_line.get_buffer (), old_line.length ());
+	  int line_len;
+	  const char *old_line
+	    = location_get_source_line (m_filename, line_num, &line_len);
+	  print_diff_line (pp, ' ', old_line, line_len);
 	  line_num++;
 	}
     }
@@ -569,9 +574,10 @@ edited_file::print_run_of_changed_lines (pretty_printer *pp,
       gcc_assert (el_in_run);
       if (el_in_run->actually_edited_p ())
 	{
-	  char_span old_line = location_get_source_line (m_filename, line_num);
-	  print_diff_line (pp, '-', old_line.get_buffer (),
-			   old_line.length ());
+	  int line_len;
+	  const char *old_line
+	    = location_get_source_line (m_filename, line_num, &line_len);
+	  print_diff_line (pp, '-', old_line, line_len);
 	}
     }
   pp_string (pp, colorize_stop (pp_show_color (pp)));
@@ -665,8 +671,10 @@ edited_file::get_num_lines (bool *missing_trailing_newline)
       m_num_lines = 0;
       while (true)
 	{
-	  char_span line
-	    = location_get_source_line (m_filename, m_num_lines + 1);
+	  int line_size;
+	  const char *line
+	    = location_get_source_line (m_filename, m_num_lines + 1,
+					&line_size);
 	  if (line)
 	    m_num_lines++;
 	  else
@@ -687,12 +695,12 @@ edited_line::edited_line (const char *filename, int line_num)
   m_line_events (),
   m_predecessors ()
 {
-  char_span line = location_get_source_line (filename, line_num);
+  const char *line = location_get_source_line (filename, line_num,
+					       &m_len);
   if (!line)
     return;
-  m_len = line.length ();
   ensure_capacity (m_len);
-  memcpy (m_content, line.get_buffer (), m_len);
+  memcpy (m_content, line, m_len);
   ensure_terminated ();
 }
 

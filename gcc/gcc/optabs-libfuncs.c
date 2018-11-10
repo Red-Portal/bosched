@@ -719,10 +719,10 @@ struct libfunc_decl_hasher : ggc_ptr_hash<tree_node>
 /* A table of previously-created libfuncs, hashed by name.  */
 static GTY (()) hash_table<libfunc_decl_hasher> *libfunc_decls;
 
-/* Build a decl for a libfunc named NAME with visibility VIS.  */
+/* Build a decl for a libfunc named NAME.  */
 
 tree
-build_libfunc_function_visibility (const char *name, symbol_visibility vis)
+build_libfunc_function (const char *name)
 {
   /* ??? We don't have any type information; pretend this is "int foo ()".  */
   tree decl = build_decl (UNKNOWN_LOCATION, FUNCTION_DECL,
@@ -731,7 +731,7 @@ build_libfunc_function_visibility (const char *name, symbol_visibility vis)
   DECL_EXTERNAL (decl) = 1;
   TREE_PUBLIC (decl) = 1;
   DECL_ARTIFICIAL (decl) = 1;
-  DECL_VISIBILITY (decl) = vis;
+  DECL_VISIBILITY (decl) = VISIBILITY_DEFAULT;
   DECL_VISIBILITY_SPECIFIED (decl) = 1;
   gcc_assert (DECL_ASSEMBLER_NAME (decl));
 
@@ -742,19 +742,11 @@ build_libfunc_function_visibility (const char *name, symbol_visibility vis)
   return decl;
 }
 
-/* Build a decl for a libfunc named NAME.  */
-
-tree
-build_libfunc_function (const char *name)
-{
-  return build_libfunc_function_visibility (name, VISIBILITY_DEFAULT);
-}
-
 /* Return a libfunc for NAME, creating one if we don't already have one.
-   The decl is given visibility VIS.  The returned rtx is a SYMBOL_REF.  */
+   The returned rtx is a SYMBOL_REF.  */
 
 rtx
-init_one_libfunc_visibility (const char *name, symbol_visibility vis)
+init_one_libfunc (const char *name)
 {
   tree id, decl;
   hashval_t hash;
@@ -771,16 +763,10 @@ init_one_libfunc_visibility (const char *name, symbol_visibility vis)
     {
       /* Create a new decl, so that it can be passed to
 	 targetm.encode_section_info.  */
-      decl = build_libfunc_function_visibility (name, vis);
+      decl = build_libfunc_function (name);
       *slot = decl;
     }
   return XEXP (DECL_RTL (decl), 0);
-}
-
-rtx
-init_one_libfunc (const char *name)
-{
-  return init_one_libfunc_visibility (name, VISIBILITY_DEFAULT);
 }
 
 /* Adjust the assembler name of libfunc NAME to ASMSPEC.  */

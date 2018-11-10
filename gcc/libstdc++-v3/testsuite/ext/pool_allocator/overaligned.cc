@@ -17,7 +17,6 @@
 
 // { dg-options "-faligned-new" }
 // { dg-do run { target c++11 } }
-// { dg-require-cstdint "" }
 
 #include <ext/pool_allocator.h>
 #include <cstddef>

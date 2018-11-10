@@ -661,7 +661,6 @@ test_expansion_to_rtl ()
   ASSERT_STR_CONTAINS (dump, ") ;; function \"test_fn\"\n");
 
   free (dump);
-  free_after_compilation (fun);
 }
 
 /* Run all of the selftests within this file.  */

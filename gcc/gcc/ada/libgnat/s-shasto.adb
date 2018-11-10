@@ -507,9 +507,9 @@ package body System.Shared_Storage is
          raise;
    end Shared_Var_Unlock;
 
-   ----------------------
-   -- Shared_Var_WOpen --
-   ----------------------
+   ---------------------
+   -- Share_Var_WOpen --
+   ---------------------
 
    function Shared_Var_WOpen (Var : String) return SIO.Stream_Access is
       SFE : Shared_Var_File_Entry_Ptr;

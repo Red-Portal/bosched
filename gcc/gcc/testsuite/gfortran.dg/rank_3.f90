@@ -3,5 +3,5 @@
 !
 ! PR fortran/48820
 !
-intrinsic :: rank  ! { dg-error "new in Fortran 2018" }
+intrinsic :: rank  ! { dg-error "new in TS 29113" }
 end

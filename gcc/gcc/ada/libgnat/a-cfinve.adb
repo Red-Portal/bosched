@@ -426,9 +426,9 @@ is
       end;
    end Element;
 
-   -----------
-   -- Elems --
-   -----------
+   --------------
+   -- Elements --
+   --------------
 
    function Elems (Container : in out Vector) return Maximal_Array_Ptr is
    begin
@@ -590,7 +590,7 @@ is
       end M_Elements_Reversed;
 
       ------------------------
-      -- M_Elements_Swapped --
+      -- M_Elements_Swapted --
       ------------------------
 
       function M_Elements_Swapped

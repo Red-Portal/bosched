@@ -397,7 +397,6 @@ package Sem_Prag is
    --    Extensions_Visible
    --    Global
    --    Initializes
-   --    Max_Entry_Queue_Depth
    --    Max_Queue_Length
    --    Post
    --    Post_Class

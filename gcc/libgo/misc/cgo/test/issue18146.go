@@ -22,10 +22,6 @@ import (
 )
 
 func test18146(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping in short mode")
-	}
-
 	if runtime.GOOS == "darwin" {
 		t.Skipf("skipping flaky test on %s; see golang.org/issue/18202", runtime.GOOS)
 	}
@@ -36,6 +32,10 @@ func test18146(t *testing.T) {
 
 	attempts := 1000
 	threads := 4
+
+	if testing.Short() {
+		attempts = 100
+	}
 
 	// Restrict the number of attempts based on RLIMIT_NPROC.
 	// Tediously, RLIMIT_NPROC was left out of the syscall package,

@@ -28,32 +28,24 @@ import (
 
 var calibrate = flag.Bool("calibrate", false, "run calibration test")
 
-const (
-	sqrModeMul       = "mul(x, x)"
-	sqrModeBasic     = "basicSqr(x)"
-	sqrModeKaratsuba = "karatsubaSqr(x)"
-)
-
 func TestCalibrate(t *testing.T) {
-	if !*calibrate {
-		return
-	}
+	if *calibrate {
+		computeKaratsubaThresholds()
 
-	computeKaratsubaThresholds()
-
-	// compute basicSqrThreshold where overhead becomes negligible
-	minSqr := computeSqrThreshold(10, 30, 1, 3, sqrModeMul, sqrModeBasic)
-	// compute karatsubaSqrThreshold where karatsuba is faster
-	maxSqr := computeSqrThreshold(200, 500, 10, 3, sqrModeBasic, sqrModeKaratsuba)
-	if minSqr != 0 {
-		fmt.Printf("found basicSqrThreshold = %d\n", minSqr)
-	} else {
-		fmt.Println("no basicSqrThreshold found")
-	}
-	if maxSqr != 0 {
-		fmt.Printf("found karatsubaSqrThreshold = %d\n", maxSqr)
-	} else {
-		fmt.Println("no karatsubaSqrThreshold found")
+		// compute basicSqrThreshold where overhead becomes negligible
+		minSqr := computeSqrThreshold(10, 30, 1, 3)
+		// compute karatsubaSqrThreshold where karatsuba is faster
+		maxSqr := computeSqrThreshold(300, 500, 10, 3)
+		if minSqr != 0 {
+			fmt.Printf("found basicSqrThreshold = %d\n", minSqr)
+		} else {
+			fmt.Println("no basicSqrThreshold found")
+		}
+		if maxSqr != 0 {
+			fmt.Printf("found karatsubaSqrThreshold = %d\n", maxSqr)
+		} else {
+			fmt.Println("no karatsubaSqrThreshold found")
+		}
 	}
 }
 
@@ -117,17 +109,16 @@ func computeKaratsubaThresholds() {
 	}
 }
 
-func measureSqr(words, nruns int, mode string) time.Duration {
+func measureBasicSqr(words, nruns int, enable bool) time.Duration {
 	// more runs for better statistics
 	initBasicSqr, initKaratsubaSqr := basicSqrThreshold, karatsubaSqrThreshold
 
-	switch mode {
-	case sqrModeMul:
-		basicSqrThreshold = words + 1
-	case sqrModeBasic:
+	if enable {
+		// set thresholds to use basicSqr at this number of words
 		basicSqrThreshold, karatsubaSqrThreshold = words-1, words+1
-	case sqrModeKaratsuba:
-		karatsubaSqrThreshold = words - 1
+	} else {
+		// set thresholds to disable basicSqr for any number of words
+		basicSqrThreshold, karatsubaSqrThreshold = -1, -1
 	}
 
 	var testval int64
@@ -142,18 +133,18 @@ func measureSqr(words, nruns int, mode string) time.Duration {
 	return time.Duration(testval)
 }
 
-func computeSqrThreshold(from, to, step, nruns int, lower, upper string) int {
-	fmt.Printf("Calibrating threshold between %s and %s\n", lower, upper)
+func computeSqrThreshold(from, to, step, nruns int) int {
+	fmt.Println("Calibrating thresholds for basicSqr via benchmarks of z.mul(x,x)")
 	fmt.Printf("Looking for a timing difference for x between %d - %d words by %d step\n", from, to, step)
 	var initPos bool
 	var threshold int
 	for i := from; i <= to; i += step {
-		baseline := measureSqr(i, nruns, lower)
-		testval := measureSqr(i, nruns, upper)
+		baseline := measureBasicSqr(i, nruns, false)
+		testval := measureBasicSqr(i, nruns, true)
 		pos := baseline > testval
 		delta := baseline - testval
 		percent := delta * 100 / baseline
-		fmt.Printf("words = %3d deltaT = %10s (%4d%%) is %s better: %v", i, delta, percent, upper, pos)
+		fmt.Printf("words = %3d deltaT = %10s (%4d%%) is basicSqr better: %v", i, delta, percent, pos)
 		if i == from {
 			initPos = pos
 		}

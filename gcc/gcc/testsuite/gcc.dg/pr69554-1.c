@@ -12,9 +12,6 @@ int test_1 (const char *p, const char *q)
 /* { dg-begin-multiline-output "" }
    return (p + 1) + (q + 1);
           ~~~~~~~ ^ ~~~~~~~
-             |         |
-             |         const char *
-             const char *
    { dg-end-multiline-output "" } */
 }
 
@@ -29,14 +26,10 @@ int test_2 (const char *p, const char *q)
 /* { dg-begin-multiline-output "" }
    return (p + 1)
           ~~~~~~~
-             |
-             const char *
             +
             ^
              (q + 1);
              ~~~~~~~
-                |
-                const char *
    { dg-end-multiline-output "" } */
 }
 
@@ -50,20 +43,16 @@ int test_3 (const char *p, const char *q)
 
            +  /* { dg-error "invalid operands" } */
              (q + 1);
-/* { dg-locus "12" "" { target *-*-* } "51" } */
+/* { dg-locus "12" "" { target *-*-* } "44" } */
 /* { dg-begin-multiline-output "" }
    return (p + 1)
           ~~~~~~~
-             |
-             const char *
    { dg-end-multiline-output "" } */
 /* { dg-begin-multiline-output "" }
             +
             ^
               (q + 1);
               ~~~~~~~
-                 |
-                 const char *
    { dg-end-multiline-output "" } */
 }
 
@@ -79,16 +68,12 @@ int test_4 (const char *p, const char *q)
 /* { dg-begin-multiline-output "" }
    return (p + 1)
           ~~~~~~~
-             |
-             const char *
             +
             ^
    { dg-end-multiline-output "" } */
 /* { dg-begin-multiline-output "" }
               (q + 1);
               ~~~~~~~
-                 |
-                 const char *
    { dg-end-multiline-output "" } */
 }
 
@@ -103,12 +88,10 @@ int test_5 (const char *p, const char *q)
            +  /* { dg-error "invalid operands" } */
 
              (q + 1); /* { dg-locus "14" } */
-/* { dg-locus "12" "" { target *-*-* } "103" } */
+/* { dg-locus "12" "" { target *-*-* } "88" } */
 /* { dg-begin-multiline-output "" }
    return (p + 1)
           ~~~~~~~
-             |
-             const char *
    { dg-end-multiline-output "" } */
 /* { dg-begin-multiline-output "" }
             +
@@ -117,8 +100,6 @@ int test_5 (const char *p, const char *q)
 /* { dg-begin-multiline-output "" }
               (q + 1);
               ~~~~~~~
-                 |
-                 const char *
    { dg-end-multiline-output "" } */
 }
 
@@ -155,12 +136,10 @@ int test_6 (const char *p, const char *q)
 	     fringilla sapien elit vitae nisl. Fusce mattis commodo risus
 	     nec convallis. */
              (q + 1); /* { dg-locus "14" } */
-/* { dg-locus "12" "" { target *-*-* } "144" } */
+/* { dg-locus "12" "" { target *-*-* } "125" } */
 /* { dg-begin-multiline-output "" }
    return (p + 1)
           ~~~~~~~
-             |
-             const char *
    { dg-end-multiline-output "" } */
 /* { dg-begin-multiline-output "" }
             +
@@ -169,7 +148,5 @@ int test_6 (const char *p, const char *q)
 /* { dg-begin-multiline-output "" }
               (q + 1);
               ~~~~~~~
-                 |
-                 const char *
    { dg-end-multiline-output "" } */
 }

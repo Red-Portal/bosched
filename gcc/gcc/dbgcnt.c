@@ -41,84 +41,53 @@ static struct string2counter_map map[debug_counter_number_of_counters] =
 #undef DEBUG_COUNTER
 
 #define DEBUG_COUNTER(a) UINT_MAX,
-static unsigned int limit_high[debug_counter_number_of_counters] =
+static unsigned int limit[debug_counter_number_of_counters] =
 {
 #include "dbgcnt.def"
 };
 #undef DEBUG_COUNTER
-
-static unsigned int limit_low[debug_counter_number_of_counters];
 
 static unsigned int count[debug_counter_number_of_counters];
 
 bool
 dbg_cnt_is_enabled (enum debug_counter index)
 {
-  unsigned v = count[index];
-  return v > limit_low[index] && v <= limit_high[index];
+  return count[index] <= limit[index];
 }
 
 bool
 dbg_cnt (enum debug_counter index)
 {
   count[index]++;
-
-  if (dump_file)
-    {
-      /* Do not print the info for default lower limit.  */
-      if (count[index] == limit_low[index] && limit_low[index] > 0)
-	fprintf (dump_file, "***dbgcnt: lower limit %d reached for %s.***\n",
-		 limit_low[index], map[index].name);
-      else if (count[index] == limit_high[index])
-	fprintf (dump_file, "***dbgcnt: upper limit %d reached for %s.***\n",
-		 limit_high[index], map[index].name);
-    }
+  if (dump_file && count[index] == limit[index])
+    fprintf (dump_file, "***dbgcnt: limit reached for %s.***\n",
+	     map[index].name);
 
   return dbg_cnt_is_enabled (index);
 }
 
-static void
-dbg_cnt_set_limit_by_index (enum debug_counter index, int low, int high)
-{
-  limit_low[index] = low;
-  limit_high[index] = high;
 
-  fprintf (stderr, "dbg_cnt '%s' set to %d-%d\n", map[index].name, low, high);
+static void
+dbg_cnt_set_limit_by_index (enum debug_counter index, int value)
+{
+  limit[index] = value;
+
+  fprintf (stderr, "dbg_cnt '%s' set to %d\n", map[index].name, value);
 }
 
 static bool
-dbg_cnt_set_limit_by_name (const char *name, int low, int high)
+dbg_cnt_set_limit_by_name (const char *name, int len, int value)
 {
-  if (high < low)
-    {
-      error ("-fdbg-cnt=%s:%d:%d has smaller upper limit than the lower",
-	     name, low, high);
-      return false;
-    }
-
-  if (low < 0)
-    {
-      error ("Lower limit %d of -fdbg-cnt=%s must be a non-negative number", low,
-	     name);
-      return false;
-    }
-
-  if (high < 0)
-    {
-      error ("Upper limit %d of -fdbg-cnt=%s must be a non-negative number", high,
-	     name);
-      return false;
-    }
-
   int i;
   for (i = debug_counter_number_of_counters - 1; i >= 0; i--)
-    if (strcmp (map[i].name, name) == 0)
+    if (strncmp (map[i].name, name, len) == 0
+        && map[i].name[len] == '\0')
       break;
 
   if (i < 0)
     return false;
 
-  dbg_cnt_set_limit_by_index ((enum debug_counter) i, low, high);
+  dbg_cnt_set_limit_by_index ((enum debug_counter) i, value);
   return true;
 }
 
@@ -127,53 +96,42 @@ dbg_cnt_set_limit_by_name (const char *name, int low, int high)
    Returns NULL if there's no valid pair is found.
    Otherwise returns a pointer to the end of the pair. */
 
-static bool
+static const char *
 dbg_cnt_process_single_pair (const char *arg)
 {
-  char *str = xstrdup (arg);
-  char *name = strtok (str, ":");
-  char *value1 = strtok (NULL, ":");
-  char *value2 = strtok (NULL, ":");
+   const char *colon = strchr (arg, ':');
+   char *endptr = NULL;
+   int value;
 
-  int high, low;
+   if (colon == NULL)
+     return NULL;
 
-  if (value1 == NULL)
-    return false;
+   value = strtol (colon + 1, &endptr, 10);
 
-  if (value2 == NULL)
-    {
-      low = 0;
-      high = strtol (value1, NULL, 10);
-    }
-  else
-    {
-      low = strtol (value1, NULL, 10);
-      high = strtol (value2, NULL, 10);
-    }
+   if (endptr != NULL && endptr != colon + 1
+       && dbg_cnt_set_limit_by_name (arg, colon - arg, value))
+     return endptr;
 
-   return dbg_cnt_set_limit_by_name (name, low, high);
+   return NULL;
 }
 
 void
 dbg_cnt_process_opt (const char *arg)
 {
-  char *str = xstrdup (arg);
-  const char *next = strtok (str, ",");
-  unsigned int start = 0;
-
+   const char *start = arg;
+   const char *next;
    do {
-     if (!dbg_cnt_process_single_pair (arg))
+     next = dbg_cnt_process_single_pair (arg);
+     if (next == NULL)
        break;
-     start += strlen (arg) + 1;
-     next = strtok (NULL, ",");
-   } while (next != NULL);
+   } while (*next == ',' && (arg = next + 1));
 
-   if (next != NULL)
+   if (next == NULL || *next != 0)
      {
-       char *buffer = XALLOCAVEC (char, start + 2);
-       sprintf (buffer, "%*c", start + 1, '^');
+       char *buffer = XALLOCAVEC (char, arg - start + 2);
+       sprintf (buffer, "%*c", (int)(1 + (arg - start)), '^');
        error ("cannot find a valid counter:value pair:");
-       error ("-fdbg-cnt=%s", next);
+       error ("-fdbg-cnt=%s", start);
        error ("          %s", buffer);
      }
 }
@@ -184,11 +142,10 @@ void
 dbg_cnt_list_all_counters (void)
 {
   int i;
-  printf ("  %-32s %-11s %-12s\n", "counter name",  "low limit",
-	  "high limit");
-  printf ("-----------------------------------------------------------------\n");
+  printf ("  %-30s %-5s %-5s\n", "counter name",  "limit", "value");
+  printf ("----------------------------------------------\n");
   for (i = 0; i < debug_counter_number_of_counters; i++)
-    printf ("  %-30s %11u %12u\n",
-	    map[i].name, limit_low[map[i].counter], limit_high[map[i].counter]);
+    printf ("  %-30s %5d %5u\n",
+            map[i].name, limit[map[i].counter], count[map[i].counter]);
   printf ("\n");
 }

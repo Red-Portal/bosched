@@ -3,6 +3,5 @@
 
 struct A
 {
-  static virtual int i = 0;	// { dg-error "10:member .i. cannot be declared both .virtual. and .static." }
-  // { dg-error "declared as" "" { target *-*-* } .-1 }
+  static virtual int i = 0;	// { dg-error "both 'virtual' and 'static'|declared as" }
 };

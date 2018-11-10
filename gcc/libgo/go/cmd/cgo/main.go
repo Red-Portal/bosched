@@ -17,7 +17,6 @@ import (
 	"go/ast"
 	"go/printer"
 	"go/token"
-	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -43,11 +42,9 @@ type Package struct {
 	Name        map[string]*Name // accumulated Name from Files
 	ExpFunc     []*ExpFunc       // accumulated ExpFunc from Files
 	Decl        []ast.Decl
-	GoFiles     []string        // list of Go files
-	GccFiles    []string        // list of gcc output files
-	Preamble    string          // collected preamble for _cgo_export.h
-	typedefs    map[string]bool // type names that appear in the types of the objects we're interested in
-	typedefList []string
+	GoFiles     []string // list of Go files
+	GccFiles    []string // list of gcc output files
+	Preamble    string   // collected preamble for _cgo_export.h
 }
 
 // A File collects information about a single Go input file.
@@ -168,7 +165,6 @@ var ptrSizeMap = map[string]int64{
 	"mips64le":    8,
 	"mips64p32":   4,
 	"mips64p32le": 4,
-	"nios2":       4,
 	"ppc":         4,
 	"ppc64":       8,
 	"ppc64le":     8,
@@ -194,7 +190,6 @@ var intSizeMap = map[string]int64{
 	"mips64le":    8,
 	"mips64p32":   8,
 	"mips64p32le": 8,
-	"nios2":       4,
 	"ppc":         4,
 	"ppc64":       8,
 	"ppc64le":     8,
@@ -229,8 +224,6 @@ var exportHeader = flag.String("exportheader", "", "where to write export header
 var gccgo = flag.Bool("gccgo", false, "generate files for use with gccgo")
 var gccgoprefix = flag.String("gccgoprefix", "", "-fgo-prefix option used with gccgo")
 var gccgopkgpath = flag.String("gccgopkgpath", "", "-fgo-pkgpath option used with gccgo")
-var gccgoMangleCheckDone bool
-var gccgoNewmanglingInEffect bool
 var importRuntimeCgo = flag.Bool("import_runtime_cgo", true, "import runtime/cgo in generated code")
 var importSyscall = flag.Bool("import_syscall", true, "import syscall in generated code")
 var goarch, goos string
@@ -283,9 +276,6 @@ func main() {
 		if arg == "-fsanitize=thread" {
 			tsanProlog = yesTsanProlog
 		}
-		if arg == "-fsanitize=memory" {
-			msanProlog = yesMsanProlog
-		}
 	}
 
 	p := newPackage(args[:i])
@@ -305,7 +295,6 @@ func main() {
 	// concern is other cgo wrappers for the same functions.
 	// Use the beginning of the md5 of the input to disambiguate.
 	h := md5.New()
-	io.WriteString(h, *importPath)
 	fs := make([]*File, len(goFiles))
 	for i, input := range goFiles {
 		if *srcDir != "" {
@@ -419,14 +408,6 @@ func (p *Package) Record(f *File) {
 		for k, v := range f.Name {
 			if p.Name[k] == nil {
 				p.Name[k] = v
-			} else if p.incompleteTypedef(p.Name[k].Type) {
-				p.Name[k] = v
-			} else if p.incompleteTypedef(v.Type) {
-				// Nothing to do.
-			} else if _, ok := nameToC[k]; ok {
-				// Names we predefine may appear inconsistent
-				// if some files typedef them and some don't.
-				// Issue 26743.
 			} else if !reflect.DeepEqual(p.Name[k], v) {
 				error_(token.NoPos, "inconsistent definitions for C.%s", fixGo(k))
 			}
@@ -438,10 +419,4 @@ func (p *Package) Record(f *File) {
 		p.Preamble += "\n" + f.Preamble
 	}
 	p.Decl = append(p.Decl, f.AST.Decls...)
-}
-
-// incompleteTypedef reports whether t appears to be an incomplete
-// typedef definition.
-func (p *Package) incompleteTypedef(t *Type) bool {
-	return t == nil || (t.Size == 0 && t.Align == -1)
 }

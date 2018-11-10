@@ -20,7 +20,9 @@ along with GCC; see the file COPYING3.  If not see
 #ifndef GCC_TREE_SSA_COALESCE_H
 #define GCC_TREE_SSA_COALESCE_H
 
-extern void coalesce_ssa_name (var_map);
+extern var_map coalesce_ssa_name (void);
 extern bool gimple_can_coalesce_p (tree, tree);
+extern bitmap get_parm_default_def_partitions (var_map);
+extern bitmap get_undefined_value_partitions (var_map);
 
 #endif /* GCC_TREE_SSA_COALESCE_H */

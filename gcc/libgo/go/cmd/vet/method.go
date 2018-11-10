@@ -166,7 +166,9 @@ func (f *File) matchParams(expect []string, actual []ast.Expr, prefix string) bo
 
 // Does this one type match?
 func (f *File) matchParamType(expect string, actual ast.Expr) bool {
-	expect = strings.TrimPrefix(expect, "=")
+	if strings.HasPrefix(expect, "=") {
+		expect = expect[1:]
+	}
 	// Strip package name if we're in that package.
 	if n := len(f.file.Name.Name); len(expect) > n && expect[:n] == f.file.Name.Name && expect[n] == '.' {
 		expect = expect[n+1:]

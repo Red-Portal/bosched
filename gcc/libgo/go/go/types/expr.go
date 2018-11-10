@@ -382,7 +382,7 @@ func (check *Checker) updateExprType(x ast.Expr, typ Type, final bool) {
 		// The respective sub-expressions got their final types
 		// upon assignment or use.
 		if debug {
-			check.dump("%v: found old type(%s): %s (new: %s)", x.Pos(), x, old.typ, typ)
+			check.dump("%s: found old type(%s): %s (new: %s)", x.Pos(), x, old.typ, typ)
 			unreachable()
 		}
 		return
@@ -1030,15 +1030,16 @@ func (check *Checker) exprInternal(x *operand, e ast.Expr, hint Type) exprKind {
 			// Anonymous functions are considered part of the
 			// init expression/func declaration which contains
 			// them: use existing package-level declaration info.
-			decl := check.decl // capture for use in closure below
-			iota := check.iota // capture for use in closure below (#22345)
-			// Don't type-check right away because the function may
-			// be part of a type definition to which the function
-			// body refers. Instead, type-check as soon as possible,
-			// but before the enclosing scope contents changes (#22992).
-			check.later(func() {
-				check.funcBody(decl, "<function literal>", sig, e.Body, iota)
-			})
+			//
+			// TODO(gri) We delay type-checking of regular (top-level)
+			//           function bodies until later. Why don't we do
+			//           it for closures of top-level expressions?
+			//           (We can't easily do it for local closures
+			//           because the surrounding scopes must reflect
+			//           the exact position where the closure appears
+			//           in the source; e.g., variables declared below
+			//           must not be visible).
+			check.funcBody(check.decl, "", sig, e.Body)
 			x.mode = value
 			x.typ = sig
 		} else {
@@ -1064,7 +1065,7 @@ func (check *Checker) exprInternal(x *operand, e ast.Expr, hint Type) exprKind {
 					break
 				}
 			}
-			typ = check.typExpr(e.Type, nil, nil)
+			typ = check.typ(e.Type)
 			base = typ
 
 		case hint != nil:
@@ -1094,9 +1095,6 @@ func (check *Checker) exprInternal(x *operand, e ast.Expr, hint Type) exprKind {
 						continue
 					}
 					key, _ := kv.Key.(*ast.Ident)
-					// do all possible checks early (before exiting due to errors)
-					// so we don't drop information on the floor
-					check.expr(x, kv.Value)
 					if key == nil {
 						check.errorf(kv.Pos(), "invalid field name %s in struct literal", kv.Key)
 						continue
@@ -1108,14 +1106,15 @@ func (check *Checker) exprInternal(x *operand, e ast.Expr, hint Type) exprKind {
 					}
 					fld := fields[i]
 					check.recordUse(key, fld)
-					etyp := fld.typ
-					check.assignment(x, etyp, "struct literal")
 					// 0 <= i < len(fields)
 					if visited[i] {
 						check.errorf(kv.Pos(), "duplicate field name %s in struct literal", key.Name)
 						continue
 					}
 					visited[i] = true
+					check.expr(x, kv.Value)
+					etyp := fld.typ
+					check.assignment(x, etyp, "struct literal")
 				}
 			} else {
 				// no element must have a key
@@ -1433,7 +1432,7 @@ func (check *Checker) exprInternal(x *operand, e ast.Expr, hint Type) exprKind {
 			check.invalidAST(e.Pos(), "use of .(type) outside type switch")
 			goto Error
 		}
-		T := check.typExpr(e.Type, nil, nil)
+		T := check.typ(e.Type)
 		if T == Typ[Invalid] {
 			goto Error
 		}

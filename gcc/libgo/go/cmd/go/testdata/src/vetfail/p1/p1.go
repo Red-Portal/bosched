@@ -1,5 +1,3 @@
-// +build !foo-bar
-
 package p1
 
 import "fmt"

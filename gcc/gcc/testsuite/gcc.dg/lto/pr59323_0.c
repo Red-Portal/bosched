@@ -1,6 +1,6 @@
 /* { dg-lto-do link } */
 /* { dg-lto-options { { -O2 -g -flto } } } */
-/* { dg-extra-ld-options { -r -nostdlib -flinker-output=nolto-rel } } */
+/* { dg-extra-ld-options { -r -nostdlib } } */
 
 extern void bar(void);
 

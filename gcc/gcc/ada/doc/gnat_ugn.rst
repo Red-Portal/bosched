@@ -14,7 +14,7 @@ GNAT User's Guide for Native Platforms
 
     .. only:: GPL
 
-       *GNAT Community Edition*
+       *GNAT GPL Edition*
 
        | Version |version|
        | Date: |today|

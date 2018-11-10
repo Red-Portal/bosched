@@ -256,11 +256,26 @@ Gogo::Gogo(Backend* backend, Linemap* linemap, int, int pointer_size)
   this->globals_->add_function_declaration("delete", NULL, delete_type, loc);
 }
 
+// Convert a pkgpath into a string suitable for a symbol.  Note that
+// this transformation is convenient but imperfect.  A -fgo-pkgpath
+// option of a/b_c will conflict with a -fgo-pkgpath option of a_b/c,
+// possibly leading to link time errors.
+
 std::string
 Gogo::pkgpath_for_symbol(const std::string& pkgpath)
 {
-  go_assert(!pkgpath.empty());
-  return go_encode_id(pkgpath);
+  std::string s = pkgpath;
+  for (size_t i = 0; i < s.length(); ++i)
+    {
+      char c = s[i];
+      if ((c >= 'a' && c <= 'z')
+	  || (c >= 'A' && c <= 'Z')
+	  || (c >= '0' && c <= '9'))
+	;
+      else
+	s[i] = '_';
+    }
+  return s;
 }
 
 // Get the package path to use for type reflection data.  This should
@@ -302,32 +317,6 @@ Gogo::set_prefix(const std::string& arg)
   go_assert(!this->prefix_from_option_);
   this->prefix_ = arg;
   this->prefix_from_option_ = true;
-}
-
-// Given a name which may or may not have been hidden, append the
-// appropriate version of the name to the result string. Take care
-// to avoid creating a sequence that will be rejected by go_encode_id
-// (avoid ..u, ..U, ..z).
-void
-Gogo::append_possibly_hidden_name(std::string *result, const std::string& name)
-{
-  // FIXME: This adds in pkgpath twice for hidden symbols, which is
-  // less than ideal.
-  if (!Gogo::is_hidden_name(name))
-    (*result) += name;
-  else
-    {
-      std::string n = ".";
-      std::string pkgpath = Gogo::hidden_name_pkgpath(name);
-      char lastR = result->at(result->length() - 1);
-      char firstP = pkgpath.at(0);
-      if (lastR == '.' && (firstP == 'u' || firstP == 'U' || firstP == 'z'))
-        n = "_.";
-      n.append(pkgpath);
-      n.append(1, '.');
-      n.append(Gogo::unpack_hidden_name(name));
-      (*result) += n;
-    }
 }
 
 // Munge name for use in an error message.
@@ -719,12 +708,10 @@ Gogo::init_imports(std::vector<Bstatement*>& init_stmts, Bfunction *bfunction)
       const Import_init* ii = *p;
       std::string user_name = ii->package_name() + ".init";
       const std::string& init_name(ii->init_name());
-      const unsigned int flags =
-	(Backend::function_is_visible
-	 | Backend::function_is_declaration
-	 | Backend::function_is_inlinable);
+
       Bfunction* pfunc = this->backend()->function(fntype, user_name, init_name,
-						   flags, unknown_loc);
+                                                   true, true, true, false,
+                                                   false, false, unknown_loc);
       Bexpression* pfunc_code =
           this->backend()->function_code_expression(pfunc, unknown_loc);
       Bexpression* pfunc_call =
@@ -923,52 +910,43 @@ Gogo::create_initialization_function(Named_object* initfn,
   return initfn;
 }
 
-// Given an expression, collect all the global variables defined in
-// this package that it references.
+// Search for references to VAR in any statements or called functions.
 
-class Find_vars : public Traverse
+class Find_var : public Traverse
 {
- private:
-  // The list of variables we accumulate.
-  typedef Unordered_set(Named_object*) Vars;
-
-  // A hash table we use to avoid looping.  The index is a
-  // Named_object* or a Temporary_statement*.  We only look through
-  // objects defined in this package.
+ public:
+  // A hash table we use to avoid looping.  The index is the name of a
+  // named object.  We only look through objects defined in this
+  // package.
   typedef Unordered_set(const void*) Seen_objects;
 
- public:
-  Find_vars()
+  Find_var(Named_object* var, Seen_objects* seen_objects)
     : Traverse(traverse_expressions),
-      vars_(), seen_objects_()
+      var_(var), seen_objects_(seen_objects), found_(false)
   { }
 
-  // An iterator through the variables found, after the traversal.
-  typedef Vars::const_iterator const_iterator;
-
-  const_iterator
-  begin() const
-  { return this->vars_.begin(); }
-
-  const_iterator
-  end() const
-  { return this->vars_.end(); }
+  // Whether the variable was found.
+  bool
+  found() const
+  { return this->found_; }
 
   int
   expression(Expression**);
 
  private:
-  // Accumulated variables.
-  Vars vars_;
-  // Objects we have already seen.
-  Seen_objects seen_objects_;
+  // The variable we are looking for.
+  Named_object* var_;
+  // Names of objects we have already seen.
+  Seen_objects* seen_objects_;
+  // True if the variable was found.
+  bool found_;
 };
 
-// Collect global variables referenced by EXPR.  Look through function
-// calls and variable initializations.
+// See if EXPR refers to VAR, looking through function calls and
+// variable initializations.
 
 int
-Find_vars::expression(Expression** pexpr)
+Find_var::expression(Expression** pexpr)
 {
   Expression* e = *pexpr;
 
@@ -976,29 +954,26 @@ Find_vars::expression(Expression** pexpr)
   if (ve != NULL)
     {
       Named_object* v = ve->named_object();
-      if (!v->is_variable() || v->package() != NULL)
+      if (v == this->var_)
 	{
-	  // This is a result parameter or a variable defined in a
-	  // different package.  Either way we don't care about it.
-	  return TRAVERSE_CONTINUE;
+	  this->found_ = true;
+	  return TRAVERSE_EXIT;
 	}
 
-      std::pair<Seen_objects::iterator, bool> ins =
-	this->seen_objects_.insert(v);
-      if (!ins.second)
+      if (v->is_variable() && v->package() == NULL)
 	{
-	  // We've seen this variable before.
-	  return TRAVERSE_CONTINUE;
-	}
-
-      if (v->var_value()->is_global())
-	this->vars_.insert(v);
-
-      Expression* init = v->var_value()->init();
-      if (init != NULL)
-	{
-	  if (Expression::traverse(&init, this) == TRAVERSE_EXIT)
-	    return TRAVERSE_EXIT;
+	  Expression* init = v->var_value()->init();
+	  if (init != NULL)
+	    {
+	      std::pair<Seen_objects::iterator, bool> ins =
+		this->seen_objects_->insert(v);
+	      if (ins.second)
+		{
+		  // This is the first time we have seen this name.
+		  if (Expression::traverse(&init, this) == TRAVERSE_EXIT)
+		    return TRAVERSE_EXIT;
+		}
+	    }
 	}
     }
 
@@ -1013,7 +988,7 @@ Find_vars::expression(Expression** pexpr)
       if (f->is_function() && f->package() == NULL)
 	{
 	  std::pair<Seen_objects::iterator, bool> ins =
-	    this->seen_objects_.insert(f);
+	    this->seen_objects_->insert(f);
 	  if (ins.second)
 	    {
 	      // This is the first time we have seen this name.
@@ -1031,7 +1006,7 @@ Find_vars::expression(Expression** pexpr)
       if (init != NULL)
 	{
 	  std::pair<Seen_objects::iterator, bool> ins =
-	    this->seen_objects_.insert(ts);
+	    this->seen_objects_->insert(ts);
 	  if (ins.second)
 	    {
 	      // This is the first time we have seen this temporary
@@ -1051,28 +1026,22 @@ static bool
 expression_requires(Expression* expr, Block* preinit, Named_object* dep,
 		    Named_object* var)
 {
-  Find_vars find_vars;
+  Find_var::Seen_objects seen_objects;
+  Find_var find_var(var, &seen_objects);
   if (expr != NULL)
-    Expression::traverse(&expr, &find_vars);
+    Expression::traverse(&expr, &find_var);
   if (preinit != NULL)
-    preinit->traverse(&find_vars);
+    preinit->traverse(&find_var);
   if (dep != NULL)
     {
       Expression* init = dep->var_value()->init();
       if (init != NULL)
-	Expression::traverse(&init, &find_vars);
+	Expression::traverse(&init, &find_var);
       if (dep->var_value()->has_pre_init())
-	dep->var_value()->preinit()->traverse(&find_vars);
+	dep->var_value()->preinit()->traverse(&find_var);
     }
 
-  for (Find_vars::const_iterator p = find_vars.begin();
-       p != find_vars.end();
-       ++p)
-    {
-      if (*p == var)
-	return true;
-    }
-  return false;
+  return find_var.found();
 }
 
 // Sort variable initializations.  If the initialization expression
@@ -1083,11 +1052,11 @@ class Var_init
 {
  public:
   Var_init()
-    : var_(NULL), init_(NULL), refs_(NULL), dep_count_(0)
+    : var_(NULL), init_(NULL), dep_count_(0)
   { }
 
   Var_init(Named_object* var, Bstatement* init)
-    : var_(var), init_(init), refs_(NULL), dep_count_(0)
+    : var_(var), init_(init), dep_count_(0)
   { }
 
   // Return the variable.
@@ -1099,19 +1068,6 @@ class Var_init
   Bstatement*
   init() const
   { return this->init_; }
-
-  // Add a reference.
-  void
-  add_ref(Named_object* var);
-
-  // The variables which this variable's initializers refer to.
-  const std::vector<Named_object*>*
-  refs()
-  { return this->refs_; }
-
-  // Clear the references, if any.
-  void
-  clear_refs();
 
   // Return the number of remaining dependencies.
   size_t
@@ -1131,37 +1087,13 @@ class Var_init
  private:
   // The variable being initialized.
   Named_object* var_;
-  // The backend initialization statement.
+  // The initialization statement.
   Bstatement* init_;
-  // Variables this refers to.
-  std::vector<Named_object*>* refs_;
   // The number of initializations this is dependent on.  A variable
   // initialization should not be emitted if any of its dependencies
   // have not yet been resolved.
   size_t dep_count_;
 };
-
-// Add a reference.
-
-void
-Var_init::add_ref(Named_object* var)
-{
-  if (this->refs_ == NULL)
-    this->refs_ = new std::vector<Named_object*>;
-  this->refs_->push_back(var);
-}
-
-// Clear the references, if any.
-
-void
-Var_init::clear_refs()
-{
-  if (this->refs_ != NULL)
-    {
-      delete this->refs_;
-      this->refs_ = NULL;
-    }
-}
 
 // For comparing Var_init keys in a map.
 
@@ -1182,118 +1114,69 @@ sort_var_inits(Gogo* gogo, Var_inits* var_inits)
   if (var_inits->empty())
     return;
 
-  std::map<Named_object*, Var_init*> var_to_init;
+  typedef std::pair<Named_object*, Named_object*> No_no;
+  typedef std::map<No_no, bool> Cache;
+  Cache cache;
 
   // A mapping from a variable initialization to a set of
   // variable initializations that depend on it.
   typedef std::map<Var_init, std::set<Var_init*> > Init_deps;
   Init_deps init_deps;
   bool init_loop = false;
-
-  // Compute all variable references.
-  for (Var_inits::iterator pvar = var_inits->begin();
-       pvar != var_inits->end();
-       ++pvar)
+  for (Var_inits::iterator p1 = var_inits->begin();
+       p1 != var_inits->end();
+       ++p1)
     {
-      Named_object* var = pvar->var();
-      var_to_init[var] = &*pvar;
-
-      Find_vars find_vars;
+      Named_object* var = p1->var();
       Expression* init = var->var_value()->init();
-      if (init != NULL)
-	Expression::traverse(&init, &find_vars);
-      if (var->var_value()->has_pre_init())
-	var->var_value()->preinit()->traverse(&find_vars);
+      Block* preinit = var->var_value()->preinit();
       Named_object* dep = gogo->var_depends_on(var->var_value());
-      if (dep != NULL)
+
+      // Start walking through the list to see which variables VAR
+      // needs to wait for.
+      for (Var_inits::iterator p2 = var_inits->begin();
+	   p2 != var_inits->end();
+	   ++p2)
 	{
-	  Expression* dinit = dep->var_value()->init();
-	  if (dinit != NULL)
-	    Expression::traverse(&dinit, &find_vars);
-	  if (dep->var_value()->has_pre_init())
-	    dep->var_value()->preinit()->traverse(&find_vars);
-	}
-      for (Find_vars::const_iterator p = find_vars.begin();
-	   p != find_vars.end();
-	   ++p)
-	pvar->add_ref(*p);
-    }
-
-  // Add dependencies to init_deps, and check for cycles.
-  for (Var_inits::iterator pvar = var_inits->begin();
-       pvar != var_inits->end();
-       ++pvar)
-    {
-      Named_object* var = pvar->var();
-
-      const std::vector<Named_object*>* refs = pvar->refs();
-      if (refs == NULL)
-	continue;
-      for (std::vector<Named_object*>::const_iterator pdep = refs->begin();
-	   pdep != refs->end();
-	   ++pdep)
-	{
-	  Named_object* dep = *pdep;
-	  if (var == dep)
-	    {
-	      // This is a reference from a variable to itself, which
-	      // may indicate a loop.  We only report an error if
-	      // there is an initializer and there is no dependency.
-	      // When there is no initializer, it means that the
-	      // preinitializer sets the variable, which will appear
-	      // to be a loop here.
-	      if (var->var_value()->init() != NULL
-		  && gogo->var_depends_on(var->var_value()) == NULL)
-		go_error_at(var->location(),
-			    ("initialization expression for %qs "
-			     "depends upon itself"),
-			    var->message_name().c_str());
-
-	      continue;
-	    }
-
-	  Var_init* dep_init = var_to_init[dep];
-	  if (dep_init == NULL)
-	    {
-	      // This is a dependency on some variable that doesn't
-	      // have an initializer, so for purposes of
-	      // initialization ordering this is irrelevant.
-	      continue;
-	    }
-
-	  init_deps[*dep_init].insert(&(*pvar));
-	  pvar->add_dependency();
-
-	  // Check for cycles.
-	  const std::vector<Named_object*>* deprefs = dep_init->refs();
-	  if (deprefs == NULL)
+	  if (var == p2->var())
 	    continue;
-	  for (std::vector<Named_object*>::const_iterator pdepdep =
-		 deprefs->begin();
-	       pdepdep != deprefs->end();
-	       ++pdepdep)
+
+	  Named_object* p2var = p2->var();
+	  No_no key(var, p2var);
+	  std::pair<Cache::iterator, bool> ins =
+	    cache.insert(std::make_pair(key, false));
+	  if (ins.second)
+	    ins.first->second = expression_requires(init, preinit, dep, p2var);
+	  if (ins.first->second)
 	    {
-	      if (*pdepdep == var)
+	      // VAR depends on P2VAR.
+	      init_deps[*p2].insert(&(*p1));
+	      p1->add_dependency();
+
+	      // Check for cycles.
+	      key = std::make_pair(p2var, var);
+	      ins = cache.insert(std::make_pair(key, false));
+	      if (ins.second)
+		ins.first->second =
+		  expression_requires(p2var->var_value()->init(),
+				      p2var->var_value()->preinit(),
+				      gogo->var_depends_on(p2var->var_value()),
+				      var);
+	      if (ins.first->second)
 		{
 		  go_error_at(var->location(),
 			      ("initialization expressions for %qs and "
 			       "%qs depend upon each other"),
 			      var->message_name().c_str(),
-			      dep->message_name().c_str());
-		  go_inform(dep->location(), "%qs defined here",
-			    dep->message_name().c_str());
+			      p2var->message_name().c_str());
+		  go_inform(p2->var()->location(), "%qs defined here",
+			    p2var->message_name().c_str());
 		  init_loop = true;
 		  break;
 		}
 	    }
 	}
     }
-
-  var_to_init.clear();
-  for (Var_inits::iterator pvar = var_inits->begin();
-       pvar != var_inits->end();
-       ++pvar)
-    pvar->clear_refs();
 
   // If there are no dependencies then the declaration order is sorted.
   if (!init_deps.empty() && !init_loop)
@@ -1331,6 +1214,14 @@ sort_var_inits(Gogo* gogo, Var_inits* var_inits)
       var_inits->swap(ready);
       go_assert(init_deps.empty());
     }
+
+  // VAR_INITS is in the correct order.  For each VAR in VAR_INITS,
+  // check for a loop of VAR on itself.
+  // interpret as a loop.
+  for (Var_inits::const_iterator p = var_inits->begin();
+       p != var_inits->end();
+       ++p)
+    gogo->check_self_dep(p->var());
 }
 
 // Give an error if the initialization expression for VAR depends on
@@ -1548,8 +1439,7 @@ Gogo::write_globals()
 	      // Avoid putting runtime.gcRoots itself on the list.
 	      if (this->compiling_runtime()
 		  && this->package_name() == "runtime"
-		  && (Gogo::unpack_hidden_name(no->name()) == "gcRoots"
-                   || Gogo::unpack_hidden_name(no->name()) == "gcRootsIndex"))
+		  && Gogo::unpack_hidden_name(no->name()) == "gcRoots")
 		;
 	      else
 		var_gc.push_back(no);
@@ -3446,6 +3336,210 @@ Gogo::check_types_in_block(Block* block)
   block->traverse(&traverse);
 }
 
+// A traversal class used to find a single shortcut operator within an
+// expression.
+
+class Find_shortcut : public Traverse
+{
+ public:
+  Find_shortcut()
+    : Traverse(traverse_blocks
+	       | traverse_statements
+	       | traverse_expressions),
+      found_(NULL)
+  { }
+
+  // A pointer to the expression which was found, or NULL if none was
+  // found.
+  Expression**
+  found() const
+  { return this->found_; }
+
+ protected:
+  int
+  block(Block*)
+  { return TRAVERSE_SKIP_COMPONENTS; }
+
+  int
+  statement(Block*, size_t*, Statement*)
+  { return TRAVERSE_SKIP_COMPONENTS; }
+
+  int
+  expression(Expression**);
+
+ private:
+  Expression** found_;
+};
+
+// Find a shortcut expression.
+
+int
+Find_shortcut::expression(Expression** pexpr)
+{
+  Expression* expr = *pexpr;
+  Binary_expression* be = expr->binary_expression();
+  if (be == NULL)
+    return TRAVERSE_CONTINUE;
+  Operator op = be->op();
+  if (op != OPERATOR_OROR && op != OPERATOR_ANDAND)
+    return TRAVERSE_CONTINUE;
+  go_assert(this->found_ == NULL);
+  this->found_ = pexpr;
+  return TRAVERSE_EXIT;
+}
+
+// A traversal class used to turn shortcut operators into explicit if
+// statements.
+
+class Shortcuts : public Traverse
+{
+ public:
+  Shortcuts(Gogo* gogo)
+    : Traverse(traverse_variables
+	       | traverse_statements),
+      gogo_(gogo)
+  { }
+
+ protected:
+  int
+  variable(Named_object*);
+
+  int
+  statement(Block*, size_t*, Statement*);
+
+ private:
+  // Convert a shortcut operator.
+  Statement*
+  convert_shortcut(Block* enclosing, Expression** pshortcut);
+
+  // The IR.
+  Gogo* gogo_;
+};
+
+// Remove shortcut operators in a single statement.
+
+int
+Shortcuts::statement(Block* block, size_t* pindex, Statement* s)
+{
+  // FIXME: This approach doesn't work for switch statements, because
+  // we add the new statements before the whole switch when we need to
+  // instead add them just before the switch expression.  The right
+  // fix is probably to lower switch statements with nonconstant cases
+  // to a series of conditionals.
+  if (s->switch_statement() != NULL)
+    return TRAVERSE_CONTINUE;
+
+  while (true)
+    {
+      Find_shortcut find_shortcut;
+
+      // If S is a variable declaration, then ordinary traversal won't
+      // do anything.  We want to explicitly traverse the
+      // initialization expression if there is one.
+      Variable_declaration_statement* vds = s->variable_declaration_statement();
+      Expression* init = NULL;
+      if (vds == NULL)
+	s->traverse_contents(&find_shortcut);
+      else
+	{
+	  init = vds->var()->var_value()->init();
+	  if (init == NULL)
+	    return TRAVERSE_CONTINUE;
+	  init->traverse(&init, &find_shortcut);
+	}
+      Expression** pshortcut = find_shortcut.found();
+      if (pshortcut == NULL)
+	return TRAVERSE_CONTINUE;
+
+      Statement* snew = this->convert_shortcut(block, pshortcut);
+      block->insert_statement_before(*pindex, snew);
+      ++*pindex;
+
+      if (pshortcut == &init)
+	vds->var()->var_value()->set_init(init);
+    }
+}
+
+// Remove shortcut operators in the initializer of a global variable.
+
+int
+Shortcuts::variable(Named_object* no)
+{
+  if (no->is_result_variable())
+    return TRAVERSE_CONTINUE;
+  Variable* var = no->var_value();
+  Expression* init = var->init();
+  if (!var->is_global() || init == NULL)
+    return TRAVERSE_CONTINUE;
+
+  while (true)
+    {
+      Find_shortcut find_shortcut;
+      init->traverse(&init, &find_shortcut);
+      Expression** pshortcut = find_shortcut.found();
+      if (pshortcut == NULL)
+	return TRAVERSE_CONTINUE;
+
+      Statement* snew = this->convert_shortcut(NULL, pshortcut);
+      var->add_preinit_statement(this->gogo_, snew);
+      if (pshortcut == &init)
+	var->set_init(init);
+    }
+}
+
+// Given an expression which uses a shortcut operator, return a
+// statement which implements it, and update *PSHORTCUT accordingly.
+
+Statement*
+Shortcuts::convert_shortcut(Block* enclosing, Expression** pshortcut)
+{
+  Binary_expression* shortcut = (*pshortcut)->binary_expression();
+  Expression* left = shortcut->left();
+  Expression* right = shortcut->right();
+  Location loc = shortcut->location();
+
+  Block* retblock = new Block(enclosing, loc);
+  retblock->set_end_location(loc);
+
+  Temporary_statement* ts = Statement::make_temporary(shortcut->type(),
+						      left, loc);
+  retblock->add_statement(ts);
+
+  Block* block = new Block(retblock, loc);
+  block->set_end_location(loc);
+  Expression* tmpref = Expression::make_temporary_reference(ts, loc);
+  Statement* assign = Statement::make_assignment(tmpref, right, loc);
+  block->add_statement(assign);
+
+  Expression* cond = Expression::make_temporary_reference(ts, loc);
+  if (shortcut->binary_expression()->op() == OPERATOR_OROR)
+    cond = Expression::make_unary(OPERATOR_NOT, cond, loc);
+
+  Statement* if_statement = Statement::make_if_statement(cond, block, NULL,
+							 loc);
+  retblock->add_statement(if_statement);
+
+  *pshortcut = Expression::make_temporary_reference(ts, loc);
+
+  delete shortcut;
+
+  // Now convert any shortcut operators in LEFT and RIGHT.
+  Shortcuts shortcuts(this->gogo_);
+  retblock->traverse(&shortcuts);
+
+  return Statement::make_block_statement(retblock, loc);
+}
+
+// Turn shortcut operators into explicit if statements.  Doing this
+// considerably simplifies the order of evaluation rules.
+
+void
+Gogo::remove_shortcuts()
+{
+  Shortcuts shortcuts(this);
+  this->traverse(&shortcuts);
+}
+
 // A traversal class which finds all the expressions which must be
 // evaluated in order within a statement or larger expression.  This
 // is used to implement the rules about order of evaluation.
@@ -3499,18 +3593,6 @@ class Find_eval_ordering : public Traverse
 int
 Find_eval_ordering::expression(Expression** expression_pointer)
 {
-  Binary_expression* binexp = (*expression_pointer)->binary_expression();
-  if (binexp != NULL
-      && (binexp->op() == OPERATOR_ANDAND || binexp->op() == OPERATOR_OROR))
-    {
-      // Shortcut expressions may potentially have side effects which need
-      // to be ordered, so add them to the list.
-      // We don't order its subexpressions here since they may be evaluated
-      // conditionally. This is handled in remove_shortcuts.
-      this->exprs_.push_back(expression_pointer);
-      return TRAVERSE_SKIP_COMPONENTS;
-    }
-
   // We have to look at subexpressions before this one.
   if ((*expression_pointer)->traverse_subexpressions(this) == TRAVERSE_EXIT)
     return TRAVERSE_EXIT;
@@ -3745,215 +3827,6 @@ Gogo::order_evaluations()
 {
   Order_eval order_eval(this);
   this->traverse(&order_eval);
-}
-
-// A traversal class used to find a single shortcut operator within an
-// expression.
-
-class Find_shortcut : public Traverse
-{
- public:
-  Find_shortcut()
-    : Traverse(traverse_blocks
-	       | traverse_statements
-	       | traverse_expressions),
-      found_(NULL)
-  { }
-
-  // A pointer to the expression which was found, or NULL if none was
-  // found.
-  Expression**
-  found() const
-  { return this->found_; }
-
- protected:
-  int
-  block(Block*)
-  { return TRAVERSE_SKIP_COMPONENTS; }
-
-  int
-  statement(Block*, size_t*, Statement*)
-  { return TRAVERSE_SKIP_COMPONENTS; }
-
-  int
-  expression(Expression**);
-
- private:
-  Expression** found_;
-};
-
-// Find a shortcut expression.
-
-int
-Find_shortcut::expression(Expression** pexpr)
-{
-  Expression* expr = *pexpr;
-  Binary_expression* be = expr->binary_expression();
-  if (be == NULL)
-    return TRAVERSE_CONTINUE;
-  Operator op = be->op();
-  if (op != OPERATOR_OROR && op != OPERATOR_ANDAND)
-    return TRAVERSE_CONTINUE;
-  go_assert(this->found_ == NULL);
-  this->found_ = pexpr;
-  return TRAVERSE_EXIT;
-}
-
-// A traversal class used to turn shortcut operators into explicit if
-// statements.
-
-class Shortcuts : public Traverse
-{
- public:
-  Shortcuts(Gogo* gogo)
-    : Traverse(traverse_variables
-	       | traverse_statements),
-      gogo_(gogo)
-  { }
-
- protected:
-  int
-  variable(Named_object*);
-
-  int
-  statement(Block*, size_t*, Statement*);
-
- private:
-  // Convert a shortcut operator.
-  Statement*
-  convert_shortcut(Block* enclosing, Expression** pshortcut);
-
-  // The IR.
-  Gogo* gogo_;
-};
-
-// Remove shortcut operators in a single statement.
-
-int
-Shortcuts::statement(Block* block, size_t* pindex, Statement* s)
-{
-  // FIXME: This approach doesn't work for switch statements, because
-  // we add the new statements before the whole switch when we need to
-  // instead add them just before the switch expression.  The right
-  // fix is probably to lower switch statements with nonconstant cases
-  // to a series of conditionals.
-  if (s->switch_statement() != NULL)
-    return TRAVERSE_CONTINUE;
-
-  while (true)
-    {
-      Find_shortcut find_shortcut;
-
-      // If S is a variable declaration, then ordinary traversal won't
-      // do anything.  We want to explicitly traverse the
-      // initialization expression if there is one.
-      Variable_declaration_statement* vds = s->variable_declaration_statement();
-      Expression* init = NULL;
-      if (vds == NULL)
-	s->traverse_contents(&find_shortcut);
-      else
-	{
-	  init = vds->var()->var_value()->init();
-	  if (init == NULL)
-	    return TRAVERSE_CONTINUE;
-	  init->traverse(&init, &find_shortcut);
-	}
-      Expression** pshortcut = find_shortcut.found();
-      if (pshortcut == NULL)
-	return TRAVERSE_CONTINUE;
-
-      Statement* snew = this->convert_shortcut(block, pshortcut);
-      block->insert_statement_before(*pindex, snew);
-      ++*pindex;
-
-      if (pshortcut == &init)
-	vds->var()->var_value()->set_init(init);
-    }
-}
-
-// Remove shortcut operators in the initializer of a global variable.
-
-int
-Shortcuts::variable(Named_object* no)
-{
-  if (no->is_result_variable())
-    return TRAVERSE_CONTINUE;
-  Variable* var = no->var_value();
-  Expression* init = var->init();
-  if (!var->is_global() || init == NULL)
-    return TRAVERSE_CONTINUE;
-
-  while (true)
-    {
-      Find_shortcut find_shortcut;
-      init->traverse(&init, &find_shortcut);
-      Expression** pshortcut = find_shortcut.found();
-      if (pshortcut == NULL)
-	return TRAVERSE_CONTINUE;
-
-      Statement* snew = this->convert_shortcut(NULL, pshortcut);
-      var->add_preinit_statement(this->gogo_, snew);
-      if (pshortcut == &init)
-	var->set_init(init);
-    }
-}
-
-// Given an expression which uses a shortcut operator, return a
-// statement which implements it, and update *PSHORTCUT accordingly.
-
-Statement*
-Shortcuts::convert_shortcut(Block* enclosing, Expression** pshortcut)
-{
-  Binary_expression* shortcut = (*pshortcut)->binary_expression();
-  Expression* left = shortcut->left();
-  Expression* right = shortcut->right();
-  Location loc = shortcut->location();
-
-  Block* retblock = new Block(enclosing, loc);
-  retblock->set_end_location(loc);
-
-  Temporary_statement* ts = Statement::make_temporary(shortcut->type(),
-						      left, loc);
-  retblock->add_statement(ts);
-
-  Block* block = new Block(retblock, loc);
-  block->set_end_location(loc);
-  Expression* tmpref = Expression::make_temporary_reference(ts, loc);
-  Statement* assign = Statement::make_assignment(tmpref, right, loc);
-  block->add_statement(assign);
-
-  Expression* cond = Expression::make_temporary_reference(ts, loc);
-  if (shortcut->binary_expression()->op() == OPERATOR_OROR)
-    cond = Expression::make_unary(OPERATOR_NOT, cond, loc);
-
-  Statement* if_statement = Statement::make_if_statement(cond, block, NULL,
-							 loc);
-  retblock->add_statement(if_statement);
-
-  *pshortcut = Expression::make_temporary_reference(ts, loc);
-
-  delete shortcut;
-
-  // Now convert any shortcut operators in LEFT and RIGHT.
-  // LEFT and RIGHT were skipped in the top level
-  // Gogo::order_evaluations. We need to order their
-  // components first.
-  Order_eval order_eval(this->gogo_);
-  retblock->traverse(&order_eval);
-  Shortcuts shortcuts(this->gogo_);
-  retblock->traverse(&shortcuts);
-
-  return Statement::make_block_statement(retblock, loc);
-}
-
-// Turn shortcut operators into explicit if statements.  Doing this
-// considerably simplifies the order of evaluation rules.
-
-void
-Gogo::remove_shortcuts()
-{
-  Shortcuts shortcuts(this);
-  this->traverse(&shortcuts);
 }
 
 // Traversal to flatten parse tree after order of evaluation rules are applied.
@@ -5404,7 +5277,7 @@ Function::export_func_with_type(Export* exp, const std::string& name,
 	  exp->write_c_string(")");
 	}
     }
-  exp->write_c_string("\n");
+  exp->write_c_string(";\n");
 }
 
 // Import a function.
@@ -5511,8 +5384,7 @@ Function::import_func(Import* imp, std::string* pname,
 	  imp->require_c_string(")");
 	}
     }
-  imp->require_semicolon_if_old_version();
-  imp->require_c_string("\n");
+  imp->require_c_string(";\n");
   *presults = results;
 }
 
@@ -5523,7 +5395,7 @@ Function::get_or_make_decl(Gogo* gogo, Named_object* no)
 {
   if (this->fndecl_ == NULL)
     {
-      unsigned int flags = 0;
+      bool is_visible = false;
       bool is_init_fn = false;
       Type* rtype = NULL;
       if (no->package() != NULL)
@@ -5535,12 +5407,12 @@ Function::get_or_make_decl(Gogo* gogo, Named_object* no)
 	;
       else if (no->name() == gogo->get_init_fn_name())
 	{
-	  flags |= Backend::function_is_visible;
+	  is_visible = true;
 	  is_init_fn = true;
 	}
       else if (Gogo::unpack_hidden_name(no->name()) == "main"
                && gogo->is_main_package())
-	flags |= Backend::function_is_visible;
+        is_visible = true;
       // Methods have to be public even if they are hidden because
       // they can be pulled into type descriptors when using
       // anonymous fields.
@@ -5548,7 +5420,7 @@ Function::get_or_make_decl(Gogo* gogo, Named_object* no)
                || this->type_->is_method())
         {
 	  if (!this->is_unnamed_type_stub_method_)
-	    flags |= Backend::function_is_visible;
+	    is_visible = true;
 	  if (this->type_->is_method())
 	    rtype = this->type_->receiver()->type();
         }
@@ -5561,7 +5433,7 @@ Function::get_or_make_decl(Gogo* gogo, Named_object* no)
 	  // If an assembler name is explicitly specified, there must
 	  // be some reason to refer to the symbol from a different
 	  // object file.
-	  flags |= Backend::function_is_visible;
+	  is_visible = true;
 	}
       else if (is_init_fn)
 	{
@@ -5593,9 +5465,6 @@ Function::get_or_make_decl(Gogo* gogo, Named_object* no)
       if ((this->pragmas_ & GOPRAGMA_NOINLINE) != 0)
 	is_inlinable = false;
 
-      if (is_inlinable)
-	flags |= Backend::function_is_inlinable;
-
       // If this is a thunk created to call a function which calls
       // the predeclared recover function, we need to disable
       // stack splitting for the thunk.
@@ -5605,22 +5474,20 @@ Function::get_or_make_decl(Gogo* gogo, Named_object* no)
       if ((this->pragmas_ & GOPRAGMA_NOSPLIT) != 0)
 	disable_split_stack = true;
 
-      if (disable_split_stack)
-	flags |= Backend::function_no_split_stack;
-
       // This should go into a unique section if that has been
       // requested elsewhere, or if this is a nointerface function.
       // We want to put a nointerface function into a unique section
       // because there is a good chance that the linker garbage
       // collection can discard it.
-      if (this->in_unique_section_
-	  || (this->is_method() && this->nointerface()))
-	flags |= Backend::function_in_unique_section;
+      bool in_unique_section = (this->in_unique_section_
+				|| (this->is_method() && this->nointerface()));
 
       Btype* functype = this->type_->get_backend_fntype(gogo);
       this->fndecl_ =
           gogo->backend()->function(functype, no->get_id(gogo), asm_name,
-				    flags, this->location());
+                                    is_visible, false, is_inlinable,
+                                    disable_split_stack, false,
+				    in_unique_section, this->location());
     }
   return this->fndecl_;
 }
@@ -5632,10 +5499,7 @@ Function_declaration::get_or_make_decl(Gogo* gogo, Named_object* no)
 {
   if (this->fndecl_ == NULL)
     {
-      unsigned int flags =
-	(Backend::function_is_visible
-	 | Backend::function_is_declaration
-	 | Backend::function_is_inlinable);
+      bool does_not_return = false;
 
       // Let Go code use an asm declaration to pick up a builtin
       // function.
@@ -5651,7 +5515,7 @@ Function_declaration::get_or_make_decl(Gogo* gogo, Named_object* no)
 
 	  if (this->asm_name_ == "runtime.gopanic"
 	      || this->asm_name_ == "__go_runtime_error")
-	    flags |= Backend::function_does_not_return;
+	    does_not_return = true;
 	}
 
       std::string asm_name;
@@ -5668,7 +5532,8 @@ Function_declaration::get_or_make_decl(Gogo* gogo, Named_object* no)
       Btype* functype = this->fntype_->get_backend_fntype(gogo);
       this->fndecl_ =
           gogo->backend()->function(functype, no->get_id(gogo), asm_name,
-				    flags, this->location());
+                                    true, true, true, false, does_not_return,
+				    false, this->location());
     }
 
   return this->fndecl_;
@@ -6512,8 +6377,7 @@ Variable::flatten_init_expression(Gogo* gogo, Named_object* function,
       // If an interface conversion is needed, we need a temporary
       // variable.
       if (this->type_ != NULL
-	  && !Type::are_identical(this->type_, this->init_->type(),
-				  Type::COMPARE_ERRORS | Type::COMPARE_TAGS,
+	  && !Type::are_identical(this->type_, this->init_->type(), false,
 				  NULL)
 	  && this->init_->type()->interface_type() != NULL
 	  && !this->init_->is_variable())
@@ -6907,7 +6771,7 @@ Variable::export_var(Export* exp, const std::string& name) const
   exp->write_string(name);
   exp->write_c_string(" ");
   exp->write_type(this->type());
-  exp->write_c_string("\n");
+  exp->write_c_string(";\n");
 }
 
 // Import a variable.
@@ -6919,8 +6783,7 @@ Variable::import_var(Import* imp, std::string* pname, Type** ptype)
   *pname = imp->read_identifier();
   imp->require_c_string(" ");
   *ptype = imp->read_type();
-  imp->require_semicolon_if_old_version();
-  imp->require_c_string("\n");
+  imp->require_c_string(";\n");
 }
 
 // Convert a variable to the backend representation.
@@ -7112,7 +6975,7 @@ Named_constant::export_const(Export* exp, const std::string& name) const
     }
   exp->write_c_string("= ");
   this->expr()->export_expression(exp);
-  exp->write_c_string("\n");
+  exp->write_c_string(";\n");
 }
 
 // Import a constant.
@@ -7133,8 +6996,7 @@ Named_constant::import_const(Import* imp, std::string* pname, Type** ptype,
     }
   imp->require_c_string("= ");
   *pexpr = Expression::import_expression(imp);
-  imp->require_semicolon_if_old_version();
-  imp->require_c_string("\n");
+  imp->require_c_string(";\n");
 }
 
 // Get the backend representation.
@@ -7531,8 +7393,8 @@ Named_object::export_named_object(Export* exp) const
       break;
 
     case NAMED_OBJECT_TYPE:
-      // Types are handled by export::write_types.
-      go_unreachable();
+      this->type_value()->export_named_type(exp, this->name_);
+      break;
 
     case NAMED_OBJECT_TYPE_DECLARATION:
       go_error_at(this->type_declaration_value()->location(),
@@ -7646,7 +7508,7 @@ Named_object::get_backend(Gogo* gogo, std::vector<Bexpression*>& const_decls,
     case NAMED_OBJECT_TYPE:
       {
         Named_type* named_type = this->u_.type_value;
-	if (!Gogo::is_erroneous_name(this->name_) && !named_type->is_alias())
+	if (!Gogo::is_erroneous_name(this->name_))
 	  type_decls.push_back(named_type->get_backend(gogo));
 
         // We need to produce a type descriptor for every named
@@ -8396,16 +8258,8 @@ Traverse::remember_type(const Type* type)
   // We mostly only have to remember named types.  But it turns out
   // that an interface type can refer to itself without using a name
   // by relying on interface inheritance, as in
-  //
-  //         type I interface { F() interface{I} }
-  //
-  // Similarly it is possible for array types to refer to themselves
-  // without a name, e.g.
-  //
-  //         var x [uintptr(unsafe.Sizeof(&x))]byte
-  //
+  // type I interface { F() interface{I} }
   if (type->classification() != Type::TYPE_NAMED
-      && type->classification() != Type::TYPE_ARRAY
       && type->classification() != Type::TYPE_INTERFACE)
     return false;
   if (this->types_seen_ == NULL)
@@ -8486,9 +8340,6 @@ Traverse::function_declaration(Named_object*)
 void
 Statement_inserter::insert(Statement* s)
 {
-  if (this->statements_added_ != NULL)
-    this->statements_added_->insert(s);
-
   if (this->block_ != NULL)
     {
       go_assert(this->pindex_ != NULL);

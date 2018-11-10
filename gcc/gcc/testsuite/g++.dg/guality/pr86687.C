@@ -13,11 +13,7 @@ public:
 class foo {
 public:
   foo (string dir_hint) {
-<<<<<<< HEAD
-    p = dir_hint.p; // { dg-final { gdb-test . "dir_hint.p" 3 } }
-=======
     p = dir_hint.p; // { dg-final { gdb-test 16 "dir_hint.p" 3 } }
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
   }
 
   int p;

@@ -1327,9 +1327,6 @@ disable_extension_diagnostics (void)
 	     /* Similarly for warn_c99_c11_compat.  */
 	     | ((warn_c99_c11_compat == 1) << 9)
 	     | ((warn_c99_c11_compat == -1) << 10)
-	     /* Similarly for warn_c11_c2x_compat.  */
-	     | ((warn_c11_c2x_compat == 1) << 11)
-	     | ((warn_c11_c2x_compat == -1) << 12)
 	     );
   cpp_opts->cpp_pedantic = pedantic = 0;
   warn_pointer_arith = 0;
@@ -1340,7 +1337,6 @@ disable_extension_diagnostics (void)
   warn_overlength_strings = 0;
   warn_c90_c99_compat = 0;
   warn_c99_c11_compat = 0;
-  warn_c11_c2x_compat = 0;
   return ret;
 }
 
@@ -1360,7 +1356,6 @@ restore_extension_diagnostics (int flags)
   /* See above for why is this needed.  */
   warn_c90_c99_compat = (flags >> 7) & 1 ? 1 : ((flags >> 8) & 1 ? -1 : 0);
   warn_c99_c11_compat = (flags >> 9) & 1 ? 1 : ((flags >> 10) & 1 ? -1 : 0);
-  warn_c11_c2x_compat = (flags >> 11) & 1 ? 1 : ((flags >> 12) & 1 ? -1 : 0);
 }
 
 /* Helper data structure for parsing #pragma acc routine.  */
@@ -1819,15 +1814,14 @@ c_parser_declaration_or_fndef (c_parser *parser, bool fndef_ok,
 	}
       else
 	{
-	  auto_diagnostic_group d;
 	  name_hint hint = lookup_name_fuzzy (name, FUZZY_LOOKUP_TYPENAME,
 					      here);
-	  if (const char *suggestion = hint.suggestion ())
+	  if (hint)
 	    {
-	      richloc.add_fixit_replace (suggestion);
+	      richloc.add_fixit_replace (hint.suggestion ());
 	      error_at (&richloc,
 			"unknown type name %qE; did you mean %qs?",
-			name, suggestion);
+			name, hint.suggestion ());
 	    }
 	  else
 	    error_at (here, "unknown type name %qE", name);
@@ -2409,10 +2403,6 @@ c_parser_static_assert_declaration (c_parser *parser)
 
    static_assert-declaration-no-semi:
      _Static_assert ( constant-expression , string-literal )
-
-   C2X:
-   static_assert-declaration-no-semi:
-     _Static_assert ( constant-expression )
 */
 
 static void
@@ -2420,7 +2410,7 @@ c_parser_static_assert_declaration_no_semi (c_parser *parser)
 {
   location_t assert_loc, value_loc;
   tree value;
-  tree string = NULL_TREE;
+  tree string;
 
   gcc_assert (c_parser_next_token_is_keyword (parser, RID_STATIC_ASSERT));
   assert_loc = c_parser_peek_token (parser)->location;
@@ -2438,33 +2428,27 @@ c_parser_static_assert_declaration_no_semi (c_parser *parser)
   value = c_parser_expr_no_commas (parser, NULL).value;
   value_loc = EXPR_LOC_OR_LOC (value, value_tok_loc);
   parser->lex_untranslated_string = true;
-  if (c_parser_next_token_is (parser, CPP_COMMA))
+  if (!c_parser_require (parser, CPP_COMMA, "expected %<,%>"))
     {
-      c_parser_consume_token (parser);
-      switch (c_parser_peek_token (parser)->type)
-	{
-	case CPP_STRING:
-	case CPP_STRING16:
-	case CPP_STRING32:
-	case CPP_WSTRING:
-	case CPP_UTF8STRING:
-	  string = c_parser_peek_token (parser)->value;
-	  c_parser_consume_token (parser);
-	  parser->lex_untranslated_string = false;
-	  break;
-	default:
-	  c_parser_error (parser, "expected string literal");
-	  parser->lex_untranslated_string = false;
-	  return;
-	}
+      parser->lex_untranslated_string = false;
+      return;
     }
-  else if (flag_isoc11)
-    /* If pedantic for pre-C11, the use of _Static_assert itself will
-       have been diagnosed, so do not also diagnose the use of this
-       new C2X feature of _Static_assert.  */
-    pedwarn_c11 (assert_loc, OPT_Wpedantic,
-		 "ISO C11 does not support omitting the string in "
-		 "%<_Static_assert%>");
+  switch (c_parser_peek_token (parser)->type)
+    {
+    case CPP_STRING:
+    case CPP_STRING16:
+    case CPP_STRING32:
+    case CPP_WSTRING:
+    case CPP_UTF8STRING:
+      string = c_parser_peek_token (parser)->value;
+      c_parser_consume_token (parser);
+      parser->lex_untranslated_string = false;
+      break;
+    default:
+      c_parser_error (parser, "expected string literal");
+      parser->lex_untranslated_string = false;
+      return;
+    }
   parens.require_close (parser);
 
   if (!INTEGRAL_TYPE_P (TREE_TYPE (value)))
@@ -2488,12 +2472,7 @@ c_parser_static_assert_declaration_no_semi (c_parser *parser)
     }
   constant_expression_warning (value);
   if (integer_zerop (value))
-    {
-      if (string)
-	error_at (assert_loc, "static assertion failed: %E", string);
-      else
-	error_at (assert_loc, "static assertion failed");
-    }
+    error_at (assert_loc, "static assertion failed: %E", string);
 }
 
 /* Parse some declaration specifiers (possibly none) (C90 6.5, C99
@@ -4070,17 +4049,16 @@ c_parser_parameter_declaration (c_parser *parser, tree attrs)
       c_parser_set_source_position_from_token (token);
       if (c_parser_next_tokens_start_typename (parser, cla_prefer_type))
 	{
-	  auto_diagnostic_group d;
 	  name_hint hint = lookup_name_fuzzy (token->value,
 					      FUZZY_LOOKUP_TYPENAME,
 					      token->location);
-	  if (const char *suggestion = hint.suggestion ())
+	  if (hint)
 	    {
 	      gcc_rich_location richloc (token->location);
-	      richloc.add_fixit_replace (suggestion);
+	      richloc.add_fixit_replace (hint.suggestion ());
 	      error_at (&richloc,
 			"unknown type name %qE; did you mean %qs?",
-			token->value, suggestion);
+			token->value, hint.suggestion ());
 	    }
 	  else
 	    error_at (token->location, "unknown type name %qE", token->value);
@@ -6886,18 +6864,14 @@ c_parser_binary_expression (c_parser *parser, struct c_expr *after,
 		&& !(TREE_CODE (first_arg) == PARM_DECL			      \
 		     && C_ARRAY_PARAMETER (first_arg)			      \
 		     && warn_sizeof_array_argument))			      \
-	      {								\
-		auto_diagnostic_group d;					\
-		if (warning_at (stack[sp].loc, OPT_Wsizeof_pointer_div, \
-				  "division %<sizeof (%T) / sizeof (%T)%> " \
-				  "does not compute the number of array " \
-				  "elements",				\
-				  type0, type1))			\
-		  if (DECL_P (first_arg))				\
-		    inform (DECL_SOURCE_LOCATION (first_arg),		\
-			      "first %<sizeof%> operand was declared here"); \
-	      }								\
-	  }								\
+	      if (warning_at (stack[sp].loc, OPT_Wsizeof_pointer_div,	      \
+			      "division %<sizeof (%T) / sizeof (%T)%> does "  \
+			      "not compute the number of array elements",     \
+			      type0, type1))				      \
+		if (DECL_P (first_arg))					      \
+		  inform (DECL_SOURCE_LOCATION (first_arg),		      \
+			  "first %<sizeof%> operand was declared here");      \
+	  }								      \
 	break;								      \
       default:								      \
 	break;								      \
@@ -7956,10 +7930,7 @@ c_parser_postfix_expression (c_parser *parser)
 	  c_parser_consume_token (parser);
 	  brace_loc = c_parser_peek_token (parser)->location;
 	  c_parser_consume_token (parser);
-	  /* If we've not yet started the current function's statement list,
-	     or we're in the parameter scope of an old-style function
-	     declaration, statement expressions are not allowed.  */
-	  if (!building_stmt_list_p () || old_style_parameter_scope ())
+	  if (!building_stmt_list_p ())
 	    {
 	      error_at (loc, "braced-group within expression allowed "
 			"only inside a function");
@@ -9121,147 +9092,6 @@ sizeof_ptr_memacc_comptypes (tree type1, tree type2)
   return comptypes (type1, type2) == 1;
 }
 
-/* Warn for patterns where abs-like function appears to be used incorrectly,
-   gracefully ignore any non-abs-like function.  The warning location should
-   be LOC.  FNDECL is the declaration of called function, it must be a
-   BUILT_IN_NORMAL function.  ARG is the first and only argument of the
-   call.  */
-
-static void
-warn_for_abs (location_t loc, tree fndecl, tree arg)
-{
-  tree atype = TREE_TYPE (arg);
-
-  /* Casts from pointers (and thus arrays and fndecls) will generate
-     -Wint-conversion warnings.  Most other wrong types hopefully lead to type
-     mismatch errors.  TODO: Think about what to do with FIXED_POINT_TYPE_P
-     types and possibly other exotic types.  */
-  if (!INTEGRAL_TYPE_P (atype)
-      && !SCALAR_FLOAT_TYPE_P (atype)
-      && TREE_CODE (atype) != COMPLEX_TYPE)
-    return;
-
-  enum built_in_function fcode = DECL_FUNCTION_CODE (fndecl);
-
-  switch (fcode)
-    {
-    case BUILT_IN_ABS:
-    case BUILT_IN_LABS:
-    case BUILT_IN_LLABS:
-    case BUILT_IN_IMAXABS:
-      if (!INTEGRAL_TYPE_P (atype))
-	{
-	  if (SCALAR_FLOAT_TYPE_P (atype))
-	    warning_at (loc, OPT_Wabsolute_value,
-			"using integer absolute value function %qD when "
-			"argument is of floating point type %qT",
-			fndecl, atype);
-	  else if (TREE_CODE (atype) == COMPLEX_TYPE)
-	    warning_at (loc, OPT_Wabsolute_value,
-			"using integer absolute value function %qD when "
-			"argument is of complex type %qT", fndecl, atype);
-	  else
-	    gcc_unreachable ();
-	  return;
-	}
-      if (TYPE_UNSIGNED (atype))
-	warning_at (loc, OPT_Wabsolute_value,
-		    "taking the absolute value of unsigned type %qT "
-		    "has no effect", atype);
-      break;
-
-    CASE_FLT_FN (BUILT_IN_FABS):
-    CASE_FLT_FN_FLOATN_NX (BUILT_IN_FABS):
-      if (!SCALAR_FLOAT_TYPE_P (atype)
-	  || DECIMAL_FLOAT_MODE_P (TYPE_MODE (atype)))
-	{
-	  if (INTEGRAL_TYPE_P (atype))
-	    warning_at (loc, OPT_Wabsolute_value,
-			"using floating point absolute value function %qD "
-			"when argument is of integer type %qT", fndecl, atype);
-	  else if (DECIMAL_FLOAT_TYPE_P (atype))
-	    warning_at (loc, OPT_Wabsolute_value,
-			"using floating point absolute value function %qD "
-			"when argument is of decimal floating point type %qT",
-			fndecl, atype);
-	  else if (TREE_CODE (atype) == COMPLEX_TYPE)
-	    warning_at (loc, OPT_Wabsolute_value,
-			"using floating point absolute value function %qD when "
-			"argument is of complex type %qT", fndecl, atype);
-	  else
-	    gcc_unreachable ();
-	  return;
-	}
-      break;
-
-    CASE_FLT_FN (BUILT_IN_CABS):
-      if (TREE_CODE (atype) != COMPLEX_TYPE)
-	{
-	  if (INTEGRAL_TYPE_P (atype))
-	    warning_at (loc, OPT_Wabsolute_value,
-			"using complex absolute value function %qD when "
-			"argument is of integer type %qT", fndecl, atype);
-	  else if (SCALAR_FLOAT_TYPE_P (atype))
-	    warning_at (loc, OPT_Wabsolute_value,
-			"using complex absolute value function %qD when "
-			"argument is of floating point type %qT",
-			fndecl, atype);
-	  else
-	    gcc_unreachable ();
-
-	  return;
-	}
-      break;
-
-    case BUILT_IN_FABSD32:
-    case BUILT_IN_FABSD64:
-    case BUILT_IN_FABSD128:
-      if (!DECIMAL_FLOAT_TYPE_P (atype))
-	{
-	  if (INTEGRAL_TYPE_P (atype))
-	    warning_at (loc, OPT_Wabsolute_value,
-			"using decimal floating point absolute value "
-			"function %qD when argument is of integer type %qT",
-			fndecl, atype);
-	  else if (SCALAR_FLOAT_TYPE_P (atype))
-	    warning_at (loc, OPT_Wabsolute_value,
-			"using decimal floating point absolute value "
-			"function %qD when argument is of floating point "
-			"type %qT", fndecl, atype);
-	  else if (TREE_CODE (atype) == COMPLEX_TYPE)
-	    warning_at (loc, OPT_Wabsolute_value,
-			"using decimal floating point absolute value "
-			"function %qD when argument is of complex type %qT",
-			fndecl, atype);
-	  else
-	    gcc_unreachable ();
-	  return;
-	}
-      break;
-
-    default:
-      return;
-    }
-
-  if (!TYPE_ARG_TYPES (TREE_TYPE (fndecl)))
-    return;
-
-  tree ftype = TREE_VALUE (TYPE_ARG_TYPES (TREE_TYPE (fndecl)));
-  if (TREE_CODE (atype) == COMPLEX_TYPE)
-    {
-      gcc_assert (TREE_CODE (ftype) == COMPLEX_TYPE);
-      atype = TREE_TYPE (atype);
-      ftype = TREE_TYPE (ftype);
-    }
-
-  if (TYPE_PRECISION (ftype) < TYPE_PRECISION (atype))
-    warning_at (loc, OPT_Wabsolute_value,
-		"absolute value function %qD given an argument of type %qT "
-		"but has parameter of type %qT which may cause truncation "
-		"of value", fndecl, atype, ftype);
-}
-
-
 /* Parse a postfix expression after the initial primary or compound
    literal; that is, parse a series of postfix operators.
 
@@ -9326,19 +9156,14 @@ c_parser_postfix_expression_after_primary (c_parser *parser,
 					      expr.value, exprlist,
 					      sizeof_arg,
 					      sizeof_ptr_memacc_comptypes);
-	  if (TREE_CODE (expr.value) == FUNCTION_DECL)
+	  if (TREE_CODE (expr.value) == FUNCTION_DECL
+	      && DECL_BUILT_IN_CLASS (expr.value) == BUILT_IN_NORMAL
+	      && DECL_FUNCTION_CODE (expr.value) == BUILT_IN_MEMSET
+	      && vec_safe_length (exprlist) == 3)
 	    {
-	      if (fndecl_built_in_p (expr.value, BUILT_IN_MEMSET)
-		  && vec_safe_length (exprlist) == 3)
-		{
-		  tree arg0 = (*exprlist)[0];
-		  tree arg2 = (*exprlist)[2];
-		  warn_for_memset (expr_loc, arg0, arg2, literal_zero_mask);
-		}
-	      if (warn_absolute_value
-		  && fndecl_built_in_p (expr.value, BUILT_IN_NORMAL)
-		  && vec_safe_length (exprlist) == 1)
-		warn_for_abs (expr_loc, expr.value, (*exprlist)[0]);
+	      tree arg0 = (*exprlist)[0];
+	      tree arg2 = (*exprlist)[2];
+	      warn_for_memset (expr_loc, arg0, arg2, literal_zero_mask);
 	    }
 
 	  start = expr.get_start ();
@@ -9351,7 +9176,8 @@ c_parser_postfix_expression_after_primary (c_parser *parser,
 	  expr.original_code = ERROR_MARK;
 	  if (TREE_CODE (expr.value) == INTEGER_CST
 	      && TREE_CODE (orig_expr.value) == FUNCTION_DECL
-	      && fndecl_built_in_p (orig_expr.value, BUILT_IN_CONSTANT_P))
+	      && DECL_BUILT_IN_CLASS (orig_expr.value) == BUILT_IN_NORMAL
+	      && DECL_FUNCTION_CODE (orig_expr.value) == BUILT_IN_CONSTANT_P)
 	    expr.original_code = C_MAYBE_CONST_EXPR;
 	  expr.original_type = NULL;
 	  if (exprlist)
@@ -11430,8 +11256,6 @@ c_parser_omp_clause_name (c_parser *parser)
 	case 'f':
 	  if (!strcmp ("final", p))
 	    result = PRAGMA_OMP_CLAUSE_FINAL;
-	  else if (!strcmp ("finalize", p))
-	    result = PRAGMA_OACC_CLAUSE_FINALIZE;
 	  else if (!strcmp ("firstprivate", p))
 	    result = PRAGMA_OMP_CLAUSE_FIRSTPRIVATE;
 	  else if (!strcmp ("from", p))
@@ -11450,9 +11274,7 @@ c_parser_omp_clause_name (c_parser *parser)
 	    result = PRAGMA_OACC_CLAUSE_HOST;
 	  break;
 	case 'i':
-	  if (!strcmp ("if_present", p))
-	    result = PRAGMA_OACC_CLAUSE_IF_PRESENT;
-	  else if (!strcmp ("inbranch", p))
+	  if (!strcmp ("inbranch", p))
 	    result = PRAGMA_OMP_CLAUSE_INBRANCH;
 	  else if (!strcmp ("independent", p))
 	    result = PRAGMA_OACC_CLAUSE_INDEPENDENT;
@@ -11500,20 +11322,18 @@ c_parser_omp_clause_name (c_parser *parser)
 	    result = PRAGMA_OMP_CLAUSE_PARALLEL;
 	  else if (!strcmp ("present", p))
 	    result = PRAGMA_OACC_CLAUSE_PRESENT;
-	  /* As of OpenACC 2.5, these are now aliases of the non-present_or
-	     clauses.  */
 	  else if (!strcmp ("present_or_copy", p)
 		   || !strcmp ("pcopy", p))
-	    result = PRAGMA_OACC_CLAUSE_COPY;
+	    result = PRAGMA_OACC_CLAUSE_PRESENT_OR_COPY;
 	  else if (!strcmp ("present_or_copyin", p)
 		   || !strcmp ("pcopyin", p))
-	    result = PRAGMA_OACC_CLAUSE_COPYIN;
+	    result = PRAGMA_OACC_CLAUSE_PRESENT_OR_COPYIN;
 	  else if (!strcmp ("present_or_copyout", p)
 		   || !strcmp ("pcopyout", p))
-	    result = PRAGMA_OACC_CLAUSE_COPYOUT;
+	    result = PRAGMA_OACC_CLAUSE_PRESENT_OR_COPYOUT;
 	  else if (!strcmp ("present_or_create", p)
 		   || !strcmp ("pcreate", p))
-	    result = PRAGMA_OACC_CLAUSE_CREATE;
+	    result = PRAGMA_OACC_CLAUSE_PRESENT_OR_CREATE;
 	  else if (!strcmp ("priority", p))
 	    result = PRAGMA_OMP_CLAUSE_PRIORITY;
 	  else if (!strcmp ("private", p))
@@ -11532,8 +11352,6 @@ c_parser_omp_clause_name (c_parser *parser)
 	    result = PRAGMA_OMP_CLAUSE_SCHEDULE;
 	  else if (!strcmp ("sections", p))
 	    result = PRAGMA_OMP_CLAUSE_SECTIONS;
-	  else if (!strcmp ("self", p)) /* "self" is a synonym for "host".  */
-	    result = PRAGMA_OACC_CLAUSE_HOST;
 	  else if (!strcmp ("seq", p))
 	    result = PRAGMA_OACC_CLAUSE_SEQ;
 	  else if (!strcmp ("shared", p))
@@ -11542,6 +11360,8 @@ c_parser_omp_clause_name (c_parser *parser)
 	    result = PRAGMA_OMP_CLAUSE_SIMD;
 	  else if (!strcmp ("simdlen", p))
 	    result = PRAGMA_OMP_CLAUSE_SIMDLEN;
+	  else if (!strcmp ("self", p))
+	    result = PRAGMA_OACC_CLAUSE_SELF;
 	  break;
 	case 't':
 	  if (!strcmp ("taskgroup", p))
@@ -11823,7 +11643,15 @@ c_parser_omp_var_list_parens (c_parser *parser, enum omp_clause_code kind,
    copyout ( variable-list )
    create ( variable-list )
    delete ( variable-list )
-   present ( variable-list ) */
+   present ( variable-list )
+   present_or_copy ( variable-list )
+     pcopy ( variable-list )
+   present_or_copyin ( variable-list )
+     pcopyin ( variable-list )
+   present_or_copyout ( variable-list )
+     pcopyout ( variable-list )
+   present_or_create ( variable-list )
+     pcreate ( variable-list ) */
 
 static tree
 c_parser_oacc_data_clause (c_parser *parser, pragma_omp_clause c_kind,
@@ -11833,19 +11661,19 @@ c_parser_oacc_data_clause (c_parser *parser, pragma_omp_clause c_kind,
   switch (c_kind)
     {
     case PRAGMA_OACC_CLAUSE_COPY:
-      kind = GOMP_MAP_TOFROM;
+      kind = GOMP_MAP_FORCE_TOFROM;
       break;
     case PRAGMA_OACC_CLAUSE_COPYIN:
-      kind = GOMP_MAP_TO;
+      kind = GOMP_MAP_FORCE_TO;
       break;
     case PRAGMA_OACC_CLAUSE_COPYOUT:
-      kind = GOMP_MAP_FROM;
+      kind = GOMP_MAP_FORCE_FROM;
       break;
     case PRAGMA_OACC_CLAUSE_CREATE:
-      kind = GOMP_MAP_ALLOC;
+      kind = GOMP_MAP_FORCE_ALLOC;
       break;
     case PRAGMA_OACC_CLAUSE_DELETE:
-      kind = GOMP_MAP_RELEASE;
+      kind = GOMP_MAP_DELETE;
       break;
     case PRAGMA_OACC_CLAUSE_DEVICE:
       kind = GOMP_MAP_FORCE_TO;
@@ -11854,6 +11682,7 @@ c_parser_oacc_data_clause (c_parser *parser, pragma_omp_clause c_kind,
       kind = GOMP_MAP_DEVICE_RESIDENT;
       break;
     case PRAGMA_OACC_CLAUSE_HOST:
+    case PRAGMA_OACC_CLAUSE_SELF:
       kind = GOMP_MAP_FORCE_FROM;
       break;
     case PRAGMA_OACC_CLAUSE_LINK:
@@ -11861,6 +11690,18 @@ c_parser_oacc_data_clause (c_parser *parser, pragma_omp_clause c_kind,
       break;
     case PRAGMA_OACC_CLAUSE_PRESENT:
       kind = GOMP_MAP_FORCE_PRESENT;
+      break;
+    case PRAGMA_OACC_CLAUSE_PRESENT_OR_COPY:
+      kind = GOMP_MAP_TOFROM;
+      break;
+    case PRAGMA_OACC_CLAUSE_PRESENT_OR_COPYIN:
+      kind = GOMP_MAP_TO;
+      break;
+    case PRAGMA_OACC_CLAUSE_PRESENT_OR_COPYOUT:
+      kind = GOMP_MAP_FROM;
+      break;
+    case PRAGMA_OACC_CLAUSE_PRESENT_OR_CREATE:
+      kind = GOMP_MAP_ALLOC;
       break;
     default:
       gcc_unreachable ();
@@ -12753,9 +12594,8 @@ c_parser_oacc_shape_clause (c_parser *parser, omp_clause_code kind,
   return list;
 }
 
-/* OpenACC 2.5:
+/* OpenACC:
    auto
-   finalize
    independent
    nohost
    seq */
@@ -14112,11 +13952,6 @@ c_parser_oacc_all_clauses (c_parser *parser, omp_clause_mask mask,
 	  clauses = c_parser_oacc_data_clause (parser, c_kind, clauses);
 	  c_name = "device_resident";
 	  break;
-	case PRAGMA_OACC_CLAUSE_FINALIZE:
-	  clauses = c_parser_oacc_simple_clause (parser, OMP_CLAUSE_FINALIZE,
-						 clauses);
-	  c_name = "finalize";
-	  break;
 	case PRAGMA_OACC_CLAUSE_FIRSTPRIVATE:
 	  clauses = c_parser_omp_clause_firstprivate (parser, clauses);
 	  c_name = "firstprivate";
@@ -14133,11 +13968,6 @@ c_parser_oacc_all_clauses (c_parser *parser, omp_clause_mask mask,
 	case PRAGMA_OACC_CLAUSE_IF:
 	  clauses = c_parser_omp_clause_if (parser, clauses, false);
 	  c_name = "if";
-	  break;
-	case PRAGMA_OACC_CLAUSE_IF_PRESENT:
-	  clauses = c_parser_oacc_simple_clause (parser, OMP_CLAUSE_IF_PRESENT,
-						 clauses);
-	  c_name = "if_present";
 	  break;
 	case PRAGMA_OACC_CLAUSE_INDEPENDENT:
 	  clauses = c_parser_oacc_simple_clause (parser, OMP_CLAUSE_INDEPENDENT,
@@ -14164,6 +13994,22 @@ c_parser_oacc_all_clauses (c_parser *parser, omp_clause_mask mask,
 	  clauses = c_parser_oacc_data_clause (parser, c_kind, clauses);
 	  c_name = "present";
 	  break;
+	case PRAGMA_OACC_CLAUSE_PRESENT_OR_COPY:
+	  clauses = c_parser_oacc_data_clause (parser, c_kind, clauses);
+	  c_name = "present_or_copy";
+	  break;
+	case PRAGMA_OACC_CLAUSE_PRESENT_OR_COPYIN:
+	  clauses = c_parser_oacc_data_clause (parser, c_kind, clauses);
+	  c_name = "present_or_copyin";
+	  break;
+	case PRAGMA_OACC_CLAUSE_PRESENT_OR_COPYOUT:
+	  clauses = c_parser_oacc_data_clause (parser, c_kind, clauses);
+	  c_name = "present_or_copyout";
+	  break;
+	case PRAGMA_OACC_CLAUSE_PRESENT_OR_CREATE:
+	  clauses = c_parser_oacc_data_clause (parser, c_kind, clauses);
+	  c_name = "present_or_create";
+	  break;
 	case PRAGMA_OACC_CLAUSE_PRIVATE:
 	  clauses = c_parser_omp_clause_private (parser, clauses);
 	  c_name = "private";
@@ -14171,6 +14017,10 @@ c_parser_oacc_all_clauses (c_parser *parser, omp_clause_mask mask,
 	case PRAGMA_OACC_CLAUSE_REDUCTION:
 	  clauses = c_parser_omp_clause_reduction (parser, clauses);
 	  c_name = "reduction";
+	  break;
+	case PRAGMA_OACC_CLAUSE_SELF:
+	  clauses = c_parser_oacc_data_clause (parser, c_kind, clauses);
+	  c_name = "self";
 	  break;
 	case PRAGMA_OACC_CLAUSE_SEQ:
 	  clauses = c_parser_oacc_simple_clause (parser, OMP_CLAUSE_SEQ,
@@ -14564,7 +14414,11 @@ c_parser_oacc_cache (location_t loc, c_parser *parser)
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_CREATE)		\
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_DEVICEPTR)		\
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_IF)			\
-	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_PRESENT))
+	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_PRESENT)		\
+	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_PRESENT_OR_COPY)	\
+	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_PRESENT_OR_COPYIN)	\
+	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_PRESENT_OR_COPYOUT)	\
+	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_PRESENT_OR_CREATE) )
 
 static tree
 c_parser_oacc_data (location_t loc, c_parser *parser, bool *if_p)
@@ -14594,7 +14448,11 @@ c_parser_oacc_data (location_t loc, c_parser *parser, bool *if_p)
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_DEVICEPTR)		\
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_DEVICE_RESIDENT)	\
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_LINK)		\
-	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_PRESENT))
+	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_PRESENT)		\
+	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_PRESENT_OR_COPY)	\
+	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_PRESENT_OR_COPYIN)	\
+	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_PRESENT_OR_COPYOUT)	\
+	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_PRESENT_OR_CREATE) )
 
 static void
 c_parser_oacc_declare (c_parser *parser)
@@ -14629,8 +14487,8 @@ c_parser_oacc_declare (c_parser *parser)
       switch (OMP_CLAUSE_MAP_KIND (t))
 	{
 	case GOMP_MAP_FIRSTPRIVATE_POINTER:
-	case GOMP_MAP_ALLOC:
-	case GOMP_MAP_TO:
+	case GOMP_MAP_FORCE_ALLOC:
+	case GOMP_MAP_FORCE_TO:
 	case GOMP_MAP_FORCE_DEVICEPTR:
 	case GOMP_MAP_DEVICE_RESIDENT:
 	  break;
@@ -14743,6 +14601,8 @@ c_parser_oacc_declare (c_parser *parser)
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_ASYNC)		\
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_COPYIN)		\
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_CREATE)		\
+	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_PRESENT_OR_COPYIN)	\
+	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_PRESENT_OR_CREATE)	\
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_WAIT) )
 
 #define OACC_EXIT_DATA_CLAUSE_MASK					\
@@ -14750,7 +14610,6 @@ c_parser_oacc_declare (c_parser *parser)
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_ASYNC)		\
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_COPYOUT)		\
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_DELETE) 		\
-	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_FINALIZE) 		\
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_WAIT) )
 
 static void
@@ -14894,6 +14753,10 @@ c_parser_oacc_loop (location_t loc, c_parser *parser, char *p_name,
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_NUM_GANGS)		\
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_NUM_WORKERS)		\
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_PRESENT)		\
+	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_PRESENT_OR_COPY)	\
+	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_PRESENT_OR_COPYIN)	\
+	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_PRESENT_OR_COPYOUT)	\
+	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_PRESENT_OR_CREATE)	\
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_VECTOR_LENGTH)	\
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_WAIT) )
 
@@ -14911,6 +14774,10 @@ c_parser_oacc_loop (location_t loc, c_parser *parser, char *p_name,
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_NUM_GANGS)		\
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_NUM_WORKERS)		\
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_PRESENT)		\
+	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_PRESENT_OR_COPY)	\
+	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_PRESENT_OR_COPYIN)	\
+	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_PRESENT_OR_COPYOUT)	\
+	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_PRESENT_OR_CREATE)	\
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_REDUCTION)		\
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_VECTOR_LENGTH)	\
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_WAIT) )
@@ -15138,7 +15005,7 @@ c_finish_oacc_routine (struct oacc_routine_data *data, tree fndecl,
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_DEVICE)		\
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_HOST)		\
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_IF)			\
-	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_IF_PRESENT)		\
+	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_SELF)		\
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_WAIT) )
 
 static void

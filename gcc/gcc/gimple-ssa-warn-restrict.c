@@ -88,7 +88,7 @@ class wrestrict_dom_walker : public dom_walker
   bool handle_gimple_call (gimple_stmt_iterator *);
 
  private:
-  void check_call (gimple *);
+  void check_call (gcall *);
 };
 
 edge
@@ -102,7 +102,8 @@ wrestrict_dom_walker::before_dom_children (basic_block bb)
       if (!is_gimple_call (stmt))
 	continue;
 
-      check_call (stmt);
+      if (gcall *call = as_a <gcall *> (stmt))
+	check_call (call);
     }
 
   return NULL;
@@ -191,7 +192,7 @@ class builtin_access
     return detect_overlap != &builtin_access::generic_overlap;
   }
 
-  builtin_access (gimple *, builtin_memref &, builtin_memref &);
+  builtin_access (gcall *, builtin_memref &, builtin_memref &);
 
   /* Entry point to determine overlap.  */
   bool overlap ();
@@ -262,32 +263,27 @@ builtin_memref::builtin_memref (tree expr, tree size)
   else
     sizrange[1] = maxobjsize;
 
-  if (!DECL_P (base))
-    return;
-
-  /* If the offset could be in the range of the referenced object
-     constrain its bounds so neither exceeds those of the object.  */
-  if (offrange[0] < 0 && offrange[1] > 0)
-    offrange[0] = 0;
-
-  offset_int maxoff = maxobjsize;
   tree basetype = TREE_TYPE (base);
-  if (TREE_CODE (basetype) == ARRAY_TYPE
-      && ref
-      && array_at_struct_end_p (ref))
-    ;   /* Use the maximum possible offset for last member arrays.  */
-  else if (tree basesize = TYPE_SIZE_UNIT (basetype))
-    if (TREE_CODE (basesize) == INTEGER_CST)
-      /* Size could be non-constant for a variable-length type such
-	 as a struct with a VLA member (a GCC extension).  */
-      maxoff = wi::to_offset (basesize);
-
-  if (offrange[0] >= 0)
+  if (DECL_P (base) && TREE_CODE (basetype) == ARRAY_TYPE)
     {
-      if (offrange[1] < 0)
-	offrange[1] = offrange[0] <= maxoff ? maxoff : maxobjsize;
-      else if (offrange[0] <= maxoff && offrange[1] > maxoff)
-	offrange[1] = maxoff;
+      /* If the offset could be in range of the referenced object
+	 constrain its bounds so neither exceeds those of the object.  */
+      if (offrange[0] < 0 && offrange[1] > 0)
+	offrange[0] = 0;
+
+      offset_int maxoff = maxobjsize;
+      if (ref && array_at_struct_end_p (ref))
+	;   /* Use the maximum possible offset for last member arrays.  */
+      else if (tree basesize = TYPE_SIZE_UNIT (basetype))
+	maxoff = wi::to_offset (basesize);
+
+      if (offrange[0] >= 0)
+	{
+	  if (offrange[1] < 0)
+	    offrange[1] = offrange[0] <= maxoff ? maxoff : maxobjsize;
+	  else if (offrange[0] <= maxoff && offrange[1] > maxoff)
+	    offrange[1] = maxoff;
+	}
     }
 }
 
@@ -312,7 +308,7 @@ builtin_memref::extend_offset_range (tree offset)
   if (TREE_CODE (offset) == SSA_NAME)
     {
       wide_int min, max;
-      value_range_kind rng = get_range_info (offset, &min, &max);
+      value_range_type rng = get_range_info (offset, &min, &max);
       if (rng == VR_RANGE)
 	{
 	  offrange[0] += offset_int::from (min, SIGNED);
@@ -562,7 +558,7 @@ builtin_memref::offset_out_of_bounds (int strict, offset_int ooboff[2]) const
 /* Create an association between the memory references DST and SRC
    for access by a call EXPR to a memory or string built-in funtion.  */
 
-builtin_access::builtin_access (gimple *call, builtin_memref &dst,
+builtin_access::builtin_access (gcall *call, builtin_memref &dst,
 				builtin_memref &src)
 : dstref (&dst), srcref (&src), sizrange (), ovloff (), ovlsiz (),
   dstoff (), srcoff (), dstsiz (), srcsiz ()
@@ -588,14 +584,20 @@ builtin_access::builtin_access (gimple *call, builtin_memref &dst,
 
   /* The size argument number (depends on the built-in).  */
   unsigned sizeargno = 2;
+  if (gimple_call_with_bounds_p (call))
+    sizeargno += 2;
 
   tree func = gimple_call_fndecl (call);
   switch (DECL_FUNCTION_CODE (func))
     {
     case BUILT_IN_MEMCPY:
     case BUILT_IN_MEMCPY_CHK:
+    case BUILT_IN_MEMCPY_CHKP:
+    case BUILT_IN_MEMCPY_CHK_CHKP:
     case BUILT_IN_MEMPCPY:
     case BUILT_IN_MEMPCPY_CHK:
+    case BUILT_IN_MEMPCPY_CHKP:
+    case BUILT_IN_MEMPCPY_CHK_CHKP:
       ostype = 0;
       depends_p = false;
       detect_overlap = &builtin_access::generic_overlap;
@@ -603,6 +605,8 @@ builtin_access::builtin_access (gimple *call, builtin_memref &dst,
 
     case BUILT_IN_MEMMOVE:
     case BUILT_IN_MEMMOVE_CHK:
+    case BUILT_IN_MEMMOVE_CHKP:
+    case BUILT_IN_MEMMOVE_CHK_CHKP:
       /* For memmove there is never any overlap to check for.  */
       ostype = 0;
       depends_p = false;
@@ -619,13 +623,19 @@ builtin_access::builtin_access (gimple *call, builtin_memref &dst,
 
     case BUILT_IN_STPCPY:
     case BUILT_IN_STPCPY_CHK:
+    case BUILT_IN_STPCPY_CHKP:
+    case BUILT_IN_STPCPY_CHK_CHKP:
     case BUILT_IN_STRCPY:
     case BUILT_IN_STRCPY_CHK:
+    case BUILT_IN_STRCPY_CHKP:
+    case BUILT_IN_STRCPY_CHK_CHKP:
       detect_overlap = &builtin_access::strcpy_overlap;
       break;
 
     case BUILT_IN_STRCAT:
     case BUILT_IN_STRCAT_CHK:
+    case BUILT_IN_STRCAT_CHKP:
+    case BUILT_IN_STRCAT_CHK_CHKP:
       detect_overlap = &builtin_access::strcat_overlap;
       break;
 
@@ -639,7 +649,8 @@ builtin_access::builtin_access (gimple *call, builtin_memref &dst,
     default:
       /* Handle other string functions here whose access may need
 	 to be validated for in-bounds offsets and non-overlapping
-	 copies.  */
+	 copies.  (Not all _chkp functions have BUILT_IN_XXX_CHKP
+	 macros so they need to be handled here.)  */
       return;
     }
 
@@ -1323,7 +1334,7 @@ builtin_access::overlap ()
    Return true when one has been detected, false otherwise.  */
 
 static bool
-maybe_diag_overlap (location_t loc, gimple *call, builtin_access &acs)
+maybe_diag_overlap (location_t loc, gcall *call, builtin_access &acs)
 {
   if (!acs.overlap ())
     return false;
@@ -1576,7 +1587,7 @@ maybe_diag_overlap (location_t loc, gimple *call, builtin_access &acs)
    has been issued.  */
 
 static bool
-maybe_diag_offset_bounds (location_t loc, gimple *call, tree func, int strict,
+maybe_diag_offset_bounds (location_t loc, gcall *call, tree func, int strict,
 			  tree expr, const builtin_memref &ref)
 {
   if (!warn_array_bounds)
@@ -1592,6 +1603,8 @@ maybe_diag_offset_bounds (location_t loc, gimple *call, tree func, int strict,
 
   loc = expansion_point_location_if_in_system_header (loc);
 
+  tree type;
+
   char rangestr[2][64];
   if (ooboff[0] == ooboff[1]
       || (ooboff[0] != ref.offrange[0]
@@ -1602,8 +1615,6 @@ maybe_diag_offset_bounds (location_t loc, gimple *call, tree func, int strict,
 	     (long long) ooboff[0].to_shwi (),
 	     (long long) ooboff[1].to_shwi ());
 
-  bool warned = false;
-
   if (oobref == error_mark_node)
     {
       if (ref.sizrange[0] == ref.sizrange[1])
@@ -1613,32 +1624,26 @@ maybe_diag_offset_bounds (location_t loc, gimple *call, tree func, int strict,
 		 (long long) ref.sizrange[0].to_shwi (),
 		 (long long) ref.sizrange[1].to_shwi ());
 
-      tree type;
-
       if (DECL_P (ref.base)
 	  && TREE_CODE (type = TREE_TYPE (ref.base)) == ARRAY_TYPE)
 	{
-	  auto_diagnostic_group d;
 	  if (warning_at (loc, OPT_Warray_bounds,
 			  "%G%qD pointer overflow between offset %s "
 			  "and size %s accessing array %qD with type %qT",
 			  call, func, rangestr[0], rangestr[1], ref.base, type))
-	    {
-	      inform (DECL_SOURCE_LOCATION (ref.base),
-		      "array %qD declared here", ref.base);
-	      warned = true;
-	    }
+	    inform (DECL_SOURCE_LOCATION (ref.base),
+		    "array %qD declared here", ref.base);
 	  else
-	    warned = warning_at (loc, OPT_Warray_bounds,
-				 "%G%qD pointer overflow between offset %s "
-				 "and size %s",
-				 call, func, rangestr[0], rangestr[1]);
+	    warning_at (loc, OPT_Warray_bounds,
+			"%G%qD pointer overflow between offset %s "
+			"and size %s",
+			call, func, rangestr[0], rangestr[1]);
 	}
       else
-	warned = warning_at (loc, OPT_Warray_bounds,
-			     "%G%qD pointer overflow between offset %s "
-			     "and size %s",
-			     call, func, rangestr[0], rangestr[1]);
+	warning_at (loc, OPT_Warray_bounds,
+		    "%G%qD pointer overflow between offset %s "
+		    "and size %s",
+		    call, func, rangestr[0], rangestr[1]);
     }
   else if (oobref == ref.base)
     {
@@ -1651,7 +1656,6 @@ maybe_diag_offset_bounds (location_t loc, gimple *call, tree func, int strict,
 
       if (DECL_P (ref.base))
 	{
-	  auto_diagnostic_group d;
 	  if ((ref.basesize < maxobjsize
 	       && warning_at (loc, OPT_Warray_bounds,
 			      form
@@ -1670,26 +1674,22 @@ maybe_diag_offset_bounds (location_t loc, gimple *call, tree func, int strict,
 				  "of object %qD with type %qT"),
 			     call, func, rangestr[0],
 			     ref.base, TREE_TYPE (ref.base)))
-	    {
-	      inform (DECL_SOURCE_LOCATION (ref.base),
-		      "%qD declared here", ref.base);
-	      warned = true;
-	    }
+	    inform (DECL_SOURCE_LOCATION (ref.base),
+		    "%qD declared here", ref.base);
 	}
       else if (ref.basesize < maxobjsize)
-	warned = warning_at (loc, OPT_Warray_bounds,
-			     form
-			     ? G_("%G%qD forming offset %s is out "
-				  "of the bounds [0, %wu]")
-			     : G_("%G%qD offset %s is out "
-				  "of the bounds [0, %wu]"),
-			     call, func, rangestr[0], ref.basesize.to_uhwi ());
+	warning_at (loc, OPT_Warray_bounds,
+		    form
+		    ? G_("%G%qD forming offset %s is out of the bounds "
+			 "[0, %wu]")
+		    : G_("%G%qD offset %s is out of the bounds [0, %wu]"),
+		    call, func, rangestr[0], ref.basesize.to_uhwi ());
       else
-	warned = warning_at (loc, OPT_Warray_bounds,
-			     form
-			     ? G_("%G%qD forming offset %s is out of bounds")
-			     : G_("%G%qD offset %s is out of bounds"),
-			     call, func, rangestr[0]);
+	warning_at (loc, OPT_Warray_bounds,
+		    form
+		    ? G_("%G%qD forming offset %s is out of bounds")
+		    : G_("%G%qD offset %s is out of bounds"),
+		    call, func, rangestr[0]);
     }
   else if (TREE_CODE (ref.ref) == MEM_REF)
     {
@@ -1698,32 +1698,31 @@ maybe_diag_offset_bounds (location_t loc, gimple *call, tree func, int strict,
 	type = TREE_TYPE (type);
       type = TYPE_MAIN_VARIANT (type);
 
-      warned = warning_at (loc, OPT_Warray_bounds,
-			   "%G%qD offset %s from the object at %qE is out "
-			   "of the bounds of %qT",
-			   call, func, rangestr[0], ref.base, type);
+      warning_at (loc, OPT_Warray_bounds,
+		  "%G%qD offset %s from the object at %qE is out "
+		  "of the bounds of %qT",
+		  call, func, rangestr[0], ref.base, type);
     }
   else
     {
-      tree type = TYPE_MAIN_VARIANT (TREE_TYPE (ref.ref));
+      type = TYPE_MAIN_VARIANT (TREE_TYPE (ref.ref));
 
-      warned = warning_at (loc, OPT_Warray_bounds,
-			   "%G%qD offset %s from the object at %qE is out "
-			   "of the bounds of referenced subobject %qD with "
-			   "type %qT at offset %wu",
-			   call, func, rangestr[0], ref.base,
-			   TREE_OPERAND (ref.ref, 1), type,
-			   ref.refoff.to_uhwi ());
+      warning_at (loc, OPT_Warray_bounds,
+		"%G%qD offset %s from the object at %qE is out "
+		"of the bounds of referenced subobject %qD with type %qT "
+		"at offset %wu",
+		call, func, rangestr[0], ref.base, TREE_OPERAND (ref.ref, 1),
+		type, ref.refoff.to_uhwi ());
     }
 
-  return warned;
+  return true;
 }
 
 /* Check a CALL statement for restrict-violations and issue warnings
    if/when appropriate.  */
 
 void
-wrestrict_dom_walker::check_call (gimple *call)
+wrestrict_dom_walker::check_call (gcall *call)
 {
   /* Avoid checking the call if it has already been diagnosed for
      some reason.  */
@@ -1731,8 +1730,10 @@ wrestrict_dom_walker::check_call (gimple *call)
     return;
 
   tree func = gimple_call_fndecl (call);
-  if (!func || !fndecl_built_in_p (func, BUILT_IN_NORMAL))
+  if (!func || DECL_BUILT_IN_CLASS (func) != BUILT_IN_NORMAL)
     return;
+
+  bool with_bounds = gimple_call_with_bounds_p (call);
 
   /* Argument number to extract from the call (depends on the built-in
      and its kind).  */
@@ -1748,10 +1749,16 @@ wrestrict_dom_walker::check_call (gimple *call)
     {
     case BUILT_IN_MEMCPY:
     case BUILT_IN_MEMCPY_CHK:
+    case BUILT_IN_MEMCPY_CHKP:
+    case BUILT_IN_MEMCPY_CHK_CHKP:
     case BUILT_IN_MEMPCPY:
     case BUILT_IN_MEMPCPY_CHK:
+    case BUILT_IN_MEMPCPY_CHKP:
+    case BUILT_IN_MEMPCPY_CHK_CHKP:
     case BUILT_IN_MEMMOVE:
     case BUILT_IN_MEMMOVE_CHK:
+    case BUILT_IN_MEMMOVE_CHKP:
+    case BUILT_IN_MEMMOVE_CHK_CHKP:
       strfun = false;
       /* Fall through.  */
 
@@ -1762,24 +1769,31 @@ wrestrict_dom_walker::check_call (gimple *call)
     case BUILT_IN_STRNCPY:
     case BUILT_IN_STRNCPY_CHK:
       dst_idx = 0;
-      src_idx = 1;
-      bnd_idx = 2;
+      src_idx = 1 + with_bounds;
+      bnd_idx = 2 + 2 * with_bounds;
       break;
 
     case BUILT_IN_STPCPY:
     case BUILT_IN_STPCPY_CHK:
+    case BUILT_IN_STPCPY_CHKP:
+    case BUILT_IN_STPCPY_CHK_CHKP:
     case BUILT_IN_STRCPY:
     case BUILT_IN_STRCPY_CHK:
+    case BUILT_IN_STRCPY_CHKP:
+    case BUILT_IN_STRCPY_CHK_CHKP:
     case BUILT_IN_STRCAT:
     case BUILT_IN_STRCAT_CHK:
+    case BUILT_IN_STRCAT_CHKP:
+    case BUILT_IN_STRCAT_CHK_CHKP:
       dst_idx = 0;
-      src_idx = 1;
+      src_idx = 1 + with_bounds;
       break;
 
     default:
       /* Handle other string functions here whose access may need
 	 to be validated for in-bounds offsets and non-overlapping
-	 copies.  */
+	 copies.  (Not all _chkp functions have BUILT_IN_XXX_CHKP
+	 macros so they need to be handled here.)  */
       return;
     }
 
@@ -1823,10 +1837,15 @@ wrestrict_dom_walker::check_call (gimple *call)
    detected and diagnosed, true otherwise.  */
 
 bool
-check_bounds_or_overlap (gimple *call, tree dst, tree src, tree dstsize,
+check_bounds_or_overlap (gcall *call, tree dst, tree src, tree dstsize,
 			 tree srcsize, bool bounds_only /* = false */)
 {
-  location_t loc = gimple_nonartificial_location (call);
+  location_t loc = gimple_location (call);
+
+  if (tree block = gimple_block (call))
+    if (location_t *pbloc = block_nonartificial_location (block))
+      loc = *pbloc;
+
   loc = expansion_point_location_if_in_system_header (loc);
 
   tree func = gimple_call_fndecl (call);

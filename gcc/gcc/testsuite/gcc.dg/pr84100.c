@@ -1,7 +1,6 @@
 /* PR c/84100 */
 /* { dg-do compile } */
 /* { dg-options "-O2" } */
-/* { dg-skip-if "no code alignment > 2" { "pdp11-*-*" } } */
 
 void bar (void);
 

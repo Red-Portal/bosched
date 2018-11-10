@@ -741,27 +741,29 @@ read_line_num (fcache *c, size_t line_num,
    The line is not nul-terminated.  The returned pointer is only
    valid until the next call of location_get_source_line.
    Note that the line can contain several null characters,
-   so the returned value's length has the actual length of the line.
-   If the function fails, a NULL char_span is returned.  */
+   so LINE_LEN, if non-null, points to the actual length of the line.
+   If the function fails, NULL is returned.  */
 
-char_span
-location_get_source_line (const char *file_path, int line)
+const char *
+location_get_source_line (const char *file_path, int line,
+			  int *line_len)
 {
   char *buffer = NULL;
   ssize_t len;
 
   if (line == 0)
-    return char_span (NULL, 0);
+    return NULL;
 
   fcache *c = lookup_or_add_file_to_cache_tab (file_path);
   if (c == NULL)
-    return char_span (NULL, 0);
+    return NULL;
 
   bool read = read_line_num (c, line, &buffer, &len);
-  if (!read)
-    return char_span (NULL, 0);
 
-  return char_span (buffer, len);
+  if (read && line_len)
+    *line_len = len;
+
+  return read ? buffer : NULL;
 }
 
 /* Determine if FILE_PATH missing a trailing newline on its final line.
@@ -813,10 +815,10 @@ expand_location (source_location loc)
    "<built-in>".  */
 
 expanded_location
-expand_location_to_spelling_point (source_location loc,
-				   enum location_aspect aspect)
+expand_location_to_spelling_point (source_location loc)
 {
-  return expand_location_1 (loc, /*expansion_point_p=*/false, aspect);
+  return expand_location_1 (loc, /*expansion_point_p=*/false,
+			    LOCATION_ASPECT_CARET);
 }
 
 /* The rich_location class within libcpp requires a way to expand
@@ -1119,23 +1121,25 @@ dump_location_info (FILE *stream)
 	    {
 	      /* Beginning of a new source line: draw the line.  */
 
-	      char_span line_text = location_get_source_line (exploc.file,
-							      exploc.line);
+	      int line_size;
+	      const char *line_text = location_get_source_line (exploc.file,
+								exploc.line,
+								&line_size);
 	      if (!line_text)
 		break;
 	      fprintf (stream,
 		       "%s:%3i|loc:%5i|%.*s\n",
 		       exploc.file, exploc.line,
 		       loc,
-		       (int)line_text.length (), line_text.get_buffer ());
+		       line_size, line_text);
 
 	      /* "loc" is at column 0, which means "the whole line".
 		 Render the locations *within* the line, by underlining
 		 it, showing the source_location numeric values
 		 at each column.  */
-	      size_t max_col = (1 << map->m_column_and_range_bits) - 1;
-	      if (max_col > line_text.length ())
-		max_col = line_text.length () + 1;
+	      int max_col = (1 << map->m_column_and_range_bits) - 1;
+	      if (max_col > line_size)
+		max_col = line_size + 1;
 
 	      int indent = 14 + strlen (exploc.file);
 
@@ -1397,32 +1401,24 @@ get_substring_ranges_for_loc (cpp_reader *pfile,
       source_range src_range = get_range_from_loc (line_table, strlocs[i]);
 
       if (src_range.m_start >= LINEMAPS_MACRO_LOWEST_LOCATION (line_table))
-	{
-	  /* If the string token was within a macro expansion, then we can
-	     cope with it for the simple case where we have a single token.
-	     Otherwise, bail out.  */
-	  if (src_range.m_start != src_range.m_finish)
-	    return "macro expansion";
-	}
-      else
-	{
-	  if (src_range.m_start >= LINE_MAP_MAX_LOCATION_WITH_COLS)
-	    /* If so, we can't reliably determine where the token started within
-	       its line.  */
-	    return "range starts after LINE_MAP_MAX_LOCATION_WITH_COLS";
+	/* If the string is within a macro expansion, we can't get at the
+	   end location.  */
+	return "macro expansion";
 
-	  if (src_range.m_finish >= LINE_MAP_MAX_LOCATION_WITH_COLS)
-	    /* If so, we can't reliably determine where the token finished
-	       within its line.  */
-	    return "range ends after LINE_MAP_MAX_LOCATION_WITH_COLS";
-	}
+      if (src_range.m_start >= LINE_MAP_MAX_LOCATION_WITH_COLS)
+	/* If so, we can't reliably determine where the token started within
+	   its line.  */
+	return "range starts after LINE_MAP_MAX_LOCATION_WITH_COLS";
+
+      if (src_range.m_finish >= LINE_MAP_MAX_LOCATION_WITH_COLS)
+	/* If so, we can't reliably determine where the token finished within
+	   its line.  */
+	return "range ends after LINE_MAP_MAX_LOCATION_WITH_COLS";
 
       expanded_location start
-	= expand_location_to_spelling_point (src_range.m_start,
-					     LOCATION_ASPECT_START);
+	= expand_location_to_spelling_point (src_range.m_start);
       expanded_location finish
-	= expand_location_to_spelling_point (src_range.m_finish,
-					     LOCATION_ASPECT_FINISH);
+	= expand_location_to_spelling_point (src_range.m_finish);
       if (start.file != finish.file)
 	return "range endpoints are in different files";
       if (start.line != finish.line)
@@ -1430,46 +1426,37 @@ get_substring_ranges_for_loc (cpp_reader *pfile,
       if (start.column > finish.column)
 	return "range endpoints are reversed";
 
-      char_span line = location_get_source_line (start.file, start.line);
-      if (!line)
+      int line_width;
+      const char *line = location_get_source_line (start.file, start.line,
+						   &line_width);
+      if (line == NULL)
 	return "unable to read source line";
 
       /* Determine the location of the literal (including quotes
 	 and leading prefix chars, such as the 'u' in a u""
 	 token).  */
-      size_t literal_length = finish.column - start.column + 1;
+      const char *literal = line + start.column - 1;
+      int literal_length = finish.column - start.column + 1;
 
       /* Ensure that we don't crash if we got the wrong location.  */
-      if (line.length () < (start.column - 1 + literal_length))
+      if (line_width < (start.column - 1 + literal_length))
 	return "line is not wide enough";
-
-      char_span literal = line.subspan (start.column - 1, literal_length);
 
       cpp_string from;
       from.len = literal_length;
       /* Make a copy of the literal, to avoid having to rely on
 	 the lifetime of the copy of the line within the cache.
 	 This will be released by the auto_cpp_string_vec dtor.  */
-      from.text = (unsigned char *)literal.xstrdup ();
+      from.text = XDUPVEC (unsigned char, literal, literal_length);
       strs.safe_push (from);
 
       /* For very long lines, a new linemap could have started
 	 halfway through the token.
 	 Ensure that the loc_reader uses the linemap of the
 	 *end* of the token for its start location.  */
-      const line_map_ordinary *start_ord_map;
-      linemap_resolve_location (line_table, src_range.m_start,
-				LRK_SPELLING_LOCATION, &start_ord_map);
       const line_map_ordinary *final_ord_map;
       linemap_resolve_location (line_table, src_range.m_finish,
-				LRK_SPELLING_LOCATION, &final_ord_map);
-      if (start_ord_map == NULL || final_ord_map == NULL)
-	return "failed to get ordinary maps";
-      /* Bulletproofing.  We ought to only have different ordinary maps
-	 for start vs finish due to line-length jumps.  */
-      if (start_ord_map != final_ord_map
-	  && start_ord_map->to_file != final_ord_map->to_file)
-	  return "start and finish are spelled in different ordinary maps";
+				LRK_MACRO_EXPANSION_POINT, &final_ord_map);
       location_t start_loc
 	= linemap_position_for_line_and_column (line_table, final_ord_map,
 						start.line, start.column);
@@ -1921,23 +1908,24 @@ test_reading_source_line ()
 			"This is the 3rd line");
 
   /* Read back a specific line from the tempfile.  */
-  char_span source_line = location_get_source_line (tmp.get_filename (), 3);
-  ASSERT_TRUE (source_line);
-  ASSERT_TRUE (source_line.get_buffer () != NULL);
-  ASSERT_EQ (20, source_line.length ());
+  int line_size;
+  const char *source_line = location_get_source_line (tmp.get_filename (),
+						      3, &line_size);
+  ASSERT_TRUE (source_line != NULL);
+  ASSERT_EQ (20, line_size);
   ASSERT_TRUE (!strncmp ("This is the 3rd line",
-			 source_line.get_buffer (), source_line.length ()));
+			 source_line, line_size));
 
-  source_line = location_get_source_line (tmp.get_filename (), 2);
-  ASSERT_TRUE (source_line);
-  ASSERT_TRUE (source_line.get_buffer () != NULL);
-  ASSERT_EQ (21, source_line.length ());
+  source_line = location_get_source_line (tmp.get_filename (),
+					  2, &line_size);
+  ASSERT_TRUE (source_line != NULL);
+  ASSERT_EQ (21, line_size);
   ASSERT_TRUE (!strncmp ("This is the test text",
-			 source_line.get_buffer (), source_line.length ()));
+			 source_line, line_size));
 
-  source_line = location_get_source_line (tmp.get_filename (), 4);
-  ASSERT_FALSE (source_line);
-  ASSERT_TRUE (source_line.get_buffer () == NULL);
+  source_line = location_get_source_line (tmp.get_filename (),
+					  4, &line_size);
+  ASSERT_TRUE (source_line == NULL);
 }
 
 /* Tests of lexing.  */
@@ -2126,14 +2114,14 @@ class ebcdic_execution_charset : public lexer_test_options
     cpp_opts->narrow_charset = "IBM1047";
 
     cpp_callbacks *callbacks = cpp_get_callbacks (test.m_parser);
-    callbacks->diagnostic = on_diagnostic;
+    callbacks->error = on_error;
   }
 
-  static bool on_diagnostic (cpp_reader *pfile ATTRIBUTE_UNUSED,
-			     enum cpp_diagnostic_level level ATTRIBUTE_UNUSED,
-			     enum cpp_warning_reason reason ATTRIBUTE_UNUSED,
-			     rich_location *richloc ATTRIBUTE_UNUSED,
-			     const char *msgid, va_list *ap ATTRIBUTE_UNUSED)
+  static bool on_error (cpp_reader *pfile ATTRIBUTE_UNUSED,
+			int level ATTRIBUTE_UNUSED,
+			int reason ATTRIBUTE_UNUSED,
+			rich_location *richloc ATTRIBUTE_UNUSED,
+			const char *msgid, va_list *ap ATTRIBUTE_UNUSED)
     ATTRIBUTE_FPTR_PRINTF(5,0)
   {
     gcc_assert (s_singleton);
@@ -2163,53 +2151,53 @@ class ebcdic_execution_charset : public lexer_test_options
 
 ebcdic_execution_charset *ebcdic_execution_charset::s_singleton;
 
-/* A lexer_test_options subclass that records a list of diagnostic
+/* A lexer_test_options subclass that records a list of error
    messages emitted by the lexer.  */
 
-class lexer_diagnostic_sink : public lexer_test_options
+class lexer_error_sink : public lexer_test_options
 {
  public:
-  lexer_diagnostic_sink ()
+  lexer_error_sink ()
   {
     gcc_assert (s_singleton == NULL);
     s_singleton = this;
   }
-  ~lexer_diagnostic_sink ()
+  ~lexer_error_sink ()
   {
     gcc_assert (s_singleton == this);
     s_singleton = NULL;
 
     int i;
     char *str;
-    FOR_EACH_VEC_ELT (m_diagnostics, i, str)
+    FOR_EACH_VEC_ELT (m_errors, i, str)
       free (str);
   }
 
   void apply (lexer_test &test) FINAL OVERRIDE
   {
     cpp_callbacks *callbacks = cpp_get_callbacks (test.m_parser);
-    callbacks->diagnostic = on_diagnostic;
+    callbacks->error = on_error;
   }
 
-  static bool on_diagnostic (cpp_reader *pfile ATTRIBUTE_UNUSED,
-			     enum cpp_diagnostic_level level ATTRIBUTE_UNUSED,
-			     enum cpp_warning_reason reason ATTRIBUTE_UNUSED,
-			     rich_location *richloc ATTRIBUTE_UNUSED,
-			     const char *msgid, va_list *ap)
+  static bool on_error (cpp_reader *pfile ATTRIBUTE_UNUSED,
+			int level ATTRIBUTE_UNUSED,
+			int reason ATTRIBUTE_UNUSED,
+			rich_location *richloc ATTRIBUTE_UNUSED,
+			const char *msgid, va_list *ap)
     ATTRIBUTE_FPTR_PRINTF(5,0)
   {
     char *msg = xvasprintf (msgid, *ap);
-    s_singleton->m_diagnostics.safe_push (msg);
+    s_singleton->m_errors.safe_push (msg);
     return true;
   }
 
-  auto_vec<char *> m_diagnostics;
+  auto_vec<char *> m_errors;
 
  private:
-  static lexer_diagnostic_sink *s_singleton;
+  static lexer_error_sink *s_singleton;
 };
 
-lexer_diagnostic_sink *lexer_diagnostic_sink::s_singleton;
+lexer_error_sink *lexer_error_sink::s_singleton;
 
 /* Constructor.  Override line_table with a new instance based on CASE_,
    and write CONTENT to a tempfile.  Create a cpp_reader, and use it to
@@ -3423,21 +3411,21 @@ test_lexer_string_locations_raw_string_unterminated (const line_table_case &case
 {
   const char *content = "R\"ouch()ouCh\" /* etc */";
 
-  lexer_diagnostic_sink diagnostics;
-  lexer_test test (case_, content, &diagnostics);
+  lexer_error_sink errors;
+  lexer_test test (case_, content, &errors);
   test.m_implicitly_expect_EOF = false;
 
   /* Attempt to parse the raw string.  */
   const cpp_token *tok = test.get_token ();
   ASSERT_EQ (tok->type, CPP_EOF);
 
-  ASSERT_EQ (1, diagnostics.m_diagnostics.length ());
+  ASSERT_EQ (1, errors.m_errors.length ());
   /* We expect the message "unterminated raw string"
      in the "cpplib" translation domain.
      It's not clear that dgettext is available on all supported hosts,
      so this assertion is commented-out for now.
        ASSERT_STREQ (dgettext ("cpplib", "unterminated raw string"),
-                     diagnostics.m_diagnostics[0]);
+                     errors.m_errors[0]);
   */
 }
 

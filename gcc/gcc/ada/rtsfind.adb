@@ -929,10 +929,9 @@ package body Rtsfind is
 
       --  Local variables
 
-      Saved_GM  : constant Ghost_Mode_Type := Ghost_Mode;
-      Saved_IGR : constant Node_Id         := Ignored_Ghost_Region;
-      Saved_SM  : constant SPARK_Mode_Type := SPARK_Mode;
-      Saved_SMP : constant Node_Id         := SPARK_Mode_Pragma;
+      Save_GM  : constant Ghost_Mode_Type := Ghost_Mode;
+      Save_SM  : constant SPARK_Mode_Type := SPARK_Mode;
+      Save_SMP : constant Node_Id         := SPARK_Mode_Pragma;
       --  Save Ghost and SPARK mode-related data to restore on exit
 
    --  Start of processing for Load_RTU
@@ -946,8 +945,8 @@ package body Rtsfind is
 
       --  Provide a clean environment for the unit
 
-      Install_Ghost_Region (None, Empty);
-      Install_SPARK_Mode   (None, Empty);
+      Install_Ghost_Mode (None);
+      Install_SPARK_Mode (None, Empty);
 
       --  Note if secondary stack is used
 
@@ -1050,8 +1049,8 @@ package body Rtsfind is
          Set_Is_Potentially_Use_Visible (U.Entity, True);
       end if;
 
-      Restore_Ghost_Region (Saved_GM, Saved_IGR);
-      Restore_SPARK_Mode   (Saved_SM, Saved_SMP);
+      Restore_Ghost_Mode (Save_GM);
+      Restore_SPARK_Mode (Save_SM, Save_SMP);
    end Load_RTU;
 
    --------------------

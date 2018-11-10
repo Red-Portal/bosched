@@ -106,23 +106,12 @@ const enum rtx_class rtx_class[NUM_RTX_CODE] = {
 #undef DEF_RTL_EXPR
 };
 
-/* Whether rtxs with the given code code store data in the hwint field.  */
-
-#define RTX_CODE_HWINT_P_1(ENUM)					\
-    ((ENUM) == CONST_INT || (ENUM) == CONST_DOUBLE			\
-     || (ENUM) == CONST_FIXED || (ENUM) == CONST_WIDE_INT)
-#ifdef GENERATOR_FILE
-#define RTX_CODE_HWINT_P(ENUM)						\
-    (RTX_CODE_HWINT_P_1 (ENUM) || (ENUM) == EQ_ATTR_ALT)
-#else
-#define RTX_CODE_HWINT_P RTX_CODE_HWINT_P_1
-#endif
-
 /* Indexed by rtx code, gives the size of the rtx in bytes.  */
 
 const unsigned char rtx_code_size[NUM_RTX_CODE] = {
 #define DEF_RTL_EXPR(ENUM, NAME, FORMAT, CLASS)				\
-  (RTX_CODE_HWINT_P (ENUM)						\
+  (((ENUM) == CONST_INT || (ENUM) == CONST_DOUBLE			\
+    || (ENUM) == CONST_FIXED || (ENUM) == CONST_WIDE_INT)		\
    ? RTX_HDR_SIZE + (sizeof FORMAT - 1) * sizeof (HOST_WIDE_INT)	\
    : (ENUM) == REG							\
    ? RTX_HDR_SIZE + sizeof (reg_info)					\
@@ -314,10 +303,6 @@ copy_rtx (rtx orig)
 	  && ORIGINAL_REGNO (XEXP (orig, 0)) == REGNO (XEXP (orig, 0)))
 	return orig;
       break;
-
-    case CLOBBER_HIGH:
-	gcc_assert (REG_P (XEXP (orig, 0)));
-	return orig;
 
     case CONST:
       if (shared_const_p (orig))
@@ -869,17 +854,6 @@ rtl_check_failed_code2 (const_rtx r, enum rtx_code code1, enum rtx_code code2,
     ("RTL check: expected code '%s' or '%s', have '%s' in %s, at %s:%d",
      GET_RTX_NAME (code1), GET_RTX_NAME (code2), GET_RTX_NAME (GET_CODE (r)),
      func, trim_filename (file), line);
-}
-
-void
-rtl_check_failed_code3 (const_rtx r, enum rtx_code code1, enum rtx_code code2,
-			enum rtx_code code3, const char *file, int line,
-			const char *func)
-{
-  internal_error
-    ("RTL check: expected code '%s', '%s' or '%s', have '%s' in %s, at %s:%d",
-     GET_RTX_NAME (code1), GET_RTX_NAME (code2), GET_RTX_NAME (code3),
-     GET_RTX_NAME (GET_CODE (r)), func, trim_filename (file), line);
 }
 
 void

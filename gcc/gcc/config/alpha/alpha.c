@@ -67,7 +67,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "params.h"
 #include "builtins.h"
 #include "rtl-iter.h"
-#include "flags.h"
 
 /* This file should be included last.  */
 #include "target-def.h"
@@ -615,13 +614,13 @@ alpha_override_options_after_change (void)
   /* ??? Kludge these by not doing anything if we don't optimize.  */
   if (optimize > 0)
     {
-      if (flag_align_loops && !str_align_loops)
-	str_align_loops = "16";
-      if (flag_align_jumps && !str_align_jumps)
-	str_align_jumps = "16";
+      if (align_loops <= 0)
+	align_loops = 16;
+      if (align_jumps <= 0)
+	align_jumps = 16;
     }
-  if (flag_align_functions && !str_align_functions)
-    str_align_functions = "16";
+  if (align_functions <= 0)
+    align_functions = 16;
 }
 
 /* Returns 1 if VALUE is a mask that contains full bytes of zero or ones.  */
@@ -9269,11 +9268,10 @@ alpha_align_insns_1 (unsigned int max_align,
   /* Let shorten branches care for assigning alignments to code labels.  */
   shorten_branches (get_insns ());
 
-  unsigned int option_alignment = align_functions.levels[0].get_value ();
-  if (option_alignment < 4)
+  if (align_functions < 4)
     align = 4;
-  else if ((unsigned int) option_alignment < max_align)
-    align = option_alignment;
+  else if ((unsigned int) align_functions < max_align)
+    align = align_functions;
   else
     align = max_align;
 
@@ -9291,8 +9289,7 @@ alpha_align_insns_1 (unsigned int max_align,
       /* When we see a label, resync alignment etc.  */
       if (LABEL_P (i))
 	{
-	  unsigned int new_align
-	    = label_to_alignment (i).levels[0].get_value ();
+	  unsigned int new_align = 1 << label_to_alignment (i);
 
 	  if (new_align >= align)
 	    {

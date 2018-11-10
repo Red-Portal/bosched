@@ -111,7 +111,7 @@ static int compare_constant (const tree, const tree);
 static void output_constant_def_contents (rtx);
 static void output_addressed_constants (tree);
 static unsigned HOST_WIDE_INT output_constant (tree, unsigned HOST_WIDE_INT,
-					       unsigned int, bool, bool);
+					       unsigned int, bool);
 static void globalize_decl (tree);
 static bool decl_readonly_section_1 (enum section_category);
 #ifdef BSS_SECTION_ASM_OP
@@ -805,7 +805,7 @@ mergeable_string_section (tree decl ATTRIBUTE_UNUSED,
       && TREE_CODE (TREE_TYPE (decl)) == ARRAY_TYPE
       && align <= 256
       && (len = int_size_in_bytes (TREE_TYPE (decl))) > 0
-      && TREE_STRING_LENGTH (decl) == len)
+      && TREE_STRING_LENGTH (decl) >= len)
     {
       scalar_int_mode mode;
       unsigned int modesize;
@@ -823,9 +823,6 @@ mergeable_string_section (tree decl ATTRIBUTE_UNUSED,
 	  if (align < modesize)
 	    align = modesize;
 
-	  if (!HAVE_LD_ALIGNED_SHF_MERGE && align > 8)
-	    return readonly_data_section;
-
 	  str = TREE_STRING_POINTER (decl);
 	  unit = GET_MODE_SIZE (mode);
 
@@ -838,7 +835,7 @@ mergeable_string_section (tree decl ATTRIBUTE_UNUSED,
 	      if (j == unit)
 		break;
 	    }
-	  if (i == len - unit || (unit == 1 && i == len))
+	  if (i == len - unit)
 	    {
 	      sprintf (name, "%s.str%d.%d", prefix,
 		       modesize / 8, (int) (align / 8));
@@ -864,8 +861,7 @@ mergeable_constant_section (machine_mode mode ATTRIBUTE_UNUSED,
       && known_le (GET_MODE_BITSIZE (mode), align)
       && align >= 8
       && align <= 256
-      && (align & (align - 1)) == 0
-      && (HAVE_LD_ALIGNED_SHF_MERGE ? 1 : align == 8))
+      && (align & (align - 1)) == 0)
     {
       const char *prefix = function_mergeable_rodata_prefix ();
       char *name = (char *) alloca (strlen (prefix) + 30);
@@ -1381,6 +1377,10 @@ make_decl_rtl (tree decl)
     }
 
   id = DECL_ASSEMBLER_NAME (decl);
+  if (TREE_CODE (decl) == FUNCTION_DECL
+      && cgraph_node::get (decl)
+      && cgraph_node::get (decl)->instrumentation_clone)
+    ultimate_transparent_alias_target (&id);
   name = IDENTIFIER_POINTER (id);
 
   if (name[0] != '*' && TREE_CODE (decl) != FUNCTION_DECL
@@ -1805,25 +1805,21 @@ assemble_start_function (tree decl, const char *fnname)
      Note that we still need to align to DECL_ALIGN, as above,
      because ASM_OUTPUT_MAX_SKIP_ALIGN might not do any alignment at all.  */
   if (! DECL_USER_ALIGN (decl)
-      && align_functions.levels[0].log > align
+      && align_functions_log > align
       && optimize_function_for_speed_p (cfun))
     {
 #ifdef ASM_OUTPUT_MAX_SKIP_ALIGN
-      int align_log = align_functions.levels[0].log;
+      int align_log = align_functions_log;
 #endif
-      int max_skip = align_functions.levels[0].maxskip;
+      int max_skip = align_functions - 1;
       if (flag_limit_function_alignment && crtl->max_insn_address > 0
 	  && max_skip >= crtl->max_insn_address)
 	max_skip = crtl->max_insn_address - 1;
 
 #ifdef ASM_OUTPUT_MAX_SKIP_ALIGN
       ASM_OUTPUT_MAX_SKIP_ALIGN (asm_out_file, align_log, max_skip);
-      if (max_skip == align_functions.levels[0].maxskip)
-	ASM_OUTPUT_MAX_SKIP_ALIGN (asm_out_file,
-				   align_functions.levels[1].log,
-				   align_functions.levels[1].maxskip);
 #else
-      ASM_OUTPUT_ALIGN (asm_out_file, align_functions.levels[0].log);
+      ASM_OUTPUT_ALIGN (asm_out_file, align_functions_log);
 #endif
     }
 
@@ -1836,7 +1832,10 @@ assemble_start_function (tree decl, const char *fnname)
 
   /* Make function name accessible from other files, if appropriate.  */
 
-  if (TREE_PUBLIC (decl))
+  if (TREE_PUBLIC (decl)
+      || (cgraph_node::get (decl)->instrumentation_clone
+	  && cgraph_node::get (decl)->instrumented_version
+	  && TREE_PUBLIC (cgraph_node::get (decl)->instrumented_version->decl)))
     {
       notice_global_symbol (decl);
 
@@ -2121,7 +2120,7 @@ assemble_noswitch_variable (tree decl, const char *name, section *sect,
 
 static void
 assemble_variable_contents (tree decl, const char *name,
-			    bool dont_output_data, bool merge_strings)
+			    bool dont_output_data)
 {
   /* Do any machine/system dependent processing of the object.  */
 #ifdef ASM_DECLARE_OBJECT_NAME
@@ -2144,7 +2143,7 @@ assemble_variable_contents (tree decl, const char *name,
 	output_constant (DECL_INITIAL (decl),
 			 tree_to_uhwi (DECL_SIZE_UNIT (decl)),
 			 get_variable_align (decl),
-			 false, merge_strings);
+			 false);
       else
 	/* Leave space for it.  */
 	assemble_zeros (tree_to_uhwi (DECL_SIZE_UNIT (decl)));
@@ -2320,9 +2319,7 @@ assemble_variable (tree decl, int top_level ATTRIBUTE_UNUSED,
 	switch_to_section (sect);
       if (align > BITS_PER_UNIT)
 	ASM_OUTPUT_ALIGN (asm_out_file, floor_log2 (align / BITS_PER_UNIT));
-      assemble_variable_contents (decl, name, dont_output_data,
-				  (sect->common.flags & SECTION_MERGE)
-				  && (sect->common.flags & SECTION_STRINGS));
+      assemble_variable_contents (decl, name, dont_output_data);
       if (asan_protected)
 	{
 	  unsigned HOST_WIDE_INT int size
@@ -2407,7 +2404,7 @@ static hash_set<tree> *pending_assemble_externals_set;
 static bool
 incorporeal_function_p (tree decl)
 {
-  if (TREE_CODE (decl) == FUNCTION_DECL && fndecl_built_in_p (decl))
+  if (TREE_CODE (decl) == FUNCTION_DECL && DECL_BUILT_IN (decl))
     {
       const char *name;
 
@@ -3051,10 +3048,6 @@ const_hash_1 (const tree exp)
       }
 
     case ADDR_EXPR:
-      if (CONSTANT_CLASS_P (TREE_OPERAND (exp, 0)))
-       return const_hash_1 (TREE_OPERAND (exp, 0));
-
-      /* Fallthru.  */
     case FDESC_EXPR:
       {
 	struct addr_const value;
@@ -3161,9 +3154,7 @@ compare_constant (const tree t1, const tree t2)
       return FIXED_VALUES_IDENTICAL (TREE_FIXED_CST (t1), TREE_FIXED_CST (t2));
 
     case STRING_CST:
-      if (TYPE_MODE (TREE_TYPE (t1)) != TYPE_MODE (TREE_TYPE (t2))
-	  || int_size_in_bytes (TREE_TYPE (t1))
-	     != int_size_in_bytes (TREE_TYPE (t2)))
+      if (TYPE_MODE (TREE_TYPE (t1)) != TYPE_MODE (TREE_TYPE (t2)))
 	return 0;
 
       return (TREE_STRING_LENGTH (t1) == TREE_STRING_LENGTH (t2)
@@ -3320,9 +3311,8 @@ get_constant_size (tree exp)
   HOST_WIDE_INT size;
 
   size = int_size_in_bytes (TREE_TYPE (exp));
-  gcc_checking_assert (size >= 0);
-  gcc_checking_assert (TREE_CODE (exp) != STRING_CST
-		       || size >= TREE_STRING_LENGTH (exp));
+  if (TREE_CODE (exp) == STRING_CST)
+    size = MAX (TREE_STRING_LENGTH (exp), size);
   return size;
 }
 
@@ -3486,8 +3476,7 @@ maybe_output_constant_def_contents (struct constant_descriptor_tree *desc,
    constant's alignment in bits.  */
 
 static void
-assemble_constant_contents (tree exp, const char *label, unsigned int align,
-			    bool merge_strings)
+assemble_constant_contents (tree exp, const char *label, unsigned int align)
 {
   HOST_WIDE_INT size;
 
@@ -3497,7 +3486,7 @@ assemble_constant_contents (tree exp, const char *label, unsigned int align,
   targetm.asm_out.declare_constant_name (asm_out_file, label, exp, size);
 
   /* Output the value of EXP.  */
-  output_constant (exp, size, align, false, merge_strings);
+  output_constant (exp, size, align, false);
 
   targetm.asm_out.decl_end ();
 }
@@ -3538,13 +3527,10 @@ output_constant_def_contents (rtx symbol)
 		   || (VAR_P (decl) && DECL_IN_CONSTANT_POOL (decl))
 		   ? DECL_ALIGN (decl)
 		   : symtab_node::get (decl)->definition_alignment ());
-      section *sect = get_constant_section (exp, align);
-      switch_to_section (sect);
+      switch_to_section (get_constant_section (exp, align));
       if (align > BITS_PER_UNIT)
 	ASM_OUTPUT_ALIGN (asm_out_file, floor_log2 (align / BITS_PER_UNIT));
-      assemble_constant_contents (exp, XSTR (symbol, 0), align,
-				  (sect->common.flags & SECTION_MERGE)
-				  && (sect->common.flags & SECTION_STRINGS));
+      assemble_constant_contents (exp, XSTR (symbol, 0), align);
       if (asan_protected)
 	{
 	  HOST_WIDE_INT size = get_constant_size (exp);
@@ -3945,6 +3931,7 @@ output_constant_pool_2 (fixed_size_mode mode, rtx x, unsigned int align)
     case MODE_UFRACT:
     case MODE_ACCUM:
     case MODE_UACCUM:
+    case MODE_POINTER_BOUNDS:
       assemble_integer (x, GET_MODE_SIZE (mode), align, 1);
       break;
 
@@ -4795,30 +4782,6 @@ initializer_constant_valid_for_bitfield_p (tree value)
   return false;
 }
 
-/* Check if a STRING_CST fits into the field.
-   Tolerate only the case when the NUL termination
-   does not fit into the field.   */
-
-static bool
-check_string_literal (tree string, unsigned HOST_WIDE_INT size)
-{
-  tree type = TREE_TYPE (string);
-  tree eltype = TREE_TYPE (type);
-  unsigned HOST_WIDE_INT elts = tree_to_uhwi (TYPE_SIZE_UNIT (eltype));
-  unsigned HOST_WIDE_INT mem_size = tree_to_uhwi (TYPE_SIZE_UNIT (type));
-  int len = TREE_STRING_LENGTH (string);
-
-  if (elts != 1 && elts != 2 && elts != 4)
-    return false;
-  if (len < 0 || len % elts != 0)
-    return false;
-  if (size < (unsigned)len)
-    return false;
-  if (mem_size != size)
-    return false;
-  return true;
-}
-
 /* output_constructor outer state of relevance in recursive calls, typically
    for nested aggregate bitfields.  */
 
@@ -4857,7 +4820,7 @@ output_constructor (tree, unsigned HOST_WIDE_INT, unsigned int, bool,
 
 static unsigned HOST_WIDE_INT
 output_constant (tree exp, unsigned HOST_WIDE_INT size, unsigned int align,
-		 bool reverse, bool merge_strings)
+		 bool reverse)
 {
   enum tree_code code;
   unsigned HOST_WIDE_INT thissize;
@@ -4954,6 +4917,7 @@ output_constant (tree exp, unsigned HOST_WIDE_INT size, unsigned int align,
     case REFERENCE_TYPE:
     case OFFSET_TYPE:
     case FIXED_POINT_TYPE:
+    case POINTER_BOUNDS_TYPE:
     case NULLPTR_TYPE:
       cst = expand_expr (exp, NULL_RTX, VOIDmode, EXPAND_INITIALIZER);
       if (reverse)
@@ -4972,11 +4936,10 @@ output_constant (tree exp, unsigned HOST_WIDE_INT size, unsigned int align,
       break;
 
     case COMPLEX_TYPE:
-      output_constant (TREE_REALPART (exp), thissize / 2, align,
-		       reverse, false);
+      output_constant (TREE_REALPART (exp), thissize / 2, align, reverse);
       output_constant (TREE_IMAGPART (exp), thissize / 2,
 		       min_align (align, BITS_PER_UNIT * (thissize / 2)),
-		       reverse, false);
+		       reverse);
       break;
 
     case ARRAY_TYPE:
@@ -4986,12 +4949,8 @@ output_constant (tree exp, unsigned HOST_WIDE_INT size, unsigned int align,
 	case CONSTRUCTOR:
 	  return output_constructor (exp, size, align, reverse, NULL);
 	case STRING_CST:
-	  thissize = (unsigned HOST_WIDE_INT)TREE_STRING_LENGTH (exp);
-	  if (merge_strings
-	      && (thissize == 0
-		  || TREE_STRING_POINTER (exp) [thissize - 1] != '\0'))
-	    thissize++;
-	  gcc_checking_assert (check_string_literal (exp, size));
+	  thissize
+	    = MIN ((unsigned HOST_WIDE_INT)TREE_STRING_LENGTH (exp), size);
 	  assemble_string (TREE_STRING_POINTER (exp), thissize);
 	  break;
 	case VECTOR_CST:
@@ -5000,14 +4959,14 @@ output_constant (tree exp, unsigned HOST_WIDE_INT size, unsigned int align,
 	    unsigned int nalign = MIN (align, GET_MODE_ALIGNMENT (inner));
 	    int elt_size = GET_MODE_SIZE (inner);
 	    output_constant (VECTOR_CST_ELT (exp, 0), elt_size, align,
-			     reverse, false);
+			     reverse);
 	    thissize = elt_size;
 	    /* Static constants must have a fixed size.  */
 	    unsigned int nunits = VECTOR_CST_NELTS (exp).to_constant ();
 	    for (unsigned int i = 1; i < nunits; i++)
 	      {
 		output_constant (VECTOR_CST_ELT (exp, i), elt_size, nalign,
-				 reverse, false);
+				 reverse);
 		thissize += elt_size;
 	      }
 	    break;
@@ -5128,8 +5087,8 @@ output_constructor_array_range (oc_local_state *local)
       if (local->val == NULL_TREE)
 	assemble_zeros (fieldsize);
       else
-	fieldsize = output_constant (local->val, fieldsize, align2,
-				     local->reverse, false);
+	fieldsize
+	  = output_constant (local->val, fieldsize, align2, local->reverse);
 
       /* Count its size.  */
       local->total_bytes += fieldsize;
@@ -5211,8 +5170,6 @@ output_constructor_regular_field (oc_local_state *local)
 	     on the chain is a TYPE_DECL of the enclosing struct.  */
 	  const_tree next = DECL_CHAIN (local->field);
 	  gcc_assert (!fieldsize || !next || TREE_CODE (next) != FIELD_DECL);
-	  tree size = TYPE_SIZE_UNIT (TREE_TYPE (local->val));
-	  gcc_checking_assert (compare_tree_int (size, fieldsize) == 0);
 	}
       else
 	fieldsize = tree_to_uhwi (DECL_SIZE_UNIT (local->field));
@@ -5224,8 +5181,8 @@ output_constructor_regular_field (oc_local_state *local)
   if (local->val == NULL_TREE)
     assemble_zeros (fieldsize);
   else
-    fieldsize = output_constant (local->val, fieldsize, align2,
-				 local->reverse, false);
+    fieldsize
+      = output_constant (local->val, fieldsize, align2, local->reverse);
 
   /* Count its size.  */
   local->total_bytes += fieldsize;
@@ -5700,8 +5657,7 @@ weak_finish (void)
       tree alias_decl = TREE_PURPOSE (t);
       tree target = ultimate_transparent_alias_target (&TREE_VALUE (t));
 
-      if (! TREE_SYMBOL_REFERENCED (DECL_ASSEMBLER_NAME (alias_decl))
-         || TREE_SYMBOL_REFERENCED (target))
+      if (! TREE_SYMBOL_REFERENCED (DECL_ASSEMBLER_NAME (alias_decl)))
 	/* Remove alias_decl from the weak list, but leave entries for
 	   the target alone.  */
 	target = NULL_TREE;
@@ -5868,6 +5824,11 @@ do_assemble_alias (tree decl, tree target)
 
 #ifdef ASM_OUTPUT_DEF
   tree orig_decl = decl;
+
+  if (TREE_CODE (decl) == FUNCTION_DECL
+      && cgraph_node::get (decl)->instrumentation_clone
+      && cgraph_node::get (decl)->instrumented_version)
+    orig_decl = cgraph_node::get (decl)->instrumented_version->decl;
 
   /* Make name accessible from other files, if appropriate.  */
 
@@ -6193,6 +6154,13 @@ int
 maybe_assemble_visibility (tree decl)
 {
   enum symbol_visibility vis = DECL_VISIBILITY (decl);
+
+  if (TREE_CODE (decl) == FUNCTION_DECL
+      && cgraph_node::get (decl)
+      && cgraph_node::get (decl)->instrumentation_clone
+      && cgraph_node::get (decl)->instrumented_version)
+    vis = DECL_VISIBILITY (cgraph_node::get (decl)->instrumented_version->decl);
+
   if (vis != VISIBILITY_DEFAULT)
     {
       targetm.asm_out.assemble_visibility (decl, vis);
@@ -6486,7 +6454,7 @@ default_elf_asm_named_section (const char *name, unsigned int flags,
     {
       if (!(flags & SECTION_DEBUG))
 	*f++ = 'a';
-#if HAVE_GAS_SECTION_EXCLUDE
+#if defined (HAVE_GAS_SECTION_EXCLUDE) && HAVE_GAS_SECTION_EXCLUDE == 1
       if (flags & SECTION_EXCLUDE)
 	*f++ = 'e';
 #endif
@@ -7641,8 +7609,8 @@ output_object_block (struct object_block *block)
 	{
 	  HOST_WIDE_INT size;
 	  decl = SYMBOL_REF_DECL (symbol);
-	  assemble_constant_contents (DECL_INITIAL (decl), XSTR (symbol, 0),
-				      DECL_ALIGN (decl), false);
+	  assemble_constant_contents
+	       (DECL_INITIAL (decl), XSTR (symbol, 0), DECL_ALIGN (decl));
 
 	  size = get_constant_size (DECL_INITIAL (decl));
 	  offset += size;
@@ -7659,7 +7627,7 @@ output_object_block (struct object_block *block)
 	{
 	  HOST_WIDE_INT size;
 	  decl = SYMBOL_REF_DECL (symbol);
-	  assemble_variable_contents (decl, XSTR (symbol, 0), false, false);
+	  assemble_variable_contents (decl, XSTR (symbol, 0), false);
 	  size = tree_to_uhwi (DECL_SIZE_UNIT (decl));
 	  offset += size;
 	  if ((flag_sanitize & SANITIZE_ADDRESS)

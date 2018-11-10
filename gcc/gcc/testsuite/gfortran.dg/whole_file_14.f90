@@ -1,5 +1,5 @@
 ! { dg-do run }
-! { dg-options "-O3" }
+! { dg-options "-fwhole-file -O3" }
 ! Check that the derived types are correctly substituted when
 ! whole file compiling.
 !

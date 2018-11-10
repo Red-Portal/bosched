@@ -35,10 +35,6 @@ rs6000-p8swap.o: $(srcdir)/config/rs6000/rs6000-p8swap.c
 	$(COMPILE) $<
 	$(POSTCOMPILE)
 
-rs6000-d.o: $(srcdir)/config/rs6000/rs6000-d.c
-	$(COMPILE) $<
-	$(POSTCOMPILE)
-
 $(srcdir)/config/rs6000/rs6000-tables.opt: $(srcdir)/config/rs6000/genopt.sh \
   $(srcdir)/config/rs6000/rs6000-cpus.def
 	$(SHELL) $(srcdir)/config/rs6000/genopt.sh $(srcdir)/config/rs6000 > \
@@ -66,6 +62,7 @@ MD_INCLUDES = $(srcdir)/config/rs6000/rs64.md \
 	$(srcdir)/config/rs6000/power8.md \
 	$(srcdir)/config/rs6000/power9.md \
 	$(srcdir)/config/rs6000/cell.md \
+	$(srcdir)/config/rs6000/xfpu.md \
 	$(srcdir)/config/rs6000/a2.md \
 	$(srcdir)/config/rs6000/predicates.md \
 	$(srcdir)/config/rs6000/constraints.md \
@@ -76,4 +73,5 @@ MD_INCLUDES = $(srcdir)/config/rs6000/rs64.md \
 	$(srcdir)/config/rs6000/altivec.md \
 	$(srcdir)/config/rs6000/crypto.md \
 	$(srcdir)/config/rs6000/htm.md \
-	$(srcdir)/config/rs6000/dfp.md
+	$(srcdir)/config/rs6000/dfp.md \
+	$(srcdir)/config/rs6000/paired.md

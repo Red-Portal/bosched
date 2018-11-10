@@ -68,7 +68,7 @@
 // all pprof commands.
 //
 // For more information about pprof, see
-// https://github.com/google/pprof/blob/master/doc/README.md.
+// https://github.com/google/pprof/blob/master/doc/pprof.md.
 package pprof
 
 import (
@@ -99,8 +99,7 @@ import (
 // Each Profile has a unique name. A few profiles are predefined:
 //
 //	goroutine    - stack traces of all current goroutines
-//	heap         - a sampling of memory allocations of live objects
-//	allocs       - a sampling of all past memory allocations
+//	heap         - a sampling of all heap allocations
 //	threadcreate - stack traces that led to the creation of new OS threads
 //	block        - stack traces that led to blocking on synchronization primitives
 //	mutex        - stack traces of holders of contended mutexes
@@ -114,16 +113,6 @@ import (
 // If there has been no garbage collection at all, the heap profile reports
 // all known allocations. This exception helps mainly in programs running
 // without garbage collection enabled, usually for debugging purposes.
-//
-// The heap profile tracks both the allocation sites for all live objects in
-// the application memory and for all objects allocated since the program start.
-// Pprof's -inuse_space, -inuse_objects, -alloc_space, and -alloc_objects
-// flags select which to display, defaulting to -inuse_space (live objects,
-// scaled by size).
-//
-// The allocs profile is the same as the heap profile but changes the default
-// pprof display to -alloc_space, the total number of bytes allocated since
-// the program began (including garbage-collected bytes).
 //
 // The CPU profile is not available as a Profile. It has a special API,
 // the StartCPUProfile and StopCPUProfile functions, because it streams
@@ -161,12 +150,6 @@ var heapProfile = &Profile{
 	write: writeHeap,
 }
 
-var allocsProfile = &Profile{
-	name:  "allocs",
-	count: countHeap, // identical to heap profile
-	write: writeAlloc,
-}
-
 var blockProfile = &Profile{
 	name:  "block",
 	count: countBlock,
@@ -187,7 +170,6 @@ func lockProfiles() {
 			"goroutine":    goroutineProfile,
 			"threadcreate": threadcreateProfile,
 			"heap":         heapProfile,
-			"allocs":       allocsProfile,
 			"block":        blockProfile,
 			"mutex":        mutexProfile,
 		}
@@ -543,16 +525,6 @@ func countHeap() int {
 
 // writeHeap writes the current runtime heap profile to w.
 func writeHeap(w io.Writer, debug int) error {
-	return writeHeapInternal(w, debug, "")
-}
-
-// writeAlloc writes the current runtime heap profile to w
-// with the total allocation space as the default sample type.
-func writeAlloc(w io.Writer, debug int) error {
-	return writeHeapInternal(w, debug, "alloc_space")
-}
-
-func writeHeapInternal(w io.Writer, debug int, defaultSampleType string) error {
 	var memStats *runtime.MemStats
 	if debug != 0 {
 		// Read mem stats first, so that our other allocations
@@ -583,7 +555,7 @@ func writeHeapInternal(w io.Writer, debug int, defaultSampleType string) error {
 	}
 
 	if debug == 0 {
-		return writeHeapProto(w, p, int64(runtime.MemProfileRate), defaultSampleType)
+		return writeHeapProto(w, p, int64(runtime.MemProfileRate))
 	}
 
 	sort.Slice(p, func(i, j int) bool { return p[i].InUseBytes() > p[j].InUseBytes() })

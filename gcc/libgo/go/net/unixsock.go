@@ -12,9 +12,6 @@ import (
 	"time"
 )
 
-// BUG(mikio): On JS, NaCl, Plan 9 and Windows, methods and functions
-// related to UnixConn and UnixListener are not implemented.
-
 // UnixAddr represents the address of a Unix domain socket end point.
 type UnixAddr struct {
 	Name string
@@ -203,8 +200,7 @@ func DialUnix(network string, laddr, raddr *UnixAddr) (*UnixConn, error) {
 	default:
 		return nil, &OpError{Op: "dial", Net: network, Source: laddr.opAddr(), Addr: raddr.opAddr(), Err: UnknownNetworkError(network)}
 	}
-	sd := &sysDialer{network: network, address: raddr.String()}
-	c, err := sd.dialUnix(context.Background(), laddr, raddr)
+	c, err := dialUnix(context.Background(), network, laddr, raddr)
 	if err != nil {
 		return nil, &OpError{Op: "dial", Net: network, Source: laddr.opAddr(), Addr: raddr.opAddr(), Err: err}
 	}
@@ -290,8 +286,8 @@ func (l *UnixListener) SetDeadline(t time.Time) error {
 	return nil
 }
 
-// File returns a copy of the underlying os.File.
-// It is the caller's responsibility to close f when finished.
+// File returns a copy of the underlying os.File, set to blocking
+// mode. It is the caller's responsibility to close f when finished.
 // Closing l does not affect f, and closing f does not affect l.
 //
 // The returned os.File's file descriptor is different from the
@@ -320,8 +316,7 @@ func ListenUnix(network string, laddr *UnixAddr) (*UnixListener, error) {
 	if laddr == nil {
 		return nil, &OpError{Op: "listen", Net: network, Source: nil, Addr: laddr.opAddr(), Err: errMissingAddress}
 	}
-	sl := &sysListener{network: network, address: laddr.String()}
-	ln, err := sl.listenUnix(context.Background(), laddr)
+	ln, err := listenUnix(context.Background(), network, laddr)
 	if err != nil {
 		return nil, &OpError{Op: "listen", Net: network, Source: nil, Addr: laddr.opAddr(), Err: err}
 	}
@@ -340,8 +335,7 @@ func ListenUnixgram(network string, laddr *UnixAddr) (*UnixConn, error) {
 	if laddr == nil {
 		return nil, &OpError{Op: "listen", Net: network, Source: nil, Addr: nil, Err: errMissingAddress}
 	}
-	sl := &sysListener{network: network, address: laddr.String()}
-	c, err := sl.listenUnixgram(context.Background(), laddr)
+	c, err := listenUnixgram(context.Background(), network, laddr)
 	if err != nil {
 		return nil, &OpError{Op: "listen", Net: network, Source: nil, Addr: laddr.opAddr(), Err: err}
 	}

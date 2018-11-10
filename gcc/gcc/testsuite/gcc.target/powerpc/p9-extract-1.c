@@ -13,120 +13,84 @@
 int
 extract_int_0 (vector int a)
 {
-  int c = 0;
-  int b = vec_extract (a, c);
+  int b = vec_extract (a, 0);
   return b;
 }
 
 int
 extract_int_3 (vector int a)
 {
-  int c = 3;
-  int b = vec_extract (a, c);
+  int b = vec_extract (a, 3);
   return b;
 }
 
 unsigned int
 extract_uint_0 (vector unsigned int a)
 {
-  int c = 0;
-  unsigned int b = vec_extract (a, c);
+  unsigned int b = vec_extract (a, 0);
   return b;
 }
 
 unsigned int
 extract_uint_3 (vector unsigned int a)
 {
-  int c = 3;
-  unsigned int b = vec_extract (a, c);
+  unsigned int b = vec_extract (a, 3);
   return b;
 }
 
 short
 extract_short_0 (vector short a)
 {
-  int c = 0;
-  short b = vec_extract (a, c);
+  short b = vec_extract (a, 0);
   return b;
 }
 
 short
 extract_short_7 (vector short a)
 {
-  int c = 7;
-  short b = vec_extract (a, c);
+  short b = vec_extract (a, 7);
   return b;
 }
 
 unsigned short
 extract_ushort_0 (vector unsigned short a)
 {
-  int c = 0;
-  unsigned short b = vec_extract (a, c);
+  unsigned short b = vec_extract (a, 0);
   return b;
 }
 
 unsigned short
 extract_ushort_7 (vector unsigned short a)
 {
-  int c = 7;
-  unsigned short b = vec_extract (a, c);
+  unsigned short b = vec_extract (a, 7);
   return b;
 }
 
 signed char
 extract_schar_0 (vector signed char a)
 {
-  int c = 0;
-  signed char b = vec_extract (a, c);
+  signed char b = vec_extract (a, 0);
   return b;
 }
 
 signed char
 extract_schar_15 (vector signed char a)
 {
-  int c = 15;
-  signed char b = vec_extract (a, c);
+  signed char b = vec_extract (a, 15);
   return b;
 }
 
 unsigned char
 extract_uchar_0 (vector unsigned char a)
 {
-  int c = 0;
-  unsigned char b = vec_extract (a, c);
+  unsigned char b = vec_extract (a, 0);
   return b;
 }
 
 unsigned char
 extract_uchar_15 (vector unsigned char a)
 {
-  int c = 15;
-  signed char b = vec_extract (a, c);
-  return b;
-}
-
-unsigned char
-extract_bool_char_0 (vector bool char a)
-{
-  int c = 0;
-  unsigned char b = vec_extract (a, c);
-  return b;
-}
-
-unsigned int
-extract_bool_int_0 (vector bool int a)
-{
-  int c = 0;
-  unsigned int b = vec_extract (a, c);
-  return b;
-}
-
-unsigned short int
-extract_bool_short_int_0 (vector bool short int a)
-{
-  int c = 0;
-  unsigned short int b = vec_extract (a, c);
+  signed char b = vec_extract (a, 15);
   return b;
 }
 

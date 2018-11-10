@@ -1,6 +1,5 @@
 ## Process this file with automake to produce Makefile.in
 
-AUTOMAKE_OPTIONS = info-in-builddir
 ACLOCAL_AMFLAGS = -I .. -I ../config
 SUBDIRS = testsuite
 
@@ -119,7 +118,5 @@ stamp-build-info: libitm.texi
 	@touch $@
 
 
-CLEANFILES = $(STAMP_GENINSRC) $(STAMP_BUILD_INFO)
+CLEANFILES = $(STAMP_GENINSRC) $(STAMP_BUILD_INFO) libitm.info
 MAINTAINERCLEANFILES = $(srcdir)/libitm.info
-
-include $(top_srcdir)/../multilib.am

@@ -158,11 +158,7 @@ func (check *Checker) builtin(x *operand, call *ast.CallExpr, id builtinId) (_ b
 			// function calls; in this case s is not evaluated."
 			if !check.hasCallOrRecv {
 				mode = constant_
-				if t.len >= 0 {
-					val = constant.MakeInt64(t.len)
-				} else {
-					val = constant.MakeUnknown()
-				}
+				val = constant.MakeInt64(t.len)
 			}
 
 		case *Slice, *Chan:
@@ -174,7 +170,7 @@ func (check *Checker) builtin(x *operand, call *ast.CallExpr, id builtinId) (_ b
 			}
 		}
 
-		if mode == invalid && typ != Typ[Invalid] {
+		if mode == invalid {
 			check.invalidArg(x.pos(), "%s for %s", x, bin.name)
 			return
 		}
@@ -474,19 +470,6 @@ func (check *Checker) builtin(x *operand, call *ast.CallExpr, id builtinId) (_ b
 
 	case _Panic:
 		// panic(x)
-		// record panic call if inside a function with result parameters
-		// (for use in Checker.isTerminating)
-		if check.sig != nil && check.sig.results.Len() > 0 {
-			// function has result parameters
-			p := check.isPanic
-			if p == nil {
-				// allocate lazily
-				p = make(map[*ast.CallExpr]bool)
-				check.isPanic = p
-			}
-			p[call] = true
-		}
-
 		check.assignment(x, &emptyInterface, "argument to panic")
 		if x.mode == invalid {
 			return
@@ -623,7 +606,7 @@ func (check *Checker) builtin(x *operand, call *ast.CallExpr, id builtinId) (_ b
 		// Note: trace is only available in self-test mode.
 		// (no argument evaluated yet)
 		if nargs == 0 {
-			check.dump("%v: trace() without arguments", call.Pos())
+			check.dump("%s: trace() without arguments", call.Pos())
 			x.mode = novalue
 			break
 		}
@@ -631,7 +614,7 @@ func (check *Checker) builtin(x *operand, call *ast.CallExpr, id builtinId) (_ b
 		x1 := x
 		for _, arg := range call.Args {
 			check.rawExpr(x1, arg, nil) // permit trace for types, e.g.: new(trace(T))
-			check.dump("%v: %s", x1.pos(), x1)
+			check.dump("%s: %s", x1.pos(), x1)
 			x1 = &t // use incoming x only for first argument
 		}
 		// trace is only available in test mode - no need to record signature

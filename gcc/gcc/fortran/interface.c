@@ -122,9 +122,9 @@ fold_unary_intrinsic (gfc_intrinsic_op op)
 static gfc_intrinsic_op
 dtio_op (char* mode)
 {
-  if (strcmp (mode, "formatted") == 0)
+  if (strncmp (mode, "formatted", 9) == 0)
     return INTRINSIC_FORMATTED;
-  if (strcmp (mode, "unformatted") == 0)
+  if (strncmp (mode, "unformatted", 9) == 0)
     return INTRINSIC_UNFORMATTED;
   return INTRINSIC_NONE;
 }
@@ -1197,24 +1197,6 @@ count_types_test (gfc_formal_arglist *f1, gfc_formal_arglist *f2,
 }
 
 
-/* Returns true if two dummy arguments are distinguishable due to their POINTER
-   and ALLOCATABLE attributes according to F2018 section 15.4.3.4.5 (3).
-   The function is asymmetric wrt to the arguments s1 and s2 and should always
-   be called twice (with flipped arguments in the second call).  */
-
-static bool
-compare_ptr_alloc(gfc_symbol *s1, gfc_symbol *s2)
-{
-  /* Is s1 allocatable?  */
-  const bool a1 = s1->ts.type == BT_CLASS ?
-		  CLASS_DATA(s1)->attr.allocatable : s1->attr.allocatable;
-  /* Is s2 a pointer?  */
-  const bool p2 = s2->ts.type == BT_CLASS ?
-		  CLASS_DATA(s2)->attr.class_pointer : s2->attr.pointer;
-  return a1 && p2 && (s2->attr.intent != INTENT_IN);
-}
-
-
 /* Perform the correspondence test in rule (3) of F08:C1215.
    Returns zero if no argument is found that satisfies this rule,
    nonzero otherwise. 'p1' and 'p2' are the PASS arguments of both procedures
@@ -1258,8 +1240,8 @@ generic_correspondence (gfc_formal_arglist *f1, gfc_formal_arglist *f2,
       if (f2 != NULL && (compare_type_rank (f1->sym, f2->sym)
 			 || compare_type_rank (f2->sym, f1->sym))
 	  && !((gfc_option.allow_std & GFC_STD_F2008)
-	       && (compare_ptr_alloc(f1->sym, f2->sym)
-		   || compare_ptr_alloc(f2->sym, f1->sym))))
+	       && ((f1->sym->attr.allocatable && f2->sym->attr.pointer)
+		   || (f2->sym->attr.allocatable && f1->sym->attr.pointer))))
 	goto next;
 
       /* Now search for a disambiguating keyword argument starting at
@@ -1272,8 +1254,8 @@ generic_correspondence (gfc_formal_arglist *f1, gfc_formal_arglist *f2,
 	  sym = find_keyword_arg (g->sym->name, f2_save);
 	  if (sym == NULL || !compare_type_rank (g->sym, sym)
 	      || ((gfc_option.allow_std & GFC_STD_F2008)
-		  && (compare_ptr_alloc(sym, g->sym)
-		      || compare_ptr_alloc(g->sym, sym))))
+		  && ((sym->attr.allocatable && g->sym->attr.pointer)
+		      || (sym->attr.pointer && g->sym->attr.allocatable))))
 	    return true;
 	}
 
@@ -1784,7 +1766,7 @@ gfc_compare_interfaces (gfc_symbol *s1, gfc_symbol *s2, const char *name2,
 	  }
 	else
 	  {
-	    /* Operators: Only check type and rank of arguments.  */
+	    /* Only check type and rank.  */
 	    if (!compare_type (f2->sym, f1->sym))
 	      {
 		if (errmsg != NULL)
@@ -1800,15 +1782,6 @@ gfc_compare_interfaces (gfc_symbol *s1, gfc_symbol *s2, const char *name2,
 		  snprintf (errmsg, err_len, "Rank mismatch in argument '%s' "
 			    "(%i/%i)", f1->sym->name, symbol_rank (f1->sym),
 			    symbol_rank (f2->sym));
-		return false;
-	      }
-	    if ((gfc_option.allow_std & GFC_STD_F2008)
-		&& (compare_ptr_alloc(f1->sym, f2->sym)
-		    || compare_ptr_alloc(f2->sym, f1->sym)))
-	      {
-    		if (errmsg != NULL)
-		  snprintf (errmsg, err_len, "Mismatching POINTER/ALLOCATABLE "
-			    "attribute in argument '%s' ", f1->sym->name);
 		return false;
 	      }
 	  }
@@ -4780,6 +4753,7 @@ check_dtio_interface1 (gfc_symbol *derived, gfc_symtree *tb_io_st,
 	return;
 
       gcc_assert (tb_io_proc->is_generic);
+      gcc_assert (tb_io_proc->u.generic->next == NULL);
 
       specific_proc = tb_io_proc->u.generic->specific;
       if (specific_proc == NULL || specific_proc->is_generic)

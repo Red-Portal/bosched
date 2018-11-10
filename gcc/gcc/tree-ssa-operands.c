@@ -515,7 +515,7 @@ add_stmt_operand (struct function *fn, tree *var_p, gimple *stmt, int flags)
 {
   tree var = *var_p;
 
-  gcc_assert (SSA_VAR_P (*var_p) || TREE_CODE (*var_p) == STRING_CST);
+  gcc_assert (SSA_VAR_P (*var_p));
 
   if (is_gimple_reg (var))
     {
@@ -740,7 +740,6 @@ get_expr_operands (struct function *fn, gimple *stmt, tree *expr_p, int flags)
     case VAR_DECL:
     case PARM_DECL:
     case RESULT_DECL:
-    case STRING_CST:
       if (!(flags & opf_address_taken))
 	add_stmt_operand (fn, expr_p, stmt, flags);
       return;
@@ -850,6 +849,7 @@ get_expr_operands (struct function *fn, gimple *stmt, tree *expr_p, int flags)
     case REALIGN_LOAD_EXPR:
     case WIDEN_MULT_PLUS_EXPR:
     case WIDEN_MULT_MINUS_EXPR:
+    case FMA_EXPR:
       {
 	get_expr_operands (fn, stmt, &TREE_OPERAND (expr, 0), flags);
 	get_expr_operands (fn, stmt, &TREE_OPERAND (expr, 1), flags);

@@ -41,9 +41,10 @@
 # include <stdint.h>
 #endif
 
+#ifdef _GLIBCXX_USE_C99_STDINT_TR1
+
 namespace std
 {
-#ifdef _GLIBCXX_USE_C99_STDINT_TR1
   using ::int8_t;
   using ::int16_t;
   using ::int32_t;
@@ -79,12 +80,9 @@ namespace std
 
   using ::uintmax_t;
   using ::uintptr_t;
-#else // !_GLIBCXX_USE_C99_STDINT_TR1
-  // Define the minimum needed for <ratio>, <chrono> etc.
-  using intmax_t = __INTMAX_TYPE__;
-  using uintmax_t = __UINTMAX_TYPE__;
-#endif // _GLIBCXX_USE_C99_STDINT_TR1
 } // namespace std
+
+#endif // _GLIBCXX_USE_C99_STDINT_TR1
 
 #endif // C++11
 

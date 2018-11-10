@@ -8,13 +8,8 @@
 #include <string.h>
 #include <stdint.h>
 
-#define STR1(X) #X
-#define STR2(X) STR1(X)
-
-int lib_memcmp(const void *a, const void *b, size_t n)
- asm(STR2(__USER_LABEL_PREFIX__) "memcmp");
-int lib_strncmp(const char *a, const char *b, size_t n)
- asm(STR2(__USER_LABEL_PREFIX__) "strncmp");
+int lib_memcmp(const void *a, const void *b, size_t n) asm("memcmp");
+int lib_strncmp(const char *a, const char *b, size_t n) asm("strncmp");
 
 #ifndef NRAND
 #ifdef TEST_ALL

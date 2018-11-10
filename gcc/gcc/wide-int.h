@@ -322,9 +322,6 @@ class wide_int_storage;
 typedef generic_wide_int <wide_int_storage> wide_int;
 typedef FIXED_WIDE_INT (ADDR_MAX_PRECISION) offset_int;
 typedef FIXED_WIDE_INT (WIDE_INT_MAX_PRECISION) widest_int;
-/* Spelled out explicitly (rather than through FIXED_WIDE_INT)
-   so as not to confuse gengtype.  */
-typedef generic_wide_int < fixed_wide_int_storage <WIDE_INT_MAX_PRECISION * 2> > widest2_int;
 
 /* wi::storage_ref can be a reference to a primitive type,
    so this is the conservatively-correct setting.  */
@@ -347,23 +344,6 @@ typedef generic_wide_int <wide_int_ref_storage <false> > wide_int_ref;
 
 namespace wi
 {
-  /* Operations that calculate overflow do so even for
-     TYPE_OVERFLOW_WRAPS types.  For example, adding 1 to +MAX_INT in
-     an unsigned int is 0 and does not overflow in C/C++, but wi::add
-     will set the overflow argument in case it's needed for further
-     analysis.
-
-     For operations that require overflow, these are the different
-     types of overflow.  */
-  enum overflow_type {
-    OVF_NONE = 0,
-    OVF_UNDERFLOW = -1,
-    OVF_OVERFLOW = 1,
-    /* There was an overflow, but we are unsure whether it was an
-       overflow or an underflow.  */
-    OVF_UNKNOWN = 2
-  };
-
   /* Classifies an integer based on its precision.  */
   enum precision_type {
     /* The integer has both a precision and defined signedness.  This allows
@@ -542,7 +522,7 @@ namespace wi
 
   UNARY_FUNCTION bit_not (const T &);
   UNARY_FUNCTION neg (const T &);
-  UNARY_FUNCTION neg (const T &, overflow_type *);
+  UNARY_FUNCTION neg (const T &, bool *);
   UNARY_FUNCTION abs (const T &);
   UNARY_FUNCTION ext (const T &, unsigned int, signop);
   UNARY_FUNCTION sext (const T &, unsigned int);
@@ -562,41 +542,33 @@ namespace wi
   BINARY_FUNCTION bit_or_not (const T1 &, const T2 &);
   BINARY_FUNCTION bit_xor (const T1 &, const T2 &);
   BINARY_FUNCTION add (const T1 &, const T2 &);
-  BINARY_FUNCTION add (const T1 &, const T2 &, signop, overflow_type *);
+  BINARY_FUNCTION add (const T1 &, const T2 &, signop, bool *);
   BINARY_FUNCTION sub (const T1 &, const T2 &);
-  BINARY_FUNCTION sub (const T1 &, const T2 &, signop, overflow_type *);
+  BINARY_FUNCTION sub (const T1 &, const T2 &, signop, bool *);
   BINARY_FUNCTION mul (const T1 &, const T2 &);
-  BINARY_FUNCTION mul (const T1 &, const T2 &, signop, overflow_type *);
-  BINARY_FUNCTION smul (const T1 &, const T2 &, overflow_type *);
-  BINARY_FUNCTION umul (const T1 &, const T2 &, overflow_type *);
+  BINARY_FUNCTION mul (const T1 &, const T2 &, signop, bool *);
+  BINARY_FUNCTION smul (const T1 &, const T2 &, bool *);
+  BINARY_FUNCTION umul (const T1 &, const T2 &, bool *);
   BINARY_FUNCTION mul_high (const T1 &, const T2 &, signop);
-  BINARY_FUNCTION div_trunc (const T1 &, const T2 &, signop,
-			     overflow_type * = 0);
+  BINARY_FUNCTION div_trunc (const T1 &, const T2 &, signop, bool * = 0);
   BINARY_FUNCTION sdiv_trunc (const T1 &, const T2 &);
   BINARY_FUNCTION udiv_trunc (const T1 &, const T2 &);
-  BINARY_FUNCTION div_floor (const T1 &, const T2 &, signop,
-			     overflow_type * = 0);
+  BINARY_FUNCTION div_floor (const T1 &, const T2 &, signop, bool * = 0);
   BINARY_FUNCTION udiv_floor (const T1 &, const T2 &);
   BINARY_FUNCTION sdiv_floor (const T1 &, const T2 &);
-  BINARY_FUNCTION div_ceil (const T1 &, const T2 &, signop,
-			    overflow_type * = 0);
+  BINARY_FUNCTION div_ceil (const T1 &, const T2 &, signop, bool * = 0);
   BINARY_FUNCTION udiv_ceil (const T1 &, const T2 &);
-  BINARY_FUNCTION div_round (const T1 &, const T2 &, signop,
-			     overflow_type * = 0);
+  BINARY_FUNCTION div_round (const T1 &, const T2 &, signop, bool * = 0);
   BINARY_FUNCTION divmod_trunc (const T1 &, const T2 &, signop,
 				WI_BINARY_RESULT (T1, T2) *);
   BINARY_FUNCTION gcd (const T1 &, const T2 &, signop = UNSIGNED);
-  BINARY_FUNCTION mod_trunc (const T1 &, const T2 &, signop,
-			     overflow_type * = 0);
+  BINARY_FUNCTION mod_trunc (const T1 &, const T2 &, signop, bool * = 0);
   BINARY_FUNCTION smod_trunc (const T1 &, const T2 &);
   BINARY_FUNCTION umod_trunc (const T1 &, const T2 &);
-  BINARY_FUNCTION mod_floor (const T1 &, const T2 &, signop,
-			     overflow_type * = 0);
+  BINARY_FUNCTION mod_floor (const T1 &, const T2 &, signop, bool * = 0);
   BINARY_FUNCTION umod_floor (const T1 &, const T2 &);
-  BINARY_FUNCTION mod_ceil (const T1 &, const T2 &, signop,
-			    overflow_type * = 0);
-  BINARY_FUNCTION mod_round (const T1 &, const T2 &, signop,
-			     overflow_type * = 0);
+  BINARY_FUNCTION mod_ceil (const T1 &, const T2 &, signop, bool * = 0);
+  BINARY_FUNCTION mod_round (const T1 &, const T2 &, signop, bool * = 0);
 
   template <typename T1, typename T2>
   bool multiple_of_p (const T1 &, const T2 &, signop);
@@ -634,8 +606,6 @@ namespace wi
 
   template <typename T>
   unsigned int min_precision (const T &, signop);
-
-  static inline void accumulate_overflow (overflow_type &, overflow_type);
 }
 
 namespace wi
@@ -1730,20 +1700,20 @@ namespace wi
 			  const HOST_WIDE_INT *, unsigned int, unsigned int);
   unsigned int add_large (HOST_WIDE_INT *, const HOST_WIDE_INT *, unsigned int,
 			  const HOST_WIDE_INT *, unsigned int, unsigned int,
-			  signop, overflow_type *);
+			  signop, bool *);
   unsigned int sub_large (HOST_WIDE_INT *, const HOST_WIDE_INT *, unsigned int,
 			  const HOST_WIDE_INT *, unsigned int, unsigned int,
-			  signop, overflow_type *);
+			  signop, bool *);
   unsigned int mul_internal (HOST_WIDE_INT *, const HOST_WIDE_INT *,
 			     unsigned int, const HOST_WIDE_INT *,
-			     unsigned int, unsigned int, signop,
-			     overflow_type *, bool);
+			     unsigned int, unsigned int, signop, bool *,
+			     bool);
   unsigned int divmod_internal (HOST_WIDE_INT *, unsigned int *,
 				HOST_WIDE_INT *, const HOST_WIDE_INT *,
 				unsigned int, unsigned int,
 				const HOST_WIDE_INT *,
 				unsigned int, unsigned int,
-				signop, overflow_type *);
+				signop, bool *);
 }
 
 /* Return the number of bits that integer X can hold.  */
@@ -2132,13 +2102,12 @@ wi::neg (const T &x)
   return sub (0, x);
 }
 
-/* Return -x.  Indicate in *OVERFLOW if performing the negation would
-   cause an overflow.  */
+/* Return -x.  Indicate in *OVERFLOW if X is the minimum signed value.  */
 template <typename T>
 inline WI_UNARY_RESULT (T)
-wi::neg (const T &x, overflow_type *overflow)
+wi::neg (const T &x, bool *overflow)
 {
-  *overflow = only_sign_bit_p (x) ? OVF_OVERFLOW : OVF_NONE;
+  *overflow = only_sign_bit_p (x);
   return sub (0, x);
 }
 
@@ -2438,7 +2407,7 @@ wi::add (const T1 &x, const T2 &y)
    and indicate in *OVERFLOW whether the operation overflowed.  */
 template <typename T1, typename T2>
 inline WI_BINARY_RESULT (T1, T2)
-wi::add (const T1 &x, const T2 &y, signop sgn, overflow_type *overflow)
+wi::add (const T1 &x, const T2 &y, signop sgn, bool *overflow)
 {
   WI_BINARY_RESULT_VAR (result, val, T1, x, T2, y);
   unsigned int precision = get_precision (result);
@@ -2450,24 +2419,11 @@ wi::add (const T1 &x, const T2 &y, signop sgn, overflow_type *overflow)
       unsigned HOST_WIDE_INT yl = yi.ulow ();
       unsigned HOST_WIDE_INT resultl = xl + yl;
       if (sgn == SIGNED)
-	{
-	  if ((((resultl ^ xl) & (resultl ^ yl))
-	       >> (precision - 1)) & 1)
-	    {
-	      if (xl > resultl)
-		*overflow = OVF_UNDERFLOW;
-	      else if (xl < resultl)
-		*overflow = OVF_OVERFLOW;
-	      else
-		*overflow = OVF_NONE;
-	    }
-	  else
-	    *overflow = OVF_NONE;
-	}
+	*overflow = (((resultl ^ xl) & (resultl ^ yl))
+		     >> (precision - 1)) & 1;
       else
 	*overflow = ((resultl << (HOST_BITS_PER_WIDE_INT - precision))
-		     < (xl << (HOST_BITS_PER_WIDE_INT - precision)))
-	  ? OVF_OVERFLOW : OVF_NONE;
+		     < (xl << (HOST_BITS_PER_WIDE_INT - precision)));
       val[0] = resultl;
       result.set_len (1);
     }
@@ -2524,7 +2480,7 @@ wi::sub (const T1 &x, const T2 &y)
    and indicate in *OVERFLOW whether the operation overflowed.  */
 template <typename T1, typename T2>
 inline WI_BINARY_RESULT (T1, T2)
-wi::sub (const T1 &x, const T2 &y, signop sgn, overflow_type *overflow)
+wi::sub (const T1 &x, const T2 &y, signop sgn, bool *overflow)
 {
   WI_BINARY_RESULT_VAR (result, val, T1, x, T2, y);
   unsigned int precision = get_precision (result);
@@ -2536,23 +2492,10 @@ wi::sub (const T1 &x, const T2 &y, signop sgn, overflow_type *overflow)
       unsigned HOST_WIDE_INT yl = yi.ulow ();
       unsigned HOST_WIDE_INT resultl = xl - yl;
       if (sgn == SIGNED)
-	{
-	  if ((((xl ^ yl) & (resultl ^ xl)) >> (precision - 1)) & 1)
-	    {
-	      if (xl > yl)
-		*overflow = OVF_UNDERFLOW;
-	      else if (xl < yl)
-		*overflow = OVF_OVERFLOW;
-	      else
-		*overflow = OVF_NONE;
-	    }
-	  else
-	    *overflow = OVF_NONE;
-	}
+	*overflow = (((xl ^ yl) & (resultl ^ xl)) >> (precision - 1)) & 1;
       else
 	*overflow = ((resultl << (HOST_BITS_PER_WIDE_INT - precision))
-		     > (xl << (HOST_BITS_PER_WIDE_INT - precision)))
-	  ? OVF_UNDERFLOW : OVF_NONE;
+		     > (xl << (HOST_BITS_PER_WIDE_INT - precision)));
       val[0] = resultl;
       result.set_len (1);
     }
@@ -2587,7 +2530,7 @@ wi::mul (const T1 &x, const T2 &y)
    and indicate in *OVERFLOW whether the operation overflowed.  */
 template <typename T1, typename T2>
 inline WI_BINARY_RESULT (T1, T2)
-wi::mul (const T1 &x, const T2 &y, signop sgn, overflow_type *overflow)
+wi::mul (const T1 &x, const T2 &y, signop sgn, bool *overflow)
 {
   WI_BINARY_RESULT_VAR (result, val, T1, x, T2, y);
   unsigned int precision = get_precision (result);
@@ -2603,16 +2546,16 @@ wi::mul (const T1 &x, const T2 &y, signop sgn, overflow_type *overflow)
    *OVERFLOW whether the operation overflowed.  */
 template <typename T1, typename T2>
 inline WI_BINARY_RESULT (T1, T2)
-wi::smul (const T1 &x, const T2 &y, overflow_type *overflow)
+wi::smul (const T1 &x, const T2 &y, bool *overflow)
 {
   return mul (x, y, SIGNED, overflow);
 }
 
 /* Return X * Y, treating both X and Y as unsigned values.  Indicate in
-  *OVERFLOW if the result overflows.  */
+   *OVERFLOW whether the operation overflowed.  */
 template <typename T1, typename T2>
 inline WI_BINARY_RESULT (T1, T2)
-wi::umul (const T1 &x, const T2 &y, overflow_type *overflow)
+wi::umul (const T1 &x, const T2 &y, bool *overflow)
 {
   return mul (x, y, UNSIGNED, overflow);
 }
@@ -2638,7 +2581,7 @@ wi::mul_high (const T1 &x, const T2 &y, signop sgn)
    overflows.  */
 template <typename T1, typename T2>
 inline WI_BINARY_RESULT (T1, T2)
-wi::div_trunc (const T1 &x, const T2 &y, signop sgn, overflow_type *overflow)
+wi::div_trunc (const T1 &x, const T2 &y, signop sgn, bool *overflow)
 {
   WI_BINARY_RESULT_VAR (quotient, quotient_val, T1, x, T2, y);
   unsigned int precision = get_precision (quotient);
@@ -2673,7 +2616,7 @@ wi::udiv_trunc (const T1 &x, const T2 &y)
    overflows.  */
 template <typename T1, typename T2>
 inline WI_BINARY_RESULT (T1, T2)
-wi::div_floor (const T1 &x, const T2 &y, signop sgn, overflow_type *overflow)
+wi::div_floor (const T1 &x, const T2 &y, signop sgn, bool *overflow)
 {
   WI_BINARY_RESULT_VAR (quotient, quotient_val, T1, x, T2, y);
   WI_BINARY_RESULT_VAR (remainder, remainder_val, T1, x, T2, y);
@@ -2715,7 +2658,7 @@ wi::udiv_floor (const T1 &x, const T2 &y)
    overflows.  */
 template <typename T1, typename T2>
 inline WI_BINARY_RESULT (T1, T2)
-wi::div_ceil (const T1 &x, const T2 &y, signop sgn, overflow_type *overflow)
+wi::div_ceil (const T1 &x, const T2 &y, signop sgn, bool *overflow)
 {
   WI_BINARY_RESULT_VAR (quotient, quotient_val, T1, x, T2, y);
   WI_BINARY_RESULT_VAR (remainder, remainder_val, T1, x, T2, y);
@@ -2748,7 +2691,7 @@ wi::udiv_ceil (const T1 &x, const T2 &y)
    in *OVERFLOW if the result overflows.  */
 template <typename T1, typename T2>
 inline WI_BINARY_RESULT (T1, T2)
-wi::div_round (const T1 &x, const T2 &y, signop sgn, overflow_type *overflow)
+wi::div_round (const T1 &x, const T2 &y, signop sgn, bool *overflow)
 {
   WI_BINARY_RESULT_VAR (quotient, quotient_val, T1, x, T2, y);
   WI_BINARY_RESULT_VAR (remainder, remainder_val, T1, x, T2, y);
@@ -2836,7 +2779,7 @@ wi::gcd (const T1 &a, const T2 &b, signop sgn)
    in *OVERFLOW if the division overflows.  */
 template <typename T1, typename T2>
 inline WI_BINARY_RESULT (T1, T2)
-wi::mod_trunc (const T1 &x, const T2 &y, signop sgn, overflow_type *overflow)
+wi::mod_trunc (const T1 &x, const T2 &y, signop sgn, bool *overflow)
 {
   WI_BINARY_RESULT_VAR (remainder, remainder_val, T1, x, T2, y);
   unsigned int precision = get_precision (remainder);
@@ -2875,7 +2818,7 @@ wi::umod_trunc (const T1 &x, const T2 &y)
    in *OVERFLOW if the division overflows.  */
 template <typename T1, typename T2>
 inline WI_BINARY_RESULT (T1, T2)
-wi::mod_floor (const T1 &x, const T2 &y, signop sgn, overflow_type *overflow)
+wi::mod_floor (const T1 &x, const T2 &y, signop sgn, bool *overflow)
 {
   WI_BINARY_RESULT_VAR (quotient, quotient_val, T1, x, T2, y);
   WI_BINARY_RESULT_VAR (remainder, remainder_val, T1, x, T2, y);
@@ -2911,7 +2854,7 @@ wi::umod_floor (const T1 &x, const T2 &y)
    in *OVERFLOW if the division overflows.  */
 template <typename T1, typename T2>
 inline WI_BINARY_RESULT (T1, T2)
-wi::mod_ceil (const T1 &x, const T2 &y, signop sgn, overflow_type *overflow)
+wi::mod_ceil (const T1 &x, const T2 &y, signop sgn, bool *overflow)
 {
   WI_BINARY_RESULT_VAR (quotient, quotient_val, T1, x, T2, y);
   WI_BINARY_RESULT_VAR (remainder, remainder_val, T1, x, T2, y);
@@ -2937,7 +2880,7 @@ wi::mod_ceil (const T1 &x, const T2 &y, signop sgn, overflow_type *overflow)
    given by SGN.  Indicate in *OVERFLOW if the division overflows.  */
 template <typename T1, typename T2>
 inline WI_BINARY_RESULT (T1, T2)
-wi::mod_round (const T1 &x, const T2 &y, signop sgn, overflow_type *overflow)
+wi::mod_round (const T1 &x, const T2 &y, signop sgn, bool *overflow)
 {
   WI_BINARY_RESULT_VAR (quotient, quotient_val, T1, x, T2, y);
   WI_BINARY_RESULT_VAR (remainder, remainder_val, T1, x, T2, y);
@@ -3450,20 +3393,6 @@ inline T
 wi::set_bit_in_zero (unsigned int bit)
 {
   return shifted_mask <T> (bit, 1, false);
-}
-
-/* Accumulate a set of overflows into OVERFLOW.  */
-
-static inline void
-wi::accumulate_overflow (wi::overflow_type &overflow,
-			 wi::overflow_type suboverflow)
-{
-  if (!suboverflow)
-    return;
-  if (!overflow)
-    overflow = suboverflow;
-  else if (overflow != suboverflow)
-    overflow = wi::OVF_UNKNOWN;
 }
 
 #endif /* WIDE_INT_H */

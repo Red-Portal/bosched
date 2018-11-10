@@ -905,9 +905,3 @@ func TestGlobal(t *testing.T) {
 	AssertIsLinkedTo(t, "./bin/global", soname)
 	AssertHasRPath(t, "./bin/global", gorootInstallDir)
 }
-
-// Run a test using -linkshared of an installed shared package.
-// Issue 26400.
-func TestTestInstalledShared(t *testing.T) {
-	goCmd(nil, "test", "-linkshared", "-test.short", "sync/atomic")
-}

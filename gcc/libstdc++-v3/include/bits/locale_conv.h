@@ -174,17 +174,14 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
       typedef typename _Codecvt::state_type 			   state_type;
       typedef typename wide_string::traits_type::int_type	   int_type;
 
-      /// Default constructor.
-      wstring_convert() : _M_cvt(new _Codecvt()) { }
-
-      /** Constructor.
+      /** Default constructor.
        *
        * @param  __pcvt The facet to use for conversions.
        *
        * Takes ownership of @p __pcvt and will delete it in the destructor.
        */
       explicit
-      wstring_convert(_Codecvt* __pcvt) : _M_cvt(__pcvt)
+      wstring_convert(_Codecvt* __pcvt = new _Codecvt()) : _M_cvt(__pcvt)
       {
 	if (!_M_cvt)
 	  __throw_logic_error("wstring_convert");
@@ -328,10 +325,7 @@ _GLIBCXX_END_NAMESPACE_CXX11
     public:
       typedef typename _Codecvt::state_type state_type;
 
-      /// Default constructor.
-      wbuffer_convert() : wbuffer_convert(nullptr) { }
-
-      /** Constructor.
+      /** Default constructor.
        *
        * @param  __bytebuf The underlying byte stream buffer.
        * @param  __pcvt    The facet to use for conversions.
@@ -340,7 +334,7 @@ _GLIBCXX_END_NAMESPACE_CXX11
        * Takes ownership of @p __pcvt and will delete it in the destructor.
        */
       explicit
-      wbuffer_convert(streambuf* __bytebuf, _Codecvt* __pcvt = new _Codecvt,
+      wbuffer_convert(streambuf* __bytebuf = 0, _Codecvt* __pcvt = new _Codecvt,
 		      state_type __state = state_type())
       : _M_buf(__bytebuf), _M_cvt(__pcvt), _M_state(__state)
       {

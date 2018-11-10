@@ -30,7 +30,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "obstack.h"
 #include "intl.h"
 #include "prefix.h"
-#include "opt-suggestions.h"
 #include "gcc.h"
 
 /* Implement the top-level "main" within the driver in terms of

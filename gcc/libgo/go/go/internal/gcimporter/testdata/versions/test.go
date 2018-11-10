@@ -11,10 +11,7 @@
 //
 // go build -o test_go1.$X_$Y.a test.go
 //
-// with $X = Go version and $Y = export format version
-// (add 'b' or 'i' to distinguish between binary and
-// indexed format starting with 1.11 as long as both
-// formats are supported).
+// with $X = Go version and $Y = export format version.
 //
 // Make sure this source is extended such that it exercises
 // whatever export format change has taken place.

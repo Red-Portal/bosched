@@ -47,7 +47,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
-#include "opt-suggestions.h"
 #include "gcc.h"
 #include "opts.h"
 
@@ -243,7 +242,6 @@ lang_specific_driver (struct cl_decoded_option **in_decoded_options,
 	case OPT_nostdlib:
 	case OPT_nodefaultlibs:
 	case OPT_c:
-	case OPT_r:
 	case OPT_S:
 	case OPT_fsyntax_only:
 	case OPT_E:

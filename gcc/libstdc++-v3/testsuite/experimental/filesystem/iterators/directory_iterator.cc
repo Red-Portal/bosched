@@ -44,16 +44,15 @@ test01()
   VERIFY( iter == end(iter) );
 
   // Test non-empty directory.
-  create_directory(p / "x", ec);
+  create_directory_symlink(p, p / "l", ec);
   VERIFY( !ec );
   iter = fs::directory_iterator(p, ec);
   VERIFY( !ec );
   VERIFY( iter != fs::directory_iterator() );
-  VERIFY( iter->path() == p/"x" );
+  VERIFY( iter->path() == p/"l" );
   ++iter;
   VERIFY( iter == end(iter) );
 
-#if !(defined(__MINGW32__) || defined(__MINGW64__))
   // Test inaccessible directory.
   permissions(p, fs::perms::none, ec);
   VERIFY( !ec );
@@ -66,7 +65,6 @@ test01()
   iter = fs::directory_iterator(p, opts, ec);
   VERIFY( !ec );
   VERIFY( iter == end(iter) );
-#endif
 
   permissions(p, fs::perms::owner_all, ec);
   remove_all(p, ec);
@@ -78,7 +76,7 @@ test02()
   std::error_code ec;
   const auto p = __gnu_test::nonexistent_path();
   create_directory(p, fs::current_path(), ec);
-  create_directory(p / "x", ec);
+  create_directory_symlink(p, p / "l", ec);
   VERIFY( !ec );
 
   // Test post-increment (libstdc++/71005)
@@ -88,7 +86,7 @@ test02()
   const auto entry1 = *iter;
   const auto entry2 = *iter++;
   VERIFY( entry1 == entry2 );
-  VERIFY( entry1.path() == p/"x" );
+  VERIFY( entry1.path() == p/"l" );
   VERIFY( iter == end(iter) );
 
   remove_all(p, ec);
@@ -123,7 +121,7 @@ test05()
 {
   auto p = __gnu_test::nonexistent_path();
   create_directory(p);
-  create_directory(p / "x");
+  create_directory_symlink(p, p / "l");
   fs::directory_iterator it(p), endit;
   VERIFY( begin(it) == it );
   static_assert( noexcept(begin(it)), "begin is noexcept" );

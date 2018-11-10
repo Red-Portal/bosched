@@ -104,6 +104,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimple-pretty-print.h"
 #include "ipa-fnsummary.h"
 #include "cfgloop.h"
+#include "tree-chkp.h"
 
 /* Per basic block info.  */
 
@@ -150,6 +151,7 @@ struct split_point best_split_point;
 static bitmap forbidden_dominators;
 
 static tree find_retval (basic_block return_bb);
+static tree find_retbnd (basic_block return_bb);
 
 /* Callback for walk_stmt_load_store_addr_ops.  If T is non-SSA automatic
    variable, check it if it is present in bitmap passed via DATA.  */
@@ -431,6 +433,7 @@ consider_split (struct split_point *current, bitmap non_ssa_vars,
   gphi_iterator bsi;
   unsigned int i;
   tree retval;
+  tree retbnd;
   bool back_edge = false;
 
   if (dump_file && (dump_flags & TDF_DETAILS))
@@ -675,6 +678,29 @@ consider_split (struct split_point *current, bitmap non_ssa_vars,
   else
     current->split_part_set_retval = true;
 
+  /* See if retbnd used by return bb is computed by header or split part.  */
+  retbnd = find_retbnd (return_bb);
+  if (retbnd)
+    {
+      bool split_part_set_retbnd
+	= split_part_set_ssa_name_p (retbnd, current, return_bb);
+
+      /* If we have both return value and bounds then keep their definitions
+	 in a single function.  We use SSA names to link returned bounds and
+	 value and therefore do not handle cases when result is passed by
+	 reference (which should not be our case anyway since bounds are
+	 returned for pointers only).  */
+      if ((DECL_BY_REFERENCE (DECL_RESULT (current_function_decl))
+	   && current->split_part_set_retval)
+	  || split_part_set_retbnd != current->split_part_set_retval)
+	{
+	  if (dump_file && (dump_flags & TDF_DETAILS))
+	    fprintf (dump_file,
+		     "  Refused: split point splits return value and bounds\n");
+	  return;
+	}
+    }
+
   /* split_function fixes up at most one PHI non-virtual PHI node in return_bb,
      for the return value.  If there are other PHIs, give up.  */
   if (return_bb != EXIT_BLOCK_PTR_FOR_FN (cfun))
@@ -804,6 +830,18 @@ find_retval (basic_block return_bb)
   return NULL;
 }
 
+/* Given return basic block RETURN_BB, see where return bounds are really
+   stored.  */
+static tree
+find_retbnd (basic_block return_bb)
+{
+  gimple_stmt_iterator bsi;
+  for (bsi = gsi_last_bb (return_bb); !gsi_end_p (bsi); gsi_prev (&bsi))
+    if (gimple_code (gsi_stmt (bsi)) == GIMPLE_RETURN)
+      return gimple_return_retbnd (gsi_stmt (bsi));
+  return NULL;
+}
+
 /* Callback for walk_stmt_load_store_addr_ops.  If T is non-SSA automatic
    variable, mark it as used in bitmap passed via DATA.
    Return true when access to T prevents splitting the function.  */
@@ -899,7 +937,8 @@ visit_bb (basic_block bb, basic_block return_bb,
       /* Check builtins that prevent splitting.  */
       if (gimple_code (stmt) == GIMPLE_CALL
 	  && (decl = gimple_call_fndecl (stmt)) != NULL_TREE
-	  && fndecl_built_in_p (decl, BUILT_IN_NORMAL))
+	  && DECL_BUILT_IN (decl)
+	  && DECL_BUILT_IN_CLASS (decl) == BUILT_IN_NORMAL)
 	switch (DECL_FUNCTION_CODE (decl))
 	  {
 	  /* FIXME: once we will allow passing non-parm values to split part,
@@ -1189,7 +1228,8 @@ split_function (basic_block return_bb, struct split_point *split_point,
   gcall *call, *tsan_func_exit_call = NULL;
   edge e;
   edge_iterator ei;
-  tree retval = NULL, real_retval = NULL;
+  tree retval = NULL, real_retval = NULL, retbnd = NULL;
+  bool with_bounds = chkp_function_instrumented_p (current_function_decl);
   gimple *last_stmt = NULL;
   unsigned int i;
   tree arg, ddef;
@@ -1271,10 +1311,14 @@ split_function (basic_block return_bb, struct split_point *split_point,
       e = make_single_succ_edge (new_return_bb, EXIT_BLOCK_PTR_FOR_FN (cfun), 0);
       add_bb_to_loop (new_return_bb, current_loops->tree_root);
       bitmap_set_bit (split_point->split_bbs, new_return_bb->index);
+      retbnd = find_retbnd (return_bb);
     }
   /* When we pass around the value, use existing return block.  */
   else
-    bitmap_set_bit (split_point->split_bbs, return_bb->index);
+    {
+      bitmap_set_bit (split_point->split_bbs, return_bb->index);
+      retbnd = find_retbnd (return_bb);
+    }
 
   /* If RETURN_BB has virtual operand PHIs, they must be removed and the
      virtual operand marked for renaming as we change the CFG in a way that
@@ -1346,7 +1390,7 @@ split_function (basic_block return_bb, struct split_point *split_point,
   /* For usual cloning it is enough to clear builtin only when signature
      changes.  For partial inlining we however can not expect the part
      of builtin implementation to have same semantic as the whole.  */
-  if (fndecl_built_in_p (node->decl))
+  if (DECL_BUILT_IN (node->decl))
     {
       DECL_BUILT_IN_CLASS (node->decl) = NOT_BUILT_IN;
       DECL_FUNCTION_CODE (node->decl) = (enum built_in_function) 0;
@@ -1390,6 +1434,11 @@ split_function (basic_block return_bb, struct split_point *split_point,
 	}
     }
 
+  /* If the original function is instrumented then it's
+     part is also instrumented.  */
+  if (with_bounds)
+    chkp_function_mark_instrumented (node->decl);
+
   /* If the original function is declared inline, there is no point in issuing
      a warning for the non-inlinable part.  */
   DECL_NO_INLINE_WARNING_P (node->decl) = 1;
@@ -1425,6 +1474,7 @@ split_function (basic_block return_bb, struct split_point *split_point,
 	args_to_pass[i] = arg;
       }
   call = gimple_build_call_vec (node->decl, args_to_pass);
+  gimple_call_set_with_bounds (call, with_bounds);
   gimple_set_block (call, DECL_INITIAL (current_function_decl));
   args_to_pass.release ();
 
@@ -1568,6 +1618,21 @@ split_function (basic_block return_bb, struct split_point *split_point,
 			    }
 			}
 		    }
+
+		  /* Replace retbnd with new one.  */
+		  if (retbnd)
+		    {
+		      gimple_stmt_iterator bsi;
+		      for (bsi = gsi_last_bb (return_bb); !gsi_end_p (bsi);
+			   gsi_prev (&bsi))
+			if (gimple_code (gsi_stmt (bsi)) == GIMPLE_RETURN)
+			  {
+			    retbnd = copy_ssa_name (retbnd, call);
+			    gimple_return_set_retbnd (gsi_stmt (bsi), retbnd);
+			    update_stmt (gsi_stmt (bsi));
+			    break;
+			  }
+		    }
 		}
 	      if (DECL_BY_REFERENCE (DECL_RESULT (current_function_decl)))
 		{
@@ -1588,6 +1653,9 @@ split_function (basic_block return_bb, struct split_point *split_point,
 		      gsi_insert_after (&gsi, cpy, GSI_NEW_STMT);
 		      retval = tem;
 		    }
+		  /* Build bndret call to obtain returned bounds.  */
+		  if (retbnd)
+		    chkp_insert_retbnd_call (retbnd, retval, &gsi);
 		  gimple_call_set_lhs (call, retval);
 		  update_stmt (call);
 		}
@@ -1607,6 +1675,10 @@ split_function (basic_block return_bb, struct split_point *split_point,
 	      && !VOID_TYPE_P (TREE_TYPE (TREE_TYPE (current_function_decl))))
 	    {
 	      retval = DECL_RESULT (current_function_decl);
+
+	      if (chkp_function_instrumented_p (current_function_decl)
+		  && BOUNDED_P (retval))
+		retbnd = create_tmp_reg (pointer_bounds_type_node);
 
 	      /* We use temporary register to hold value when aggregate_value_p
 		 is false.  Similarly for DECL_BY_REFERENCE we must avoid extra
@@ -1645,6 +1717,9 @@ split_function (basic_block return_bb, struct split_point *split_point,
 		  gsi_insert_after (&gsi, g, GSI_NEW_STMT);
 		}
 	    }
+	  /* Build bndret call to obtain returned bounds.  */
+	  if (retbnd)
+	    chkp_insert_retbnd_call (retbnd, retval, &gsi);
 	  if (tsan_func_exit_call)
 	    gsi_insert_after (&gsi, tsan_func_exit_call, GSI_NEW_STMT);
 	  ret = gimple_build_return (retval);
@@ -1690,7 +1765,6 @@ execute_split_functions (void)
   /* This can be relaxed; function might become inlinable after splitting
      away the uninlinable part.  */
   if (ipa_fn_summaries
-      && ipa_fn_summaries->get (node)
       && !ipa_fn_summaries->get (node)->inlinable)
     {
       if (dump_file)

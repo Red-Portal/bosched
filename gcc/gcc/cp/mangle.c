@@ -233,6 +233,7 @@ static void write_discriminator (const int);
 static void write_local_name (tree, const tree, const tree);
 static void dump_substitution_candidates (void);
 static tree mangle_decl_string (const tree);
+static int local_class_index (tree);
 static void maybe_check_abi_tags (tree, tree = NULL_TREE, int = 10);
 static bool equal_abi_tags (tree, tree);
 
@@ -1554,10 +1555,6 @@ struct releasing_vec
   releasing_vec (vec_t *v): v(v) { }
   releasing_vec (): v(make_tree_vector ()) { }
 
-  /* Copy constructor is deliberately declared but not defined,
-     copies must always be elided.  */
-  releasing_vec (const releasing_vec &);
-
   vec_t &operator* () const { return *v; }
   vec_t *operator-> () const { return v; }
   vec_t *get () const { return v; }
@@ -1641,7 +1638,7 @@ write_unnamed_type_name (const tree type)
   MANGLE_TRACE_TREE ("unnamed-type-name", type);
 
   if (TYPE_FUNCTION_SCOPE_P (type))
-    discriminator = discriminator_for_local_entity (TYPE_NAME (type));
+    discriminator = local_class_index (type);
   else if (TYPE_CLASS_SCOPE_P (type))
     discriminator = nested_anon_class_index (type);
   else
@@ -1912,25 +1909,58 @@ write_special_name_destructor (const tree dtor)
     }
 }
 
+/* Scan the vector of local classes and return how many others with the
+   same name (or same no name) and context precede ENTITY.  */
+
+static int
+local_class_index (tree entity)
+{
+  int ix, discriminator = 0;
+  tree name = (TYPE_UNNAMED_P (entity) ? NULL_TREE
+	       : TYPE_IDENTIFIER (entity));
+  tree ctx = TYPE_CONTEXT (entity);
+  for (ix = 0; ; ix++)
+    {
+      tree type = (*local_classes)[ix];
+      if (type == entity)
+	return discriminator;
+      if (TYPE_CONTEXT (type) == ctx
+	  && (name ? TYPE_IDENTIFIER (type) == name
+	      : TYPE_UNNAMED_P (type)))
+	++discriminator;
+    }
+  gcc_unreachable ();
+}
+
 /* Return the discriminator for ENTITY appearing inside
-   FUNCTION.  The discriminator is the lexical ordinal of VAR or TYPE among
-   entities with the same name and kind in the same FUNCTION.  */
+   FUNCTION.  The discriminator is the lexical ordinal of VAR among
+   entities with the same name in the same FUNCTION.  */
 
 static int
 discriminator_for_local_entity (tree entity)
 {
-  if (!DECL_LANG_SPECIFIC (entity))
+  if (DECL_DISCRIMINATOR_P (entity))
     {
-      /* Some decls, like __FUNCTION__, don't need a discriminator.  */
-      gcc_checking_assert (DECL_ARTIFICIAL (entity));
-      return 0;
+      if (DECL_DISCRIMINATOR_SET_P (entity))
+	return DECL_DISCRIMINATOR (entity);
+      else
+	/* The first entity with a particular name doesn't get
+	   DECL_DISCRIMINATOR set up.  */
+	return 0;
     }
-  else if (tree disc = DECL_DISCRIMINATOR (entity))
-    return TREE_INT_CST_LOW (disc);
+  else if (TREE_CODE (entity) == TYPE_DECL)
+    {
+      /* Scan the list of local classes.  */
+      entity = TREE_TYPE (entity);
+
+      /* Lambdas and unnamed types have their own discriminators.  */
+      if (LAMBDA_TYPE_P (entity) || TYPE_UNNAMED_P (entity))
+	return 0;
+
+      return local_class_index (entity);
+    }
   else
-    /* The first entity with a particular name doesn't get
-       DECL_DISCRIMINATOR set up.  */
-    return 0;
+    gcc_unreachable ();
 }
 
 /* Return the discriminator for STRING, a string literal used inside
@@ -2028,11 +2058,7 @@ write_local_name (tree function, const tree local_entity,
 	 from <local-name>, so it doesn't try to process the enclosing
 	 function scope again.  */
       write_name (entity, /*ignore_local_scope=*/1);
-      if (DECL_DISCRIMINATOR_P (local_entity)
-	  && !(TREE_CODE (local_entity) == TYPE_DECL
-	       && (LAMBDA_TYPE_P (TREE_TYPE (local_entity))
-		   || TYPE_UNNAMED_P (TREE_TYPE (local_entity)))))
-	write_discriminator (discriminator_for_local_entity (local_entity));
+      write_discriminator (discriminator_for_local_entity (local_entity));
     }
 }
 
@@ -2129,7 +2155,11 @@ write_type (tree type)
       type = TYPE_MAIN_VARIANT (type);
       if (TREE_CODE (type) == FUNCTION_TYPE
 	  || TREE_CODE (type) == METHOD_TYPE)
-	type = cxx_copy_lang_qualifiers (type, type_orig);
+	{
+	  type = build_ref_qualified_type (type, type_memfn_rqual (type_orig));
+	  type = build_exception_variant (type,
+					  TYPE_RAISES_EXCEPTIONS (type_orig));
+	}
 
       /* According to the C++ ABI, some library classes are passed the
 	 same as the scalar type of their single member and use the same
@@ -3041,7 +3071,7 @@ write_expression (tree expr)
     }
   else if (INDIRECT_REF_P (expr)
 	   && TREE_TYPE (TREE_OPERAND (expr, 0))
-	   && TYPE_REF_P (TREE_TYPE (TREE_OPERAND (expr, 0))))
+	   && TREE_CODE (TREE_TYPE (TREE_OPERAND (expr, 0))) == REFERENCE_TYPE)
     {
       write_expression (TREE_OPERAND (expr, 0));
     }
@@ -3179,7 +3209,7 @@ write_expression (tree expr)
 	 don't actually want to output a mangling code for the `&'.  */
       if (TREE_CODE (expr) == ADDR_EXPR
 	  && TREE_TYPE (expr)
-	  && TYPE_REF_P (TREE_TYPE (expr)))
+	  && TREE_CODE (TREE_TYPE (expr)) == REFERENCE_TYPE)
 	{
 	  expr = TREE_OPERAND (expr, 0);
 	  if (DECL_P (expr))
@@ -3443,7 +3473,7 @@ write_template_arg (tree node)
   if (REFERENCE_REF_P (node))
     node = TREE_OPERAND (node, 0);
   if (TREE_CODE (node) == NOP_EXPR
-      && TYPE_REF_P (TREE_TYPE (node)))
+      && TREE_CODE (TREE_TYPE (node)) == REFERENCE_TYPE)
     {
       /* Template parameters can be of reference type. To maintain
 	 internal consistency, such arguments use a conversion from
@@ -3836,7 +3866,8 @@ mangle_decl (const tree decl)
   if (id != DECL_NAME (decl)
       /* Don't do this for a fake symbol we aren't going to emit anyway.  */
       && TREE_CODE (decl) != TYPE_DECL
-      && !DECL_MAYBE_IN_CHARGE_CDTOR_P (decl))
+      && !DECL_MAYBE_IN_CHARGE_CONSTRUCTOR_P (decl)
+      && !DECL_MAYBE_IN_CHARGE_DESTRUCTOR_P (decl))
     {
       int save_ver = flag_abi_version;
       tree id2 = NULL_TREE;

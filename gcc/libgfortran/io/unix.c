@@ -27,7 +27,6 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 
 #include "io.h"
 #include "unix.h"
-#include "async.h"
 #include <limits.h>
 
 #ifdef HAVE_UNISTD_H
@@ -1622,7 +1621,7 @@ error_stream (void)
    filename. */
 
 int
-compare_file_filename (gfc_unit *u, const char *name, gfc_charlen_type len)
+compare_file_filename (gfc_unit *u, const char *name, int len)
 {
   struct stat st;
   int ret;
@@ -1751,7 +1750,7 @@ find_file (const char *file, gfc_charlen_type file_len)
   id = id_from_path (path);
 #endif
 
-  LOCK (&unit_lock);
+  __gthread_mutex_lock (&unit_lock);
 retry:
   u = find_file0 (unit_root, FIND_FILE0_ARGS);
   if (u != NULL)
@@ -1760,20 +1759,20 @@ retry:
       if (! __gthread_mutex_trylock (&u->lock))
 	{
 	  /* assert (u->closed == 0); */
-	  UNLOCK (&unit_lock);
+	  __gthread_mutex_unlock (&unit_lock);
 	  goto done;
 	}
 
       inc_waiting_locked (u);
     }
-  UNLOCK (&unit_lock);
+  __gthread_mutex_unlock (&unit_lock);
   if (u != NULL)
     {
-      LOCK (&u->lock);
+      __gthread_mutex_lock (&u->lock);
       if (u->closed)
 	{
-	  LOCK (&unit_lock);
-	  UNLOCK (&u->lock);
+	  __gthread_mutex_lock (&unit_lock);
+	  __gthread_mutex_unlock (&u->lock);
 	  if (predec_waiting_locked (u) == 0)
 	    free (u);
 	  goto retry;
@@ -1803,7 +1802,7 @@ flush_all_units_1 (gfc_unit *u, int min_unit)
 	    return u;
 	  if (u->s)
 	    sflush (u->s);
-	  UNLOCK (&u->lock);
+	  __gthread_mutex_unlock (&u->lock);
 	}
       u = u->right;
     }
@@ -1816,31 +1815,31 @@ flush_all_units (void)
   gfc_unit *u;
   int min_unit = 0;
 
-  LOCK (&unit_lock);
+  __gthread_mutex_lock (&unit_lock);
   do
     {
       u = flush_all_units_1 (unit_root, min_unit);
       if (u != NULL)
 	inc_waiting_locked (u);
-      UNLOCK (&unit_lock);
+      __gthread_mutex_unlock (&unit_lock);
       if (u == NULL)
 	return;
 
-      LOCK (&u->lock);
+      __gthread_mutex_lock (&u->lock);
 
       min_unit = u->unit_number + 1;
 
       if (u->closed == 0)
 	{
 	  sflush (u->s);
-	  LOCK (&unit_lock);
-	  UNLOCK (&u->lock);
+	  __gthread_mutex_lock (&unit_lock);
+	  __gthread_mutex_unlock (&u->lock);
 	  (void) predec_waiting_locked (u);
 	}
       else
 	{
-	  LOCK (&unit_lock);
-	  UNLOCK (&u->lock);
+	  __gthread_mutex_lock (&unit_lock);
+	  __gthread_mutex_unlock (&u->lock);
 	  if (predec_waiting_locked (u) == 0)
 	    free (u);
 	}
@@ -1918,7 +1917,7 @@ static const char yes[] = "YES", no[] = "NO", unknown[] = "UNKNOWN";
    string. */
 
 const char *
-inquire_sequential (const char *string, gfc_charlen_type len)
+inquire_sequential (const char *string, int len)
 {
   struct stat statbuf;
 
@@ -1947,7 +1946,7 @@ inquire_sequential (const char *string, gfc_charlen_type len)
    suitable for direct access.  Returns a C-style string. */
 
 const char *
-inquire_direct (const char *string, gfc_charlen_type len)
+inquire_direct (const char *string, int len)
 {
   struct stat statbuf;
 
@@ -1976,7 +1975,7 @@ inquire_direct (const char *string, gfc_charlen_type len)
    is suitable for formatted form.  Returns a C-style string. */
 
 const char *
-inquire_formatted (const char *string, gfc_charlen_type len)
+inquire_formatted (const char *string, int len)
 {
   struct stat statbuf;
 
@@ -2006,7 +2005,7 @@ inquire_formatted (const char *string, gfc_charlen_type len)
    is suitable for unformatted form.  Returns a C-style string. */
 
 const char *
-inquire_unformatted (const char *string, gfc_charlen_type len)
+inquire_unformatted (const char *string, int len)
 {
   return inquire_formatted (string, len);
 }
@@ -2016,7 +2015,7 @@ inquire_unformatted (const char *string, gfc_charlen_type len)
    suitable for access. */
 
 static const char *
-inquire_access (const char *string, gfc_charlen_type len, int mode)
+inquire_access (const char *string, int len, int mode)
 {
   if (string == NULL)
     return no;
@@ -2034,7 +2033,7 @@ inquire_access (const char *string, gfc_charlen_type len, int mode)
    suitable for READ access. */
 
 const char *
-inquire_read (const char *string, gfc_charlen_type len)
+inquire_read (const char *string, int len)
 {
   return inquire_access (string, len, R_OK);
 }
@@ -2044,7 +2043,7 @@ inquire_read (const char *string, gfc_charlen_type len)
    suitable for READ access. */
 
 const char *
-inquire_write (const char *string, gfc_charlen_type len)
+inquire_write (const char *string, int len)
 {
   return inquire_access (string, len, W_OK);
 }
@@ -2054,7 +2053,7 @@ inquire_write (const char *string, gfc_charlen_type len)
    suitable for read and write access. */
 
 const char *
-inquire_readwrite (const char *string, gfc_charlen_type len)
+inquire_readwrite (const char *string, int len)
 {
   return inquire_access (string, len, R_OK | W_OK);
 }

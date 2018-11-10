@@ -24,15 +24,10 @@ if { ![istarget msp430-*-*] } then {
 # Load support procs.
 load_lib gcc-dg.exp
 
-# The '-pedantic-errors' option in the global variable DEFAULT_CFLAGS that is
-# set by other drivers causes an error when the __int20 type is used, so remove
-# this option from DEFAULT_CFLAGS for the msp430 tests.
+# If a testcase doesn't have special options, use these.
 global DEFAULT_CFLAGS
-if [info exists DEFAULT_CFLAGS] then {
-    set MSP430_DEFAULT_CFLAGS \
-      [ string map { "-pedantic-errors" "" } $DEFAULT_CFLAGS ]
-} else {
-   set MSP430_DEFAULT_CFLAGS ""
+if ![info exists DEFAULT_CFLAGS] then {
+    set DEFAULT_CFLAGS ""
 }
 
 # Initialize `dg'.
@@ -40,7 +35,7 @@ dg-init
 
 # Main loop.
 dg-runtest [lsort [glob -nocomplain $srcdir/$subdir/*.\[cCS\]]] \
-	"" $MSP430_DEFAULT_CFLAGS
+	"" $DEFAULT_CFLAGS
 
 # All done.
 dg-finish

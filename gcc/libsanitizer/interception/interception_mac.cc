@@ -10,8 +10,9 @@
 // Mac-specific interception methods.
 //===----------------------------------------------------------------------===//
 
+#ifdef __APPLE__
+
 #include "interception.h"
 
-#if SANITIZER_MAC
 
-#endif  // SANITIZER_MAC
+#endif  // __APPLE__

@@ -1,5 +1,6 @@
 // PR c++/80084
-// { dg-do run { target c++17 } }
+// { dg-options -std=c++17 }
+// { dg-do run }
 
 struct A
 {

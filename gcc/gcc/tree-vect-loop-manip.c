@@ -935,16 +935,14 @@ vect_set_loop_condition (struct loop *loop, loop_vec_info loop_vinfo,
 						  loop_cond_gsi);
 
   /* Remove old loop exit test.  */
-  stmt_vec_info orig_cond_info;
-  if (loop_vinfo
-      && (orig_cond_info = loop_vinfo->lookup_stmt (orig_cond)))
-    loop_vinfo->remove_stmt (orig_cond_info);
-  else
-    gsi_remove (&loop_cond_gsi, true);
+  gsi_remove (&loop_cond_gsi, true);
+  free_stmt_vec_info (orig_cond);
 
   if (dump_enabled_p ())
-    dump_printf_loc (MSG_NOTE, vect_location, "New loop exit condition: %G",
-		     cond_stmt);
+    {
+      dump_printf_loc (MSG_NOTE, vect_location, "New loop exit condition: ");
+      dump_gimple_stmt (MSG_NOTE, TDF_SLIM, cond_stmt, 0);
+    }
 }
 
 /* Helper routine of slpeel_tree_duplicate_loop_to_edge_cfg.
@@ -1303,7 +1301,7 @@ create_lcssa_for_virtual_phi (struct loop *loop)
    location is calculated.
    Return the loop location if succeed and NULL if not.  */
 
-dump_user_location_t
+source_location
 find_loop_location (struct loop *loop)
 {
   gimple *stmt = NULL;
@@ -1311,19 +1309,19 @@ find_loop_location (struct loop *loop)
   gimple_stmt_iterator si;
 
   if (!loop)
-    return dump_user_location_t ();
+    return UNKNOWN_LOCATION;
 
   stmt = get_loop_exit_condition (loop);
 
   if (stmt
       && LOCATION_LOCUS (gimple_location (stmt)) > BUILTINS_LOCATION)
-    return stmt;
+    return gimple_location (stmt);
 
   /* If we got here the loop is probably not "well formed",
      try to estimate the loop location */
 
   if (!loop->header)
-    return dump_user_location_t ();
+    return UNKNOWN_LOCATION;
 
   bb = loop->header;
 
@@ -1331,22 +1329,22 @@ find_loop_location (struct loop *loop)
     {
       stmt = gsi_stmt (si);
       if (LOCATION_LOCUS (gimple_location (stmt)) > BUILTINS_LOCATION)
-        return stmt;
+        return gimple_location (stmt);
     }
 
-  return dump_user_location_t ();
+  return UNKNOWN_LOCATION;
 }
 
-/* Return true if the phi described by STMT_INFO defines an IV of the
-   loop to be vectorized.  */
+/* Return true if PHI defines an IV of the loop to be vectorized.  */
 
 static bool
-iv_phi_p (stmt_vec_info stmt_info)
+iv_phi_p (gphi *phi)
 {
-  gphi *phi = as_a <gphi *> (stmt_info->stmt);
   if (virtual_operand_p (PHI_RESULT (phi)))
     return false;
 
+  stmt_vec_info stmt_info = vinfo_for_stmt (phi);
+  gcc_assert (stmt_info != NULL);
   if (STMT_VINFO_DEF_TYPE (stmt_info) == vect_reduction_def
       || STMT_VINFO_DEF_TYPE (stmt_info) == vect_double_reduction_def)
     return false;
@@ -1379,16 +1377,17 @@ vect_can_advance_ivs_p (loop_vec_info loop_vinfo)
       tree evolution_part;
 
       gphi *phi = gsi.phi ();
-      stmt_vec_info phi_info = loop_vinfo->lookup_stmt (phi);
       if (dump_enabled_p ())
-	dump_printf_loc (MSG_NOTE, vect_location, "Analyze phi: %G",
-			 phi_info->stmt);
+	{
+          dump_printf_loc (MSG_NOTE, vect_location, "Analyze phi: ");
+          dump_gimple_stmt (MSG_NOTE, TDF_SLIM, phi, 0);
+	}
 
       /* Skip virtual phi's. The data dependences that are associated with
 	 virtual defs/uses (i.e., memory accesses) are analyzed elsewhere.
 
 	 Skip reduction phis.  */
-      if (!iv_phi_p (phi_info))
+      if (!iv_phi_p (phi))
 	{
 	  if (dump_enabled_p ())
 	    dump_printf_loc (MSG_NOTE, vect_location,
@@ -1398,7 +1397,8 @@ vect_can_advance_ivs_p (loop_vec_info loop_vinfo)
 
       /* Analyze the evolution function.  */
 
-      evolution_part = STMT_VINFO_LOOP_PHI_EVOLUTION_PART (phi_info);
+      evolution_part
+	= STMT_VINFO_LOOP_PHI_EVOLUTION_PART (vinfo_for_stmt (phi));
       if (evolution_part == NULL_TREE)
         {
 	  if (dump_enabled_p ())
@@ -1500,13 +1500,15 @@ vect_update_ivs_after_vectorizer (loop_vec_info loop_vinfo,
 
       gphi *phi = gsi.phi ();
       gphi *phi1 = gsi1.phi ();
-      stmt_vec_info phi_info = loop_vinfo->lookup_stmt (phi);
       if (dump_enabled_p ())
-	dump_printf_loc (MSG_NOTE, vect_location,
-			 "vect_update_ivs_after_vectorizer: phi: %G", phi);
+	{
+	  dump_printf_loc (MSG_NOTE, vect_location,
+			   "vect_update_ivs_after_vectorizer: phi: ");
+	  dump_gimple_stmt (MSG_NOTE, TDF_SLIM, phi, 0);
+	}
 
       /* Skip reduction and virtual phis.  */
-      if (!iv_phi_p (phi_info))
+      if (!iv_phi_p (phi))
 	{
 	  if (dump_enabled_p ())
 	    dump_printf_loc (MSG_NOTE, vect_location,
@@ -1515,7 +1517,7 @@ vect_update_ivs_after_vectorizer (loop_vec_info loop_vinfo,
 	}
 
       type = TREE_TYPE (gimple_phi_result (phi));
-      step_expr = STMT_VINFO_LOOP_PHI_EVOLUTION_PART (phi_info);
+      step_expr = STMT_VINFO_LOOP_PHI_EVOLUTION_PART (vinfo_for_stmt (phi));
       step_expr = unshare_expr (step_expr);
 
       /* FORNOW: We do not support IVs whose evolution function is a polynomial
@@ -1557,19 +1559,19 @@ vect_update_ivs_after_vectorizer (loop_vec_info loop_vinfo,
 static tree
 get_misalign_in_elems (gimple **seq, loop_vec_info loop_vinfo)
 {
-  dr_vec_info *dr_info = LOOP_VINFO_UNALIGNED_DR (loop_vinfo);
-  stmt_vec_info stmt_info = dr_info->stmt;
+  struct data_reference *dr = LOOP_VINFO_UNALIGNED_DR (loop_vinfo);
+  gimple *dr_stmt = DR_STMT (dr);
+  stmt_vec_info stmt_info = vinfo_for_stmt (dr_stmt);
   tree vectype = STMT_VINFO_VECTYPE (stmt_info);
 
-  unsigned int target_align = DR_TARGET_ALIGNMENT (dr_info);
+  unsigned int target_align = DR_TARGET_ALIGNMENT (dr);
   gcc_assert (target_align != 0);
 
-  bool negative = tree_int_cst_compare (DR_STEP (dr_info->dr),
-					size_zero_node) < 0;
+  bool negative = tree_int_cst_compare (DR_STEP (dr), size_zero_node) < 0;
   tree offset = (negative
 		 ? size_int (-TYPE_VECTOR_SUBPARTS (vectype) + 1)
 		 : size_zero_node);
-  tree start_addr = vect_create_addr_base_for_vector_ref (stmt_info, seq,
+  tree start_addr = vect_create_addr_base_for_vector_ref (dr_stmt, seq,
 							  offset);
   tree type = unsigned_type_for (TREE_TYPE (start_addr));
   tree target_align_minus_1 = build_int_cst (type, target_align - 1);
@@ -1624,14 +1626,15 @@ static tree
 vect_gen_prolog_loop_niters (loop_vec_info loop_vinfo,
 			     basic_block bb, int *bound)
 {
-  dr_vec_info *dr_info = LOOP_VINFO_UNALIGNED_DR (loop_vinfo);
+  struct data_reference *dr = LOOP_VINFO_UNALIGNED_DR (loop_vinfo);
   tree var;
   tree niters_type = TREE_TYPE (LOOP_VINFO_NITERS (loop_vinfo));
   gimple_seq stmts = NULL, new_stmts = NULL;
   tree iters, iters_name;
-  stmt_vec_info stmt_info = dr_info->stmt;
+  gimple *dr_stmt = DR_STMT (dr);
+  stmt_vec_info stmt_info = vinfo_for_stmt (dr_stmt);
   tree vectype = STMT_VINFO_VECTYPE (stmt_info);
-  unsigned int target_align = DR_TARGET_ALIGNMENT (dr_info);
+  unsigned int target_align = DR_TARGET_ALIGNMENT (dr);
 
   if (LOOP_VINFO_PEELING_FOR_ALIGNMENT (loop_vinfo) > 0)
     {
@@ -1656,8 +1659,7 @@ vect_gen_prolog_loop_niters (loop_vec_info loop_vinfo,
 
       /* Create:  (niters_type) ((align_in_elems - misalign_in_elems)
 				 & (align_in_elems - 1)).  */
-      bool negative = tree_int_cst_compare (DR_STEP (dr_info->dr),
-					    size_zero_node) < 0;
+      bool negative = tree_int_cst_compare (DR_STEP (dr), size_zero_node) < 0;
       if (negative)
 	iters = fold_build2 (MINUS_EXPR, type, misalign_in_elems,
 			     align_in_elems_tree);
@@ -1670,8 +1672,12 @@ vect_gen_prolog_loop_niters (loop_vec_info loop_vinfo,
     }
 
   if (dump_enabled_p ())
-    dump_printf_loc (MSG_NOTE, vect_location,
-		     "niters for prolog loop: %T\n", iters);
+    {
+      dump_printf_loc (MSG_NOTE, vect_location,
+                       "niters for prolog loop: ");
+      dump_generic_expr (MSG_NOTE, TDF_SLIM, iters);
+      dump_printf (MSG_NOTE, "\n");
+    }
 
   var = create_tmp_var (niters_type, "prolog_loop_niters");
   iters_name = force_gimple_operand (iters, &new_stmts, false, var);
@@ -1727,7 +1733,9 @@ vect_update_inits_of_drs (loop_vec_info loop_vinfo, tree niters,
   vec<data_reference_p> datarefs = LOOP_VINFO_DATAREFS (loop_vinfo);
   struct data_reference *dr;
 
-  DUMP_VECT_SCOPE ("vect_update_inits_of_dr");
+  if (dump_enabled_p ())
+    dump_printf_loc (MSG_NOTE, vect_location,
+		     "=== vect_update_inits_of_dr ===\n");
 
   /* Adjust niters to sizetype and insert stmts on loop preheader edge.  */
   if (!types_compatible_p (sizetype, TREE_TYPE (niters)))
@@ -1746,11 +1754,7 @@ vect_update_inits_of_drs (loop_vec_info loop_vinfo, tree niters,
     }
 
   FOR_EACH_VEC_ELT (datarefs, i, dr)
-    {
-      dr_vec_info *dr_info = loop_vinfo->lookup_dr (dr);
-      if (!STMT_VINFO_GATHER_SCATTER_P (dr_info->stmt))
-	vect_update_init_of_dr (dr, niters, code);
-    }
+    vect_update_init_of_dr (dr, niters, code);
 }
 
 /* For the information recorded in LOOP_VINFO prepare the loop for peeling
@@ -1790,9 +1794,12 @@ vect_prepare_for_masked_peels (loop_vec_info loop_vinfo)
     }
 
   if (dump_enabled_p ())
-    dump_printf_loc (MSG_NOTE, vect_location,
-		     "misalignment for fully-masked loop: %T\n",
-		     misalign_in_elems);
+    {
+      dump_printf_loc (MSG_NOTE, vect_location,
+		       "misalignment for fully-masked loop: ");
+      dump_generic_expr (MSG_NOTE, TDF_SLIM, misalign_in_elems);
+      dump_printf (MSG_NOTE, "\n");
+    }
 
   LOOP_VINFO_MASK_SKIP_NITERS (loop_vinfo) = misalign_in_elems;
 
@@ -2080,8 +2087,7 @@ slpeel_update_phi_nodes_for_loops (loop_vec_info loop_vinfo,
       tree arg = PHI_ARG_DEF_FROM_EDGE (orig_phi, first_latch_e);
       /* Generate lcssa PHI node for the first loop.  */
       gphi *vect_phi = (loop == first) ? orig_phi : update_phi;
-      stmt_vec_info vect_phi_info = loop_vinfo->lookup_stmt (vect_phi);
-      if (create_lcssa_for_iv_phis || !iv_phi_p (vect_phi_info))
+      if (create_lcssa_for_iv_phis || !iv_phi_p (vect_phi))
 	{
 	  tree new_res = copy_ssa_name (PHI_RESULT (orig_phi));
 	  gphi *lcssa_phi = create_phi_node (new_res, between_bb);
@@ -2490,7 +2496,7 @@ vect_do_peeling (loop_vec_info loop_vinfo, tree niters, tree nitersm1,
 	}
     }
 
-  dump_user_location_t loop_loc = find_loop_location (loop);
+  source_location loop_loc = find_loop_location (loop);
   struct loop *scalar_loop = LOOP_VINFO_SCALAR_LOOP (loop_vinfo);
   if (prolog_peeling)
     {
@@ -2766,9 +2772,9 @@ vect_create_cond_for_align_checks (loop_vec_info loop_vinfo,
                                    tree *cond_expr,
 				   gimple_seq *cond_expr_stmt_list)
 {
-  vec<stmt_vec_info> may_misalign_stmts
+  vec<gimple *> may_misalign_stmts
     = LOOP_VINFO_MAY_MISALIGN_STMTS (loop_vinfo);
-  stmt_vec_info stmt_info;
+  gimple *ref_stmt;
   int mask = LOOP_VINFO_PTR_MASK (loop_vinfo);
   tree mask_cst;
   unsigned int i;
@@ -2789,22 +2795,23 @@ vect_create_cond_for_align_checks (loop_vec_info loop_vinfo,
   /* Create expression (mask & (dr_1 || ... || dr_n)) where dr_i is the address
      of the first vector of the i'th data reference. */
 
-  FOR_EACH_VEC_ELT (may_misalign_stmts, i, stmt_info)
+  FOR_EACH_VEC_ELT (may_misalign_stmts, i, ref_stmt)
     {
       gimple_seq new_stmt_list = NULL;
       tree addr_base;
       tree addr_tmp_name;
       tree new_or_tmp_name;
       gimple *addr_stmt, *or_stmt;
-      tree vectype = STMT_VINFO_VECTYPE (stmt_info);
+      stmt_vec_info stmt_vinfo = vinfo_for_stmt (ref_stmt);
+      tree vectype = STMT_VINFO_VECTYPE (stmt_vinfo);
       bool negative = tree_int_cst_compare
-	(DR_STEP (STMT_VINFO_DATA_REF (stmt_info)), size_zero_node) < 0;
+	(DR_STEP (STMT_VINFO_DATA_REF (stmt_vinfo)), size_zero_node) < 0;
       tree offset = negative
 	? size_int (-TYPE_VECTOR_SUBPARTS (vectype) + 1) : size_zero_node;
 
       /* create: addr_tmp = (int)(address_of_first_vector) */
       addr_base =
-	vect_create_addr_base_for_vector_ref (stmt_info, &new_stmt_list,
+	vect_create_addr_base_for_vector_ref (ref_stmt, &new_stmt_list,
 					      offset);
       if (new_stmt_list != NULL)
 	gimple_seq_add_seq (cond_expr_stmt_list, new_stmt_list);
@@ -3029,9 +3036,8 @@ vect_loop_versioning (loop_vec_info loop_vinfo,
 	 while we need to move it above LOOP's preheader.  */
       e = loop_preheader_edge (loop);
       scalar_e = loop_preheader_edge (scalar_loop);
-      /* The vector loop preheader might not be empty, since new
-	 invariants could have been created while analyzing the loop.  */
-      gcc_assert (single_pred_p (e->src));
+      gcc_assert (empty_block_p (e->src)
+		  && single_pred_p (e->src));
       gcc_assert (empty_block_p (scalar_e->src)
 		  && single_pred_p (scalar_e->src));
       gcc_assert (single_pred_p (condition_bb));
@@ -3064,17 +3070,15 @@ vect_loop_versioning (loop_vec_info loop_vinfo,
       loop_constraint_set (loop, LOOP_C_INFINITE);
     }
 
-  if (LOCATION_LOCUS (vect_location.get_location_t ()) != UNKNOWN_LOCATION
+  if (LOCATION_LOCUS (vect_location) != UNKNOWN_LOCATION
       && dump_enabled_p ())
     {
       if (version_alias)
-        dump_printf_loc (MSG_OPTIMIZED_LOCATIONS | MSG_PRIORITY_USER_FACING,
-			 vect_location,
+        dump_printf_loc (MSG_OPTIMIZED_LOCATIONS, vect_location,
                          "loop versioned for vectorization because of "
 			 "possible aliasing\n");
       if (version_align)
-        dump_printf_loc (MSG_OPTIMIZED_LOCATIONS | MSG_PRIORITY_USER_FACING,
-			 vect_location,
+        dump_printf_loc (MSG_OPTIMIZED_LOCATIONS, vect_location,
                          "loop versioned for vectorization to enhance "
 			 "alignment\n");
 

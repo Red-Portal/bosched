@@ -20,7 +20,6 @@
 // 27.6.1.2.3 basic_istream::operator>>
 
 // { dg-options "-DMAX_SIZE=466" { target simulator } }
-// { dg-require-fileio "" }
 
 #ifndef MAX_SIZE
 #define MAX_SIZE 666

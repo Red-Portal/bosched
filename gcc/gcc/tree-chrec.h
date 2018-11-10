@@ -170,6 +170,8 @@ evolution_function_is_constant_p (const_tree chrec)
   if (chrec == NULL_TREE)
     return false;
 
+  if (CONSTANT_CLASS_P (chrec))
+    return true;
   return is_gimple_min_invariant (chrec);
 }
 

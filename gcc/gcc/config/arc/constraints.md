@@ -321,12 +321,6 @@
   (and (match_code "const_double")
        (match_test "1")))
 
-(define_constraint "CfZ"
-  "@internal
-   Match a floating-point zero"
-  (and (match_code "const_double")
-       (match_test "op == CONST0_RTX (SFmode)")))
-
 ;; Memory constraints
 (define_memory_constraint "T"
   "@internal
@@ -353,7 +347,11 @@
        (match_test "!cmem_address (XEXP (op, 0), SImode)")
        (not (match_operand 0 "long_immediate_loadstore_operand"))))
 
-(define_memory_constraint "Usd"
+; Don't use define_memory_constraint here as the relocation patching
+; for small data symbols only works within a ld/st instruction and
+; define_memory_constraint may result in the address being calculated
+; into a register first.
+(define_constraint "Usd"
    "@internal
     A valid _small-data_ memory operand for ARCompact instructions"
    (and (match_code "mem")
@@ -434,12 +432,6 @@
   (match_test "immediate_operand (op, VOIDmode)
 	       && !arc_legitimate_pic_addr_p (op)
 	       && !satisfies_constraint_I (op)"))
-
-(define_constraint "Csz"
-  "a 32 bit constant avoided when compiling for size."
-  (match_test "immediate_operand (op, VOIDmode)
-	       && !arc_legitimate_pic_addr_p (op)
-	       && !(satisfies_constraint_I (op) && optimize_size)"))
 
 ; Note that the 'cryptic' register constraints will not make reload use the
 ; associated class to reload into, but this will not penalize reloading of any

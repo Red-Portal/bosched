@@ -1253,9 +1253,8 @@ place_prologue_for_one_component (unsigned int which, basic_block head)
 /* Set HAS_COMPONENTS in every block to the maximum it can be set to without
    setting it on any path from entry to exit where it was not already set
    somewhere (or, for blocks that have no path to the exit, consider only
-   paths from the entry to the block itself).  Return whether any changes
-   were made to some HAS_COMPONENTS.  */
-static bool
+   paths from the entry to the block itself).  */
+static void
 spread_components (sbitmap components)
 {
   basic_block entry_block = ENTRY_BLOCK_PTR_FOR_FN (cfun);
@@ -1378,19 +1377,12 @@ spread_components (sbitmap components)
 
   /* Finally, mark everything not not needed both forwards and backwards.  */
 
-  bool did_changes = false;
-
   FOR_EACH_BB_FN (bb, cfun)
     {
-      bitmap_copy (old, SW (bb)->has_components);
-
       bitmap_and (SW (bb)->head_components, SW (bb)->head_components,
 		  SW (bb)->tail_components);
       bitmap_and_compl (SW (bb)->has_components, components,
 			SW (bb)->head_components);
-
-      if (!did_changes && !bitmap_equal_p (old, SW (bb)->has_components))
-	did_changes = true;
     }
 
   FOR_ALL_BB_FN (bb, cfun)
@@ -1402,8 +1394,6 @@ spread_components (sbitmap components)
 	  fprintf (dump_file, "\n");
 	}
     }
-
-  return did_changes;
 }
 
 /* If we cannot handle placing some component's prologues or epilogues where
@@ -1807,16 +1797,7 @@ try_shrink_wrapping_separate (basic_block first_bb)
   EXECUTE_IF_SET_IN_BITMAP (components, 0, j, sbi)
     place_prologue_for_one_component (j, first_bb);
 
-  /* Try to minimize the number of saves and restores.  Do this as long as
-     it changes anything.  This does not iterate more than a few times.  */
-  int spread_times = 0;
-  while (spread_components (components))
-    {
-      spread_times++;
-
-      if (dump_file)
-	fprintf (dump_file, "Now spread %d times.\n", spread_times);
-    }
+  spread_components (components);
 
   disqualify_problematic_components (components);
 

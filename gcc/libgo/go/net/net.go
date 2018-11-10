@@ -84,7 +84,6 @@ import (
 	"internal/poll"
 	"io"
 	"os"
-	"sync"
 	"syscall"
 	"time"
 )
@@ -230,7 +229,7 @@ func (c *conn) SetDeadline(t time.Time) error {
 	if !c.ok() {
 		return syscall.EINVAL
 	}
-	if err := c.fd.SetDeadline(t); err != nil {
+	if err := c.fd.pfd.SetDeadline(t); err != nil {
 		return &OpError{Op: "set", Net: c.fd.net, Source: nil, Addr: c.fd.laddr, Err: err}
 	}
 	return nil
@@ -241,7 +240,7 @@ func (c *conn) SetReadDeadline(t time.Time) error {
 	if !c.ok() {
 		return syscall.EINVAL
 	}
-	if err := c.fd.SetReadDeadline(t); err != nil {
+	if err := c.fd.pfd.SetReadDeadline(t); err != nil {
 		return &OpError{Op: "set", Net: c.fd.net, Source: nil, Addr: c.fd.laddr, Err: err}
 	}
 	return nil
@@ -252,7 +251,7 @@ func (c *conn) SetWriteDeadline(t time.Time) error {
 	if !c.ok() {
 		return syscall.EINVAL
 	}
-	if err := c.fd.SetWriteDeadline(t); err != nil {
+	if err := c.fd.pfd.SetWriteDeadline(t); err != nil {
 		return &OpError{Op: "set", Net: c.fd.net, Source: nil, Addr: c.fd.laddr, Err: err}
 	}
 	return nil
@@ -282,13 +281,15 @@ func (c *conn) SetWriteBuffer(bytes int) error {
 	return nil
 }
 
-// File returns a copy of the underlying os.File
+// File sets the underlying os.File to blocking mode and returns a copy.
 // It is the caller's responsibility to close f when finished.
 // Closing c does not affect f, and closing f does not affect c.
 //
 // The returned os.File's file descriptor is different from the connection's.
 // Attempting to change properties of the original using this duplicate
 // may or may not have the desired effect.
+//
+// On Unix systems this will cause the SetDeadline methods to stop working.
 func (c *conn) File() (f *os.File, err error) {
 	f, err = c.fd.dup()
 	if err != nil {
@@ -302,23 +303,20 @@ func (c *conn) File() (f *os.File, err error) {
 // Multiple goroutines may invoke methods on a PacketConn simultaneously.
 type PacketConn interface {
 	// ReadFrom reads a packet from the connection,
-	// copying the payload into p. It returns the number of
-	// bytes copied into p and the return address that
+	// copying the payload into b. It returns the number of
+	// bytes copied into b and the return address that
 	// was on the packet.
-	// It returns the number of bytes read (0 <= n <= len(p))
-	// and any error encountered. Callers should always process
-	// the n > 0 bytes returned before considering the error err.
 	// ReadFrom can be made to time out and return
 	// an Error with Timeout() == true after a fixed time limit;
 	// see SetDeadline and SetReadDeadline.
-	ReadFrom(p []byte) (n int, addr Addr, err error)
+	ReadFrom(b []byte) (n int, addr Addr, err error)
 
-	// WriteTo writes a packet with payload p to addr.
+	// WriteTo writes a packet with payload b to addr.
 	// WriteTo can be made to time out and return
 	// an Error with Timeout() == true after a fixed time limit;
 	// see SetDeadline and SetWriteDeadline.
 	// On packet-oriented connections, write timeouts are rare.
-	WriteTo(p []byte, addr Addr) (n int, err error)
+	WriteTo(b []byte, addr Addr) (n int, err error)
 
 	// Close closes the connection.
 	// Any blocked ReadFrom or WriteTo operations will be unblocked and return errors.
@@ -491,12 +489,6 @@ type temporary interface {
 }
 
 func (e *OpError) Temporary() bool {
-	// Treat ECONNRESET and ECONNABORTED as temporary errors when
-	// they come from calling accept. See issue 6163.
-	if e.Op == "accept" && isConnError(e.Err) {
-		return true
-	}
-
 	if ne, ok := e.Err.(*os.SyscallError); ok {
 		t, ok := ne.Err.(temporary)
 		return ok && t.Temporary()
@@ -611,14 +603,9 @@ func genericReadFrom(w io.Writer, r io.Reader) (n int64, err error) {
 // server is not responding. Then the many lookups each use a different
 // thread, and the system or the program runs out of threads.
 
-var threadLimit chan struct{}
-
-var threadOnce sync.Once
+var threadLimit = make(chan struct{}, 500)
 
 func acquireThread() {
-	threadOnce.Do(func() {
-		threadLimit = make(chan struct{}, concurrentThreadsLimit())
-	})
 	threadLimit <- struct{}{}
 }
 

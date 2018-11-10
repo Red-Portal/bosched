@@ -532,14 +532,13 @@ static void
 cb_used_define (cpp_reader *pfile, source_location line ATTRIBUTE_UNUSED,
 		cpp_hashnode *node)
 {
-  if (cpp_user_macro_p (node))
-    {
-      macro_queue *q;
-      q = XNEW (macro_queue);
-      q->macro = xstrdup ((const char *) cpp_macro_definition (pfile, node));
-      q->next = define_queue;
-      define_queue = q;
-    }
+  macro_queue *q;
+  if (node->flags & NODE_BUILTIN)
+    return;
+  q = XNEW (macro_queue);
+  q->macro = xstrdup ((const char *) cpp_macro_definition (pfile, node));
+  q->next = define_queue;
+  define_queue = q;
 }
 
 static void
@@ -664,9 +663,11 @@ pp_file_change (const line_map_ordinary *map)
 	  /* Bring current file to correct line when entering a new file.  */
 	  if (map->reason == LC_ENTER)
 	    {
-	      maybe_print_line (linemap_included_from (map));
-	      flags = " 1";
+	      const line_map_ordinary *from = INCLUDED_FROM (line_table, map);
+	      maybe_print_line (LAST_SOURCE_LINE_LOCATION (from));
 	    }
+	  if (map->reason == LC_ENTER)
+	    flags = " 1";
 	  else if (map->reason == LC_LEAVE)
 	    flags = " 2";
 	  print_line (map->start_location, flags);
@@ -689,7 +690,7 @@ cb_def_pragma (cpp_reader *pfile, source_location line)
 static int
 dump_macro (cpp_reader *pfile, cpp_hashnode *node, void *v ATTRIBUTE_UNUSED)
 {
-  if (cpp_user_macro_p (node))
+  if (node->type == NT_MACRO && !(node->flags & NODE_BUILTIN))
     {
       fputs ("#define ", print.outf);
       fputs ((const char *) cpp_macro_definition (pfile, node),

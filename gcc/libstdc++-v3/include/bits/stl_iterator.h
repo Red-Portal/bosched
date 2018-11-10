@@ -139,10 +139,6 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       reverse_iterator(const reverse_iterator& __x)
       : current(__x.current) { }
 
-#if __cplusplus >= 201103L
-      reverse_iterator& operator=(const reverse_iterator&) = default;
-#endif
-
       /**
        *  A %reverse_iterator across other types can be copied if the
        *  underlying %iterator can be converted to the type of @c current.
@@ -185,17 +181,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       // 2188. Reverse iterator does not fully support targets that overload &
       _GLIBCXX17_CONSTEXPR pointer
       operator->() const
-<<<<<<< HEAD
-      {
-	// _GLIBCXX_RESOLVE_LIB_DEFECTS
-	// 1052. operator-> should also support smart pointers
-	_Iterator __tmp = current;
-	--__tmp;
-	return _S_to_pointer(__tmp);
-      }
-=======
       { return std::__addressof(operator*()); }
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
 
       /**
        *  @return  @c *this
@@ -299,17 +285,6 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       _GLIBCXX17_CONSTEXPR reference
       operator[](difference_type __n) const
       { return *(*this + __n); }
-
-    private:
-      template<typename _Tp>
-	static _GLIBCXX17_CONSTEXPR _Tp*
-	_S_to_pointer(_Tp* __p)
-        { return __p; }
-
-      template<typename _Tp>
-	static _GLIBCXX17_CONSTEXPR pointer
-	_S_to_pointer(_Tp __t)
-        { return __t.operator->(); }
     };
 
   //@{
@@ -427,7 +402,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     { return reverse_iterator<_Iterator>(__x.base() - __n); }
 
 #if __cplusplus >= 201103L
-  // Same as C++14 make_reverse_iterator but used in C++11 mode too.
+  // Same as C++14 make_reverse_iterator but used in C++03 mode too.
   template<typename _Iterator>
     inline _GLIBCXX17_CONSTEXPR reverse_iterator<_Iterator>
     __make_reverse_iterator(_Iterator __i)

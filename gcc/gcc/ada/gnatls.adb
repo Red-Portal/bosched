@@ -187,7 +187,6 @@ procedure Gnatls is
    --  Print usage message
 
    procedure Output_License_Information;
-   pragma No_Return (Output_License_Information);
    --  Output license statement, and if not found, output reference to COPYING
 
    function Image (Restriction : Restriction_Id) return String;
@@ -695,38 +694,40 @@ procedure Gnatls is
 
       procedure Output_Token (T : Token_Type) is
       begin
-         case T is
-            when T_No_ALI .. T_Flags =>
-               for J in 1 .. N_Indents loop
-                  Write_Str ("   ");
-               end loop;
+         if T in T_No_ALI .. T_Flags then
+            for J in 1 .. N_Indents loop
+               Write_Str ("   ");
+            end loop;
 
-               Write_Str (Image (T).all);
+            Write_Str (Image (T).all);
 
-               for J in Image (T)'Length .. 12 loop
-                  Write_Char (' ');
-               end loop;
-
-               Write_Str ("=>");
-
-               if T in T_No_ALI .. T_With then
-                  Write_Eol;
-               elsif T in T_Source .. T_Name then
-                  Write_Char (' ');
-               end if;
-
-            when T_Preelaborated .. T_Body =>
-               if T in T_Preelaborated .. T_Is_Generic then
-                  if N_Flags = 0 then
-                     Output_Token (T_Flags);
-                  end if;
-
-                  N_Flags := N_Flags + 1;
-               end if;
-
+            for J in Image (T)'Length .. 12 loop
                Write_Char (' ');
-               Write_Str  (Image (T).all);
-         end case;
+            end loop;
+
+            Write_Str ("=>");
+
+            if T in T_No_ALI .. T_With then
+               Write_Eol;
+            elsif T in T_Source .. T_Name then
+               Write_Char (' ');
+            end if;
+
+         elsif T in T_Preelaborated .. T_Body then
+            if T in T_Preelaborated .. T_Is_Generic then
+               if N_Flags = 0 then
+                  Output_Token (T_Flags);
+               end if;
+
+               N_Flags := N_Flags + 1;
+            end if;
+
+            Write_Char (' ');
+            Write_Str  (Image (T).all);
+
+         else
+            Write_Str  (Image (T).all);
+         end if;
       end Output_Token;
 
       -----------------

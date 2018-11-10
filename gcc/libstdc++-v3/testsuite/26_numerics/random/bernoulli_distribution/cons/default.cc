@@ -20,13 +20,11 @@
 // with this library; see the file COPYING3.  If not see
 // <http://www.gnu.org/licenses/>.
 
-// C++11
-// 26.5.8.3.1 Class bernoulli_distribution [rand.dist.bern.bernoulli]
-// 26.5.1.6 random number distribution requirements [rand.req.dist]
+// 26.4.8.2.1 Class template bernoulli_distribution [rand.dist.bern.bernoulli]
+// 26.4.2.4 Concept RandomNumberDistribution [rand.concept.dist]
 
 #include <random>
 #include <testsuite_hooks.h>
-#include <testsuite_common_types.h>
 
 void
 test01()
@@ -37,16 +35,8 @@ test01()
   VERIFY( u.max() == std::numeric_limits<bool>::max() );
 }
 
-void
-test02()
-{
-  __gnu_test::implicitly_default_constructible test;
-  test.operator()<std::bernoulli_distribution>();
-  test.operator()<std::bernoulli_distribution::param_type>();
-}
-
 int main()
 {
   test01();
-  test02();
+  return 0;
 }

@@ -107,7 +107,7 @@ gfc_namespace *gfc_global_ns_list;
 
 gfc_gsymbol *gfc_gsym_root = NULL;
 
-gfc_symbol *gfc_derived_types;
+gfc_dt_list *gfc_derived_types;
 
 static gfc_undo_change_set default_undo_chgset_var = { vNULL, vNULL, NULL };
 static gfc_undo_change_set *latest_undo_chgset = &default_undo_chgset_var;
@@ -2735,13 +2735,9 @@ gfc_define_st_label (gfc_st_label *lp, gfc_sl_type type, locus *label_locus)
 	    lp->defined = type;
 
 	  if (lp->referenced == ST_LABEL_DO_TARGET && type != ST_LABEL_DO_TARGET
-      	      && !gfc_notify_std (GFC_STD_F95_OBS | GFC_STD_F2018_DEL,
-				  "DO termination statement which is not END DO"
-				  " or CONTINUE with label %d at %C", labelno))
-	    return;
-	  if (type == ST_LABEL_DO_TARGET
-	      && !gfc_notify_std (GFC_STD_F2018_OBS, "Labeled DO statement "
-				  "at %L", label_locus))
+      	      && !gfc_notify_std (GFC_STD_F95_OBS, "DO termination statement "
+				  "which is not END DO or CONTINUE with "
+				  "label %d at %C", labelno))
 	    return;
 	  break;
 
@@ -2796,8 +2792,8 @@ gfc_reference_st_label (gfc_st_label *lp, gfc_sl_type type)
     }
 
   if (lp->referenced == ST_LABEL_DO_TARGET && type == ST_LABEL_DO_TARGET
-      && !gfc_notify_std (GFC_STD_F95_OBS | GFC_STD_F2018_DEL,
-			  "Shared DO termination label %d at %C", labelno))
+      && !gfc_notify_std (GFC_STD_F95_OBS, "Shared DO termination label %d "
+			  "at %C", labelno))
     return false;
 
   if (lp->referenced != ST_LABEL_DO_TARGET)
@@ -3137,7 +3133,6 @@ gfc_new_symbol (const char *name, gfc_namespace *ns)
   p->common_block = NULL;
   p->f2k_derived = NULL;
   p->assoc = NULL;
-  p->dt_next = NULL;
   p->fn_result_spec = 0;
 
   return p;
@@ -3500,6 +3495,22 @@ find_common_symtree (gfc_symtree *st, gfc_common_head *head)
     result = find_common_symtree (st->right, head);
 
   return result;
+}
+
+
+/* Clear the given storage, and make it the current change set for registering
+   changed symbols.  Its contents are freed after a call to
+   gfc_restore_last_undo_checkpoint or gfc_drop_last_undo_checkpoint, but
+   it is up to the caller to free the storage itself.  It is usually a local
+   variable, so there is nothing to do anyway.  */
+
+void
+gfc_new_undo_checkpoint (gfc_undo_change_set &chg_syms)
+{
+  chg_syms.syms = vNULL;
+  chg_syms.tbps = vNULL;
+  chg_syms.previous = latest_undo_chgset;
+  latest_undo_chgset = &chg_syms;
 }
 
 
@@ -3897,6 +3908,23 @@ free_sym_tree (gfc_symtree *sym_tree)
 }
 
 
+/* Free the derived type list.  */
+
+void
+gfc_free_dt_list (void)
+{
+  gfc_dt_list *dt, *n;
+
+  for (dt = gfc_derived_types; dt; dt = n)
+    {
+      n = dt->next;
+      free (dt);
+    }
+
+  gfc_derived_types = NULL;
+}
+
+
 /* Free the gfc_equiv_info's.  */
 
 static void
@@ -4082,7 +4110,7 @@ gfc_symbol_done_2 (void)
       gfc_free_namespace (gfc_current_ns);
       gfc_current_ns = NULL;
     }
-  gfc_derived_types = NULL;
+  gfc_free_dt_list ();
 
   enforce_single_undo_checkpoint ();
   free_undo_change_set_data (*latest_undo_chgset);
@@ -4345,21 +4373,20 @@ gfc_get_gsymbol (const char *name)
 static gfc_symbol *
 get_iso_c_binding_dt (int sym_id)
 {
-  gfc_symbol *dt_list = gfc_derived_types;
+  gfc_dt_list *dt_list;
+
+  dt_list = gfc_derived_types;
 
   /* Loop through the derived types in the name list, searching for
      the desired symbol from iso_c_binding.  Search the parent namespaces
      if necessary and requested to (parent_flag).  */
-  if (dt_list)
+  while (dt_list != NULL)
     {
-      while (dt_list->dt_next != gfc_derived_types)
-	{
-	  if (dt_list->from_intmod != INTMOD_NONE
-	      && dt_list->intmod_sym_id == sym_id)
-	    return dt_list;
-	
-	  dt_list = dt_list->dt_next;
-	}
+      if (dt_list->derived->from_intmod != INTMOD_NONE
+	  && dt_list->derived->intmod_sym_id == sym_id)
+        return dt_list->derived;
+
+      dt_list = dt_list->next;
     }
 
   return NULL;
@@ -4765,16 +4792,11 @@ generate_isocbinding_symbol (const char *mod_name, iso_c_binding_symbol s,
       if (tmp_sym->attr.flavor == FL_DERIVED
 	  && !get_iso_c_binding_dt (tmp_sym->intmod_sym_id))
 	{
-	  if (gfc_derived_types)
-	    {
-	      tmp_sym->dt_next = gfc_derived_types->dt_next;
-	      gfc_derived_types->dt_next = tmp_sym;
-	    }
-	  else
-	    {
-	      tmp_sym->dt_next = tmp_sym;
-	    }
-	  gfc_derived_types = tmp_sym;
+	  gfc_dt_list *dt_list;
+	  dt_list = gfc_get_dt_list ();
+	  dt_list->derived = tmp_sym;
+	  dt_list->next = gfc_derived_types;
+  	  gfc_derived_types = dt_list;
         }
 
       return tmp_symtree;
@@ -4882,6 +4904,7 @@ generate_isocbinding_symbol (const char *mod_name, iso_c_binding_symbol s,
       case ISOCBINDING_FUNPTR:
 	{
 	  gfc_symbol *dt_sym;
+	  gfc_dt_list **dt_list_ptr = NULL;
 	  gfc_component *tmp_comp = NULL;
 
 	  /* Generate real derived type.  */
@@ -4943,16 +4966,17 @@ generate_isocbinding_symbol (const char *mod_name, iso_c_binding_symbol s,
 	  dt_sym->ts.u.derived = dt_sym;
 
 	  /* Add the symbol created for the derived type to the current ns.  */
-	  if (gfc_derived_types)
-	    {
-	      dt_sym->dt_next = gfc_derived_types->dt_next;
-	      gfc_derived_types->dt_next = dt_sym;
-	    }
-	  else
-	    {
-	      dt_sym->dt_next = dt_sym;
-	    }
-	  gfc_derived_types = dt_sym;
+	  dt_list_ptr = &(gfc_derived_types);
+	  while (*dt_list_ptr != NULL && (*dt_list_ptr)->next != NULL)
+	    dt_list_ptr = &((*dt_list_ptr)->next);
+
+	  /* There is already at least one derived type in the list, so append
+	     the one we're currently building for c_ptr or c_funptr.  */
+	  if (*dt_list_ptr != NULL)
+	    dt_list_ptr = &((*dt_list_ptr)->next);
+	  (*dt_list_ptr) = gfc_get_dt_list ();
+	  (*dt_list_ptr)->derived = dt_sym;
+	  (*dt_list_ptr)->next = NULL;
 
 	  gfc_add_component (dt_sym, "c_address", &tmp_comp);
 	  if (tmp_comp == NULL)

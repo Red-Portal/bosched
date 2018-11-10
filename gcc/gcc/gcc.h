@@ -45,6 +45,8 @@ class driver
   void putenv_COLLECT_GCC (const char *argv0) const;
   void maybe_putenv_COLLECT_LTO_WRAPPER () const;
   void maybe_putenv_OFFLOAD_TARGETS () const;
+  void build_option_suggestions (void);
+  const char *suggest_option (const char *bad_opt);
   void handle_unrecognized_options ();
   int maybe_print_and_exit () const;
   bool prepare_infiles ();
@@ -57,7 +59,7 @@ class driver
   char *explicit_link_files;
   struct cl_decoded_option *decoded_options;
   unsigned int decoded_options_count;
-  option_proposer m_option_proposer;
+  auto_vec <char *> *m_option_suggestions;
 };
 
 /* The mapping of a spec function name to the C function that
@@ -71,6 +73,7 @@ struct spec_function
 /* These are exported by gcc.c.  */
 extern int do_spec (const char *);
 extern void record_temp_file (const char *, int, int);
+extern void pfatal_with_name (const char *) ATTRIBUTE_NORETURN;
 extern void set_input (const char *);
 
 /* Spec files linked with gcc.c must provide definitions for these.  */

@@ -51,6 +51,10 @@ minval_i16 (gfc_array_i16 * const restrict retarray,
   index_type dim;
   int continue_loop;
 
+#ifdef HAVE_BACK_ARG
+  assert(back == 0);
+#endif
+
   /* Make dim zero based to avoid confusion.  */
   rank = GFC_DESCRIPTOR_RANK (array) - 1;
   dim = (*pdim) - 1;
@@ -154,10 +158,8 @@ minval_i16 (gfc_array_i16 * const restrict retarray,
 	  *dest = GFC_INTEGER_16_HUGE;
 	else
 	  {
-#if ! defined HAVE_BACK_ARG
 	    for (n = 0; n < len; n++, src += delta)
 	      {
-#endif
 
 #if defined (GFC_INTEGER_16_QUIET_NAN)
 		if (*src <= result)
@@ -234,6 +236,9 @@ mminval_i16 (gfc_array_i16 * const restrict retarray,
   index_type mdelta;
   int mask_kind;
 
+#ifdef HAVE_BACK_ARG
+  assert (back == 0);
+#endif
   dim = (*pdim) - 1;
   rank = GFC_DESCRIPTOR_RANK (array) - 1;
 

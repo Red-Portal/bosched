@@ -103,9 +103,11 @@ get_fileinfo (const char *name)
   struct c_fileinfo *fi;
 
   if (!file_info_tree)
-    file_info_tree = splay_tree_new (splay_tree_compare_strings,
+    file_info_tree = splay_tree_new ((splay_tree_compare_fn)
+				     (void (*) (void)) strcmp,
 				     0,
-				     splay_tree_delete_pointers);
+				     (splay_tree_delete_value_fn)
+				     (void (*) (void)) free);
 
   n = splay_tree_lookup (file_info_tree, (splay_tree_key) name);
   if (n)
@@ -199,14 +201,14 @@ fe_file_change (const line_map_ordinary *new_map)
 	 we already did in compile_file.  */
       if (!MAIN_FILE_P (new_map))
 	{
-	  location_t included_at = linemap_included_from (new_map);
+	  unsigned int included_at = LAST_SOURCE_LINE_LOCATION (new_map - 1);
 	  int line = 0;
 	  if (included_at > BUILTINS_LOCATION)
 	    line = SOURCE_LINE (new_map - 1, included_at);
 
 	  input_location = new_map->start_location;
 	  (*debug_hooks->start_source_file) (line, LINEMAP_FILE (new_map));
-#ifdef SYSTEM_IMPLICIT_EXTERN_C
+#ifndef NO_IMPLICIT_EXTERN_C
 	  if (c_header_level)
 	    ++c_header_level;
 	  else if (LINEMAP_SYSP (new_map) == 2)
@@ -219,7 +221,7 @@ fe_file_change (const line_map_ordinary *new_map)
     }
   else if (new_map->reason == LC_LEAVE)
     {
-#ifdef SYSTEM_IMPLICIT_EXTERN_C
+#ifndef NO_IMPLICIT_EXTERN_C
       if (c_header_level && --c_header_level == 0)
 	{
 	  if (LINEMAP_SYSP (new_map) == 2)
@@ -356,8 +358,6 @@ c_common_has_attribute (cpp_reader *pfile)
 		       || is_attribute_p ("nodiscard", attr_name)
 		       || is_attribute_p ("fallthrough", attr_name))
 		result = 201603;
-	      else if (is_attribute_p ("no_unique_address", attr_name))
-		result = 201803;
 	      if (result)
 		attr_name = NULL_TREE;
 	    }

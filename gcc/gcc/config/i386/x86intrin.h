@@ -28,6 +28,22 @@
 
 #ifndef __iamcu__
 
+#include <mmintrin.h>
+
+#include <xmmintrin.h>
+
+#include <emmintrin.h>
+
+#include <pmmintrin.h>
+
+#include <tmmintrin.h>
+
+#include <ammintrin.h>
+
+#include <smmintrin.h>
+
+#include <wmmintrin.h>
+
 /* For including AVX instructions */
 #include <immintrin.h>
 
@@ -39,7 +55,13 @@
 
 #include <lwpintrin.h>
 
+#include <bmiintrin.h>
+
+#include <bmi2intrin.h>
+
 #include <tbmintrin.h>
+
+#include <lzcntintrin.h>
 
 #include <popcntintrin.h>
 
@@ -52,6 +74,10 @@
 #include <xsaveintrin.h>
 
 #include <xsaveoptintrin.h>
+
+#include <sgxintrin.h>
+
+#include <pconfigintrin.h>
 
 #endif /* __iamcu__ */
 

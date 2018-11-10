@@ -5,8 +5,6 @@
 package user
 
 import (
-	"internal/testenv"
-	"os"
 	"runtime"
 	"testing"
 )
@@ -18,20 +16,6 @@ func checkUser(t *testing.T) {
 }
 
 func TestCurrent(t *testing.T) {
-	// The Go builders (in particular the ones using containers)
-	// often have minimal environments without $HOME or $USER set,
-	// which breaks Current which relies on those working as a
-	// fallback.
-	// TODO: we should fix that (Issue 24884) and remove these
-	// workarounds.
-	if testenv.Builder() != "" && runtime.GOOS != "windows" && runtime.GOOS != "plan9" {
-		if os.Getenv("HOME") == "" {
-			os.Setenv("HOME", "/tmp")
-		}
-		if os.Getenv("USER") == "" {
-			os.Setenv("USER", "gobuilder")
-		}
-	}
 	u, err := Current()
 	if err != nil {
 		t.Fatalf("Current: %v (got %#v)", err, u)
@@ -60,11 +44,15 @@ func compare(t *testing.T, want, got *User) {
 	if want.Name != got.Name {
 		t.Errorf("got Name=%q; want %q", got.Name, want.Name)
 	}
-	if want.HomeDir != got.HomeDir {
-		t.Errorf("got HomeDir=%q; want %q", got.HomeDir, want.HomeDir)
+	// TODO(brainman): fix it once we know how.
+	if runtime.GOOS == "windows" {
+		t.Skip("skipping Gid and HomeDir comparisons")
 	}
 	if want.Gid != got.Gid {
 		t.Errorf("got Gid=%q; want %q", got.Gid, want.Gid)
+	}
+	if want.HomeDir != got.HomeDir {
+		t.Errorf("got HomeDir=%q; want %q", got.HomeDir, want.HomeDir)
 	}
 }
 

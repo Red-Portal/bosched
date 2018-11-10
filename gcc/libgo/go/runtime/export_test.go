@@ -21,6 +21,7 @@ import (
 //var Fcmp64 = fcmp64
 //var Fintto64 = fintto64
 //var F64toint = f64toint
+//var Sqrt = sqrt
 
 var Entersyscall = entersyscall
 var Exitsyscall = exitsyscall
@@ -371,8 +372,6 @@ func (rw *RWMutex) Unlock() {
 	rw.rw.unlock()
 }
 
-const RuntimeHmapSize = unsafe.Sizeof(hmap{})
-
 func MapBucketsCount(m map[int]int) int {
 	h := *(**hmap)(unsafe.Pointer(&m))
 	return 1 << h.B
@@ -395,62 +394,4 @@ func LockOSCounts() (external, internal uint32) {
 		}
 	}
 	return g.m.lockedExt, g.m.lockedInt
-}
-
-func KeepNArenaHints(n int) {
-	hint := mheap_.arenaHints
-	for i := 1; i < n; i++ {
-		hint = hint.next
-		if hint == nil {
-			return
-		}
-	}
-	hint.next = nil
-}
-
-// MapNextArenaHint reserves a page at the next arena growth hint,
-// preventing the arena from growing there, and returns the range of
-// addresses that are no longer viable.
-func MapNextArenaHint() (start, end uintptr) {
-	hint := mheap_.arenaHints
-	addr := hint.addr
-	if hint.down {
-		start, end = addr-heapArenaBytes, addr
-		addr -= physPageSize
-	} else {
-		start, end = addr, addr+heapArenaBytes
-	}
-	sysReserve(unsafe.Pointer(addr), physPageSize)
-	return
-}
-
-func GetNextArenaHint() uintptr {
-	return mheap_.arenaHints.addr
-}
-
-type G = g
-
-func Getg() *G {
-	return getg()
-}
-
-//go:noinline
-func PanicForTesting(b []byte, i int) byte {
-	return unexportedPanicForTesting(b, i)
-}
-
-//go:noinline
-func unexportedPanicForTesting(b []byte, i int) byte {
-	return b[i]
-}
-
-func G0StackOverflow() {
-	systemstack(func() {
-		stackOverflow(nil)
-	})
-}
-
-func stackOverflow(x *byte) {
-	var buf [256]byte
-	stackOverflow(&buf[0])
 }

@@ -1,12 +1,6 @@
-<<<<<<< HEAD
-2018-07-25  Joseph Myers  <joseph@codesourcery.com>
-
-	* cpplib.pot: Regenerate.
-=======
 2018-07-26  Release Manager
 
 	* GCC 8.2.0 released.
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
 
 2018-06-11  Joseph Myers  <joseph@codesourcery.com>
 
@@ -16,13 +10,10 @@
 
 	* eo.po: Update.
 
-<<<<<<< HEAD
-=======
 2018-05-02  Release Manager
 
 	* GCC 8.1.0 released.
 
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
 2018-04-23  Joseph Myers  <joseph@codesourcery.com>
 
 	* cpplib.pot: Regenerate.

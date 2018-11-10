@@ -68,21 +68,6 @@ func TestWaitGroupMisuse(t *testing.T) {
 	t.Fatal("Should panic")
 }
 
-// pollUntilEqual blocks until v, loaded atomically, is
-// equal to the target.
-func pollUntilEqual(v *uint32, target uint32) {
-	for {
-		for i := 0; i < 1e3; i++ {
-			if atomic.LoadUint32(v) == target {
-				return
-			}
-		}
-		// yield to avoid deadlock with the garbage collector
-		// see issue #20072
-		runtime.Gosched()
-	}
-}
-
 func TestWaitGroupMisuse2(t *testing.T) {
 	knownRacy(t)
 	if runtime.NumCPU() <= 4 {
@@ -109,7 +94,9 @@ func TestWaitGroupMisuse2(t *testing.T) {
 				done <- recover()
 			}()
 			atomic.AddUint32(&here, 1)
-			pollUntilEqual(&here, 3)
+			for atomic.LoadUint32(&here) != 3 {
+				// spin
+			}
 			wg.Wait()
 		}()
 		go func() {
@@ -117,12 +104,16 @@ func TestWaitGroupMisuse2(t *testing.T) {
 				done <- recover()
 			}()
 			atomic.AddUint32(&here, 1)
-			pollUntilEqual(&here, 3)
+			for atomic.LoadUint32(&here) != 3 {
+				// spin
+			}
 			wg.Add(1) // This is the bad guy.
 			wg.Done()
 		}()
 		atomic.AddUint32(&here, 1)
-		pollUntilEqual(&here, 3)
+		for atomic.LoadUint32(&here) != 3 {
+			// spin
+		}
 		wg.Done()
 		for j := 0; j < 2; j++ {
 			if err := <-done; err != nil {

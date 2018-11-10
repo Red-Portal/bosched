@@ -256,7 +256,6 @@ base_pool_allocator <TBlockAllocator>::initialize ()
   size_t size = m_size;
 
   gcc_checking_assert (m_name);
-  gcc_checking_assert (m_size);
 
   /* Make size large enough to store the list header.  */
   if (size < sizeof (allocation_pool_list*))

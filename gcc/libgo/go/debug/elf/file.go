@@ -609,8 +609,6 @@ func (f *File) applyRelocations(dst []byte, rels []byte) error {
 		return f.applyRelocationsMIPS(dst, rels)
 	case f.Class == ELFCLASS64 && f.Machine == EM_MIPS:
 		return f.applyRelocationsMIPS64(dst, rels)
-	case f.Class == ELFCLASS64 && f.Machine == EM_RISCV:
-		return f.applyRelocationsRISCV64(dst, rels)
 	case f.Class == ELFCLASS64 && f.Machine == EM_S390:
 		return f.applyRelocationss390x(dst, rels)
 	case f.Class == ELFCLASS32 && (f.Machine == EM_SPARC || f.Machine == EM_SPARC32PLUS):
@@ -972,55 +970,6 @@ func (f *File) applyRelocationsMIPS64(dst []byte, rels []byte) error {
 	return nil
 }
 
-func (f *File) applyRelocationsRISCV64(dst []byte, rels []byte) error {
-	// 24 is the size of Rela64.
-	if len(rels)%24 != 0 {
-		return errors.New("length of relocation section is not a multiple of 24")
-	}
-
-	symbols, _, err := f.getSymbols(SHT_SYMTAB)
-	if err != nil {
-		return err
-	}
-
-	b := bytes.NewReader(rels)
-	var rela Rela64
-
-	for b.Len() > 0 {
-		binary.Read(b, f.ByteOrder, &rela)
-		symNo := rela.Info >> 32
-		t := R_RISCV(rela.Info & 0xffff)
-
-		if symNo == 0 || symNo > uint64(len(symbols)) {
-			continue
-		}
-		sym := &symbols[symNo-1]
-		switch SymType(sym.Info & 0xf) {
-		case STT_SECTION, STT_NOTYPE:
-			break
-		default:
-			continue
-		}
-
-		switch t {
-		case R_RISCV_64:
-			if rela.Off+8 >= uint64(len(dst)) || rela.Addend < 0 {
-				continue
-			}
-			val := sym.Value + uint64(rela.Addend)
-			f.ByteOrder.PutUint64(dst[rela.Off:rela.Off+8], val)
-		case R_RISCV_32:
-			if rela.Off+4 >= uint64(len(dst)) || rela.Addend < 0 {
-				continue
-			}
-			val := uint32(sym.Value) + uint32(rela.Addend)
-			f.ByteOrder.PutUint32(dst[rela.Off:rela.Off+4], val)
-		}
-	}
-
-	return nil
-}
-
 func (f *File) applyRelocationss390x(dst []byte, rels []byte) error {
 	// 24 is the size of Rela64.
 	if len(rels)%24 != 0 {
@@ -1205,17 +1154,6 @@ func (f *File) applyRelocationsALPHA(dst []byte, rels []byte) error {
 }
 
 func (f *File) DWARF() (*dwarf.Data, error) {
-	dwarfSuffix := func(s *Section) string {
-		switch {
-		case strings.HasPrefix(s.Name, ".debug_"):
-			return s.Name[7:]
-		case strings.HasPrefix(s.Name, ".zdebug_"):
-			return s.Name[8:]
-		default:
-			return ""
-		}
-
-	}
 	// sectionData gets the data for s, checks its size, and
 	// applies any applicable relations.
 	sectionData := func(i int, s *Section) ([]byte, error) {
@@ -1264,8 +1202,13 @@ func (f *File) DWARF() (*dwarf.Data, error) {
 	// Don't bother loading others.
 	var dat = map[string][]byte{"abbrev": nil, "info": nil, "str": nil, "line": nil, "ranges": nil}
 	for i, s := range f.Sections {
-		suffix := dwarfSuffix(s)
-		if suffix == "" {
+		suffix := ""
+		switch {
+		case strings.HasPrefix(s.Name, ".debug_"):
+			suffix = s.Name[7:]
+		case strings.HasPrefix(s.Name, ".zdebug_"):
+			suffix = s.Name[8:]
+		default:
 			continue
 		}
 		if _, ok := dat[suffix]; !ok {
@@ -1285,19 +1228,16 @@ func (f *File) DWARF() (*dwarf.Data, error) {
 
 	// Look for DWARF4 .debug_types sections.
 	for i, s := range f.Sections {
-		suffix := dwarfSuffix(s)
-		if suffix != "types" {
-			continue
-		}
+		if s.Name == ".debug_types" {
+			b, err := sectionData(i, s)
+			if err != nil {
+				return nil, err
+			}
 
-		b, err := sectionData(i, s)
-		if err != nil {
-			return nil, err
-		}
-
-		err = d.AddTypes(fmt.Sprintf("types-%d", i), b)
-		if err != nil {
-			return nil, err
+			err = d.AddTypes(fmt.Sprintf("types-%d", i), b)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 

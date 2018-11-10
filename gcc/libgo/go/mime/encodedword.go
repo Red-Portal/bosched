@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 	"unicode"
 	"unicode/utf8"
 )
@@ -50,19 +51,16 @@ func needsEncoding(s string) bool {
 
 // encodeWord encodes a string into an encoded-word.
 func (e WordEncoder) encodeWord(charset, s string) string {
-	var buf strings.Builder
-	// Could use a hint like len(s)*3, but that's not enough for cases
-	// with word splits and too much for simpler inputs.
-	// 48 is close to maxEncodedWordLen/2, but adjusted to allocator size class.
-	buf.Grow(48)
+	buf := getBuffer()
+	defer putBuffer(buf)
 
-	e.openWord(&buf, charset)
+	e.openWord(buf, charset)
 	if e == BEncoding {
-		e.bEncode(&buf, charset, s)
+		e.bEncode(buf, charset, s)
 	} else {
-		e.qEncode(&buf, charset, s)
+		e.qEncode(buf, charset, s)
 	}
-	closeWord(&buf)
+	closeWord(buf)
 
 	return buf.String()
 }
@@ -79,7 +77,7 @@ const (
 var maxBase64Len = base64.StdEncoding.DecodedLen(maxContentLen)
 
 // bEncode encodes s using base64 encoding and writes it to buf.
-func (e WordEncoder) bEncode(buf *strings.Builder, charset, s string) {
+func (e WordEncoder) bEncode(buf *bytes.Buffer, charset, s string) {
 	w := base64.NewEncoder(base64.StdEncoding, buf)
 	// If the charset is not UTF-8 or if the content is short, do not bother
 	// splitting the encoded-word.
@@ -111,7 +109,7 @@ func (e WordEncoder) bEncode(buf *strings.Builder, charset, s string) {
 
 // qEncode encodes s using Q encoding and writes it to buf. It splits the
 // encoded-words when necessary.
-func (e WordEncoder) qEncode(buf *strings.Builder, charset, s string) {
+func (e WordEncoder) qEncode(buf *bytes.Buffer, charset, s string) {
 	// We only split encoded-words when the charset is UTF-8.
 	if !isUTF8(charset) {
 		writeQString(buf, s)
@@ -141,7 +139,7 @@ func (e WordEncoder) qEncode(buf *strings.Builder, charset, s string) {
 }
 
 // writeQString encodes s using Q encoding and writes it to buf.
-func writeQString(buf *strings.Builder, s string) {
+func writeQString(buf *bytes.Buffer, s string) {
 	for i := 0; i < len(s); i++ {
 		switch b := s[i]; {
 		case b == ' ':
@@ -157,7 +155,7 @@ func writeQString(buf *strings.Builder, s string) {
 }
 
 // openWord writes the beginning of an encoded-word into buf.
-func (e WordEncoder) openWord(buf *strings.Builder, charset string) {
+func (e WordEncoder) openWord(buf *bytes.Buffer, charset string) {
 	buf.WriteString("=?")
 	buf.WriteString(charset)
 	buf.WriteByte('?')
@@ -166,12 +164,12 @@ func (e WordEncoder) openWord(buf *strings.Builder, charset string) {
 }
 
 // closeWord writes the end of an encoded-word into buf.
-func closeWord(buf *strings.Builder) {
+func closeWord(buf *bytes.Buffer) {
 	buf.WriteString("?=")
 }
 
 // splitWord closes the current encoded-word and opens a new one.
-func (e WordEncoder) splitWord(buf *strings.Builder, charset string) {
+func (e WordEncoder) splitWord(buf *bytes.Buffer, charset string) {
 	closeWord(buf)
 	buf.WriteByte(' ')
 	e.openWord(buf, charset)
@@ -226,9 +224,10 @@ func (d *WordDecoder) Decode(word string) (string, error) {
 		return "", err
 	}
 
-	var buf strings.Builder
+	buf := getBuffer()
+	defer putBuffer(buf)
 
-	if err := d.convert(&buf, charset, content); err != nil {
+	if err := d.convert(buf, charset, content); err != nil {
 		return "", err
 	}
 
@@ -244,7 +243,8 @@ func (d *WordDecoder) DecodeHeader(header string) (string, error) {
 		return header, nil
 	}
 
-	var buf strings.Builder
+	buf := getBuffer()
+	defer putBuffer(buf)
 
 	buf.WriteString(header[:i])
 	header = header[i:]
@@ -296,7 +296,7 @@ func (d *WordDecoder) DecodeHeader(header string) (string, error) {
 			buf.WriteString(header[:start])
 		}
 
-		if err := d.convert(&buf, charset, content); err != nil {
+		if err := d.convert(buf, charset, content); err != nil {
 			return "", err
 		}
 
@@ -322,7 +322,7 @@ func decode(encoding byte, text string) ([]byte, error) {
 	}
 }
 
-func (d *WordDecoder) convert(buf *strings.Builder, charset string, content []byte) error {
+func (d *WordDecoder) convert(buf *bytes.Buffer, charset string, content []byte) error {
 	switch {
 	case strings.EqualFold("utf-8", charset):
 		buf.Write(content)
@@ -346,7 +346,7 @@ func (d *WordDecoder) convert(buf *strings.Builder, charset string, content []by
 		if err != nil {
 			return err
 		}
-		if _, err = io.Copy(buf, r); err != nil {
+		if _, err = buf.ReadFrom(r); err != nil {
 			return err
 		}
 	}
@@ -421,4 +421,22 @@ func fromHex(b byte) (byte, error) {
 		return b - 'a' + 10, nil
 	}
 	return 0, fmt.Errorf("mime: invalid hex byte %#02x", b)
+}
+
+var bufPool = sync.Pool{
+	New: func() interface{} {
+		return new(bytes.Buffer)
+	},
+}
+
+func getBuffer() *bytes.Buffer {
+	return bufPool.Get().(*bytes.Buffer)
+}
+
+func putBuffer(buf *bytes.Buffer) {
+	if buf.Len() > 1024 {
+		return
+	}
+	buf.Reset()
+	bufPool.Put(buf)
 }

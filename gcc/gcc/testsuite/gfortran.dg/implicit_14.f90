@@ -1,5 +1,5 @@
 ! { dg-do compile }
-! { dg-options "-std=f2008" }
+! { dg-options "-std=f2008ts" }
 !
 ! Support Fortran 2018's IMPLICIT NONE with spec list
 ! (currently implemented as vendor extension)

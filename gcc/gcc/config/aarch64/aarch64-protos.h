@@ -120,10 +120,6 @@ enum aarch64_symbol_type
    ADDR_QUERY_LDP_STP
       Query what is valid for a load/store pair.
 
-   ADDR_QUERY_LDP_STP_N
-      Query what is valid for a load/store pair, but narrow the incoming mode
-      for address checking.  This is used for the store_pair_lanes patterns.
-
    ADDR_QUERY_ANY
       Query what is valid for at least one memory constraint, which may
       allow things that "m" doesn't.  For example, the SVE LDR and STR
@@ -132,7 +128,6 @@ enum aarch64_symbol_type
 enum aarch64_addr_query_type {
   ADDR_QUERY_M,
   ADDR_QUERY_LDP_STP,
-  ADDR_QUERY_LDP_STP_N,
   ADDR_QUERY_ANY
 };
 
@@ -235,12 +230,6 @@ struct cpu_prefetch_tune
   const int l1_cache_size;
   const int l1_cache_line_size;
   const int l2_cache_size;
-  /* Whether software prefetch hints should be issued for non-constant
-     strides.  */
-  const bool prefetch_dynamic_strides;
-  /* The minimum constant stride beyond which we should use prefetch
-     hints for.  */
-  const int minimum_stride;
   const int default_opt_level;
 };
 
@@ -255,9 +244,9 @@ struct tune_params
   int memmov_cost;
   int issue_rate;
   unsigned int fusible_ops;
-  const char *function_align;
-  const char *jump_align;
-  const char *loop_align;
+  int function_align;
+  int jump_align;
+  int loop_align;
   int int_reassoc_width;
   int fp_reassoc_width;
   int vec_reassoc_width;
@@ -286,49 +275,6 @@ struct tune_params
   /* Place prefetch struct pointer at the end to enable type checking
      errors when tune_params misses elements (e.g., from erroneous merges).  */
   const struct cpu_prefetch_tune *prefetch;
-};
-
-/* Classifies an address.
-
-   ADDRESS_REG_IMM
-       A simple base register plus immediate offset.
-
-   ADDRESS_REG_WB
-       A base register indexed by immediate offset with writeback.
-
-   ADDRESS_REG_REG
-       A base register indexed by (optionally scaled) register.
-
-   ADDRESS_REG_UXTW
-       A base register indexed by (optionally scaled) zero-extended register.
-
-   ADDRESS_REG_SXTW
-       A base register indexed by (optionally scaled) sign-extended register.
-
-   ADDRESS_LO_SUM
-       A LO_SUM rtx with a base register and "LO12" symbol relocation.
-
-   ADDRESS_SYMBOLIC:
-       A constant symbolic address, in pc-relative literal pool.  */
-
-enum aarch64_address_type {
-  ADDRESS_REG_IMM,
-  ADDRESS_REG_WB,
-  ADDRESS_REG_REG,
-  ADDRESS_REG_UXTW,
-  ADDRESS_REG_SXTW,
-  ADDRESS_LO_SUM,
-  ADDRESS_SYMBOLIC
-};
-
-/* Address information.  */
-struct aarch64_address_info {
-  enum aarch64_address_type type;
-  rtx base;
-  rtx offset;
-  poly_int64 const_offset;
-  int shift;
-  enum aarch64_symbol_type symbol_type;
 };
 
 #define AARCH64_FUSION_PAIR(x, name) \
@@ -436,7 +382,6 @@ void aarch64_split_add_offset (scalar_int_mode, rtx, rtx, rtx, rtx, rtx);
 bool aarch64_mov_operand_p (rtx, machine_mode);
 rtx aarch64_reverse_mask (machine_mode, unsigned int);
 bool aarch64_offset_7bit_signed_scaled_p (machine_mode, poly_int64);
-bool aarch64_offset_9bit_signed_unscaled_p (machine_mode, poly_int64);
 char *aarch64_output_sve_cnt_immediate (const char *, const char *, rtx);
 char *aarch64_output_sve_addvl_addpl (rtx, rtx, rtx);
 char *aarch64_output_sve_inc_dec_immediate (const char *, rtx);
@@ -497,8 +442,7 @@ void aarch64_asm_output_labelref (FILE *, const char *);
 void aarch64_cpu_cpp_builtins (cpp_reader *);
 const char * aarch64_gen_far_branch (rtx *, int, const char *, const char *);
 const char * aarch64_output_probe_stack_range (rtx, rtx);
-const char * aarch64_output_probe_sve_stack_clash (rtx, rtx, rtx, rtx);
-void aarch64_err_no_fpadvsimd (machine_mode);
+void aarch64_err_no_fpadvsimd (machine_mode, const char *);
 void aarch64_expand_epilogue (bool);
 void aarch64_expand_mov_immediate (rtx, rtx, rtx (*) (rtx, rtx) = 0);
 void aarch64_emit_sve_pred_move (rtx, rtx, rtx);
@@ -517,16 +461,6 @@ void aarch64_relayout_simd_types (void);
 void aarch64_reset_previous_fndecl (void);
 bool aarch64_return_address_signing_enabled (void);
 void aarch64_save_restore_target_globals (tree);
-void aarch64_addti_scratch_regs (rtx, rtx, rtx *,
-				 rtx *, rtx *,
-				 rtx *, rtx *,
-				 rtx *);
-void aarch64_subvti_scratch_regs (rtx, rtx, rtx *,
-				  rtx *, rtx *,
-				  rtx *, rtx *, rtx *);
-void aarch64_expand_subvti (rtx, rtx, rtx,
-			    rtx, rtx, rtx, rtx);
-
 
 /* Initialize builtins for SIMD intrinsics.  */
 void init_aarch64_simd_builtins (void);
@@ -553,8 +487,7 @@ void aarch64_split_simd_move (rtx, rtx);
 bool aarch64_float_const_representable_p (rtx);
 
 #if defined (RTX_CODE)
-void aarch64_gen_unlikely_cbranch (enum rtx_code, machine_mode cc_mode,
-				   rtx label_ref);
+
 bool aarch64_legitimate_address_p (machine_mode, rtx, bool,
 				   aarch64_addr_query_type = ADDR_QUERY_M);
 machine_mode aarch64_select_cc_mode (RTX_CODE, rtx, rtx);
@@ -563,7 +496,10 @@ rtx aarch64_load_tp (rtx);
 
 void aarch64_expand_compare_and_swap (rtx op[]);
 void aarch64_split_compare_and_swap (rtx op[]);
+void aarch64_gen_atomic_cas (rtx, rtx, rtx, rtx, rtx);
 
+bool aarch64_atomic_ldop_supported_p (enum rtx_code);
+void aarch64_gen_atomic_ldop (enum rtx_code, rtx, rtx, rtx, rtx, rtx);
 void aarch64_split_atomic_op (enum rtx_code, rtx, rtx, rtx, rtx, rtx, rtx);
 
 bool aarch64_gen_adjusted_ldpstp (rtx *, bool, scalar_mode, RTX_CODE);
@@ -598,36 +534,21 @@ int aarch64_ccmp_mode_to_code (machine_mode mode);
 bool extract_base_offset_in_addr (rtx mem, rtx *base, rtx *offset);
 bool aarch64_operands_ok_for_ldpstp (rtx *, bool, machine_mode);
 bool aarch64_operands_adjust_ok_for_ldpstp (rtx *, bool, scalar_mode);
-void aarch64_swap_ldrstr_operands (rtx *, bool);
 
 extern void aarch64_asm_output_pool_epilogue (FILE *, const char *,
 					      tree, HOST_WIDE_INT);
-
-
-extern bool aarch64_classify_address (struct aarch64_address_info *, rtx,
-				      machine_mode, bool,
-				      aarch64_addr_query_type = ADDR_QUERY_M);
 
 /* Defined in common/config/aarch64-common.c.  */
 bool aarch64_handle_option (struct gcc_options *, struct gcc_options *,
 			     const struct cl_decoded_option *, location_t);
 const char *aarch64_rewrite_selected_cpu (const char *name);
 enum aarch64_parse_opt_result aarch64_parse_extension (const char *,
-						       unsigned long *,
-						       std::string *);
-void aarch64_get_all_extension_candidates (auto_vec<const char *> *candidates);
+						       unsigned long *);
 std::string aarch64_get_extension_string_for_isa_flags (unsigned long,
 							unsigned long);
 
-/* Defined in aarch64-d.c  */
-extern void aarch64_d_target_versions (void);
-
-rtl_opt_pass *make_pass_fma_steering (gcc::context *);
-rtl_opt_pass *make_pass_track_speculation (gcc::context *);
-rtl_opt_pass *make_pass_tag_collision_avoidance (gcc::context *);
+rtl_opt_pass *make_pass_fma_steering (gcc::context *ctxt);
 
 poly_uint64 aarch64_regmode_natural_size (machine_mode);
-
-bool aarch64_high_bits_all_ones_p (HOST_WIDE_INT);
 
 #endif /* GCC_AARCH64_PROTOS_H */

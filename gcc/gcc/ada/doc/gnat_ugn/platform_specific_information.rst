@@ -241,13 +241,13 @@ The name of of that package depends on your GNU/Linux distribution:
 * Debian, Ubuntu: ``libc6-dev`` (normally installed by default).
 
 If using the 32-bit version of GNAT on a 64-bit version of GNU/Linux,
-you'll need the 32-bit version of the following packages:
+you'll need the 32-bit version of the glibc and glibc-devel packages:
 
-* RedHat, SUSE: ``glibc.i686``, ``glibc-devel.i686``, ``ncurses-libs.i686``
-* Debian, Ubuntu: ``libc6:i386``, ``libc6-dev:i386``, ``lib32ncursesw5``
+* RedHat, SUSE: ``glibc.i686``, ``glibc-devel.i686``
+* Debian, Ubuntu: ``libc6:i386``, ``libc6-dev:i386``
 
 Other GNU/Linux distributions might be choosing a different name
-for those packages.
+for that package.
 
 .. index:: Windows
 

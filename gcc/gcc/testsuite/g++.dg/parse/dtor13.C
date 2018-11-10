@@ -3,7 +3,6 @@
 
 struct A
 {
-  static friend A::~A(); /* { dg-error "3:storage class specifiers" } */
-  /* { dg-error "extra qualification|implicitly friend" "" { target *-*-* } .-1 } */
+  static friend A::~A(); /* { dg-error "storage class specifiers|extra qualification|implicitly friend" } */
 };
 

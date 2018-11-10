@@ -1,5 +1,3 @@
-! { dg-options "-std=legacy" }
-
   integer :: err
   err = 0
 !$omp parallel num_threads (4) default (none) shared (err)

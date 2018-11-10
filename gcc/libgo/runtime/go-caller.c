@@ -116,7 +116,7 @@ __go_get_backtrace_state ()
 	 argv[0] (http://gcc.gnu.org/PR61895).  It would be nice to
 	 have a better check for whether this file is the real
 	 executable.  */
-      if (filename != NULL && (stat (filename, &s) < 0 || s.st_size < 1024))
+      if (stat (filename, &s) < 0 || s.st_size < 1024)
 	filename = NULL;
 
       back_state = backtrace_create_state (filename, 1, error_callback, NULL);
@@ -208,6 +208,17 @@ Caller (int skip)
 }
 
 /* Look up the function name, file name, and line number for a PC.  */
+
+struct funcfileline_return
+{
+  String retfn;
+  String retfile;
+  intgo retline;
+};
+
+struct funcfileline_return
+runtime_funcfileline (uintptr targetpc, int32 index)
+  __asm__ (GOSYM_PREFIX "runtime.funcfileline");
 
 struct funcfileline_return
 runtime_funcfileline (uintptr targetpc, int32 index)

@@ -1,5 +1,4 @@
 // { dg-do compile { target c++11 } }
-// { dg-require-cstdint "" }
 
 #include <random>
 
@@ -12,4 +11,4 @@ auto x = std::generate_canonical<std::size_t,
 
 // { dg-error "static assertion failed: template argument must be a floating point type" "" { target *-*-* } 156 }
 
-// { dg-error "static assertion failed: template argument must be a floating point type" "" { target *-*-* } 3320 }
+// { dg-error "static assertion failed: template argument must be a floating point type" "" { target *-*-* } 3317 }

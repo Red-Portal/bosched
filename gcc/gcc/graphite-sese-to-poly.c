@@ -58,6 +58,14 @@ along with GCC; see the file COPYING3.  If not see
 
 #include "graphite.h"
 
+/* Assigns to RES the value of the INTEGER_CST T.  */
+
+static inline void
+tree_int_to_gmp (tree t, mpz_t res)
+{
+  wi::to_mpz (wi::to_wide (t), res, TYPE_SIGN (TREE_TYPE (t)));
+}
+
 /* Return an isl identifier for the polyhedral basic block PBB.  */
 
 static isl_id *
@@ -264,8 +272,7 @@ extract_affine (scop_p s, tree e, __isl_take isl_space *space)
       lhs = extract_affine (s, integer_minus_one_node, isl_space_copy (space));
       rhs = extract_affine (s, TREE_OPERAND (e, 0), space);
       res = isl_pw_aff_sub (lhs, rhs);
-      /* We need to always wrap the result of a bitwise operation.  */
-      return wrap (res, TYPE_PRECISION (type) - (TYPE_UNSIGNED (type) ? 0 : 1));
+      break;
 
     case NEGATE_EXPR:
       lhs = extract_affine (s, TREE_OPERAND (e, 0), isl_space_copy (space));
@@ -278,8 +285,8 @@ extract_affine (scop_p s, tree e, __isl_take isl_space *space)
 	gcc_assert (! defined_in_sese_p (e, s->scop_info->region));
 	int dim = parameter_index_in_region (e, s->scop_info);
 	gcc_assert (dim != -1);
-	/* No need to wrap a parameter.  */
-	return extract_affine_name (dim, space);
+	res = extract_affine_name (dim, space);
+	break;
       }
 
     case INTEGER_CST:
@@ -294,15 +301,11 @@ extract_affine (scop_p s, tree e, __isl_take isl_space *space)
 	/* Signed values, even if overflow is undefined, get modulo-reduced.
 	   But only if not all values of the old type fit in the new.  */
 	if (! TYPE_UNSIGNED (type)
-	    && ((TYPE_UNSIGNED (itype)
+	    && ((TYPE_UNSIGNED (TREE_TYPE (TREE_OPERAND (e, 0)))
 		 && TYPE_PRECISION (type) <= TYPE_PRECISION (itype))
 		|| TYPE_PRECISION (type) < TYPE_PRECISION (itype)))
 	  res = wrap (res, TYPE_PRECISION (type) - 1);
-	else if (TYPE_UNSIGNED (type)
-		 && (!TYPE_UNSIGNED (itype)
-		     || TYPE_PRECISION (type) < TYPE_PRECISION (itype)))
-	  res = wrap (res, TYPE_PRECISION (type));
-	return res;
+	break;
       }
 
     case NON_LVALUE_EXPR:
@@ -314,8 +317,7 @@ extract_affine (scop_p s, tree e, __isl_take isl_space *space)
       break;
     }
 
-  /* For all wrapping arithmetic wrap the result.  */
-  if (TYPE_OVERFLOW_WRAPS (type))
+  if (TYPE_UNSIGNED (type))
     res = wrap (res, TYPE_PRECISION (type));
 
   return res;

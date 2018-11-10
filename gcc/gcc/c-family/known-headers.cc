@@ -192,7 +192,7 @@ suggest_missing_header::~suggest_missing_header ()
     return;
 
   gcc_rich_location richloc (get_location ());
-  maybe_add_include_fixit (&richloc, m_header_hint, true);
+  maybe_add_include_fixit (&richloc, m_header_hint);
   inform (&richloc,
 	  "%qs is defined in header %qs;"
 	  " did you forget to %<#include %s%>?",

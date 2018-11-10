@@ -1,4 +1,5 @@
 // { dg-do run { target c++11 } }
+// { dg-require-cstdint "" }
 // { dg-require-time "" }
 
 // Copyright (C) 2008-2018 Free Software Foundation, Inc.

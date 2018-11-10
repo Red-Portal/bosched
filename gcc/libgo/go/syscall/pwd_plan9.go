@@ -39,15 +39,6 @@ func fixwdLocked() {
 	}
 }
 
-func fixwd(paths ...string) {
-	for _, path := range paths {
-		if path != "" && path[0] != '/' && path[0] != '#' {
-			Fixwd()
-			return
-		}
-	}
-}
-
 // goroutine-specific getwd
 func getwd() (wd string, err error) {
 	fd, err := open(".", O_RDONLY)
@@ -75,7 +66,6 @@ func Getwd() (wd string, err error) {
 }
 
 func Chdir(path string) error {
-	fixwd(path)
 	wdmu.Lock()
 	defer wdmu.Unlock()
 

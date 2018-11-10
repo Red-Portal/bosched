@@ -630,6 +630,33 @@ get_reload_reg (enum op_type type, machine_mode mode, rtx original,
 }
 
 
+
+/* The page contains code to extract memory address parts.  */
+
+/* Wrapper around REGNO_OK_FOR_INDEX_P, to allow pseudos.  */
+static inline bool
+ok_for_index_p_nonstrict (rtx reg)
+{
+  unsigned regno = REGNO (reg);
+
+  return regno >= FIRST_PSEUDO_REGISTER || REGNO_OK_FOR_INDEX_P (regno);
+}
+
+/* A version of regno_ok_for_base_p for use here, when all pseudos
+   should count as OK.	Arguments as for regno_ok_for_base_p.  */
+static inline bool
+ok_for_base_p_nonstrict (rtx reg, machine_mode mode, addr_space_t as,
+			 enum rtx_code outer_code, enum rtx_code index_code)
+{
+  unsigned regno = REGNO (reg);
+
+  if (regno >= FIRST_PSEUDO_REGISTER)
+    return true;
+  return ok_for_base_p_1 (regno, mode, as, outer_code, index_code);
+}
+
+
+
 /* The page contains major code to choose the current insn alternative
    and generate reloads for it.	 */
 
@@ -1695,13 +1722,7 @@ simplify_operand_subreg (int nop, machine_mode reg_mode)
         (subreg:TI (reg:TI 180 [orig:107 __comp ] [107]) 0)) {*movti_internal_rex64}
 
      Two reload hard registers will be allocated to reg180 to save TImode data
-     in LRA_assign.
-
-     For LRA pseudos this should normally be handled by the biggest_mode
-     mechanism.  However, it's possible for new uses of an LRA pseudo
-     to be introduced after we've allocated it, such as when undoing
-     inheritance, and the allocated register might not then be appropriate
-     for the new uses.  */
+     in LRA_assign.  */
   else if (REG_P (reg)
 	   && REGNO (reg) >= FIRST_PSEUDO_REGISTER
 	   && (hard_regno = lra_get_regno_hard_regno (REGNO (reg))) >= 0
@@ -1710,9 +1731,7 @@ simplify_operand_subreg (int nop, machine_mode reg_mode)
 	   && (regclass = lra_get_allocno_class (REGNO (reg)))
 	   && (type != OP_IN
 	       || !in_hard_reg_set_p (reg_class_contents[regclass],
-				      mode, hard_regno)
-	       || overlaps_hard_reg_set_p (lra_no_alloc_regs,
-					   mode, hard_regno)))
+				      mode, hard_regno)))
     {
       /* The class will be defined later in curr_insn_transform.  */
       enum reg_class rclass
@@ -1969,7 +1988,6 @@ process_alt_operands (int only_alternative)
       if (!TEST_BIT (preferred, nalt))
 	continue;
 
-      bool matching_early_clobber[MAX_RECOG_OPERANDS];
       curr_small_class_check++;
       overall = losers = addr_losers = 0;
       static_reject = reject = reload_nregs = reload_sum = 0;
@@ -1981,7 +1999,6 @@ process_alt_operands (int only_alternative)
 	    fprintf (lra_dump_file,
 		     "            Staticly defined alt reject+=%d\n", inc);
 	  static_reject += inc;
-	  matching_early_clobber[nop] = 0;
 	}
       reject += static_reject;
       early_clobbered_regs_num = 0;
@@ -2177,11 +2194,7 @@ process_alt_operands (int only_alternative)
 				 "            %d Matching earlyclobber alt:"
 				 " reject--\n",
 				 nop);
-			    if (!matching_early_clobber[m])
-			      {
-				reject--;
-				matching_early_clobber[m] = 1;
-			      }
+			    reject--;
 			  }
 			/* Otherwise we prefer no matching
 			   alternatives because it gives more freedom
@@ -2927,11 +2940,15 @@ process_alt_operands (int only_alternative)
 	      curr_alt_dont_inherit_ops[curr_alt_dont_inherit_ops_num++]
 		= last_conflict_j;
 	      losers++;
+	      /* Early clobber was already reflected in REJECT. */
+	      lra_assert (reject > 0);
 	      if (lra_dump_file != NULL)
 		fprintf
 		  (lra_dump_file,
 		   "            %d Conflict early clobber reload: reject--\n",
 		   i);
+	      reject--;
+	      overall += LRA_LOSER_COST_FACTOR - 1;
 	    }
 	  else
 	    {
@@ -2955,21 +2972,17 @@ process_alt_operands (int only_alternative)
 		}
 	      curr_alt_win[i] = curr_alt_match_win[i] = false;
 	      losers++;
+	      /* Early clobber was already reflected in REJECT. */
+	      lra_assert (reject > 0);
 	      if (lra_dump_file != NULL)
 		fprintf
 		  (lra_dump_file,
 		   "            %d Matched conflict early clobber reloads: "
 		   "reject--\n",
 		   i);
-	    }
-	  /* Early clobber was already reflected in REJECT. */
-	  if (!matching_early_clobber[i])
-	    {
-	      lra_assert (reject > 0);
 	      reject--;
-	      matching_early_clobber[i] = 1;
+	      overall += LRA_LOSER_COST_FACTOR - 1;
 	    }
-	  overall += LRA_LOSER_COST_FACTOR - 1;
 	}
       if (lra_dump_file != NULL)
 	fprintf (lra_dump_file, "          alt=%d,overall=%d,losers=%d,rld_nregs=%d\n",
@@ -5688,7 +5701,7 @@ spill_hard_reg_in_range (int regno, enum reg_class rclass, rtx_insn *from, rtx_i
       struct lra_insn_reg *reg;
       
       for (reg = id->regs; reg != NULL; reg = reg->next)
-	if (reg->regno < FIRST_PSEUDO_REGISTER)
+	if (reg->regno <= FIRST_PSEUDO_REGISTER)
 	  SET_HARD_REG_BIT (ignore, reg->regno);
       for (reg = static_id->hard_regs; reg != NULL; reg = reg->next)
 	SET_HARD_REG_BIT (ignore, reg->regno);
@@ -5701,22 +5714,9 @@ spill_hard_reg_in_range (int regno, enum reg_class rclass, rtx_insn *from, rtx_i
 	  || TEST_HARD_REG_BIT (ignore, hard_regno))
 	continue;
       for (insn = from; insn != NEXT_INSN (to); insn = NEXT_INSN (insn))
-	{
-	  struct lra_static_insn_data *static_id;
-	  struct lra_insn_reg *reg;
-
-	  if (!INSN_P (insn))
-	      continue;
-	  if (bitmap_bit_p (&lra_reg_info[hard_regno].insn_bitmap,
-			    INSN_UID (insn)))
-	    break;
-	  static_id = lra_get_insn_recog_data (insn)->insn_static_data;
-	  for (reg = static_id->hard_regs; reg != NULL; reg = reg->next)
-	    if (reg->regno == hard_regno)
-	      break;
-	  if (reg != NULL)
-	    break;
-	}
+	if (bitmap_bit_p (&lra_reg_info[hard_regno].insn_bitmap,
+			  INSN_UID (insn)))
+	  break;
       if (insn != NEXT_INSN (to))
 	continue;
       if (split_reg (TRUE, hard_regno, from, NULL, to))

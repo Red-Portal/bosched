@@ -20,13 +20,11 @@
 // with this library; see the file COPYING3.  If not see
 // <http://www.gnu.org/licenses/>.
 
-// C++11
-// 26.5.8.5.4 Class template cauchy_distribution [rand.dist.norm.cauchy]
-// 26.5.1.6 random number distribution requirements [rand.req.dist]
+// 26.4.8.4.4 Class template cauchy_distribution [rand.dist.norm.cauchy]
+// 26.4.2.4 Concept RandomNumberDistribution [rand.concept.dist]
 
 #include <random>
 #include <testsuite_hooks.h>
-#include <testsuite_common_types.h>
 
 void
 test01()
@@ -39,16 +37,8 @@ test01()
   VERIFY( u.max() == std::numeric_limits<result_type>::max() );
 }
 
-void
-test02()
-{
-  __gnu_test::implicitly_default_constructible test;
-  test.operator()<std::cauchy_distribution<>>();
-  test.operator()<std::cauchy_distribution<>::param_type>();
-}
-
 int main()
 {
   test01();
-  test02();
+  return 0;
 }

@@ -38,7 +38,9 @@ with System.Tasking;
 
 package Ada.Task_Identification with
   SPARK_Mode,
-  Abstract_State => (Tasking_State with Synchronous),
+  Abstract_State => (Tasking_State with Synchronous,
+                                        External => (Async_Readers,
+                                                     Async_Writers)),
   Initializes    => Tasking_State
 is
    pragma Preelaborate;

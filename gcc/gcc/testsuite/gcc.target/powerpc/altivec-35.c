@@ -1,4 +1,3 @@
-
 /* { dg-do compile } */
 /* { dg-require-effective-target powerpc_altivec_ok } */
 /* { dg-options "-maltivec -mno-vsx -mno-power8-vector -O0" } */
@@ -20,10 +19,7 @@ void foo (vector signed int *vsir,
   *vssr++ = vec_madd (vssa, vusb, vusc);
   *vssr++ = vec_madd (vusa, vssb, vssc);
   *vusr++ = vec_madd (vusa, vusb, vusc);
-
-  *vssr++ = vec_madds (vssa, vssb, vssc);
 }
 
 /* { dg-final { scan-assembler-times "vaddcuw" 1 } } */
 /* { dg-final { scan-assembler-times "vmladduhm" 4 } } */
-/* { dg-final { scan-assembler-times "vmhaddshs" 1 } } */

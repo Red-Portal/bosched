@@ -1,5 +1,4 @@
 ! { dg-do run }
-! { dg-options "-std=legacy" }
 
 program collapse2
   call test1

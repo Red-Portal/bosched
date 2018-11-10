@@ -29,13 +29,13 @@ func ResetSIGIO() {
 	signal.Reset(syscall.SIGIO)
 }
 
-// SawSIGIO reports whether we saw a SIGIO.
+// SawSIGIO returns whether we saw a SIGIO within a brief pause.
 //export SawSIGIO
 func SawSIGIO() C.int {
 	select {
 	case <-sigioChan:
 		return 1
-	case <-time.After(5 * time.Second):
+	case <-time.After(100 * time.Millisecond):
 		return 0
 	}
 }

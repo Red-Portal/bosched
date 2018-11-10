@@ -76,16 +76,9 @@ CXX_LFLAGS = \
  -L../../../$(target_noncanonical)/libstdc++-v3/libsupc++/.libs
 
 # Variables for gnattools, native
-# Due to Windows path translations (See PR ada/81878) we need to add
-# -B../../ to the compiler paths as a workaround for that $(CXX) contains
-# Unix style paths that won't be translated by the runtime.
 TOOLS_FLAGS_TO_PASS_NATIVE= \
 	"CC=../../xgcc -B../../" \
-<<<<<<< HEAD
-	"CXX=$(CXX) -B../../" \
-=======
 	"CXX=../../xg++ -B../../ $(CXX_LFLAGS)" \
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
 	"CFLAGS=$(CFLAGS) $(WARN_CFLAGS)" \
 	"LDFLAGS=$(LDFLAGS)" \
 	"ADAFLAGS=$(ADAFLAGS)" \

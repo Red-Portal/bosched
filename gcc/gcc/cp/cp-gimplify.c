@@ -217,7 +217,7 @@ genericize_cp_loop (tree *stmt_p, location_t start_locus, tree cond, tree body,
     {
       /* If COND is constant, don't bother building an exit.  If it's false,
 	 we won't build a loop.  If it's true, any exits are in the body.  */
-      location_t cloc = cp_expr_loc_or_loc (cond, start_locus);
+      location_t cloc = EXPR_LOC_OR_LOC (cond, start_locus);
       exit = build1_loc (cloc, GOTO_EXPR, void_type_node,
 			 get_bc_label (bc_break));
       exit = fold_build3_loc (cloc, COND_EXPR, void_type_node, cond,
@@ -579,7 +579,7 @@ int
 cp_gimplify_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p)
 {
   int saved_stmts_are_full_exprs_p = 0;
-  location_t loc = cp_expr_loc_or_loc (*expr_p, input_location);
+  location_t loc = EXPR_LOC_OR_LOC (*expr_p, input_location);
   enum tree_code code = TREE_CODE (*expr_p);
   enum gimplify_status ret;
 
@@ -783,7 +783,7 @@ cp_gimplify_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p)
 	{
 	  /* If flag_strong_eval_order, evaluate the object argument first.  */
 	  tree fntype = TREE_TYPE (CALL_EXPR_FN (*expr_p));
-	  if (INDIRECT_TYPE_P (fntype))
+	  if (POINTER_TYPE_P (fntype))
 	    fntype = TREE_TYPE (fntype);
 	  if (TREE_CODE (fntype) == METHOD_TYPE)
 	    {
@@ -792,14 +792,6 @@ cp_gimplify_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p)
 	      if (t == GS_ERROR)
 		ret = GS_ERROR;
 	    }
-	}
-      if (ret != GS_ERROR)
-	{
-	  tree decl = cp_get_callee_fndecl_nofold (*expr_p);
-	  if (decl
-	      && fndecl_built_in_p (decl, CP_BUILT_IN_IS_CONSTANT_EVALUATED,
-				  BUILT_IN_FRONTEND))
-	    *expr_p = boolean_false_node;
 	}
       break;
 
@@ -882,7 +874,7 @@ omp_var_to_track (tree decl)
   tree type = TREE_TYPE (decl);
   if (is_invisiref_parm (decl))
     type = TREE_TYPE (type);
-  else if (TYPE_REF_P (type))
+  else if (TREE_CODE (type) == REFERENCE_TYPE)
     type = TREE_TYPE (type);
   while (TREE_CODE (type) == ARRAY_TYPE)
     type = TREE_TYPE (type);
@@ -936,7 +928,7 @@ omp_cxx_notice_variable (struct cp_genericize_omp_taskreg *omp_ctx, tree decl)
 	      tree type = TREE_TYPE (decl);
 	      if (is_invisiref_parm (decl))
 		type = TREE_TYPE (type);
-	      else if (TYPE_REF_P (type))
+	      else if (TREE_CODE (type) == REFERENCE_TYPE)
 		type = TREE_TYPE (type);
 	      while (TREE_CODE (type) == ARRAY_TYPE)
 		type = TREE_TYPE (type);
@@ -1100,7 +1092,7 @@ cp_genericize_r (tree *stmt_p, int *walk_subtrees, void *data)
     }
 
   if (TREE_CODE (stmt) == INTEGER_CST
-      && TYPE_REF_P (TREE_TYPE (stmt))
+      && TREE_CODE (TREE_TYPE (stmt)) == REFERENCE_TYPE
       && (flag_sanitize & (SANITIZE_NULL | SANITIZE_ALIGNMENT))
       && !wtd->no_sanitize_p)
     {
@@ -1419,15 +1411,12 @@ cp_genericize_r (tree *stmt_p, int *walk_subtrees, void *data)
 	  /* Never mind.  */;
 	else if (wtd->try_block)
 	  {
-	    if (TREE_CODE (wtd->try_block) == MUST_NOT_THROW_EXPR)
-	      {
-		auto_diagnostic_group d;
-		if (warning_at (loc, OPT_Wterminate,
-				"throw will always call terminate()")
-		    && cxx_dialect >= cxx11
-		    && DECL_DESTRUCTOR_P (current_function_decl))
-		  inform (loc, "in C++11 destructors default to noexcept");
-	      }
+	    if (TREE_CODE (wtd->try_block) == MUST_NOT_THROW_EXPR
+		&& warning_at (loc, OPT_Wterminate,
+			       "throw will always call terminate()")
+		&& cxx_dialect >= cxx11
+		&& DECL_DESTRUCTOR_P (current_function_decl))
+	      inform (loc, "in C++11 destructors default to noexcept");
 	  }
 	else
 	  {
@@ -1499,7 +1488,7 @@ cp_genericize_r (tree *stmt_p, int *walk_subtrees, void *data)
     case NOP_EXPR:
       if (!wtd->no_sanitize_p
 	  && sanitize_flags_p (SANITIZE_NULL | SANITIZE_ALIGNMENT)
-	  && TYPE_REF_P (TREE_TYPE (stmt)))
+	  && TREE_CODE (TREE_TYPE (stmt)) == REFERENCE_TYPE)
 	ubsan_maybe_instrument_reference (stmt_p);
       break;
 
@@ -1511,7 +1500,7 @@ cp_genericize_r (tree *stmt_p, int *walk_subtrees, void *data)
 	  tree fn = CALL_EXPR_FN (stmt);
 	  if (fn != NULL_TREE
 	      && !error_operand_p (fn)
-	      && INDIRECT_TYPE_P (TREE_TYPE (fn))
+	      && POINTER_TYPE_P (TREE_TYPE (fn))
 	      && TREE_CODE (TREE_TYPE (TREE_TYPE (fn))) == METHOD_TYPE)
 	    {
 	      bool is_ctor
@@ -1526,7 +1515,8 @@ cp_genericize_r (tree *stmt_p, int *walk_subtrees, void *data)
 	  else if (fn == NULL_TREE
 		   && CALL_EXPR_IFN (stmt) == IFN_UBSAN_NULL
 		   && TREE_CODE (CALL_EXPR_ARG (stmt, 0)) == INTEGER_CST
-		   && TYPE_REF_P (TREE_TYPE (CALL_EXPR_ARG (stmt, 0))))
+		   && (TREE_CODE (TREE_TYPE (CALL_EXPR_ARG (stmt, 0)))
+		       == REFERENCE_TYPE))
 	    *walk_subtrees = 0;
 	}
       /* Fall through.  */
@@ -1926,7 +1916,7 @@ cxx_omp_clause_dtor (tree clause, tree decl)
 bool
 cxx_omp_privatize_by_reference (const_tree decl)
 {
-  return (TYPE_REF_P (TREE_TYPE (decl))
+  return (TREE_CODE (TREE_TYPE (decl)) == REFERENCE_TYPE
 	  || is_invisiref_parm (decl));
 }
 
@@ -1935,7 +1925,7 @@ bool
 cxx_omp_const_qual_no_mutable (tree decl)
 {
   tree type = TREE_TYPE (decl);
-  if (TYPE_REF_P (type))
+  if (TREE_CODE (type) == REFERENCE_TYPE)
     {
       if (!is_invisiref_parm (decl))
 	return false;
@@ -2036,7 +2026,7 @@ cxx_omp_finish_clause (tree c, gimple_seq *)
   inner_type = TREE_TYPE (decl);
   if (decl == error_mark_node)
     make_shared = true;
-  else if (TYPE_REF_P (TREE_TYPE (decl)))
+  else if (TREE_CODE (TREE_TYPE (decl)) == REFERENCE_TYPE)
     inner_type = TREE_TYPE (inner_type);
 
   /* We're interested in the base element, not arrays.  */
@@ -2084,7 +2074,7 @@ cp_fold_maybe_rvalue (tree x, bool rval)
     {
       x = cp_fold (x);
       if (rval && DECL_P (x)
-	  && !TYPE_REF_P (TREE_TYPE (x)))
+	  && TREE_CODE (TREE_TYPE (x)) != REFERENCE_TYPE)
 	{
 	  tree v = decl_constant_value (x);
 	  if (v != x && v != error_mark_node)
@@ -2291,7 +2281,6 @@ cp_fold (tree x)
     case FLOAT_EXPR:
     case NEGATE_EXPR:
     case ABS_EXPR:
-    case ABSU_EXPR:
     case BIT_NOT_EXPR:
     case TRUTH_NOT_EXPR:
     case FIXED_CONVERT_EXPR:
@@ -2392,26 +2381,21 @@ cp_fold (tree x)
       else
 	x = fold (x);
 
-      /* This is only needed for -Wnonnull-compare and only if
-	 TREE_NO_WARNING (org_x), but to avoid that option affecting code
-	 generation, we do it always.  */
-      if (COMPARISON_CLASS_P (org_x))
+      if (TREE_NO_WARNING (org_x)
+	  && warn_nonnull_compare
+	  && COMPARISON_CLASS_P (org_x))
 	{
 	  if (x == error_mark_node || TREE_CODE (x) == INTEGER_CST)
 	    ;
 	  else if (COMPARISON_CLASS_P (x))
-	    {
-	      if (TREE_NO_WARNING (org_x) && warn_nonnull_compare)
-		TREE_NO_WARNING (x) = 1;
-	    }
+	    TREE_NO_WARNING (x) = 1;
 	  /* Otherwise give up on optimizing these, let GIMPLE folders
 	     optimize those later on.  */
 	  else if (op0 != TREE_OPERAND (org_x, 0)
 		   || op1 != TREE_OPERAND (org_x, 1))
 	    {
 	      x = build2_loc (loc, code, TREE_TYPE (org_x), op0, op1);
-	      if (TREE_NO_WARNING (org_x) && warn_nonnull_compare)
-		TREE_NO_WARNING (x) = 1;
+	      TREE_NO_WARNING (x) = 1;
 	    }
 	  else
 	    x = org_x;
@@ -2488,17 +2472,11 @@ cp_fold (tree x)
 	/* Some built-in function calls will be evaluated at compile-time in
 	   fold ().  Set optimize to 1 when folding __builtin_constant_p inside
 	   a constexpr function so that fold_builtin_1 doesn't fold it to 0.  */
-	if (callee && fndecl_built_in_p (callee) && !optimize
+	if (callee && DECL_BUILT_IN (callee) && !optimize
 	    && DECL_IS_BUILTIN_CONSTANT_P (callee)
 	    && current_function_decl
 	    && DECL_DECLARED_CONSTEXPR_P (current_function_decl))
 	  nw = 1;
-
-	/* Defer folding __builtin_is_constant_evaluated.  */
-	if (callee
-	    && fndecl_built_in_p (callee, CP_BUILT_IN_IS_CONSTANT_EVALUATED,
-				BUILT_IN_FRONTEND))
-	  break;
 
 	x = copy_node (x);
 

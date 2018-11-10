@@ -273,7 +273,9 @@ the unit is not implemented.
 
 ``Ada.Locales`` *(A.19)*
   This package provides declarations providing information (Language
-  and Country) about the current locale.
+  and Country) about the current locale. This package is currently not
+  implemented other than by providing stubs which will always return
+  Language_Unknown/Country_Unknown.
 
 
 ``Ada.Numerics``

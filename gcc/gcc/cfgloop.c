@@ -1539,7 +1539,6 @@ verify_loop_structure (void)
   /* Check irreducible loops.  */
   if (loops_state_satisfies_p (LOOPS_HAVE_MARKED_IRREDUCIBLE_REGIONS))
     {
-      auto_edge_flag saved_irr_mask (cfun);
       /* Record old info.  */
       auto_sbitmap irreds (last_basic_block_for_fn (cfun));
       FOR_EACH_BB_FN (bb, cfun)
@@ -1551,7 +1550,7 @@ verify_loop_structure (void)
 	    bitmap_clear_bit (irreds, bb->index);
 	  FOR_EACH_EDGE (e, ei, bb->succs)
 	    if (e->flags & EDGE_IRREDUCIBLE_LOOP)
-	      e->flags |= saved_irr_mask;
+	      e->flags |= EDGE_ALL_FLAGS + 1;
 	}
 
       /* Recount it.  */
@@ -1577,20 +1576,20 @@ verify_loop_structure (void)
 	  FOR_EACH_EDGE (e, ei, bb->succs)
 	    {
 	      if ((e->flags & EDGE_IRREDUCIBLE_LOOP)
-		  && !(e->flags & saved_irr_mask))
+		  && !(e->flags & (EDGE_ALL_FLAGS + 1)))
 		{
 		  error ("edge from %d to %d should be marked irreducible",
 			 e->src->index, e->dest->index);
 		  err = 1;
 		}
 	      else if (!(e->flags & EDGE_IRREDUCIBLE_LOOP)
-		       && (e->flags & saved_irr_mask))
+		       && (e->flags & (EDGE_ALL_FLAGS + 1)))
 		{
 		  error ("edge from %d to %d should not be marked irreducible",
 			 e->src->index, e->dest->index);
 		  err = 1;
 		}
-	      e->flags &= ~saved_irr_mask;
+	      e->flags &= ~(EDGE_ALL_FLAGS + 1);
 	    }
 	}
     }
@@ -1801,7 +1800,7 @@ loop_exits_from_bb_p (struct loop *loop, basic_block bb)
 
 /* Return location corresponding to the loop control condition if possible.  */
 
-dump_user_location_t
+location_t
 get_loop_location (struct loop *loop)
 {
   rtx_insn *insn = NULL;
@@ -1820,7 +1819,7 @@ get_loop_location (struct loop *loop)
       FOR_BB_INSNS_REVERSE (desc->in_edge->src, insn)
         {
           if (INSN_P (insn) && INSN_HAS_LOCATION (insn))
-            return insn;
+            return INSN_LOCATION (insn);
         }
     }
   /* If loop has a single exit, then the loop control branch
@@ -1830,24 +1829,24 @@ get_loop_location (struct loop *loop)
       FOR_BB_INSNS_REVERSE (exit->src, insn)
         {
           if (INSN_P (insn) && INSN_HAS_LOCATION (insn))
-            return insn;
+            return INSN_LOCATION (insn);
         }
     }
   /* Next check the latch, to see if it is non-empty.  */
   FOR_BB_INSNS_REVERSE (loop->latch, insn)
     {
       if (INSN_P (insn) && INSN_HAS_LOCATION (insn))
-        return insn;
+        return INSN_LOCATION (insn);
     }
   /* Finally, if none of the above identifies the loop control branch,
      return the first location in the loop header.  */
   FOR_BB_INSNS (loop->header, insn)
     {
       if (INSN_P (insn) && INSN_HAS_LOCATION (insn))
-        return insn;
+        return INSN_LOCATION (insn);
     }
   /* If all else fails, simply return the current function location.  */
-  return dump_user_location_t::from_function_decl (current_function_decl);
+  return DECL_SOURCE_LOCATION (current_function_decl);
 }
 
 /* Records that every statement in LOOP is executed I_BOUND times.

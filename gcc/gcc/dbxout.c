@@ -1715,7 +1715,7 @@ dbxout_range_type (tree type, tree low, tree high)
   if (TREE_TYPE (type))
     dbxout_type (TREE_TYPE (type), 0);
   else if (TREE_CODE (type) != INTEGER_TYPE)
-    dbxout_type (type, 0);
+    dbxout_type (type, 0); /* E.g. Pascal's ARRAY [BOOLEAN] of INTEGER */
   else
     {
       /* Traditionally, we made sure 'int' was type 1, and builtin types
@@ -2377,6 +2377,10 @@ dbxout_type (tree type, int full)
     case FUNCTION_TYPE:
       stabstr_C ('f');
       dbxout_type (TREE_TYPE (type), 0);
+      break;
+
+    case POINTER_BOUNDS_TYPE:
+      /* No debug info for pointer bounds type supported yet.  */
       break;
 
     default:

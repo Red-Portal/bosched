@@ -47,8 +47,6 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
-#include <cwchar>
-#include <cwctype>
 
 #if __cplusplus >= 201103L
 #include <ccomplex>
@@ -59,6 +57,8 @@
 #include <cstdint>
 #include <ctgmath>
 #include <cuchar>
+#include <cwchar>
+#include <cwctype>
 #endif
 
 // C++
@@ -123,20 +123,6 @@
 #endif
 
 #if __cplusplus >= 201703L
-#include <any>
 #include <charconv>
-// #include <execution>
 #include <filesystem>
-#include <optional>
-#include <memory_resource>
-#include <string_view>
-#include <variant>
-#endif
-
-#if __cplusplus > 201703L
-#include <bit>
-// #include <compare>
-// #include <span>
-// #include <syncstream>
-#include <version>
 #endif

@@ -1,4 +1,5 @@
 ! { dg-do compile }
+! { dg-options "-fwhole-file" }
 ! Test the fix for the third problem in PR40011, where false
 ! type/rank mismatches were found in the main program calls.
 !

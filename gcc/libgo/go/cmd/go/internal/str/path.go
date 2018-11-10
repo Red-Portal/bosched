@@ -9,25 +9,8 @@ import (
 	"strings"
 )
 
-// HasPath reports whether the slash-separated path s
-// begins with the elements in prefix.
-func HasPathPrefix(s, prefix string) bool {
-	if len(s) == len(prefix) {
-		return s == prefix
-	}
-	if prefix == "" {
-		return true
-	}
-	if len(s) > len(prefix) {
-		if prefix[len(prefix)-1] == '/' || s[len(prefix)] == '/' {
-			return s[:len(prefix)] == prefix
-		}
-	}
-	return false
-}
-
-// HasFilePathPrefix reports whether the filesystem path s
-// begins with the elements in prefix.
+// HasFilePathPrefix reports whether the filesystem path s begins with the
+// elements in prefix.
 func HasFilePathPrefix(s, prefix string) bool {
 	sv := strings.ToUpper(filepath.VolumeName(s))
 	pv := strings.ToUpper(filepath.VolumeName(prefix))
@@ -40,10 +23,8 @@ func HasFilePathPrefix(s, prefix string) bool {
 		return false
 	case len(s) == len(prefix):
 		return s == prefix
-	case prefix == "":
-		return true
 	case len(s) > len(prefix):
-		if prefix[len(prefix)-1] == filepath.Separator {
+		if prefix != "" && prefix[len(prefix)-1] == filepath.Separator {
 			return strings.HasPrefix(s, prefix)
 		}
 		return s[len(prefix)] == filepath.Separator && s[:len(prefix)] == prefix

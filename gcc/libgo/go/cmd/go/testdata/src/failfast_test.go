@@ -52,11 +52,3 @@ func TestFailingSubtestsA(t *testing.T) {
 func TestFailingB(t *testing.T) {
 	t.Errorf("FAIL - %s", t.Name())
 }
-
-func TestFatalC(t *testing.T) {
-	t.Fatalf("FAIL - %s", t.Name())
-}
-
-func TestFatalD(t *testing.T) {
-	t.Fatalf("FAIL - %s", t.Name())
-}

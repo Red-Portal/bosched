@@ -31,11 +31,6 @@
 
 #pragma GCC system_header
 
-#include <bits/c++config.h>
-namespace std _GLIBCXX_VISIBILITY(default) { namespace __debug {
-  template<typename _Tp, typename _Allocator> class vector;
-} } // namespace std::__debug
-
 #include <vector>
 #include <utility>
 #include <debug/safe_sequence.h>
@@ -132,9 +127,6 @@ namespace __debug
       typedef typename _Base::const_iterator	_Base_const_iterator;
       typedef __gnu_debug::_Equal_to<_Base_const_iterator> _Equal;
 
-      template<typename _ItT, typename _SeqT, typename _CatT>
-	friend class ::__gnu_debug::_Safe_iterator;
-
     public:
       typedef typename _Base::reference			reference;
       typedef typename _Base::const_reference		const_reference;
@@ -190,8 +182,8 @@ namespace __debug
 #endif
 	vector(_InputIterator __first, _InputIterator __last,
 	       const _Allocator& __a = _Allocator())
-	: _Base(__gnu_debug::__base(
-		  __glibcxx_check_valid_constructor_range(__first, __last)),
+	: _Base(__gnu_debug::__base(__gnu_debug::__check_valid_range(__first,
+								     __last)),
 		__gnu_debug::__base(__last), __a) { }
 
 #if __cplusplus < 201103L
@@ -207,8 +199,6 @@ namespace __debug
       : _Base(__x, __a) { }
 
       vector(vector&& __x, const allocator_type& __a)
-	noexcept( noexcept(
-	  _Base(std::declval<_Base&&>()), std::declval<const allocator_type&>()) )
       : _Safe(std::move(__x._M_safe()), __a),
 	_Base(std::move(__x._M_base()), __a),
 	_Safe_vector(std::move(__x)) { }
@@ -521,7 +511,7 @@ namespace __debug
 	{
 	  __glibcxx_check_insert(__position);
 	  bool __realloc = this->_M_requires_reallocation(this->size() + 1);
-	  difference_type __offset = __position.base() - _Base::cbegin();
+	  difference_type __offset = __position.base() - _Base::begin();
 	  _Base_iterator __res = _Base::emplace(__position.base(),
 						std::forward<_Args>(__args)...);
 	  if (__realloc)
@@ -529,7 +519,7 @@ namespace __debug
 	  else
 	    this->_M_invalidate_after_nth(__offset);
 	  this->_M_update_guaranteed_capacity();
-	  return { __res, this };
+	  return iterator(__res, this);
 	}
 #endif
 
@@ -577,7 +567,7 @@ namespace __debug
 	else
 	  this->_M_invalidate_after_nth(__offset);
 	this->_M_update_guaranteed_capacity();
-	return { __res, this };
+	return iterator(__res, this);
       }
 #else
       void
@@ -623,7 +613,7 @@ namespace __debug
 	  else
 	    this->_M_invalidate_after_nth(__offset);
 	  this->_M_update_guaranteed_capacity();
-	  return { __res, this };
+	  return iterator(__res, this);
 	}
 #else
       template<class _InputIterator>
@@ -688,7 +678,7 @@ namespace __debug
 	  }
 	else
 #if __cplusplus >= 201103L
-	  return { _Base::begin() + (__first.base() - _Base::cbegin()), this };
+	  return begin() + (__first.base() - cbegin().base());
 #else
 	  return __first;
 #endif
@@ -779,9 +769,9 @@ namespace __debug
 
 } // namespace __debug
 
+#if __cplusplus >= 201103L
 _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
-#if __cplusplus >= 201103L
   // DR 1182.
   /// std::hash specialization for vector<bool>.
   template<typename _Alloc>
@@ -792,16 +782,10 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       operator()(const __debug::vector<bool, _Alloc>& __b) const noexcept
       { return std::hash<_GLIBCXX_STD_C::vector<bool, _Alloc>>()(__b); }
     };
-#endif
-
- template<typename _Iterator, typename _Container, typename _Sequence>
-    _Iterator
-    __niter_base(const __gnu_debug::_Safe_iterator<
-		 __gnu_cxx::__normal_iterator<_Iterator, _Container>,
-		 _Sequence, std::random_access_iterator_tag>& __it)
-    { return std::__niter_base(__it.base()); }
 
 _GLIBCXX_END_NAMESPACE_VERSION
+#endif
+
 } // namespace std
 
 namespace __gnu_debug

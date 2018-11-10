@@ -1,5 +1,5 @@
 /* { dg-do compile } */
-/* { dg-options "-O2 -fdump-ipa-pure-const-details -fdelete-null-pointer-checks" } */
+/* { dg-options "-O2 -fdump-ipa-pure-const-details" } */
 
 __attribute__((noinline, no_icf, used))
 static void *f(__SIZE_TYPE__ n)

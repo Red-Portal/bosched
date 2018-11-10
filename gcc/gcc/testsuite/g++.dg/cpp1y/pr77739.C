@@ -8,7 +8,7 @@ struct A {
 struct B {
   B();
   template <typename... Args> auto g(Args &&... p1) {
-    return [=] { f(p1...); }; // { dg-warning "implicit capture" "" { target c++2a } }
+    return [=] { f(p1...); };
   }
   void f(A, const char *);
 };

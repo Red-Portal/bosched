@@ -17,7 +17,7 @@
 
 // { dg-options "-fno-show-column" }
 // { dg-do compile { target c++14 } }
-// { dg-prune-output "tuple index is in range" }
+// { dg-error "in range" "" { target *-*-* } 1297 }
 
 #include <tuple>
 

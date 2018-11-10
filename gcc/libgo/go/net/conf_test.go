@@ -33,7 +33,6 @@ func TestConfHostLookupOrder(t *testing.T) {
 	tests := []struct {
 		name      string
 		c         *conf
-		resolver  *Resolver
 		hostTests []nssHostTest
 	}{
 		{
@@ -171,7 +170,7 @@ func TestConfHostLookupOrder(t *testing.T) {
 			hostTests: []nssHostTest{{"google.com", "myhostname", hostLookupDNSFiles}},
 		},
 		// glibc lacking an nsswitch.conf, per
-		// https://www.gnu.org/software/libc/manual/html_node/Notes-on-NSS-Configuration-File.html
+		// http://www.gnu.org/software/libc/manual/html_node/Notes-on-NSS-Configuration-File.html
 		{
 			name: "linux_no_nsswitch.conf",
 			c: &conf{
@@ -323,21 +322,6 @@ func TestConfHostLookupOrder(t *testing.T) {
 				{"x.com", "myhostname", hostLookupCgo},
 			},
 		},
-		// Issue 24393: make sure "Resolver.PreferGo = true" acts like netgo.
-		{
-			name:     "resolver-prefergo",
-			resolver: &Resolver{PreferGo: true},
-			c: &conf{
-				goos:               "darwin",
-				forceCgoLookupHost: true, // always true for darwin
-				resolv:             defaultResolvConf,
-				nss:                nssStr(""),
-				netCgo:             true,
-			},
-			hostTests: []nssHostTest{
-				{"localhost", "myhostname", hostLookupFilesDNS},
-			},
-		},
 	}
 
 	origGetHostname := getHostname
@@ -347,7 +331,7 @@ func TestConfHostLookupOrder(t *testing.T) {
 		for _, ht := range tt.hostTests {
 			getHostname = func() (string, error) { return ht.localhost, nil }
 
-			gotOrder := tt.c.hostLookupOrder(tt.resolver, ht.host)
+			gotOrder := tt.c.hostLookupOrder(ht.host)
 			if gotOrder != ht.want {
 				t.Errorf("%s: hostLookupOrder(%q) = %v; want %v", tt.name, ht.host, gotOrder, ht.want)
 			}

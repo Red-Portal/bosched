@@ -481,9 +481,10 @@ conformance to the Fortran 95, Fortran 2003, Fortran 2008 and Fortran
 2018 standards, respectively; errors are given for all extensions
 beyond the relevant language standard, and warnings are given for the
 Fortran 77 features that are permitted but obsolescent in later
-standards. The deprecated option @samp{-std=f2008ts} acts as an alias for
-@samp{-std=f2018}. It is only present for backwards compatibility with
-earlier gfortran versions and should not be used any more.
+standards. @samp{-std=f2008ts} allows the Fortran 2008 standard
+including the additions of the Technical Specification (TS) 29113 on
+Further Interoperability of Fortran with C and TS 18508 on Additional
+Parallel Features in Fortran.
 
 @item -ftest-forall-temp
 @opindex @code{ftest-forall-temp}
@@ -993,7 +994,7 @@ of the Fortran Character Set.  For continuation lines, a tab followed
 by a digit between 1 and 9 is supported.  @option{-Wtabs} will cause a
 warning to be issued if a tab is encountered. Note, @option{-Wtabs} is
 active for @option{-pedantic}, @option{-std=f95}, @option{-std=f2003},
-@option{-std=f2008}, @option{-std=f2018} and
+@option{-std=f2008}, @option{-std=f2008ts}, @option{-std=f2018} and
 @option{-Wall}.
 
 @item -Wundefined-do-loop
@@ -1056,9 +1057,8 @@ off via @option{-Wno-align-commons}. See also @option{-falign-commons}.
 @opindex @code{Wfunction-elimination}
 @cindex function elimination
 @cindex warnings, function elimination
-Warn if any calls to impure functions are eliminated by the optimizations
+Warn if any calls to functions are eliminated by the optimizations
 enabled by the @option{-ffrontend-optimize} option.
-This option is implied by @option{-Wextra}.
 
 @item -Wrealloc-lhs
 @opindex @code{Wrealloc-lhs}
@@ -1793,17 +1793,13 @@ if @option{-ffrontend-optimize} is in effect.
 @opindex @code{frontend-optimize}
 @cindex Front-end optimization
 This option performs front-end optimization, based on manipulating
-parts the Fortran parse tree.  Enabled by default by any @option{-O} option
-except @option{-O0} and @option{-Og}.  Optimizations enabled by this option
-include:
-@itemize @bullet
-@item inlining calls to @code{MATMUL},
-@item elimination of identical function calls within expressions,
-@item removing unnecessary calls to @code{TRIM} in comparisons and assignments,
-@item replacing @code{TRIM(a)} with @code{a(1:LEN_TRIM(a))} and
-@item short-circuiting of logical operators (@code{.AND.} and @code{.OR.}).
-@end itemize
-It can be deselected by specifying @option{-fno-frontend-optimize}.
+parts the Fortran parse tree.  Enabled by default by any @option{-O}
+option.  Optimizations enabled by this option include inlining calls
+to @code{MATMUL}, elimination of identical function calls within
+expressions, removing unnecessary calls to @code{TRIM} in comparisons
+and assignments and replacing @code{TRIM(a)} with
+@code{a(1:LEN_TRIM(a))}.  It can be deselected by specifying
+@option{-fno-frontend-optimize}.
 
 @item -ffrontend-loop-interchange
 @opindex @code{frontend-loop-interchange}

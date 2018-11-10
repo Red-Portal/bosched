@@ -1,6 +1,6 @@
 /* { dg-skip-if "" { *-*-* } { "-O0" } { "" } } */
 /* { dg-skip-if "" { *-*-* } { "*" } { "-DACC_MEM_SHARED=0" } } */
-/* { dg-additional-options "-std=c99 -ftree-slp-vectorize -foffload=-fdump-tree-slp1" } */
+/* { dg-additional-options "-std=c99 -ftree-slp-vectorize -foffload=-ftree-slp-vectorize -foffload=-fdump-tree-slp1 -foffload=-save-temps -save-temps" } */
 
 #include <stdio.h>
 #include <sys/time.h>
@@ -43,4 +43,6 @@ main (void)
   return 0;
 }
 
-/* { dg-final { scan-offload-tree-dump "vector\\(2\\) long long unsigned int" "slp1" } } */
+/* Todo: make a scan-tree-dump variant that scans vec.o instead.  */
+/* { dg-final { file copy -force [glob vec.o.*] [regsub \.o\. [glob vec.o.*] \.c\.] } } */
+/* { dg-final { scan-tree-dump "vector\\(2\\) long long unsigned int" "slp1" } } */

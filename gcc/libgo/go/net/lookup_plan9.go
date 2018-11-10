@@ -11,58 +11,34 @@ import (
 	"os"
 )
 
-func query(ctx context.Context, filename, query string, bufSize int) (addrs []string, err error) {
-	queryAddrs := func() (addrs []string, err error) {
-		file, err := os.OpenFile(filename, os.O_RDWR, 0)
-		if err != nil {
-			return nil, err
-		}
-		defer file.Close()
-
-		_, err = file.Seek(0, io.SeekStart)
-		if err != nil {
-			return nil, err
-		}
-		_, err = file.WriteString(query)
-		if err != nil {
-			return nil, err
-		}
-		_, err = file.Seek(0, io.SeekStart)
-		if err != nil {
-			return nil, err
-		}
-		buf := make([]byte, bufSize)
-		for {
-			n, _ := file.Read(buf)
-			if n <= 0 {
-				break
-			}
-			addrs = append(addrs, string(buf[:n]))
-		}
-		return addrs, nil
+func query(ctx context.Context, filename, query string, bufSize int) (res []string, err error) {
+	file, err := os.OpenFile(filename, os.O_RDWR, 0)
+	if err != nil {
+		return
 	}
+	defer file.Close()
 
-	type ret struct {
-		addrs []string
-		err   error
+	_, err = file.Seek(0, io.SeekStart)
+	if err != nil {
+		return
 	}
-
-	ch := make(chan ret, 1)
-	go func() {
-		addrs, err := queryAddrs()
-		ch <- ret{addrs: addrs, err: err}
-	}()
-
-	select {
-	case r := <-ch:
-		return r.addrs, r.err
-	case <-ctx.Done():
-		return nil, &DNSError{
-			Name:      query,
-			Err:       ctx.Err().Error(),
-			IsTimeout: ctx.Err() == context.DeadlineExceeded,
+	_, err = file.WriteString(query)
+	if err != nil {
+		return
+	}
+	_, err = file.Seek(0, io.SeekStart)
+	if err != nil {
+		return
+	}
+	buf := make([]byte, bufSize)
+	for {
+		n, _ := file.Read(buf)
+		if n <= 0 {
+			break
 		}
+		res = append(res, string(buf[:n]))
 	}
+	return
 }
 
 func queryCS(ctx context.Context, net, host, service string) (res []string, err error) {
@@ -328,10 +304,4 @@ func (*Resolver) lookupAddr(ctx context.Context, addr string) (name []string, er
 		name = append(name, absDomainName([]byte(f[2])))
 	}
 	return
-}
-
-// concurrentThreadsLimit returns the number of threads we permit to
-// run concurrently doing DNS lookups.
-func concurrentThreadsLimit() int {
-	return 500
 }

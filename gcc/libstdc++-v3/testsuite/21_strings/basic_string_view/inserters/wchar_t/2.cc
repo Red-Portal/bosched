@@ -1,5 +1,4 @@
 // { dg-options "-std=gnu++17" }
-// { dg-require-fileio "" }
 
 // Copyright (C) 2013-2018 Free Software Foundation, Inc.
 //

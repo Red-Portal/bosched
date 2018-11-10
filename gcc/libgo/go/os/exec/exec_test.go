@@ -146,11 +146,11 @@ func TestCatGoodAndBadFile(t *testing.T) {
 	}
 }
 
-func TestNoExistExecutable(t *testing.T) {
-	// Can't run a non-existent executable
-	err := exec.Command("/no-exist-executable").Run()
+func TestNoExistBinary(t *testing.T) {
+	// Can't run a non-existent binary
+	err := exec.Command("/no-exist-binary").Run()
 	if err == nil {
-		t.Error("expected error from /no-exist-executable")
+		t.Error("expected error from /no-exist-binary")
 	}
 }
 
@@ -338,7 +338,7 @@ func TestPipeLookPathLeak(t *testing.T) {
 	}
 
 	for i := 0; i < 6; i++ {
-		cmd := exec.Command("something-that-does-not-exist-executable")
+		cmd := exec.Command("something-that-does-not-exist-binary")
 		cmd.StdoutPipe()
 		cmd.StderrPipe()
 		cmd.StdinPipe()
@@ -408,12 +408,6 @@ var testedAlreadyLeaked = false
 // stdin, stdout, stderr, epoll/kqueue, maybe testlog
 func basefds() uintptr {
 	n := os.Stderr.Fd() + 1
-	// The poll (epoll/kqueue) descriptor can be numerically
-	// either between stderr and the testlog-fd, or after
-	// testlog-fd.
-	if poll.PollDescriptor() == n {
-		n++
-	}
 	for _, arg := range os.Args {
 		if strings.HasPrefix(arg, "-test.testlogfile=") {
 			n++
@@ -1015,6 +1009,9 @@ func TestContext(t *testing.T) {
 }
 
 func TestContextCancel(t *testing.T) {
+	if testenv.Builder() == "windows-386-xp" {
+		t.Skipf("known to fail on Windows XP. Issue 17245")
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	c := helperCommandContext(t, ctx, "cat")

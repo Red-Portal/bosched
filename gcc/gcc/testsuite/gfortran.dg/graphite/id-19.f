@@ -1,5 +1,3 @@
-! { dg-do compile }
-! { dg-additional-options "-std=legacy" }
       SUBROUTINE ECCODR(FPQR)
       DIMENSION FPQR(25,25,25)
       INTEGER P,Q,R

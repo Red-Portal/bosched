@@ -17,8 +17,6 @@
 
 // 27.8.1.4 Overridden virtual functions
 
-// { dg-require-fileio "" }
-
 #include <fstream>
 #include <locale>
 #include <testsuite_hooks.h>

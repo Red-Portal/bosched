@@ -1,6 +1,5 @@
 // PR c++/84551
-// { dg-do compile { target c++17 } }
-// { dg-options "-g -O -fconcepts" }
+// { dg-options "-g -O -std=c++17 -fconcepts" }
 
 template<typename> concept bool C() { return true; }
 

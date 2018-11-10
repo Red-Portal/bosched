@@ -813,14 +813,10 @@ emit_nop_for_unique_locus_between (basic_block a, basic_block b)
 static void
 rtl_merge_blocks (basic_block a, basic_block b)
 {
-  /* If B is a forwarder block whose outgoing edge has no location, we'll
-     propagate the locus of the edge between A and B onto it.  */
-  const bool forward_edge_locus
-    = (b->flags & BB_FORWARDER_BLOCK) != 0
-      && LOCATION_LOCUS (EDGE_SUCC (b, 0)->goto_locus) == UNKNOWN_LOCATION;
   rtx_insn *b_head = BB_HEAD (b), *b_end = BB_END (b), *a_end = BB_END (a);
   rtx_insn *del_first = NULL, *del_last = NULL;
   rtx_insn *b_debug_start = b_end, *b_debug_end = b_end;
+  bool forwarder_p = (b->flags & BB_FORWARDER_BLOCK) != 0;
   int b_empty = 0;
 
   if (dump_file)
@@ -891,11 +887,9 @@ rtl_merge_blocks (basic_block a, basic_block b)
   BB_HEAD (b) = b_empty ? NULL : b_head;
   delete_insn_chain (del_first, del_last, true);
 
-  /* If not optimizing, preserve the locus of the single edge between
-     blocks A and B if necessary by emitting a nop.  */
-  if (!optimize
-      && !forward_edge_locus
-      && !DECL_IGNORED_P (current_function_decl))
+  /* When not optimizing and the edge is the only place in RTL which holds
+     some unique locus, emit a nop with that locus in between.  */
+  if (!optimize)
     {
       emit_nop_for_unique_locus_between (a, b);
       a_end = BB_END (a);
@@ -924,7 +918,9 @@ rtl_merge_blocks (basic_block a, basic_block b)
 
   df_bb_delete (b->index);
 
-  if (forward_edge_locus)
+  /* If B was a forwarder block, propagate the locus on the edge.  */
+  if (forwarder_p
+      && LOCATION_LOCUS (EDGE_SUCC (b, 0)->goto_locus) == UNKNOWN_LOCATION)
     EDGE_SUCC (b, 0)->goto_locus = EDGE_SUCC (a, 0)->goto_locus;
 
   if (dump_file)
@@ -2544,15 +2540,15 @@ rtl_verify_edges (void)
 	    n_abnormal++;
 	}
 
-      if (!has_crossing_edge
-	  && JUMP_P (BB_END (bb))
-	  && CROSSING_JUMP_P (BB_END (bb)))
-	{
-	  print_rtl_with_bb (stderr, get_insns (), TDF_BLOCKS | TDF_DETAILS);
-	  error ("Region crossing jump across same section in bb %i",
-		 bb->index);
-	  err = 1;
-	}
+        if (!has_crossing_edge
+	    && JUMP_P (BB_END (bb))
+	    && CROSSING_JUMP_P (BB_END (bb)))
+          {
+	    print_rtl_with_bb (stderr, get_insns (), TDF_BLOCKS | TDF_DETAILS);
+            error ("Region crossing jump across same section in bb %i",
+                   bb->index);
+            err = 1;
+          }
 
       if (n_eh && !find_reg_note (BB_END (bb), REG_EH_REGION, NULL_RTX))
 	{
@@ -2609,19 +2605,6 @@ rtl_verify_edges (void)
 	{
 	  error ("abnormal edges for no purpose in bb %i", bb->index);
 	  err = 1;
-	}
-
-      int has_eh = -1;
-      FOR_EACH_EDGE (e, ei, bb->preds)
-	{
-	  if (has_eh == -1)
-	    has_eh = (e->flags & EDGE_EH);
-	  if ((e->flags & EDGE_EH) == has_eh)
-	    continue;
-	  error ("EH incoming edge mixed with non-EH incoming edges "
-		 "in bb %i", bb->index);
-	  err = 1;
-	  break;
 	}
     }
 
@@ -3920,9 +3903,9 @@ fixup_reorder_chain (void)
 	force_nonfallthru (e);
     }
 
-  /* Ensure goto_locus from edges has some instructions with that locus in RTL
-     when not optimizing.  */
-  if (!optimize && !DECL_IGNORED_P (current_function_decl))
+  /* Ensure goto_locus from edges has some instructions with that locus
+     in RTL.  */
+  if (!optimize)
     FOR_EACH_BB_FN (bb, cfun)
       {
         edge e;
@@ -4609,11 +4592,7 @@ cfg_layout_can_merge_blocks_p (basic_block a, basic_block b)
 static void
 cfg_layout_merge_blocks (basic_block a, basic_block b)
 {
-  /* If B is a forwarder block whose outgoing edge has no location, we'll
-     propagate the locus of the edge between A and B onto it.  */
-  const bool forward_edge_locus
-    = (b->flags & BB_FORWARDER_BLOCK) != 0
-      && LOCATION_LOCUS (EDGE_SUCC (b, 0)->goto_locus) == UNKNOWN_LOCATION;
+  bool forwarder_p = (b->flags & BB_FORWARDER_BLOCK) != 0;
   rtx_insn *insn;
 
   gcc_checking_assert (cfg_layout_can_merge_blocks_p (a, b));
@@ -4634,11 +4613,9 @@ cfg_layout_merge_blocks (basic_block a, basic_block b)
     try_redirect_by_replacing_jump (EDGE_SUCC (a, 0), b, true);
   gcc_assert (!JUMP_P (BB_END (a)));
 
-  /* If not optimizing, preserve the locus of the single edge between
-     blocks A and B if necessary by emitting a nop.  */
-  if (!optimize
-      && !forward_edge_locus
-      && !DECL_IGNORED_P (current_function_decl))
+  /* When not optimizing and the edge is the only place in RTL which holds
+     some unique locus, emit a nop with that locus in between.  */
+  if (!optimize)
     emit_nop_for_unique_locus_between (a, b);
 
   /* Move things from b->footer after a->footer.  */
@@ -4705,7 +4682,9 @@ cfg_layout_merge_blocks (basic_block a, basic_block b)
 
   df_bb_delete (b->index);
 
-  if (forward_edge_locus)
+  /* If B was a forwarder block, propagate the locus on the edge.  */
+  if (forwarder_p
+      && LOCATION_LOCUS (EDGE_SUCC (b, 0)->goto_locus) == UNKNOWN_LOCATION)
     EDGE_SUCC (b, 0)->goto_locus = EDGE_SUCC (a, 0)->goto_locus;
 
   if (dump_file)

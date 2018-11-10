@@ -1,50 +1,3 @@
-<<<<<<< HEAD
-2018-10-31  Ian Lance Taylor  <iant@golang.org>
-
-	* go-gcc.cc (Gcc_backend::write_global_definitions): Don't call
-	gimplify_function_tree.  Instead call allocate_struct_function if
-	necessary.
-
-2018-10-29  Ian Lance Taylor  <iant@golang.org>
-
-	* go-gcc.cc (Gcc_backend::function): Change to use a single flags
-	parameter.
-
-2018-10-29  Ian Lance Taylor  <iant@golang.org>
-
-	* go-linemap.cc (Gcc_linemap::location_file): New method.
-
-2018-10-17  David Malcolm  <dmalcolm@redhat.com>
-
-	* Make-lang.in (selftest-go): New.
-
-2018-09-20  Allan Sandfeld Jensen  <allan.jensen@qt.io>
-
-	* gospec.c (lang_specific_driver): Handle -r like -nostdlib.
-
-2018-08-27  Martin Liska  <mliska@suse.cz>
-
-	* go-gcc.cc (Gcc_backend::call_expression): Use new function
-	fndecl_built_in_p and remove check for FUNCTION_DECL if
-	possible.
-
-2018-07-20  Martin Sebor  <msebor@redhat.com>
-
-	PR middle-end/82063
-	* go-lang.c (go_langhook_handle_option): Change function argument
-	to HOST_WIDE_INT.
-
-2018-06-28  Ian Lance Taylor  <iant@golang.org>
-
-	PR go/86343
-	* go-gcc.cc (Gcc_backend::set_placeholder_struct_type): Call
-	build_variant_type_copy rather than build_distinct_type_copy.
-
-2018-06-08  Cherry Zhang  <cherryyz@google.com>
-
-	* go-gcc.cc (class Gcc_backend): Remove
-	stack_allocation_expression method.
-=======
 2018-07-26  Release Manager
 
 	* GCC 8.2.0 released.
@@ -52,7 +5,6 @@
 2018-05-02  Release Manager
 
 	* GCC 8.1.0 released.
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
 
 2018-02-03  Ian Lance Taylor  <iant@golang.org>
 
@@ -507,7 +459,7 @@
 2015-07-12  Aldy Hernandez  <aldyh@redhat.com>
 
 	* gofrontend/backend.h: Fix double word typos.
-	* gofrontend/expressions.cc: Same.
+        * gofrontend/expressions.cc: Same.
 	* gospec.c: Same.
 
 2015-07-07  Andrew MacLeod  <amacleod@redhat.com>

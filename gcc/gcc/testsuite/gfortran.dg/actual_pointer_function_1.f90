@@ -17,11 +17,7 @@ CONTAINS
 
   logical function cp_logger_log(logger)
     TYPE(cp_logger_type), POINTER ::logger
-    if (associated (logger)) then
-      cp_logger_log = (logger%a .eq. 42)
-    else
-      cp_logger_log = .false.
-    end if
+    cp_logger_log = associated (logger) .and. (logger%a .eq. 42)
   END function
 
   FUNCTION cp_get_default_logger(v) RESULT(res)

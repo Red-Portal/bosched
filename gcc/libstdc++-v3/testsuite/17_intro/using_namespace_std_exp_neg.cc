@@ -61,3 +61,5 @@ namespace gnu
 {
   using namespace std::experimental;  // { dg-error "is not a namespace-name" }
 }
+
+// { dg-error "expected namespace-name before" "" { target *-*-* } 62 }

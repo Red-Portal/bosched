@@ -1470,7 +1470,7 @@ scan_function (void)
 	  tree t;
 	  unsigned i;
 
-	  if (final_bbs && stmt_can_throw_external (cfun, stmt))
+	  if (final_bbs && stmt_can_throw_external (stmt))
 	    bitmap_set_bit (final_bbs, bb->index);
 	  switch (gimple_code (stmt))
 	    {
@@ -1498,7 +1498,8 @@ scan_function (void)
 
 		  if (dest)
 		    {
-		      if (fndecl_built_in_p (dest, BUILT_IN_APPLY_ARGS))
+		      if (DECL_BUILT_IN_CLASS (dest) == BUILT_IN_NORMAL
+			  && DECL_FUNCTION_CODE (dest) == BUILT_IN_APPLY_ARGS)
 			encountered_apply_args = true;
 		      if (recursive_call_p (current_function_decl, dest))
 			{
@@ -5278,7 +5279,7 @@ convert_callers_for_node (struct cgraph_node *node,
     }
 
   for (cs = node->callers; cs; cs = cs->next_caller)
-    if (bitmap_set_bit (recomputed_callers, cs->caller->get_uid ())
+    if (bitmap_set_bit (recomputed_callers, cs->caller->uid)
 	&& gimple_in_ssa_p (DECL_STRUCT_FUNCTION (cs->caller->decl)))
       compute_fn_summary (cs->caller, true);
   BITMAP_FREE (recomputed_callers);
@@ -5457,7 +5458,6 @@ ipa_sra_preliminary_function_checks (struct cgraph_node *node)
     }
 
   if ((DECL_ONE_ONLY (node->decl) || DECL_EXTERNAL (node->decl))
-      && ipa_fn_summaries->get (node)
       && ipa_fn_summaries->get (node)->size >= MAX_INLINE_INSNS_AUTO)
     {
       if (dump_file)

@@ -46,18 +46,18 @@ class Decorator: public __sanitizer::SanitizerCommonDecorator {
 
 ReportDesc::ReportDesc()
     : tag(kExternalTagNone)
-    , stacks()
-    , mops()
-    , locs()
-    , mutexes()
-    , threads()
-    , unique_tids()
+    , stacks(MBlockReportStack)
+    , mops(MBlockReportMop)
+    , locs(MBlockReportLoc)
+    , mutexes(MBlockReportMutex)
+    , threads(MBlockReportThread)
+    , unique_tids(MBlockReportThread)
     , sleep()
     , count() {
 }
 
 ReportMop::ReportMop()
-    : mset() {
+    : mset(MBlockReportMutex) {
 }
 
 ReportDesc::~ReportDesc() {

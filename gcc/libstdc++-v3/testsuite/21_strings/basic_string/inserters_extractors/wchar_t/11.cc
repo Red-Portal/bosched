@@ -18,7 +18,6 @@
 // 21.3.7.9 inserters and extractors
 
 // { dg-options "-DMAX_SIZE=466" { target simulator } }
-// { dg-require-fileio "" }
 
 #ifndef MAX_SIZE
 #define MAX_SIZE 666

@@ -22,16 +22,12 @@ along with GCC; see the file COPYING3.  If not see
 /* This file is the lexical analyzer for GNU C++.  */
 
 #include "config.h"
-/* For use with name_hint.  */
-#define INCLUDE_UNIQUE_PTR
 #include "system.h"
 #include "coretypes.h"
 #include "cp-tree.h"
 #include "stringpool.h"
 #include "c-family/c-pragma.h"
 #include "c-family/c-objc.h"
-#include "gcc-rich-location.h"
-#include "cp-name-hint.h"
 
 static int interface_strcmp (const char *);
 static void init_cp_pragma (void);
@@ -495,7 +491,7 @@ tree
 unqualified_name_lookup_error (tree name, location_t loc)
 {
   if (loc == UNKNOWN_LOCATION)
-    loc = cp_expr_loc_or_loc (name, input_location);
+    loc = EXPR_LOC_OR_LOC (name, input_location);
 
   if (IDENTIFIER_ANY_OP_P (name))
     error_at (loc, "%qD not defined", name);
@@ -503,18 +499,8 @@ unqualified_name_lookup_error (tree name, location_t loc)
     {
       if (!objc_diagnose_private_ivar (name))
 	{
-	  auto_diagnostic_group d;
-	  name_hint hint = suggest_alternatives_for (loc, name, true);
-	  if (const char *suggestion = hint.suggestion ())
-	    {
-	      gcc_rich_location richloc (loc);
-	      richloc.add_fixit_replace (suggestion);
-	      error_at (&richloc,
-			"%qD was not declared in this scope; did you mean %qs?",
-			name, suggestion);
-	    }
-	  else
-	    error_at (loc, "%qD was not declared in this scope", name);
+	  error_at (loc, "%qD was not declared in this scope", name);
+	  suggest_alternatives_for (loc, name, true);
 	}
       /* Prevent repeated error messages by creating a VAR_DECL with
 	 this NAME in the innermost block scope.  */
@@ -540,9 +526,6 @@ unqualified_fn_lookup_error (cp_expr name_expr)
   location_t loc = name_expr.get_location ();
   if (loc == UNKNOWN_LOCATION)
     loc = input_location;
-
-  if (TREE_CODE (name) == TEMPLATE_ID_EXPR)
-    name = TREE_OPERAND (name, 0);
 
   if (processing_template_decl)
     {
@@ -869,9 +852,9 @@ maybe_add_lang_type_raw (tree t)
 }
 
 tree
-cxx_make_type (enum tree_code code MEM_STAT_DECL)
+cxx_make_type (enum tree_code code)
 {
-  tree t = make_node (code PASS_MEM_STAT);
+  tree t = make_node (code);
 
   if (maybe_add_lang_type_raw (t))
     {
@@ -885,18 +868,10 @@ cxx_make_type (enum tree_code code MEM_STAT_DECL)
   return t;
 }
 
-/* A wrapper without the memory stats for LANG_HOOKS_MAKE_TYPE.  */
-
 tree
-cxx_make_type_hook (enum tree_code code)
+make_class_type (enum tree_code code)
 {
-  return cxx_make_type (code);
-}
-
-tree
-make_class_type (enum tree_code code MEM_STAT_DECL)
-{
-  tree t = cxx_make_type (code PASS_MEM_STAT);
+  tree t = cxx_make_type (code);
   SET_CLASS_TYPE_P (t, 1);
   return t;
 }

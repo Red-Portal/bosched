@@ -1,5 +1,5 @@
 ! { dg-do compile }
-! { dg-options "-fopenmp -std=legacy" }
+! { dg-options "-fopenmp -std=gnu" }
 subroutine foo
   integer :: i, j
   integer, dimension (30) :: a
@@ -24,11 +24,11 @@ subroutine foo
     i = i + 1
   end do
 !$omp do
-  do 300 d = 1, 30, 6
+  do 300 d = 1, 30, 6 ! { dg-warning "Deleted feature: Loop variable" }
     i = d
 300 a(i) = 1
 !$omp do
-  do d = 1, 30, 5
+  do d = 1, 30, 5 ! { dg-warning "Deleted feature: Loop variable" }
     i = d
     a(i) = 2
   end do

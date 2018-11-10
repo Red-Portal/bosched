@@ -1,5 +1,5 @@
 /* { dg-do compile }  */
-/* { dg-options "-O1 -fno-tree-ccp -fno-tree-dse -Wmaybe-uninitialized" } */
+/* { dg-options "-O1 -fno-tree-ccp -Wmaybe-uninitialized" } */
 
 int oo;
 

@@ -1,4 +1,3 @@
-/* { dg-skip-if "Array too big" { "pdp11-*-*" } { "-mint32" } } */
 
 /* Prevent spurious test failures on 16-bit targets.  */
 #if __INT_MAX__ >= 2147483647L

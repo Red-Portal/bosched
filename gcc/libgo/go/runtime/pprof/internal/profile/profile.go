@@ -22,13 +22,11 @@ import (
 
 // Profile is an in-memory representation of profile.proto.
 type Profile struct {
-	SampleType        []*ValueType
-	DefaultSampleType string
-	Sample            []*Sample
-	Mapping           []*Mapping
-	Location          []*Location
-	Function          []*Function
-	Comments          []string
+	SampleType []*ValueType
+	Sample     []*Sample
+	Mapping    []*Mapping
+	Location   []*Location
+	Function   []*Function
 
 	DropFrames string
 	KeepFrames string
@@ -38,11 +36,9 @@ type Profile struct {
 	PeriodType    *ValueType
 	Period        int64
 
-	commentX           []int64
-	dropFramesX        int64
-	keepFramesX        int64
-	stringTable        []string
-	defaultSampleTypeX int64
+	dropFramesX int64
+	keepFramesX int64
+	stringTable []string
 }
 
 // ValueType corresponds to Profile.ValueType

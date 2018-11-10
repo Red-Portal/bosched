@@ -1,4 +1,5 @@
-// { dg-do run { target c++17 } }
+// { dg-options -std=c++17 }
+// { dg-do run }
 
 struct base1 { int b1, b2 = 42; };
 struct base2 {

@@ -341,7 +341,7 @@ func (p *pp) badVerb(verb rune) {
 func (p *pp) fmtBool(v bool, verb rune) {
 	switch verb {
 	case 't', 'v':
-		p.fmt.fmtBoolean(v)
+		p.fmt.fmt_boolean(v)
 	default:
 		p.badVerb(verb)
 	}
@@ -352,7 +352,7 @@ func (p *pp) fmtBool(v bool, verb rune) {
 func (p *pp) fmt0x64(v uint64, leading0x bool) {
 	sharp := p.fmt.sharp
 	p.fmt.sharp = leading0x
-	p.fmt.fmtInteger(v, 16, unsigned, ldigits)
+	p.fmt.fmt_integer(v, 16, unsigned, ldigits)
 	p.fmt.sharp = sharp
 }
 
@@ -363,28 +363,28 @@ func (p *pp) fmtInteger(v uint64, isSigned bool, verb rune) {
 		if p.fmt.sharpV && !isSigned {
 			p.fmt0x64(v, true)
 		} else {
-			p.fmt.fmtInteger(v, 10, isSigned, ldigits)
+			p.fmt.fmt_integer(v, 10, isSigned, ldigits)
 		}
 	case 'd':
-		p.fmt.fmtInteger(v, 10, isSigned, ldigits)
+		p.fmt.fmt_integer(v, 10, isSigned, ldigits)
 	case 'b':
-		p.fmt.fmtInteger(v, 2, isSigned, ldigits)
+		p.fmt.fmt_integer(v, 2, isSigned, ldigits)
 	case 'o':
-		p.fmt.fmtInteger(v, 8, isSigned, ldigits)
+		p.fmt.fmt_integer(v, 8, isSigned, ldigits)
 	case 'x':
-		p.fmt.fmtInteger(v, 16, isSigned, ldigits)
+		p.fmt.fmt_integer(v, 16, isSigned, ldigits)
 	case 'X':
-		p.fmt.fmtInteger(v, 16, isSigned, udigits)
+		p.fmt.fmt_integer(v, 16, isSigned, udigits)
 	case 'c':
-		p.fmt.fmtC(v)
+		p.fmt.fmt_c(v)
 	case 'q':
 		if v <= utf8.MaxRune {
-			p.fmt.fmtQc(v)
+			p.fmt.fmt_qc(v)
 		} else {
 			p.badVerb(verb)
 		}
 	case 'U':
-		p.fmt.fmtUnicode(v)
+		p.fmt.fmt_unicode(v)
 	default:
 		p.badVerb(verb)
 	}
@@ -395,13 +395,13 @@ func (p *pp) fmtInteger(v uint64, isSigned bool, verb rune) {
 func (p *pp) fmtFloat(v float64, size int, verb rune) {
 	switch verb {
 	case 'v':
-		p.fmt.fmtFloat(v, size, 'g', -1)
+		p.fmt.fmt_float(v, size, 'g', -1)
 	case 'b', 'g', 'G':
-		p.fmt.fmtFloat(v, size, verb, -1)
+		p.fmt.fmt_float(v, size, verb, -1)
 	case 'f', 'e', 'E':
-		p.fmt.fmtFloat(v, size, verb, 6)
+		p.fmt.fmt_float(v, size, verb, 6)
 	case 'F':
-		p.fmt.fmtFloat(v, size, 'f', 6)
+		p.fmt.fmt_float(v, size, 'f', 6)
 	default:
 		p.badVerb(verb)
 	}
@@ -432,18 +432,18 @@ func (p *pp) fmtString(v string, verb rune) {
 	switch verb {
 	case 'v':
 		if p.fmt.sharpV {
-			p.fmt.fmtQ(v)
+			p.fmt.fmt_q(v)
 		} else {
-			p.fmt.fmtS(v)
+			p.fmt.fmt_s(v)
 		}
 	case 's':
-		p.fmt.fmtS(v)
+		p.fmt.fmt_s(v)
 	case 'x':
-		p.fmt.fmtSx(v, ldigits)
+		p.fmt.fmt_sx(v, ldigits)
 	case 'X':
-		p.fmt.fmtSx(v, udigits)
+		p.fmt.fmt_sx(v, udigits)
 	case 'q':
-		p.fmt.fmtQ(v)
+		p.fmt.fmt_q(v)
 	default:
 		p.badVerb(verb)
 	}
@@ -472,18 +472,18 @@ func (p *pp) fmtBytes(v []byte, verb rune, typeString string) {
 				if i > 0 {
 					p.buf.WriteByte(' ')
 				}
-				p.fmt.fmtInteger(uint64(c), 10, unsigned, ldigits)
+				p.fmt.fmt_integer(uint64(c), 10, unsigned, ldigits)
 			}
 			p.buf.WriteByte(']')
 		}
 	case 's':
-		p.fmt.fmtS(string(v))
+		p.fmt.fmt_s(string(v))
 	case 'x':
-		p.fmt.fmtBx(v, ldigits)
+		p.fmt.fmt_bx(v, ldigits)
 	case 'X':
-		p.fmt.fmtBx(v, udigits)
+		p.fmt.fmt_bx(v, udigits)
 	case 'q':
-		p.fmt.fmtQ(string(v))
+		p.fmt.fmt_q(string(v))
 	default:
 		p.printValue(reflect.ValueOf(v), verb, 0)
 	}
@@ -577,7 +577,7 @@ func (p *pp) handleMethods(verb rune) (handled bool) {
 			handled = true
 			defer p.catchPanic(p.arg, verb)
 			// Print the result of GoString unadorned.
-			p.fmt.fmtS(stringer.GoString())
+			p.fmt.fmt_s(stringer.GoString())
 			return
 		}
 	} else {
@@ -626,7 +626,7 @@ func (p *pp) printArg(arg interface{}, verb rune) {
 	// %T (the value's type) and %p (its address) are special; we always do them first.
 	switch verb {
 	case 'T':
-		p.fmt.fmtS(reflect.TypeOf(arg).String())
+		p.fmt.fmt_s(reflect.TypeOf(arg).String())
 		return
 	case 'p':
 		p.fmtPointer(reflect.ValueOf(arg), 'p')

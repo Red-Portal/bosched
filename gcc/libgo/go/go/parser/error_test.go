@@ -91,12 +91,6 @@ func expectedErrors(fset *token.FileSet, filename string, src []byte) map[token.
 				}
 				errors[pos] = string(s[2])
 			}
-		case token.SEMICOLON:
-			// don't use the position of auto-inserted (invisible) semicolons
-			if lit != ";" {
-				break
-			}
-			fallthrough
 		default:
 			prev = pos
 			var l int // token length

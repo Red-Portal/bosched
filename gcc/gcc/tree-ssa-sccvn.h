@@ -28,18 +28,6 @@ bool expressions_equal_p (tree, tree);
 /* TOP of the VN lattice.  */
 extern tree VN_TOP;
 
-/* A predicated value.  */
-struct vn_pval
-{
-  vn_pval *next;
-  /* The value of the expression this is attached to is RESULT in
-     case the expression is computed dominated by one of the blocks
-     in valid_dominated_by_p.  */
-  tree result;
-  unsigned n;
-  int valid_dominated_by_p[1];
-};
-
 /* N-ary operations in the hashtable consist of length operands, an
    opcode, and a type.  Result is the value number of the operation,
    and hashcode is stored to avoid having to calculate it
@@ -47,20 +35,12 @@ struct vn_pval
 
 typedef struct vn_nary_op_s
 {
-  vn_nary_op_s *next;
-  vn_nary_op_s *unwind_to;
   /* Unique identify that all expressions with the same value have. */
   unsigned int value_id;
   ENUM_BITFIELD(tree_code) opcode : 16;
   unsigned length : 16;
   hashval_t hashcode;
-  unsigned predicated_values : 1;
-  union {
-      /* If ! predicated_values this is the value of the expression.  */
-      tree result;
-      /* If predicated_values this is a list of values of the expression.  */
-      vn_pval *values;
-  } u;
+  tree result;
   tree type;
   tree op[1];
 } *vn_nary_op_t;
@@ -82,18 +62,16 @@ sizeof_vn_nary_op (unsigned int length)
 
 typedef struct vn_phi_s
 {
-  vn_phi_s *next;
   /* Unique identifier that all expressions with the same value have. */
   unsigned int value_id;
   hashval_t hashcode;
+  vec<tree> phiargs;
   basic_block block;
   /* Controlling condition lhs/rhs.  */
   tree cclhs;
   tree ccrhs;
   tree type;
   tree result;
-  /* The number of args is determined by EDGE_COUT (block->preds).  */
-  tree phiargs[1];
 } *vn_phi_t;
 typedef const struct vn_phi_s *const_vn_phi_t;
 
@@ -109,6 +87,8 @@ typedef struct vn_reference_op_struct
   /* Dependence info, used for [TARGET_]MEM_REF only.  */
   unsigned short clique;
   unsigned short base;
+  /* 1 for instrumented calls.  */
+  unsigned with_bounds : 1;
   unsigned reverse : 1;
   /* For storing TYPE_ALIGN for array ref element size computation.  */
   unsigned align : 6;
@@ -137,7 +117,6 @@ vn_ref_op_align_unit (vn_reference_op_t op)
 
 typedef struct vn_reference_s
 {
-  vn_reference_s *next;
   /* Unique identifier that all expressions with the same value have. */
   unsigned int value_id;
   hashval_t hashcode;
@@ -195,23 +174,36 @@ vn_constant_eq_with_type (tree c1, tree c2)
 
 typedef struct vn_ssa_aux
 {
-  /* SSA name this vn_ssa_aux is associated with in the lattice.  */
-  tree name;
   /* Value number. This may be an SSA name or a constant.  */
   tree valnum;
   /* Statements to insert if needs_insertion is true.  */
   gimple_seq expr;
 
+  /* Saved SSA name info.  */
+  tree_ssa_name::ssa_name_info_type info;
+
   /* Unique identifier that all expressions with the same value have. */
   unsigned int value_id;
 
-  /* Whether the SSA_NAME has been processed at least once.  */
+  /* SCC information.  */
+  unsigned int dfsnum;
+  unsigned int low;
   unsigned visited : 1;
+  unsigned on_sccstack : 1;
+
+  /* Whether the SSA_NAME has been value numbered already.  This is
+     only saying whether visit_use has been called on it at least
+     once.  It cannot be used to avoid visitation for SSA_NAME's
+     involved in non-singleton SCC's.  */
+  unsigned use_processed : 1;
 
   /* Whether the SSA_NAME has no defining statement and thus an
      insertion of such with EXPR as definition is required before
      a use can be created of it.  */
   unsigned needs_insertion : 1;
+
+  /* Whether range-info is anti-range.  */
+  unsigned range_info_anti_range_p : 1;
 } *vn_ssa_aux_t;
 
 enum vn_lookup_kind { VN_NOWALK, VN_WALK, VN_WALKREWRITE };
@@ -219,7 +211,11 @@ enum vn_lookup_kind { VN_NOWALK, VN_WALK, VN_WALKREWRITE };
 /* Return the value numbering info for an SSA_NAME.  */
 bool has_VN_INFO (tree);
 extern vn_ssa_aux_t VN_INFO (tree);
+extern vn_ssa_aux_t VN_INFO_GET (tree);
 tree vn_get_expr_for (tree);
+void run_scc_vn (vn_lookup_kind);
+unsigned int vn_eliminate (bitmap);
+void free_scc_vn (void);
 void scc_vn_restore_ssa_info (void);
 tree vn_nary_op_lookup (tree, vn_nary_op_t *);
 tree vn_nary_op_lookup_stmt (gimple *, vn_nary_op_t *);
@@ -252,17 +248,55 @@ bool value_id_constant_p (unsigned int);
 tree fully_constant_vn_reference_p (vn_reference_t);
 tree vn_nary_simplify (vn_nary_op_t);
 
-unsigned do_rpo_vn (function *, edge, bitmap);
-void run_rpo_vn (vn_lookup_kind);
-unsigned eliminate_with_rpo_vn (bitmap);
-void free_rpo_vn (void);
+/* Valueize NAME if it is an SSA name, otherwise just return it.  */
 
-/* Valueize NAME if it is an SSA name, otherwise just return it.  This hook
-   is initialized by run_scc_vn.  */
-extern tree (*vn_valueize) (tree);
+static inline tree
+vn_valueize (tree name)
+{
+  if (TREE_CODE (name) == SSA_NAME)
+    {
+      tree tem = VN_INFO (name)->valnum;
+      return tem == VN_TOP ? name : tem;
+    }
+  return name;
+}
 
-/* Context that valueization should operate on.  */
-extern basic_block vn_context_bb;
+/* Get at the original range info for NAME.  */
 
+inline range_info_def *
+VN_INFO_RANGE_INFO (tree name)
+{
+  return (VN_INFO (name)->info.range_info
+	  ? VN_INFO (name)->info.range_info
+	  : SSA_NAME_RANGE_INFO (name));
+}
+
+/* Whether the original range info of NAME is an anti-range.  */
+
+inline bool
+VN_INFO_ANTI_RANGE_P (tree name)
+{
+  return (VN_INFO (name)->info.range_info
+	  ? VN_INFO (name)->range_info_anti_range_p
+	  : SSA_NAME_ANTI_RANGE_P (name));
+}
+
+/* Get at the original range info kind for NAME.  */
+
+inline value_range_type
+VN_INFO_RANGE_TYPE (tree name)
+{
+  return VN_INFO_ANTI_RANGE_P (name) ? VR_ANTI_RANGE : VR_RANGE;
+}
+
+/* Get at the original pointer info for NAME.  */
+
+inline ptr_info_def *
+VN_INFO_PTR_INFO (tree name)
+{
+  return (VN_INFO (name)->info.ptr_info
+	  ? VN_INFO (name)->info.ptr_info
+	  : SSA_NAME_PTR_INFO (name));
+}
 
 #endif /* TREE_SSA_SCCVN_H  */

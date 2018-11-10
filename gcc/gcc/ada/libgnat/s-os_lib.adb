@@ -187,86 +187,93 @@ package body System.OS_Lib is
      (Arg_String : String) return Argument_List_Access
    is
       Max_Args : constant Integer := Arg_String'Length;
+      New_Argv : Argument_List (1 .. Max_Args);
+      Idx      : Integer;
+      New_Argc : Natural := 0;
+
+      Cleaned     : String (1 .. Arg_String'Length);
+      Cleaned_Idx : Natural;
+      --  A cleaned up version of the argument. This function is taking
+      --  backslash escapes when computing the bounds for arguments. It is
+      --  then removing the extra backslashes from the argument.
 
       Backslash_Is_Sep : constant Boolean := Directory_Separator = '\';
       --  Whether '\' is a directory separator (as on Windows), or a way to
       --  quote special characters.
 
-      Backqd   : Boolean := False;
-      Idx      : Integer;
-      New_Argc : Natural := 0;
-      New_Argv : Argument_List (1 .. Max_Args);
-      Quoted   : Boolean := False;
-
-      Cleaned     : String (1 .. Arg_String'Length);
-      Cleaned_Idx : Natural;
-      --  A cleaned up version of the argument. This function is taking
-      --  backslash escapes when computing the bounds for arguments. It
-      --  is then removing the extra backslashes from the argument.
-
    begin
       Idx := Arg_String'First;
 
       loop
-         --  Skip extraneous spaces
-
-         while Idx <= Arg_String'Last and then Arg_String (Idx) = ' ' loop
-            Idx := Idx + 1;
-         end loop;
-
          exit when Idx > Arg_String'Last;
 
-         Cleaned_Idx := Cleaned'First;
-         Backqd      := False;
-         Quoted      := False;
+         declare
+            Backqd  : Boolean := False;
+            Quoted  : Boolean := False;
 
-         loop
-            --  An unquoted space is the end of an argument
+         begin
+            Cleaned_Idx := Cleaned'First;
 
-            if not (Backqd or Quoted) and then Arg_String (Idx) = ' ' then
-               exit;
+            loop
+               --  An unquoted space is the end of an argument
 
-            --  Start of a quoted string
+               if not (Backqd or Quoted)
+                 and then Arg_String (Idx) = ' '
+               then
+                  exit;
 
-            elsif not (Backqd or Quoted) and then Arg_String (Idx) = '"' then
-               Quoted := True;
-               Cleaned (Cleaned_Idx) := Arg_String (Idx);
-               Cleaned_Idx := Cleaned_Idx + 1;
+               --  Start of a quoted string
 
-            --  End of a quoted string and end of an argument
+               elsif not (Backqd or Quoted)
+                 and then Arg_String (Idx) = '"'
+               then
+                  Quoted := True;
+                  Cleaned (Cleaned_Idx) := Arg_String (Idx);
+                  Cleaned_Idx := Cleaned_Idx + 1;
 
-            elsif (Quoted and not Backqd) and then Arg_String (Idx) = '"' then
-               Cleaned (Cleaned_Idx) := Arg_String (Idx);
-               Cleaned_Idx := Cleaned_Idx + 1;
+               --  End of a quoted string and end of an argument
+
+               elsif (Quoted and not Backqd)
+                 and then Arg_String (Idx) = '"'
+               then
+                  Cleaned (Cleaned_Idx) := Arg_String (Idx);
+                  Cleaned_Idx := Cleaned_Idx + 1;
+                  Idx := Idx + 1;
+                  exit;
+
+               --  Turn off backquoting after advancing one character
+
+               elsif Backqd then
+                  Backqd := False;
+                  Cleaned (Cleaned_Idx) := Arg_String (Idx);
+                  Cleaned_Idx := Cleaned_Idx + 1;
+
+               --  Following character is backquoted
+
+               elsif not Backslash_Is_Sep and then Arg_String (Idx) = '\' then
+                  Backqd := True;
+
+               else
+                  Cleaned (Cleaned_Idx) := Arg_String (Idx);
+                  Cleaned_Idx := Cleaned_Idx + 1;
+               end if;
+
                Idx := Idx + 1;
-               exit;
+               exit when Idx > Arg_String'Last;
+            end loop;
 
-            --  Turn off backquoting after advancing one character
+            --  Found an argument
 
-            elsif Backqd then
-               Backqd := False;
-               Cleaned (Cleaned_Idx) := Arg_String (Idx);
-               Cleaned_Idx := Cleaned_Idx + 1;
+            New_Argc := New_Argc + 1;
+            New_Argv (New_Argc) :=
+              new String'(Cleaned (Cleaned'First .. Cleaned_Idx - 1));
 
-            --  Following character is backquoted
+            --  Skip extraneous spaces
 
-            elsif not Backslash_Is_Sep and then Arg_String (Idx) = '\' then
-               Backqd := True;
-
-            else
-               Cleaned (Cleaned_Idx) := Arg_String (Idx);
-               Cleaned_Idx := Cleaned_Idx + 1;
-            end if;
-
-            Idx := Idx + 1;
-            exit when Idx > Arg_String'Last;
-         end loop;
-
-         --  Found an argument
-
-         New_Argc := New_Argc + 1;
-         New_Argv (New_Argc) :=
-           new String'(Cleaned (Cleaned'First .. Cleaned_Idx - 1));
+            while Idx <= Arg_String'Last and then Arg_String (Idx) = ' ' loop
+               Idx := Idx + 1;
+            end loop;
+         end;
       end loop;
 
       return new Argument_List'(New_Argv (1 .. New_Argc));
@@ -2227,9 +2234,7 @@ package body System.OS_Lib is
       --  the path itself, the current directory if the path is relative,
       --  and additional fragments up to Max_Path in length in case
       --  there are any symlinks.
-
-      Finish : Positive;
-      Start  : Positive;
+      Start, Finish : Positive;
       Status : Integer;
 
    --  Start of processing for Normalize_Pathname
@@ -2258,6 +2263,7 @@ package body System.OS_Lib is
       --    * Remove all double-quotes
 
       if On_Windows then
+
          --  Replace all '/' by '\'
 
          for Index in 1 .. End_Path loop
@@ -2318,6 +2324,7 @@ package body System.OS_Lib is
       --  empty string.
 
       for J in 1 .. Max_Iterations loop
+
          Start  := Last + 1;
          Finish := Last;
 
@@ -2371,7 +2378,6 @@ package body System.OS_Lib is
 
                   return Path_Buffer (1 .. Last - 1);
                end if;
-
             else
                Path_Buffer (Last + 1 .. End_Path - 2) :=
                  Path_Buffer (Last + 3 .. End_Path);
@@ -2383,18 +2389,12 @@ package body System.OS_Lib is
          elsif Finish = Start + 1
            and then Path_Buffer (Start .. Finish) = ".."
          then
-            if Last > 1 then
-               Start := Last - 1;
-
-               while Start > 1
-                 and then Path_Buffer (Start) /= Directory_Separator
-               loop
-                  Start := Start - 1;
-               end loop;
-
-            else
-               Start := Last;
-            end if;
+            Start := Last;
+            loop
+               Start := Start - 1;
+               exit when Start = 1
+                 or else Path_Buffer (Start) = Directory_Separator;
+            end loop;
 
             if Start = 1 then
                if Finish = End_Path then

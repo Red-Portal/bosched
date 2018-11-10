@@ -85,7 +85,6 @@ package body Make is
 
    procedure Sigint_Intercepted;
    pragma Convention (C, Sigint_Intercepted);
-   pragma No_Return (Sigint_Intercepted);
    --  Called when the program is interrupted by Ctrl-C to delete the
    --  temporary mapping files and configuration pragmas files.
 
@@ -255,7 +254,6 @@ package body Make is
                                No_Shared_Libgcc_Switch'Access;
 
    procedure Make_Failed (S : String);
-   pragma No_Return (Make_Failed);
    --  Delete all temp files created by Gnatmake and call Osint.Fail, with the
    --  parameter S (see osint.ads).
 
@@ -547,7 +545,6 @@ package body Make is
    --  Display_Executed_Programs is set. The lower bound of Args must be 1.
 
    procedure Report_Compilation_Failed;
-   pragma No_Return (Report_Compilation_Failed);
    --  Delete all temporary files and fail graciously
 
    -----------------
@@ -583,7 +580,7 @@ package body Make is
    Gnatmake_Mapping_File : String_Access := null;
    --  The path name of a mapping file specified by switch -C=
 
-   procedure Init_Mapping_File (File_Index : out Natural);
+   procedure Init_Mapping_File (File_Index : in out Natural);
    --  Create a new mapping file or reuse one already created.
 
    package Temp_File_Paths is new Table.Table
@@ -1424,9 +1421,9 @@ package body Make is
    --------------------------
 
    procedure Check_Linker_Options
-     (E_Stamp : Time_Stamp_Type;
-      O_File  : out File_Name_Type;
-      O_Stamp : out Time_Stamp_Type)
+     (E_Stamp   : Time_Stamp_Type;
+      O_File    : out File_Name_Type;
+      O_Stamp   : out Time_Stamp_Type)
    is
       procedure Check_File (File : File_Name_Type);
       --  Update O_File and O_Stamp if the given file is younger than E_Stamp
@@ -1868,9 +1865,9 @@ package body Make is
 
             if Add_It then
                if not Queue.Insert
-                        ((File  => Sfile,
-                          Unit  => No_Unit_Name,
-                          Index => 0))
+                        ((File    => Sfile,
+                          Unit    => No_Unit_Name,
+                          Index   => 0))
                then
                   if Is_In_Obsoleted (Sfile) then
                      Executable_Obsolete := True;
@@ -2350,10 +2347,10 @@ package body Make is
          Full_Lib_File : File_Name_Type := No_File;
          Lib_File_Attr : aliased File_Attributes;
          Read_Only     : Boolean := False;
-         ALI           : ALI_Id := No_ALI_Id;
+         ALI           : ALI_Id;
          --  The ALI file and its attributes (size, stamp, ...)
 
-         Obj_File  : File_Name_Type := No_File;
+         Obj_File  : File_Name_Type;
          Obj_Stamp : Time_Stamp_Type;
          --  The object file
 
@@ -3617,7 +3614,7 @@ package body Make is
    -- Init_Mapping_File --
    -----------------------
 
-   procedure Init_Mapping_File (File_Index : out Natural) is
+   procedure Init_Mapping_File (File_Index : in out Natural) is
       FD     : File_Descriptor;
       Status : Boolean;
       --  For call to Close
@@ -4381,7 +4378,9 @@ package body Make is
                Look_In_Primary_Dir := False;
 
             elsif Program_Args = Compiler then
-               Add_Source_Search_Dir (Argv (3 .. Argv'Last));
+               if Argv (3 .. Argv'Last) /= "-" then
+                  Add_Source_Search_Dir (Argv (3 .. Argv'Last));
+               end if;
 
             elsif Program_Args = Binder then
                Add_Library_Search_Dir (Argv (3 .. Argv'Last));
@@ -4691,8 +4690,7 @@ package body Make is
 
          --  -m
 
-         elsif Argv (2) = 'm' then
-            pragma Assert (Argv'Last = 2);
+         elsif Argv (2) = 'm' and then Argv'Last = 2 then
             Minimal_Recompilation := True;
 
          --  -u

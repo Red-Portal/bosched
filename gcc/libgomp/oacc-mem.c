@@ -347,7 +347,6 @@ acc_map_data (void *h, void *d, size_t s)
 
       tgt = gomp_map_vars (acc_dev, mapnum, &hostaddrs, &devaddrs, &sizes,
 			   &kinds, true, GOMP_MAP_VARS_OPENACC);
-      tgt->list[0].key->refcount = REFCOUNT_INFINITY;
     }
 
   gomp_mutex_lock (&acc_dev->lock);
@@ -389,9 +388,6 @@ acc_unmap_data (void *h)
       gomp_fatal ("[%p,%d] surrounds %p",
 		  (void *) n->host_start, (int) host_size, (void *) h);
     }
-
-  /* Mark for removal.  */
-  n->refcount = 1;
 
   t = n->tgt;
 
@@ -464,11 +460,6 @@ present_create_copy (unsigned f, void *h, size_t s)
 	  gomp_fatal ("[%p,+%d] not mapped", (void *)h, (int)s);
 	}
 
-      if (n->refcount != REFCOUNT_INFINITY)
-	{
-	  n->refcount++;
-	  n->dynamic_refcount++;
-	}
       gomp_mutex_unlock (&acc_dev->lock);
     }
   else if (!(f & FLAG_CREATE))
@@ -492,8 +483,6 @@ present_create_copy (unsigned f, void *h, size_t s)
 
       tgt = gomp_map_vars (acc_dev, mapnum, &hostaddrs, NULL, &s, &kinds, true,
 			   GOMP_MAP_VARS_OPENACC);
-      /* Initialize dynamic refcount.  */
-      tgt->list[0].key->dynamic_refcount = 1;
 
       gomp_mutex_lock (&acc_dev->lock);
 
@@ -510,13 +499,13 @@ present_create_copy (unsigned f, void *h, size_t s)
 void *
 acc_create (void *h, size_t s)
 {
-  return present_create_copy (FLAG_PRESENT | FLAG_CREATE, h, s);
+  return present_create_copy (FLAG_CREATE, h, s);
 }
 
 void *
 acc_copyin (void *h, size_t s)
 {
-  return present_create_copy (FLAG_PRESENT | FLAG_CREATE | FLAG_COPY, h, s);
+  return present_create_copy (FLAG_CREATE | FLAG_COPY, h, s);
 }
 
 void *
@@ -553,8 +542,7 @@ acc_pcopyin (void *h, size_t s)
 }
 #endif
 
-#define FLAG_COPYOUT  (1 << 0)
-#define FLAG_FINALIZE (1 << 1)
+#define FLAG_COPYOUT (1 << 0)
 
 static void
 delete_copyout (unsigned f, void *h, size_t s, const char *libfnname)
@@ -593,52 +581,15 @@ delete_copyout (unsigned f, void *h, size_t s, const char *libfnname)
 		  (void *) n->host_start, (int) host_size, (void *) h, (int) s);
     }
 
-  if (n->refcount == REFCOUNT_INFINITY)
-    {
-      n->refcount = 0;
-      n->dynamic_refcount = 0;
-    }
-  if (n->refcount < n->dynamic_refcount)
-    {
-      gomp_mutex_unlock (&acc_dev->lock);
-      gomp_fatal ("Dynamic reference counting assert fail\n");
-    }
-
-  if (f & FLAG_FINALIZE)
-    {
-      n->refcount -= n->dynamic_refcount;
-      n->dynamic_refcount = 0;
-    }
-  else if (n->dynamic_refcount)
-    {
-      n->dynamic_refcount--;
-      n->refcount--;
-    }
-
-  if (n->refcount == 0)
-    {
-      if (n->tgt->refcount == 2)
-	{
-	  struct target_mem_desc *tp, *t;
-	  for (tp = NULL, t = acc_dev->openacc.data_environ; t != NULL;
-	       tp = t, t = t->prev)
-	    if (n->tgt == t)
-	      {
-		if (tp)
-		  tp->prev = t->prev;
-		else
-		  acc_dev->openacc.data_environ = t->prev;
-		break;
-	      }
-	}
-
-      if (f & FLAG_COPYOUT)
-	acc_dev->dev2host_func (acc_dev->target_id, h, d, s);
-
-      gomp_remove_var (acc_dev, n);
-    }
-
   gomp_mutex_unlock (&acc_dev->lock);
+
+  if (f & FLAG_COPYOUT)
+    acc_dev->dev2host_func (acc_dev->target_id, h, d, s);
+
+  acc_unmap_data (h);
+
+  if (!acc_dev->free_func (acc_dev->target_id, d))
+    gomp_fatal ("error in freeing device memory in %s", libfnname);
 }
 
 void
@@ -648,33 +599,9 @@ acc_delete (void *h , size_t s)
 }
 
 void
-acc_delete_finalize (void *h , size_t s)
-{
-  delete_copyout (FLAG_FINALIZE, h, s, __FUNCTION__);
-}
-
-void
-acc_delete_finalize_async (void *h , size_t s, int async)
-{
-  delete_copyout (FLAG_FINALIZE, h, s, __FUNCTION__);
-}
-
-void
 acc_copyout (void *h, size_t s)
 {
   delete_copyout (FLAG_COPYOUT, h, s, __FUNCTION__);
-}
-
-void
-acc_copyout_finalize (void *h, size_t s)
-{
-  delete_copyout (FLAG_COPYOUT | FLAG_FINALIZE, h, s, __FUNCTION__);
-}
-
-void
-acc_copyout_finalize_async (void *h, size_t s, int async)
-{
-  delete_copyout (FLAG_COPYOUT | FLAG_FINALIZE, h, s, __FUNCTION__);
 }
 
 static void
@@ -732,36 +659,10 @@ gomp_acc_insert_pointer (size_t mapnum, void **hostaddrs, size_t *sizes,
   struct goacc_thread *thr = goacc_thread ();
   struct gomp_device_descr *acc_dev = thr->dev;
 
-  if (acc_is_present (*hostaddrs, *sizes))
-    {
-      splay_tree_key n;
-      gomp_mutex_lock (&acc_dev->lock);
-      n = lookup_host (acc_dev, *hostaddrs, *sizes);
-      gomp_mutex_unlock (&acc_dev->lock);
-
-      tgt = n->tgt;
-      for (size_t i = 0; i < tgt->list_count; i++)
-	if (tgt->list[i].key == n)
-	  {
-	    for (size_t j = 0; j < mapnum; j++)
-	      if (i + j < tgt->list_count && tgt->list[i + j].key)
-		{
-		  tgt->list[i + j].key->refcount++;
-		  tgt->list[i + j].key->dynamic_refcount++;
-		}
-	    return;
-	  }
-      /* Should not reach here.  */
-      gomp_fatal ("Dynamic refcount incrementing failed for pointer/pset");
-    }
-
   gomp_debug (0, "  %s: prepare mappings\n", __FUNCTION__);
   tgt = gomp_map_vars (acc_dev, mapnum, hostaddrs,
 		       NULL, sizes, kinds, true, GOMP_MAP_VARS_OPENACC);
   gomp_debug (0, "  %s: mappings prepared\n", __FUNCTION__);
-
-  /* Initialize dynamic refcount.  */
-  tgt->list[0].key->dynamic_refcount = 1;
 
   gomp_mutex_lock (&acc_dev->lock);
   tgt->prev = acc_dev->openacc.data_environ;
@@ -770,17 +671,13 @@ gomp_acc_insert_pointer (size_t mapnum, void **hostaddrs, size_t *sizes,
 }
 
 void
-gomp_acc_remove_pointer (void *h, size_t s, bool force_copyfrom, int async,
-			 int finalize, int mapnum)
+gomp_acc_remove_pointer (void *h, bool force_copyfrom, int async, int mapnum)
 {
   struct goacc_thread *thr = goacc_thread ();
   struct gomp_device_descr *acc_dev = thr->dev;
   splay_tree_key n;
   struct target_mem_desc *t;
   int minrefs = (mapnum == 1) ? 2 : 3;
-
-  if (!acc_is_present (h, s))
-    return;
 
   gomp_mutex_lock (&acc_dev->lock);
 
@@ -796,65 +693,40 @@ gomp_acc_remove_pointer (void *h, size_t s, bool force_copyfrom, int async,
 
   t = n->tgt;
 
-  if (n->refcount < n->dynamic_refcount)
-    {
-      gomp_mutex_unlock (&acc_dev->lock);
-      gomp_fatal ("Dynamic reference counting assert fail\n");
-    }
+  struct target_mem_desc *tp;
 
-  if (finalize)
+  if (t->refcount == minrefs)
     {
-      n->refcount -= n->dynamic_refcount;
-      n->dynamic_refcount = 0;
-    }
-  else if (n->dynamic_refcount)
-    {
-      n->dynamic_refcount--;
-      n->refcount--;
-    }
+      /* This is the last reference, so pull the descriptor off the
+	 chain. This avoids gomp_unmap_vars via gomp_unmap_tgt from
+	 freeing the device memory. */
+      t->tgt_end = 0;
+      t->to_free = 0;
 
-  gomp_mutex_unlock (&acc_dev->lock);
-
-  if (n->refcount == 0)
-    {
-      if (t->refcount == minrefs)
+      for (tp = NULL, t = acc_dev->openacc.data_environ; t != NULL;
+	   tp = t, t = t->prev)
 	{
-	  /* This is the last reference, so pull the descriptor off the
-	     chain. This prevents gomp_unmap_vars via gomp_unmap_tgt from
-	     freeing the device memory. */
-	  struct target_mem_desc *tp;
-	  for (tp = NULL, t = acc_dev->openacc.data_environ; t != NULL;
-	       tp = t, t = t->prev)
+	  if (n->tgt == t)
 	    {
-	      if (n->tgt == t)
-		{
-		  if (tp)
-		    tp->prev = t->prev;
-		  else
-		    acc_dev->openacc.data_environ = t->prev;
-		  break;
-		}
+	      if (tp)
+		tp->prev = t->prev;
+	      else
+		acc_dev->openacc.data_environ = t->prev;
+	      break;
 	    }
 	}
-
-      /* Set refcount to 1 to allow gomp_unmap_vars to unmap it.  */
-      n->refcount = 1;
-      t->refcount = minrefs;
-      for (size_t i = 0; i < t->list_count; i++)
-	if (t->list[i].key == n)
-	  {
-	    t->list[i].copy_from = force_copyfrom ? 1 : 0;
-	    break;
-	  }
-
-      /* If running synchronously, unmap immediately.  */
-      if (async < acc_async_noval)
-	gomp_unmap_vars (t, true);
-      else
-	t->device_descr->openacc.register_async_cleanup_func (t, async);
     }
 
+  if (force_copyfrom)
+    t->list[0].copy_from = 1;
+
   gomp_mutex_unlock (&acc_dev->lock);
+
+  /* If running synchronously, unmap immediately.  */
+  if (async < acc_async_noval)
+    gomp_unmap_vars (t, true);
+  else
+    t->device_descr->openacc.register_async_cleanup_func (t, async);
 
   gomp_debug (0, "  %s: mappings restored\n", __FUNCTION__);
 }

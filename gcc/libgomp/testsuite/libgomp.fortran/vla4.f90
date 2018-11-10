@@ -1,5 +1,4 @@
 ! { dg-do run }
-! { dg-options "-std=legacy" }
 
   call test
 contains

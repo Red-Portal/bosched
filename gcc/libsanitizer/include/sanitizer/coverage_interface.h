@@ -18,10 +18,10 @@ extern "C" {
 #endif
 
   // Record and dump coverage info.
-  void __sanitizer_cov_dump(void);
+  void __sanitizer_cov_dump();
 
   // Clear collected coverage info.
-  void __sanitizer_cov_reset(void);
+  void __sanitizer_cov_reset();
 
   // Dump collected coverage info. Sorts pcs by module into individual .sancov
   // files.

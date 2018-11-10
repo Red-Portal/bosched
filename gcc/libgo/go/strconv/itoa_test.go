@@ -200,14 +200,10 @@ func BenchmarkAppendUint(b *testing.B) {
 }
 
 func BenchmarkFormatIntSmall(b *testing.B) {
-	smallInts := []int64{7, 42}
-	for _, smallInt := range smallInts {
-		b.Run(Itoa(int(smallInt)), func(b *testing.B) {
-			for i := 0; i < b.N; i++ {
-				s := FormatInt(smallInt, 10)
-				BenchSink += len(s)
-			}
-		})
+	const smallInt = 42
+	for i := 0; i < b.N; i++ {
+		s := FormatInt(smallInt, 10)
+		BenchSink += len(s)
 	}
 }
 

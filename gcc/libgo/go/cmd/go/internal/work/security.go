@@ -112,7 +112,6 @@ var validCompilerFlags = []*regexp.Regexp{
 	re(`--sysroot=([^@\-].*)`),
 	re(`-w`),
 	re(`-x([^@\-].*)`),
-	re(`-v`),
 }
 
 var validCompilerFlagsWithNextArg = []string{
@@ -136,7 +135,6 @@ var validLinkerFlags = []*regexp.Regexp{
 	re(`-f(no-)?(pic|PIC|pie|PIE)`),
 	re(`-f(no-)?openmp(-simd)?`),
 	re(`-fsanitize=([^@\-].*)`),
-	re(`-flat_namespace`),
 	re(`-g([^@\-].*)?`),
 	re(`-headerpad_max_install_names`),
 	re(`-m(abi|arch|cpu|fpu|tune)=([^@\-].*)`),
@@ -152,10 +150,6 @@ var validLinkerFlags = []*regexp.Regexp{
 	re(`-shared`),
 	re(`-?-static([-a-z0-9+]*)`),
 	re(`-?-stdlib=([^@\-].*)`),
-<<<<<<< HEAD
-	re(`-v`),
-=======
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
 
 	// Note that any wildcards in -Wl need to exclude comma,
 	// since -Wl splits its argument at commas and passes
@@ -173,7 +167,6 @@ var validLinkerFlags = []*regexp.Regexp{
 	re(`-Wl,-e[=,][a-zA-Z0-9]*`),
 	re(`-Wl,--enable-new-dtags`),
 	re(`-Wl,--end-group`),
-	re(`-Wl,--(no-)?export-dynamic`),
 	re(`-Wl,-framework,[^,@\-][^,]+`),
 	re(`-Wl,-headerpad_max_install_names`),
 	re(`-Wl,--no-undefined`),

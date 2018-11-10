@@ -14,96 +14,84 @@
 double
 fpcvt_int_0 (vector int a)
 {
-  int c = 0;
-  int b = vec_extract (a, c);
+  int b = vec_extract (a, 0);
   return (double)b;
 }
 
 double
 fpcvt_int_3 (vector int a)
 {
-  int c = 3;
-  int b = vec_extract (a, c);
+  int b = vec_extract (a, 3);
   return (double)b;
 }
 
 double
 fpcvt_uint_0 (vector unsigned int a)
 {
-  int c = 0;
-  unsigned int b = vec_extract (a, c);
+  unsigned int b = vec_extract (a, 0);
   return (double)b;
 }
 
 double
 fpcvt_uint_3 (vector unsigned int a)
 {
-  int c = 3;
-  unsigned int b = vec_extract (a, c);
+  unsigned int b = vec_extract (a, 3);
   return (double)b;
 }
 
 double
 fpcvt_short_0 (vector short a)
 {
-  int c = 0;
-  short b = vec_extract (a, c);
+  short b = vec_extract (a, 0);
   return (double)b;
 }
 
 double
 fpcvt_short_7 (vector short a)
 {
-  int c = 7;
-  short b = vec_extract (a, c);
+  short b = vec_extract (a, 7);
   return (double)b;
 }
 
 double
 fpcvt_ushort_0 (vector unsigned short a)
 {
-  int c = 0;
-  unsigned short b = vec_extract (a, c);
+  unsigned short b = vec_extract (a, 0);
   return (double)b;
 }
 
 double
 fpcvt_ushort_7 (vector unsigned short a)
 {
-  int c = 7;
-  unsigned short b = vec_extract (a, c);
+  unsigned short b = vec_extract (a, 7);
   return (double)b;
 }
 
 double
 fpcvt_schar_0 (vector signed char a)
 {
-  int c = 0;
-  signed char b = vec_extract (a, c);
+  signed char b = vec_extract (a, 0);
   return (double)b;
 }
 
 double
 fpcvt_schar_15 (vector signed char a)
 {
-  int c = 15;
-  signed char b = vec_extract (a, c);
+  signed char b = vec_extract (a, 15);
   return (double)b;
 }
 
 double
 fpcvt_uchar_0 (vector unsigned char a)
 {
-  int c = 0;
-  unsigned char b = vec_extract (a, c);
+  unsigned char b = vec_extract (a, 0);
   return (double)b;
 }
 
 double
 fpcvt_uchar_15 (vector unsigned char a)
 {
-  int c = 15;
-  signed char b = vec_extract (a, c);
+  signed char b = vec_extract (a, 15);
   return (double)b;
 }
 

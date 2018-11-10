@@ -1,8 +1,4 @@
 // { dg-do run { target c++14 } }
-<<<<<<< HEAD
-// { dg-require-cstdint "" }
-=======
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
 // { dg-require-effective-target random_device }
 // { dg-require-effective-target tls_runtime }
 // { dg-add-options tls }

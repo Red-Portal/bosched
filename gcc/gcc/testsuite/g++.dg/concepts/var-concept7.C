@@ -1,6 +1,5 @@
 // PR c++/85133
-// { dg-do compile { target c++17 } }
-// { dg-additional-options "-fconcepts" }
+// { dg-additional-options "-std=c++17 -fconcepts" }
 
 template<typename> concept bool C; // { dg-error "no initializer" }
 

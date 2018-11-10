@@ -13,5 +13,5 @@ int main()
 {
   B b;
   (A(b));			// OK
-  (A(b,1));			// { dg-error "cannot convert" }
+  (A(b,1));			// { dg-error "no match" }
 }

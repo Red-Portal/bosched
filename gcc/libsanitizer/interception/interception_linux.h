@@ -10,8 +10,7 @@
 // Linux-specific interception methods.
 //===----------------------------------------------------------------------===//
 
-#if SANITIZER_LINUX || SANITIZER_FREEBSD || SANITIZER_NETBSD || \
-    SANITIZER_OPENBSD || SANITIZER_SOLARIS
+#if defined(__linux__) || defined(__FreeBSD__) || defined(__NetBSD__)
 
 #if !defined(INCLUDED_FROM_INTERCEPTION_LIB)
 # error "interception_linux.h should be included from interception library only"
@@ -33,16 +32,14 @@ void *GetFuncAddrVer(const char *func_name, const char *ver);
       (::__interception::uptr) & (func),                                   \
       (::__interception::uptr) & WRAP(func))
 
-// Android,  Solaris and OpenBSD do not have dlvsym
-#if !SANITIZER_ANDROID && !SANITIZER_SOLARIS && !SANITIZER_OPENBSD
+#if !defined(__ANDROID__)  // android does not have dlvsym
 #define INTERCEPT_FUNCTION_VER_LINUX_OR_FREEBSD(func, symver) \
-  (::__interception::real_##func = (func##_type)(                \
+  (::__interception::real_##func = (func##_f)(                \
        unsigned long)::__interception::GetFuncAddrVer(#func, symver))
 #else
 #define INTERCEPT_FUNCTION_VER_LINUX_OR_FREEBSD(func, symver) \
   INTERCEPT_FUNCTION_LINUX_OR_FREEBSD(func)
-#endif  // !SANITIZER_ANDROID && !SANITIZER_SOLARIS
+#endif  // !defined(__ANDROID__)
 
 #endif  // INTERCEPTION_LINUX_H
-#endif  // SANITIZER_LINUX || SANITIZER_FREEBSD || SANITIZER_NETBSD ||
-        // SANITIZER_OPENBSD || SANITIZER_SOLARIS
+#endif  // __linux__ || __FreeBSD__ || __NetBSD__

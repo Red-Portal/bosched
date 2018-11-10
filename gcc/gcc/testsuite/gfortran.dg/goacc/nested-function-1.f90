@@ -25,8 +25,6 @@ contains
     local_a (:) = 5
     local_arg = 5
 
-    !$acc update device(local_a) if_present
-
     !$acc kernels loop &
     !$acc gang(num:local_arg) worker(local_arg) vector(local_arg) &
     !$acc wait async(local_arg)
@@ -56,15 +54,11 @@ contains
        enddo
     enddo
     !$acc end kernels loop
-
-    !$acc exit data copyout(local_a) delete(local_i) finalize
   end subroutine local
 
   subroutine nonlocal ()
     nonlocal_a (:) = 5
     nonlocal_arg = 5
-
-    !$acc update device(nonlocal_a) if_present
 
     !$acc kernels loop &
     !$acc gang(num:nonlocal_arg) worker(nonlocal_arg) vector(nonlocal_arg) &
@@ -95,7 +89,5 @@ contains
        enddo
     enddo
     !$acc end kernels loop
-
-    !$acc exit data copyout(nonlocal_a) delete(nonlocal_i) finalize
   end subroutine nonlocal
 end program main

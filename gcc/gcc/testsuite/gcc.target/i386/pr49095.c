@@ -73,9 +73,4 @@ G (long)
 /* { dg-final { scan-assembler-not "test\[lq\]" } } */
 /* The {f,h}{char,short,int,long}xor functions aren't optimized into
    a RMW instruction, so need load, modify and store.  FIXME eventually.  */
-<<<<<<< HEAD
-/* { dg-final { scan-assembler-times "\\), %" 57 { target { ia32 } } } } */
-/* { dg-final { scan-assembler-times "\\), %" 45 { target { ! ia32 } } } } */
-=======
 /* { dg-final { scan-assembler-times "\\), %" 8 } } */
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf

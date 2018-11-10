@@ -1,70 +1,3 @@
-<<<<<<< HEAD
-2018-10-25  Thomas Preud'homme  <thomas.preudhomme@linaro.org>
-
-	* dg-cmp-results.sh: Print NA-FAIL and NA->UNRESOLVED changes at
-	default verbosity.
-
-2018-10-16  Rainer Orth  <ro@CeBiTec.Uni-Bielefeld.DE>
-
-	* config-list.mk (LIST): Switch to i686-solaris2.11,
-	sparc64-sun-solaris2.11.
-
-2018-10-04  Bernhard Reutner-Fischer  <aldot@gcc.gnu.org>
-
-	* unused_functions.py: Handle archive files.
-
-2018-10-04  Bernhard Reutner-Fischer  <aldot@gcc.gnu.org>
-
-	* unused_functions.py: New file.
-
-2018-09-25  Martin Liska  <mliska@suse.cz>
-
-	* filter-rtags-warnings.py: New file.
-
-2018-09-25  Martin Liska  <mliska@suse.cz>
-
-	PR middle-end/86078
-	* check-params-in-docs.py: New file.
-
-2018-08-17  Jojo  <jijie_rong@c-sky.com>
-	    Huibin Wang  <huibin_wang@c-sky.com>
-	    Sandra Loosemore  <sandra@codesourcery.com>
-	    Chung-Lin Tang  <cltang@codesourcery.com>
-	    Andrew Jenner  <andrew@codesourcery.com>
-
-	C-SKY port: Configury
-
-	* config-list.mk (LIST): Add csky-elf and csky-linux-gnu.
-
-2018-07-13  Tom de Vries  <tdevries@suse.de>
-
-	* maintainers-verify.sh: New file.
-
-2018-07-12  Christophe Lyon  <christophe.lyon@linaro.org>
-
-	* compare_tests: Print number of tests in each category.
-
-2018-06-19  Alexander Monakov  <amonakov@ispras.ru>
-
-	* vim-gcc-dev/README: New file.
-	* vim-gcc-dev/ftdetect/gcc-dev.vim: New file.
-	* vim-gcc-dev/syntax/gcc-match.vim: New file.
-	* gimple.vim: Move under vim-gcc-dev/syntax/.
-	* gcc-rtl.vim: Likewise.
-
-2018-06-19  Martin Liska  <mliska@suse.cz>
-
-	* gcc-rtl.vim: New file.
-
-2018-06-12  Jeff Law  <law@redhat.com>
-
-	* config-list.mk (LIST): Remove alpha-freebsd6.
-
-2018-05-08  Richard Biener  <rguenther@suse.de>
-
-	PR bootstrap/85571
-	* compare-lto: New script derived from compare-debug.
-=======
 2018-07-26  Release Manager
 
 	* GCC 8.2.0 released.
@@ -72,19 +5,11 @@
 2018-05-02  Release Manager
 
 	* GCC 8.1.0 released.
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
 
 2018-05-02  Jakub Jelinek  <jakub@redhat.com>
 
 	* gennews (files): Add files for GCC 8.
 
-<<<<<<< HEAD
-2018-05-01  Jim Wilson  <jimw@sifive.com>
-
-	* gcc_update: Check for .git as a file.
-
-=======
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
 2018-03-21  Christophe Lyon  <christophe.lyon@linaro.org>
 
 	* test_summary: Match possible single quotes in configure path.
@@ -113,7 +38,7 @@
 	* update-copyright.py: Skip pdt-5.f03 in gfortran.dg subdir.
 
 2017-11-28  Julia Koval  <julia.koval@intel.com>
-	    Sebastian Peryt  <sebastian.peryt@intel.com>
+            Sebastian Peryt  <sebastian.peryt@intel.com>
 
 	* contrib/gcc_update: Ditto.
 
@@ -223,8 +148,8 @@
 
 2017-04-11  Damian Rouson  <damian@sourceryinstitute.org>
 
-	* download_prerequisites (md5_check): New function emulates Linux
-	'md5 --check' on macOS.  Modified script for macOS compatibility.
+        * download_prerequisites (md5_check): New function emulates Linux
+        'md5 --check' on macOS.  Modified script for macOS compatibility.
 
 2017-02-06  Palmer Dabbelt  <palmer@dabbelt.com>
 
@@ -323,7 +248,7 @@
 2016-09-20  Christophe Lyon  <christophe.lyon@linaro.org>
 
 	* compare_tests: Take ERROR messages into account when
-	  comparing.
+          comparing.
 
 2016-08-17  Martin Liska  <mliska@suse.cz>
 

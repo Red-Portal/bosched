@@ -47,7 +47,7 @@ func Cgocall() {
 	mp := getg().m
 	mp.ncgocall++
 	mp.ncgo++
-	entersyscall()
+	entersyscall(0)
 	mp.incgo = true
 }
 
@@ -63,7 +63,7 @@ func CgocallDone() {
 	// If we are invoked because the C function called _cgo_panic,
 	// then _cgo_panic will already have exited syscall mode.
 	if readgstatus(gp)&^_Gscan == _Gsyscall {
-		exitsyscall()
+		exitsyscall(0)
 	}
 }
 
@@ -84,7 +84,7 @@ func CgocallBack() {
 
 	lockOSThread()
 
-	exitsyscall()
+	exitsyscall(0)
 	gp.m.incgo = false
 
 	if gp.m.ncgo == 0 {
@@ -134,7 +134,7 @@ func CgocallBackDone() {
 	}
 
 	gp.m.incgo = true
-	entersyscall()
+	entersyscall(0)
 
 	if drop {
 		mp.dropextram = false
@@ -144,7 +144,7 @@ func CgocallBackDone() {
 
 // _cgo_panic may be called by SWIG code to panic.
 func _cgo_panic(p *byte) {
-	exitsyscall()
+	exitsyscall(0)
 	panic(gostringnocopy(p))
 }
 

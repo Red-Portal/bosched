@@ -1,5 +1,4 @@
-// { dg-do compile { target c++17 } }
-// { dg-options "-fconcepts" }
+// { dg-options "-std=c++17 -fconcepts" }
 
 template <int I> struct B { static const int i = I; };
 template <int I> concept bool Few = I < 10;

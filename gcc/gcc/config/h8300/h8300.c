@@ -865,15 +865,15 @@ h8300_expand_prologue (void)
 	  if (TARGET_H8300S)
 	    {
 	      /* See how many registers we can push at the same time.  */
-	      if ((TARGET_H8300SX || (regno & 3) == 0)
+	      if ((!TARGET_H8300SX || (regno & 3) == 0)
 		  && ((saved_regs >> regno) & 0x0f) == 0x0f)
 		n_regs = 4;
 
-	      else if ((TARGET_H8300SX || (regno & 3) == 0)
+	      else if ((!TARGET_H8300SX || (regno & 3) == 0)
 		       && ((saved_regs >> regno) & 0x07) == 0x07)
 		n_regs = 3;
 
-	      else if ((TARGET_H8300SX || (regno & 1) == 0)
+	      else if ((!TARGET_H8300SX || (regno & 1) == 0)
 		       && ((saved_regs >> regno) & 0x03) == 0x03)
 		n_regs = 2;
 	    }
@@ -2551,14 +2551,14 @@ h8300_insn_length_from_table (rtx_insn *insn, rtx * operands)
     case LENGTH_TABLE_NONE:
       gcc_unreachable ();
 
-    case LENGTH_TABLE_ADD:
-      if (GET_MODE (operands[0]) == QImode)
-        return h8300_binary_length (insn, &addb_length_table);
-      else if (GET_MODE (operands[0]) == HImode)
-        return h8300_binary_length (insn, &addw_length_table);
-      else if (GET_MODE (operands[0]) == SImode)
-        return h8300_binary_length (insn, &addl_length_table);
-      gcc_unreachable ();
+    case LENGTH_TABLE_ADDB:
+      return h8300_binary_length (insn, &addb_length_table);
+
+    case LENGTH_TABLE_ADDW:
+      return h8300_binary_length (insn, &addw_length_table);
+
+    case LENGTH_TABLE_ADDL:
+      return h8300_binary_length (insn, &addl_length_table);
 
     case LENGTH_TABLE_LOGICB:
       return h8300_binary_length (insn, &logicb_length_table);
@@ -6147,8 +6147,5 @@ h8300_push_rounding (poly_int64 bytes)
 
 #undef TARGET_MODE_DEPENDENT_ADDRESS_P
 #define TARGET_MODE_DEPENDENT_ADDRESS_P h8300_mode_dependent_address_p
-
-#undef TARGET_HAVE_SPECULATION_SAFE_VALUE
-#define TARGET_HAVE_SPECULATION_SAFE_VALUE speculation_safe_value_not_needed
 
 struct gcc_target targetm = TARGET_INITIALIZER;

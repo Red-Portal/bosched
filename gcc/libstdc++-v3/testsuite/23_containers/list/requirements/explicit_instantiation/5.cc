@@ -24,6 +24,4 @@
 
 // libstdc++/50118
 template class std::list<int, __gnu_test::ExplicitConsAlloc<int> >;
-#ifndef __STRICT_ANSI__
 template class std::list<int, __gnu_test::ExplicitConsAlloc<char> >;
-#endif

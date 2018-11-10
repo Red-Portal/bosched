@@ -15,11 +15,11 @@ adapt_parameters_next_iteration(void)
     case VAR_NONE: break;
 
     case VAR_DELTA:
-        int trunc_n_ants = 0;  // { dg-message "initialization" }
+        int trunc_n_ants = 0;
         n_ants += trunc_n_ants;
         break;
-    case VAR_SWITCH:  // { dg-error "jump" }
+    case VAR_SWITCH:
         break;
-      default: break;  // { dg-error "jump" }
+      default: break;
     }
 }

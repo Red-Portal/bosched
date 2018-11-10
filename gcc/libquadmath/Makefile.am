@@ -1,6 +1,7 @@
 ## Process this file with automake to produce Makefile.in
 
-AUTOMAKE_OPTIONS = foreign info-in-builddir
+AUTOMAKE_OPTIONS = 1.8 foreign
+
 
 ## Skip over everything if the quadlib is not available:
 if BUILD_LIBQUADMATH
@@ -122,7 +123,6 @@ STAMP_GENINSRC = stamp-geninsrc
 else
 STAMP_GENINSRC =
 endif
-ALL_LOCAL_DEPS = $(STAMP_GENINSRC)
 
 # AM_CONDITIONAL on configure check ACX_CHECK_PROG_VER([MAKEINFO])
 if BUILD_INFO
@@ -132,6 +132,8 @@ STAMP_BUILD_INFO =
 endif
 
 
+all-local: $(STAMP_GENINSRC)
+
 stamp-geninsrc: libquadmath.info
 	cp -p $(top_builddir)/libquadmath.info $(srcdir)/libquadmath.info
 	@touch $@
@@ -140,12 +142,10 @@ stamp-build-info: libquadmath.texi $(libquadmath_TEXINFOS)
 	$(MAKEINFO) $(AM_MAKEINFOFLAGS) $(MAKEINFOFLAGS) -I $(srcdir) -o libquadmath.info $(srcdir)/libquadmath.texi
 	@touch $@
 
-CLEANFILES = $(STAMP_GENINSRC) $(STAMP_BUILD_INFO)
+CLEANFILES = $(STAMP_GENINSRC) $(STAMP_BUILD_INFO) libquadmath.info
 MAINTAINERCLEANFILES = $(srcdir)/libquadmath.info
 
 endif BUILD_LIBQUADMATH
-
-all-local: $(ALL_LOCAL_DEPS)
 
 # Unconditionally override this target, so that automake's definition
 # does not wrongly interfere.
@@ -172,5 +172,3 @@ libquadmath_TEXINFOS = libquadmath-vers.texi
 
 libquadmath-vers.texi:
 	echo "@set BUGURL $(REPORT_BUGS_TEXI)" > $@
-
-include $(top_srcdir)/../multilib.am

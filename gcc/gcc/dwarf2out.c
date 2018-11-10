@@ -102,7 +102,6 @@ static void dwarf2out_source_line (unsigned int, unsigned int, const char *,
 static rtx_insn *last_var_location_insn;
 static rtx_insn *cached_next_real_insn;
 static void dwarf2out_decl (tree);
-static bool is_redundant_typedef (const_tree);
 
 #ifndef XCOFF_DEBUGGING_INFO
 #define XCOFF_DEBUGGING_INFO 0
@@ -150,6 +149,13 @@ static GTY(()) vec<rtx, va_gc> *used_rtx_array;
    vec<tree, va_gc> *because we want to tell the garbage collector about
    it.  */
 static GTY(()) vec<tree, va_gc> *incomplete_types;
+
+/* A pointer to the base of a table of references to declaration
+   scopes.  This table is a display which tracks the nesting
+   of declaration scopes at the current scope and containing
+   scopes.  This table is used to find the proper place to
+   define type declaration DIE's.  */
+static GTY(()) vec<tree, va_gc> *decl_scope_table;
 
 /* Pointers to various DWARF2 sections.  */
 static GTY(()) section *debug_info_section;
@@ -240,7 +246,7 @@ static GTY (()) hash_table<indirect_string_hasher> *debug_line_str_hash;
    That is, the comp_dir and dwo_name will appear in both places.
 
    2) Strings can use four forms: DW_FORM_string, DW_FORM_strp,
-   DW_FORM_line_strp or DW_FORM_strx/GNU_str_index.
+   DW_FORM_line_strp or DW_FORM_GNU_str_index.
 
    3) GCC chooses the form to use late, depending on the size and
    reference count.
@@ -1658,16 +1664,6 @@ dwarf_OP (enum dwarf_location_atom op)
 	return DW_OP_GNU_reinterpret;
       break;
 
-    case DW_OP_addrx:
-      if (dwarf_version < 5)
-	return DW_OP_GNU_addr_index;
-      break;
-
-    case DW_OP_constx:
-      if (dwarf_version < 5)
-	return DW_OP_GNU_const_index;
-      break;
-
     default:
       break;
     }
@@ -1735,11 +1731,6 @@ dwarf_AT (enum dwarf_attribute at)
 	return DW_AT_GNU_dwo_name;
       break;
 
-    case DW_AT_addr_base:
-      if (dwarf_version < 5)
-	return DW_AT_GNU_addr_base;
-      break;
-
     default:
       break;
     }
@@ -1768,28 +1759,6 @@ dwarf_TAG (enum dwarf_tag tag)
   return tag;
 }
 
-/* And similarly for forms.  */
-static inline enum dwarf_form
-dwarf_FORM (enum dwarf_form form)
-{
-  switch (form)
-    {
-    case DW_FORM_addrx:
-      if (dwarf_version < 5)
-	return DW_FORM_GNU_addr_index;
-      break;
-
-    case DW_FORM_strx:
-      if (dwarf_version < 5)
-	return DW_FORM_GNU_str_index;
-      break;
-
-    default:
-      break;
-    }
-  return form;
-}
-
 static unsigned long int get_base_type_offset (dw_die_ref);
 
 /* Return the size of a location descriptor.  */
@@ -1805,9 +1774,7 @@ size_of_loc_descr (dw_loc_descr_ref loc)
       size += DWARF2_ADDR_SIZE;
       break;
     case DW_OP_GNU_addr_index:
-    case DW_OP_addrx:
     case DW_OP_GNU_const_index:
-    case DW_OP_constx:
       gcc_assert (loc->dw_loc_oprnd1.val_entry->index != NO_INDEX_ASSIGNED);
       size += size_of_uleb128 (loc->dw_loc_oprnd1.val_entry->index);
       break;
@@ -2307,9 +2274,7 @@ output_loc_operands (dw_loc_descr_ref loc, int for_eh_or_skip)
       break;
 
     case DW_OP_GNU_addr_index:
-    case DW_OP_addrx:
     case DW_OP_GNU_const_index:
-    case DW_OP_constx:
       gcc_assert (loc->dw_loc_oprnd1.val_entry->index != NO_INDEX_ASSIGNED);
       dw2_asm_output_data_uleb128 (loc->dw_loc_oprnd1.val_entry->index,
                                    "(index into .debug_addr)");
@@ -2540,9 +2505,7 @@ output_loc_operands_raw (dw_loc_descr_ref loc)
     {
     case DW_OP_addr:
     case DW_OP_GNU_addr_index:
-    case DW_OP_addrx:
     case DW_OP_GNU_const_index:
-    case DW_OP_constx:
     case DW_OP_implicit_value:
       /* We cannot output addresses in .cfi_escape, only bytes.  */
       gcc_unreachable ();
@@ -3649,6 +3612,7 @@ static void add_AT_specification (dw_die_ref, dw_die_ref);
 static inline dw_die_ref AT_ref (dw_attr_node *);
 static inline int AT_ref_external (dw_attr_node *);
 static inline void set_AT_ref_external (dw_attr_node *, int);
+static void add_AT_fde_ref (dw_die_ref, enum dwarf_attribute, unsigned);
 static void add_AT_loc (dw_die_ref, enum dwarf_attribute, dw_loc_descr_ref);
 static inline dw_loc_descr_ref AT_loc (dw_attr_node *);
 static void add_AT_loc_list (dw_die_ref, enum dwarf_attribute,
@@ -3664,16 +3628,20 @@ static void add_AT_symview (dw_die_ref, enum dwarf_attribute, const char *);
 static void add_AT_lbl_id (dw_die_ref, enum dwarf_attribute, const char *);
 static void add_AT_lineptr (dw_die_ref, enum dwarf_attribute, const char *);
 static void add_AT_macptr (dw_die_ref, enum dwarf_attribute, const char *);
+static void add_AT_loclistsptr (dw_die_ref, enum dwarf_attribute,
+				const char *);
+static void add_AT_offset (dw_die_ref, enum dwarf_attribute,
+			   unsigned HOST_WIDE_INT);
 static void add_AT_range_list (dw_die_ref, enum dwarf_attribute,
                                unsigned long, bool);
 static inline const char *AT_lbl (dw_attr_node *);
 static dw_attr_node *get_AT (dw_die_ref, enum dwarf_attribute);
 static const char *get_AT_low_pc (dw_die_ref);
+static const char *get_AT_hi_pc (dw_die_ref);
 static const char *get_AT_string (dw_die_ref, enum dwarf_attribute);
 static int get_AT_flag (dw_die_ref, enum dwarf_attribute);
 static unsigned get_AT_unsigned (dw_die_ref, enum dwarf_attribute);
 static inline dw_die_ref get_AT_ref (dw_die_ref, enum dwarf_attribute);
-static bool is_c (void);
 static bool is_cxx (void);
 static bool is_cxx (const_tree);
 static bool is_fortran (void);
@@ -3710,6 +3678,7 @@ static int same_dw_val_p (const dw_val_node *, const dw_val_node *, int *);
 static int same_attr_p (dw_attr_node *, dw_attr_node *, int *);
 static int same_die_p (dw_die_ref, dw_die_ref, int *);
 static int is_type_die (dw_die_ref);
+static int is_comdat_die (dw_die_ref);
 static inline bool is_template_instantiation (dw_die_ref);
 static int is_declaration_die (dw_die_ref);
 static int should_move_die_to_comdat (dw_die_ref);
@@ -3766,6 +3735,7 @@ static int decl_quals (const_tree);
 static dw_die_ref modified_type_die (tree, int, bool, dw_die_ref);
 static dw_die_ref generic_parameter_die (tree, tree, bool, dw_die_ref);
 static dw_die_ref template_parameter_pack_die (tree, tree, dw_die_ref);
+static int type_is_enum (const_tree);
 static unsigned int dbx_reg_number (const_rtx);
 static void add_loc_descr_op_piece (dw_loc_descr_ref *, int);
 static dw_loc_descr_ref reg_loc_descriptor (rtx, enum var_init_status);
@@ -3788,6 +3758,7 @@ static dw_loc_list_ref loc_list_from_tree (tree, int,
 					   struct loc_descr_context *);
 static dw_loc_descr_ref loc_descriptor_from_tree (tree, int,
 						  struct loc_descr_context *);
+static HOST_WIDE_INT ceiling (HOST_WIDE_INT, unsigned int);
 static tree field_type (const_tree);
 static unsigned int simple_type_align_in_bits (const_tree);
 static unsigned int simple_decl_align_in_bits (const_tree);
@@ -3808,7 +3779,6 @@ static bool add_location_or_const_value_attribute (dw_die_ref, tree, bool);
 static bool tree_add_const_value_attribute (dw_die_ref, tree);
 static bool tree_add_const_value_attribute_for_decl (dw_die_ref, tree);
 static void add_name_attribute (dw_die_ref, const char *);
-static void add_desc_attribute (dw_die_ref, tree);
 static void add_gnat_descriptive_type_attribute (dw_die_ref, tree, dw_die_ref);
 static void add_comp_dir_attribute (dw_die_ref);
 static void add_scalar_info (dw_die_ref, enum dwarf_attribute, tree, int,
@@ -3822,13 +3792,15 @@ static inline void add_bit_offset_attribute (dw_die_ref, tree,
 					     struct vlr_context *);
 static void add_bit_size_attribute (dw_die_ref, tree);
 static void add_prototyped_attribute (dw_die_ref, tree);
-static void add_abstract_origin_attribute (dw_die_ref, tree);
+static dw_die_ref add_abstract_origin_attribute (dw_die_ref, tree);
 static void add_pure_or_virtual_attribute (dw_die_ref, tree);
 static void add_src_coords_attributes (dw_die_ref, tree);
 static void add_name_and_src_coords_attributes (dw_die_ref, tree, bool = false);
 static void add_discr_value (dw_die_ref, dw_discr_value *);
 static void add_discr_list (dw_die_ref, dw_discr_list_ref);
 static inline dw_discr_list_ref AT_discr_list (dw_attr_node *);
+static void push_decl_scope (tree);
+static void pop_decl_scope (void);
 static dw_die_ref scope_die_for (tree, dw_die_ref);
 static inline int local_scope_p (dw_die_ref);
 static inline int class_scope_p (dw_die_ref);
@@ -3867,7 +3839,7 @@ static void gen_subroutine_type_die (tree, dw_die_ref);
 static void gen_typedef_die (tree, dw_die_ref);
 static void gen_type_die (tree, dw_die_ref);
 static void gen_block_die (tree, dw_die_ref);
-static void decls_for_scope (tree, dw_die_ref, bool = true);
+static void decls_for_scope (tree, dw_die_ref);
 static bool is_naming_typedef_decl (const_tree);
 static inline dw_die_ref get_context_die (tree);
 static void gen_namespace_die (tree, dw_die_ref);
@@ -3901,6 +3873,8 @@ static void prune_unused_types (void);
 static int maybe_emit_file (struct dwarf_file_data *fd);
 static inline const char *AT_vms_delta1 (dw_attr_node *);
 static inline const char *AT_vms_delta2 (dw_attr_node *);
+static inline void add_AT_vms_delta (dw_die_ref, enum dwarf_attribute,
+				     const char *, const char *);
 static void append_entry_to_tmpl_value_parm_die_table (dw_die_ref, tree);
 static void gen_remaining_tmpl_value_param_die_attribute (void);
 static bool generic_type_p (tree);
@@ -3931,10 +3905,10 @@ static inline enum dwarf_location_atom
 dw_addr_op (enum dtprel_bool dtprel)
 {
   if (dtprel == dtprel_true)
-    return (dwarf_split_debug_info ? dwarf_OP (DW_OP_constx)
+    return (dwarf_split_debug_info ? DW_OP_GNU_const_index
             : (DWARF2_ADDR_SIZE == 4 ? DW_OP_const4u : DW_OP_const8u));
   else
-    return dwarf_split_debug_info ? dwarf_OP (DW_OP_addrx) : DW_OP_addr;
+    return dwarf_split_debug_info ? DW_OP_GNU_addr_index : DW_OP_addr;
 }
 
 /* Return a pointer to a newly allocated address location description.  If
@@ -4415,8 +4389,8 @@ AT_class (dw_attr_node *a)
 }
 
 /* Return the index for any attribute that will be referenced with a
-   DW_FORM_addrx/GNU_addr_index or DW_FORM_strx/GNU_str_index.  String
-   indices are stored in dw_attr_val.v.val_str for reference counting
+   DW_FORM_GNU_addr_index or DW_FORM_GNU_str_index.  String indices
+   are stored in dw_attr_val.v.val_str for reference counting
    pruning.  */
 
 static inline unsigned int
@@ -4680,7 +4654,7 @@ set_indirect_string (struct indirect_string_node *node)
   /* Already indirect is a no op.  */
   if (node->form == DW_FORM_strp
       || node->form == DW_FORM_line_strp
-      || node->form == dwarf_FORM (DW_FORM_strx))
+      || node->form == DW_FORM_GNU_str_index)
     {
       gcc_assert (node->label);
       return;
@@ -4696,7 +4670,7 @@ set_indirect_string (struct indirect_string_node *node)
     }
   else
     {
-      node->form = dwarf_FORM (DW_FORM_strx);
+      node->form = DW_FORM_GNU_str_index;
       node->index = NO_INDEX_ASSIGNED;
     }
 }
@@ -4709,7 +4683,7 @@ int
 reset_indirect_string (indirect_string_node **h, void *)
 {
   struct indirect_string_node *node = *h;
-  if (node->form == DW_FORM_strp || node->form == dwarf_FORM (DW_FORM_strx))
+  if (node->form == DW_FORM_strp || node->form == DW_FORM_GNU_str_index)
     {
       free (node->label);
       node->label = NULL;
@@ -4823,6 +4797,20 @@ set_AT_ref_external (dw_attr_node *a, int i)
 {
   gcc_assert (a && AT_class (a) == dw_val_class_die_ref);
   a->dw_attr_val.v.val_die_ref.external = i;
+}
+
+/* Add an FDE reference attribute value to a DIE.  */
+
+static inline void
+add_AT_fde_ref (dw_die_ref die, enum dwarf_attribute attr_kind, unsigned int targ_fde)
+{
+  dw_attr_node attr;
+
+  attr.dw_attr = attr_kind;
+  attr.dw_attr_val.val_class = dw_val_class_fde_ref;
+  attr.dw_attr_val.val_entry = NULL;
+  attr.dw_attr_val.v.val_fde_index = targ_fde;
+  add_dwarf_attr (die, &attr);
 }
 
 /* Add a location description attribute value to a DIE.  */
@@ -5135,6 +5123,22 @@ AT_file (dw_attr_node *a)
   return a->dw_attr_val.v.val_file;
 }
 
+/* Add a vms delta attribute value to a DIE.  */
+
+static inline void
+add_AT_vms_delta (dw_die_ref die, enum dwarf_attribute attr_kind,
+		  const char *lbl1, const char *lbl2)
+{
+  dw_attr_node attr;
+
+  attr.dw_attr = attr_kind;
+  attr.dw_attr_val.val_class = dw_val_class_vms_delta;
+  attr.dw_attr_val.val_entry = NULL;
+  attr.dw_attr_val.v.val_vms_delta.lbl1 = xstrdup (lbl1);
+  attr.dw_attr_val.v.val_vms_delta.lbl2 = xstrdup (lbl2);
+  add_dwarf_attr (die, &attr);
+}
+
 /* Add a symbolic view identifier attribute value to a DIE.  */
 
 static inline void
@@ -5186,6 +5190,22 @@ add_AT_lineptr (dw_die_ref die, enum dwarf_attribute attr_kind,
 }
 
 /* Add a section offset attribute value to a DIE, an offset into the
+   debug_loclists section.  */
+
+static inline void
+add_AT_loclistsptr (dw_die_ref die, enum dwarf_attribute attr_kind,
+		    const char *label)
+{
+  dw_attr_node attr;
+
+  attr.dw_attr = attr_kind;
+  attr.dw_attr_val.val_class = dw_val_class_loclistsptr;
+  attr.dw_attr_val.val_entry = NULL;
+  attr.dw_attr_val.v.val_lbl_id = xstrdup (label);
+  add_dwarf_attr (die, &attr);
+}
+
+/* Add a section offset attribute value to a DIE, an offset into the
    debug_macinfo section.  */
 
 static inline void
@@ -5198,6 +5218,21 @@ add_AT_macptr (dw_die_ref die, enum dwarf_attribute attr_kind,
   attr.dw_attr_val.val_class = dw_val_class_macptr;
   attr.dw_attr_val.val_entry = NULL;
   attr.dw_attr_val.v.val_lbl_id = xstrdup (label);
+  add_dwarf_attr (die, &attr);
+}
+
+/* Add an offset attribute value to a DIE.  */
+
+static inline void
+add_AT_offset (dw_die_ref die, enum dwarf_attribute attr_kind,
+	       unsigned HOST_WIDE_INT offset)
+{
+  dw_attr_node attr;
+
+  attr.dw_attr = attr_kind;
+  attr.dw_attr_val.val_class = dw_val_class_offset;
+  attr.dw_attr_val.val_entry = NULL;
+  attr.dw_attr_val.v.val_offset = offset;
   add_dwarf_attr (die, &attr);
 }
 
@@ -5311,6 +5346,18 @@ get_AT_low_pc (dw_die_ref die)
   return a ? AT_lbl (a) : NULL;
 }
 
+/* Return the "high pc" attribute value, typically associated with a subprogram
+   DIE.  Return null if the "high pc" attribute is either not present, or if it
+   cannot be represented as an assembler label identifier.  */
+
+static inline const char *
+get_AT_hi_pc (dw_die_ref die)
+{
+  dw_attr_node *a = get_AT (die, DW_AT_high_pc);
+
+  return a ? AT_lbl (a) : NULL;
+}
+
 /* Return the value of the string attribute designated by ATTR_KIND, or
    NULL if it is not present.  */
 
@@ -5358,19 +5405,6 @@ get_AT_file (dw_die_ref die, enum dwarf_attribute attr_kind)
   dw_attr_node *a = get_AT (die, attr_kind);
 
   return a ? AT_file (a) : NULL;
-}
-
-/* Return TRUE if the language is C.  */
-
-static inline bool
-is_c (void)
-{
-  unsigned int lang = get_AT_unsigned (comp_unit_die (), DW_AT_language);
-
-  return (lang == DW_LANG_C || lang == DW_LANG_C89 || lang == DW_LANG_C99
-	  || lang == DW_LANG_C11 || lang == DW_LANG_ObjC);
-
-
 }
 
 /* Return TRUE if the language is C++.  */
@@ -5435,16 +5469,6 @@ is_ada (void)
   unsigned int lang = get_AT_unsigned (comp_unit_die (), DW_AT_language);
 
   return lang == DW_LANG_Ada95 || lang == DW_LANG_Ada83;
-}
-
-/* Return TRUE if the language is D.  */
-
-static inline bool
-is_dlang (void)
-{
-  unsigned int lang = get_AT_unsigned (comp_unit_die (), DW_AT_language);
-
-  return lang == DW_LANG_D;
 }
 
 /* Remove the specified attribute if present.  Return TRUE if removal
@@ -5756,14 +5780,6 @@ equate_type_number_to_die (tree type, dw_die_ref type_die)
   TYPE_SYMTAB_DIE (type) = type_die;
 }
 
-static dw_die_ref maybe_create_die_with_external_ref (tree);
-struct GTY(()) sym_off_pair 
-{
-  const char * GTY((skip)) sym;
-  unsigned HOST_WIDE_INT off;
-};
-static GTY(()) hash_map<tree, sym_off_pair> *external_die_map;
-
 /* Returns a hash value for X (which really is a die_struct).  */
 
 inline hashval_t
@@ -5788,11 +5804,7 @@ lookup_decl_die (tree decl)
   dw_die_ref *die = decl_die_table->find_slot_with_hash (decl, DECL_UID (decl),
 							 NO_INSERT);
   if (!die)
-    {
-      if (in_lto_p)
-	return maybe_create_die_with_external_ref (decl);
-      return NULL;
-    }
+    return NULL;
   if ((*die)->removed)
     {
       decl_die_table->clear_slot (die);
@@ -5800,27 +5812,6 @@ lookup_decl_die (tree decl)
     }
   return *die;
 }
-
-
-/* Return the DIE associated with BLOCK.  */
-
-static inline dw_die_ref
-lookup_block_die (tree block)
-{
-  dw_die_ref die = BLOCK_DIE (block);
-  if (!die && in_lto_p)
-    return maybe_create_die_with_external_ref (block);
-  return die;
-}
-
-/* Associate DIE with BLOCK.  */
-
-static inline void
-equate_block_to_die (tree block, dw_die_ref die)
-{
-  BLOCK_DIE (block) = die;
-}
-#undef BLOCK_DIE
 
 
 /* For DECL which might have early dwarf output query a SYMBOL + OFFSET
@@ -5833,26 +5824,31 @@ dwarf2out_die_ref_for_decl (tree decl, const char **sym,
 {
   dw_die_ref die;
 
-  if (in_lto_p)
-    {
-      /* During WPA stage and incremental linking we use a hash-map
-	 to store the decl <-> label + offset map.  */
-      if (!external_die_map)
-	return false;
-      sym_off_pair *desc = external_die_map->get (decl);
-      if (!desc)
-	return false;
-      *sym = desc->sym;
-      *off = desc->off;
-      return true;
-    }
+  if (flag_wpa && !decl_die_table)
+    return false;
 
   if (TREE_CODE (decl) == BLOCK)
-    die = lookup_block_die (decl);
+    die = BLOCK_DIE (decl);
   else
     die = lookup_decl_die (decl);
   if (!die)
     return false;
+
+  /* During WPA stage we currently use DIEs to store the
+     decl <-> label + offset map.  That's quite inefficient but it
+     works for now.  */
+  if (flag_wpa)
+    {
+      dw_die_ref ref = get_AT_ref (die, DW_AT_abstract_origin);
+      if (!ref)
+	{
+	  gcc_assert (die == comp_unit_die ());
+	  return false;
+	}
+      *off = ref->die_offset;
+      *sym = ref->die_id.die_symbol;
+      return true;
+    }
 
   /* Similar to get_ref_die_offset_label, but using the "correct"
      label.  */
@@ -5875,10 +5871,8 @@ add_AT_external_die_ref (dw_die_ref die, enum dwarf_attribute attr_kind,
 {
   /* Create a fake DIE that contains the reference.  Don't use
      new_die because we don't want to end up in the limbo list.  */
-  /* ???  We probably want to share these, thus put a ref to the DIE
-     we create here to the external_die_map entry.  */
   dw_die_ref ref = new_die_raw (die->die_tag);
-  ref->die_id.die_symbol = symbol;
+  ref->die_id.die_symbol = IDENTIFIER_POINTER (get_identifier (symbol));
   ref->die_offset = offset;
   ref->with_offset = 1;
   add_AT_die_ref (die, attr_kind, ref);
@@ -5894,33 +5888,12 @@ dwarf2out_register_external_die (tree decl, const char *sym,
   if (debug_info_level == DINFO_LEVEL_NONE)
     return;
 
-  if (!external_die_map)
-    external_die_map = hash_map<tree, sym_off_pair>::create_ggc (1000);
-  gcc_checking_assert (!external_die_map->get (decl));
-  sym_off_pair p = { IDENTIFIER_POINTER (get_identifier (sym)), off };
-  external_die_map->put (decl, p);
-}
+  if (flag_wpa && !decl_die_table)
+    decl_die_table = hash_table<decl_die_hasher>::create_ggc (1000);
 
-/* If we have a registered external DIE for DECL return a new DIE for
-   the concrete instance with an appropriate abstract origin.  */
-
-static dw_die_ref
-maybe_create_die_with_external_ref (tree decl)
-{
-  if (!external_die_map)
-    return NULL;
-  sym_off_pair *desc = external_die_map->get (decl);
-  if (!desc)
-    return NULL;
-
-  const char *sym = desc->sym;
-  unsigned HOST_WIDE_INT off = desc->off;
-
-  in_lto_p = false;
-  dw_die_ref die = (TREE_CODE (decl) == BLOCK
-		    ? lookup_block_die (decl) : lookup_decl_die (decl));
+  dw_die_ref die
+    = TREE_CODE (decl) == BLOCK ? BLOCK_DIE (decl) : lookup_decl_die (decl);
   gcc_assert (!die);
-  in_lto_p = true;
 
   tree ctx;
   dw_die_ref parent = NULL;
@@ -5932,7 +5905,7 @@ maybe_create_die_with_external_ref (tree decl)
       /* ???  We do not output DIEs for all scopes thus skip as
 	 many DIEs as needed.  */
       while (TREE_CODE (ctx) == BLOCK
-	     && !lookup_block_die (ctx))
+	     && !BLOCK_DIE (ctx))
 	ctx = BLOCK_SUPERCONTEXT (ctx);
     }
   else
@@ -5947,18 +5920,15 @@ maybe_create_die_with_external_ref (tree decl)
   if (ctx)
     {
       if (TREE_CODE (ctx) == BLOCK)
-	parent = lookup_block_die (ctx);
+	parent = BLOCK_DIE (ctx);
       else if (TREE_CODE (ctx) == TRANSLATION_UNIT_DECL
 	       /* Keep the 1:1 association during WPA.  */
-	       && !flag_wpa
-	       && flag_incremental_link != INCREMENTAL_LINK_LTO)
+	       && !flag_wpa)
 	/* Otherwise all late annotations go to the main CU which
 	   imports the original CUs.  */
 	parent = comp_unit_die ();
       else if (TREE_CODE (ctx) == FUNCTION_DECL
-	       && TREE_CODE (decl) != FUNCTION_DECL
 	       && TREE_CODE (decl) != PARM_DECL
-	       && TREE_CODE (decl) != RESULT_DECL
 	       && TREE_CODE (decl) != BLOCK)
 	/* Leave function local entities parent determination to when
 	   we process scope vars.  */
@@ -5974,12 +5944,18 @@ maybe_create_die_with_external_ref (tree decl)
   switch (TREE_CODE (decl))
     {
     case TRANSLATION_UNIT_DECL:
-      {
-	die = comp_unit_die ();
-	/* We re-target all CU decls to the LTRANS CU DIE, so no need
-	   to create a DIE for the original CUs.  */
-	return die;
-      }
+      if (! flag_wpa)
+	{
+	  die = comp_unit_die ();
+	  dw_die_ref import = new_die (DW_TAG_imported_unit, die, NULL_TREE);
+	  add_AT_external_die_ref (import, DW_AT_import, sym, off);
+	  /* We re-target all CU decls to the LTRANS CU DIE, so no need
+	     to create a DIE for the original CUs.  */
+	  return;
+	}
+      /* Keep the 1:1 association during WPA.  */
+      die = new_die (DW_TAG_compile_unit, NULL, decl);
+      break;
     case NAMESPACE_DECL:
       if (is_fortran (decl))
 	die = new_die (DW_TAG_module, parent, decl);
@@ -6011,16 +5987,12 @@ maybe_create_die_with_external_ref (tree decl)
       gcc_unreachable ();
     }
   if (TREE_CODE (decl) == BLOCK)
-    equate_block_to_die (decl, die);
+    BLOCK_DIE (decl) = die;
   else
     equate_decl_number_to_die (decl, die);
 
-  add_desc_attribute (die, decl);
-
   /* Add a reference to the DIE providing early debug at $sym + off.  */
   add_AT_external_die_ref (die, DW_AT_abstract_origin, sym, off);
-
-  return die;
 }
 
 /* Returns a hash value for X (which really is a var_loc_list).  */
@@ -6452,12 +6424,7 @@ print_dw_val (dw_val_node *val, bool recurse, FILE *outfile)
 	  print_indent -= 4;
 	}
       else
-	{
-	  if (flag_dump_noaddr || flag_dump_unnumbered)
-	    fprintf (outfile, " #\n");
-	  else
-	    fprintf (outfile, " (%p)\n", (void *) val->v.val_loc);
-	}
+	fprintf (outfile, " (%p)\n", (void *) val->v.val_loc);
       break;
     case dw_val_class_loc_list:
       fprintf (outfile, "location list -> label:%s",
@@ -6526,10 +6493,7 @@ print_dw_val (dw_val_node *val, bool recurse, FILE *outfile)
 	    }
 	  else
 	    fprintf (outfile, "die -> %ld", die->die_offset);
-	  if (flag_dump_noaddr || flag_dump_unnumbered)
-	    fprintf (outfile, " #");
-	  else
-	    fprintf (outfile, " (%p)", (void *) die);
+	  fprintf (outfile, " (%p)", (void *) die);
 	}
       else
 	fprintf (outfile, "die -> <null>");
@@ -6619,11 +6583,8 @@ print_loc_descr (dw_loc_descr_ref loc, FILE *outfile)
   for (l = loc; l != NULL; l = l->dw_loc_next)
     {
       print_spaces (outfile);
-      if (flag_dump_noaddr || flag_dump_unnumbered)
-	fprintf (outfile, "#");
-      else
-	fprintf (outfile, "(%p)", (void *) l);
-      fprintf (outfile, " %s",
+      fprintf (outfile, "(%p) %s",
+	       (void *) l,
 	       dwarf_stack_op_name (l->dw_loc_opc));
       if (l->dw_loc_oprnd1.val_class != dw_val_class_none)
 	{
@@ -6650,12 +6611,9 @@ print_die (dw_die_ref die, FILE *outfile)
   unsigned ix;
 
   print_spaces (outfile);
-  fprintf (outfile, "DIE %4ld: %s ",
-	   die->die_offset, dwarf_tag_name (die->die_tag));
-  if (flag_dump_noaddr || flag_dump_unnumbered)
-    fprintf (outfile, "#\n");
-  else
-    fprintf (outfile, "(%p)\n", (void*) die);
+  fprintf (outfile, "DIE %4ld: %s (%p)\n",
+	   die->die_offset, dwarf_tag_name (die->die_tag),
+	   (void*) die);
   print_spaces (outfile);
   fprintf (outfile, "  abbrev id: %lu", die->die_abbrev);
   fprintf (outfile, " offset: %ld", die->die_offset);
@@ -7879,6 +7837,36 @@ is_type_die (dw_die_ref die)
     }
 }
 
+/* Returns 1 iff C is the sort of DIE that should go into a COMDAT CU.
+   Basically, we want to choose the bits that are likely to be shared between
+   compilations (types) and leave out the bits that are specific to individual
+   compilations (functions).  */
+
+static int
+is_comdat_die (dw_die_ref c)
+{
+  /* I think we want to leave base types and __vtbl_ptr_type in the main CU, as
+     we do for stabs.  The advantage is a greater likelihood of sharing between
+     objects that don't include headers in the same order (and therefore would
+     put the base types in a different comdat).  jason 8/28/00 */
+
+  if (c->die_tag == DW_TAG_base_type)
+    return 0;
+
+  if (c->die_tag == DW_TAG_pointer_type
+      || c->die_tag == DW_TAG_reference_type
+      || c->die_tag == DW_TAG_rvalue_reference_type
+      || c->die_tag == DW_TAG_const_type
+      || c->die_tag == DW_TAG_volatile_type)
+    {
+      dw_die_ref t = get_AT_ref (c, DW_AT_type);
+
+      return t ? is_comdat_die (t) : 0;
+    }
+
+  return is_type_die (c);
+}
+
 /* Returns true iff C is a compile-unit DIE.  */
 
 static inline bool
@@ -7905,6 +7893,15 @@ static inline bool
 is_namespace_die (dw_die_ref c)
 {
   return c && c->die_tag == DW_TAG_namespace;
+}
+
+/* Returns true iff C is a class or structure DIE.  */
+
+static inline bool
+is_class_die (dw_die_ref c)
+{
+  return c && (c->die_tag == DW_TAG_class_type
+               || c->die_tag == DW_TAG_structure_type);
 }
 
 /* Return non-zero if this DIE is a template parameter.  */
@@ -9023,9 +9020,8 @@ build_abbrev_table (dw_die_ref die, external_ref_hash_type *extern_map)
 	struct external_ref *ref_p;
 	gcc_assert (AT_ref (a)->comdat_type_p || AT_ref (a)->die_id.die_symbol);
 
-	if (is_type_die (c)
-	    && (ref_p = lookup_external_ref (extern_map, c))
-	    && ref_p->stub && ref_p->stub != die)
+	ref_p = lookup_external_ref (extern_map, c);
+	if (ref_p->stub && ref_p->stub != die)
 	  change_AT_die_ref (a, ref_p->stub);
 	else
 	  /* We aren't changing this reference, so mark it external.  */
@@ -9425,7 +9421,7 @@ size_of_die (dw_die_ref die)
           form = AT_string_form (a);
 	  if (form == DW_FORM_strp || form == DW_FORM_line_strp)
 	    size += DWARF_OFFSET_SIZE;
-	  else if (form == dwarf_FORM (DW_FORM_strx))
+	  else if (form == DW_FORM_GNU_str_index)
 	    size += size_of_uleb128 (AT_index (a));
 	  else
 	    size += strlen (a->dw_attr_val.v.val_str->str) + 1;
@@ -9672,7 +9668,7 @@ value_format (dw_attr_node *a)
 	case DW_AT_entry_pc:
 	case DW_AT_trampoline:
           return (AT_index (a) == NOT_INDEXED
-                  ? DW_FORM_addr : dwarf_FORM (DW_FORM_addrx));
+                  ? DW_FORM_addr : DW_FORM_GNU_addr_index);
 	default:
 	  break;
 	}
@@ -9845,7 +9841,7 @@ value_format (dw_attr_node *a)
       return DW_FORM_data;
     case dw_val_class_lbl_id:
       return (AT_index (a) == NOT_INDEXED
-              ? DW_FORM_addr : dwarf_FORM (DW_FORM_addrx));
+              ? DW_FORM_addr : DW_FORM_GNU_addr_index);
     case dw_val_class_lineptr:
     case dw_val_class_macptr:
     case dw_val_class_loclistsptr:
@@ -10821,7 +10817,7 @@ output_die (dw_die_ref die)
 				   a->dw_attr_val.v.val_str->label,
 				   debug_line_str_section,
 				   "%s: \"%s\"", name, AT_string (a));
-          else if (a->dw_attr_val.v.val_str->form == dwarf_FORM (DW_FORM_strx))
+          else if (a->dw_attr_val.v.val_str->form == DW_FORM_GNU_str_index)
             dw2_asm_output_data_uleb128 (AT_index (a),
                                          "%s: \"%s\"", name, AT_string (a));
           else
@@ -11102,7 +11098,7 @@ add_skeleton_AT_string (dw_die_ref die, enum dwarf_attribute attr_kind,
 
   node = find_AT_string_in_table (str, skeleton_debug_str_hash);
   find_string_form (node);
-  if (node->form == dwarf_FORM (DW_FORM_strx))
+  if (node->form == DW_FORM_GNU_str_index)
     node->form = DW_FORM_strp;
 
   attr.dw_attr = attr_kind;
@@ -11125,7 +11121,7 @@ add_top_level_skeleton_die_attrs (dw_die_ref die)
   if (comp_dir != NULL)
     add_skeleton_AT_string (die, DW_AT_comp_dir, comp_dir);
   add_AT_pubnames (die);
-  add_AT_lineptr (die, dwarf_AT (DW_AT_addr_base), debug_addr_section_label);
+  add_AT_lineptr (die, DW_AT_GNU_addr_base, debug_addr_section_label);
 }
 
 /* Output skeleton debug sections that point to the dwo file.  */
@@ -11974,9 +11970,7 @@ file_info_cmp (const void *p1, const void *p2)
      we return consistent values to qsort since some will get confused if
      we return the same value when identical operands are passed in opposite
      orders.  So if neither has a directory, return 0 and otherwise return
-     1 or -1 depending on which one has the directory.  We want the one with
-     the directory to sort after the one without, so all no directory files
-     are at the start (normally only the compilation unit file).  */
+     1 or -1 depending on which one has the directory.  */
   if ((s1->path == s1->fname || s2->path == s2->fname))
     return (s2->path == s2->fname) - (s1->path == s1->fname);
 
@@ -11987,12 +11981,11 @@ file_info_cmp (const void *p1, const void *p2)
     {
       ++cp1;
       ++cp2;
-      /* Reached the end of the first path?  If so, handle like above,
-	 but now we want longer directory prefixes before shorter ones.  */
+      /* Reached the end of the first path?  If so, handle like above.  */
       if ((cp1 == (const unsigned char *) s1->fname)
 	  || (cp2 == (const unsigned char *) s2->fname))
-	return ((cp1 == (const unsigned char *) s1->fname)
-		- (cp2 == (const unsigned char *) s2->fname));
+	return ((cp2 == (const unsigned char *) s2->fname)
+		- (cp1 == (const unsigned char *) s1->fname));
 
       /* Character of current path component the same?  */
       else if (*cp1 != *cp2)
@@ -12890,6 +12883,7 @@ is_base_type (tree type)
     case FIXED_POINT_TYPE:
     case COMPLEX_TYPE:
     case BOOLEAN_TYPE:
+    case POINTER_BOUNDS_TYPE:
       return 1;
 
     case VOID_TYPE:
@@ -13637,6 +13631,15 @@ template_parameter_pack_die (tree parm_pack,
   return die;
 }
 
+/* Given a pointer to an arbitrary ..._TYPE tree node, return true if it is
+   an enumerated type.  */
+
+static inline int
+type_is_enum (const_tree type)
+{
+  return TREE_CODE (type) == ENUMERAL_TYPE;
+}
+
 /* Return the DBX register number described by a given RTL node.  */
 
 static unsigned int
@@ -14267,13 +14270,13 @@ based_loc_descr (rtx reg, poly_int64 offset,
 
       if (elim != reg)
 	{
-	  /* Allow hard frame pointer here even if frame pointer
-	    isn't used since hard frame pointer is encoded with
-	    DW_OP_fbreg which uses the DW_AT_frame_base attribute,
-	    not hard frame pointer directly.  */
 	  elim = strip_offset_and_add (elim, &offset);
-	  gcc_assert (elim == hard_frame_pointer_rtx
-		      || elim == stack_pointer_rtx);
+	  gcc_assert ((SUPPORTS_STACK_ALIGNMENT
+		       && (elim == hard_frame_pointer_rtx
+			   || elim == stack_pointer_rtx))
+	              || elim == (frame_pointer_needed
+				  ? hard_frame_pointer_rtx
+				  : stack_pointer_rtx));
 
 	  /* If drap register is used to align stack, use frame
 	     pointer + offset to access stack variables.  If stack
@@ -15440,7 +15443,7 @@ mem_loc_descriptor (rtx rtl, machine_mode mode,
 
 	  if (dwarf_strict && dwarf_version < 5)
 	    break;
-	  if (REGNO (rtl) >= FIRST_PSEUDO_REGISTER)
+	  if (REGNO (rtl) > FIRST_PSEUDO_REGISTER)
 	    break;
 	  type_die = base_type_for_mode (mode, SCALAR_INT_MODE_P (mode));
 	  if (type_die == NULL)
@@ -16285,7 +16288,6 @@ mem_loc_descriptor (rtx rtl, machine_mode mode,
     case CONST_FIXED:
     case CLRSB:
     case CLOBBER:
-    case CLOBBER_HIGH:
       /* If delegitimize_address couldn't do anything with the UNSPEC, we
 	 can't express it in the debug info.  This can happen e.g. with some
 	 TLS UNSPECs.  */
@@ -18858,6 +18860,15 @@ loc_descriptor_from_tree (tree loc, int want_address,
   return ret->expr;
 }
 
+/* Given a value, round it up to the lowest multiple of `boundary'
+   which is not less than the value itself.  */
+
+static inline HOST_WIDE_INT
+ceiling (HOST_WIDE_INT value, unsigned int boundary)
+{
+  return (((value + boundary - 1) / boundary) * boundary);
+}
+
 /* Given a pointer to what is assumed to be a FIELD_DECL node, return a
    pointer to the declared type for the relevant field variable, or return
    `integer_type_node' if the given node turns out to be an
@@ -20445,13 +20456,14 @@ compute_frame_pointer_to_fb_displacement (poly_int64 offset)
      in which to eliminate.  This is because it's stack pointer isn't 
      directly accessible as a register within the ISA.  To work around
      this, assume that while we cannot provide a proper value for
-     frame_pointer_fb_offset, we won't need one either.  We can use
-     hard frame pointer in debug info even if frame pointer isn't used
-     since hard frame pointer in debug info is encoded with DW_OP_fbreg
-     which uses the DW_AT_frame_base attribute, not hard frame pointer
-     directly.  */
+     frame_pointer_fb_offset, we won't need one either.  */
   frame_pointer_fb_offset_valid
-    = (elim == hard_frame_pointer_rtx || elim == stack_pointer_rtx);
+    = ((SUPPORTS_STACK_ALIGNMENT
+	&& (elim == hard_frame_pointer_rtx
+	    || elim == stack_pointer_rtx))
+       || elim == (frame_pointer_needed
+		   ? hard_frame_pointer_rtx
+		   : stack_pointer_rtx));
 }
 
 /* Generate a DW_AT_name attribute given some string value to be included as
@@ -20466,52 +20478,6 @@ add_name_attribute (dw_die_ref die, const char *name_string)
 	name_string = (*demangle_name_func) (name_string);
 
       add_AT_string (die, DW_AT_name, name_string);
-    }
-}
-
-/* Generate a DW_AT_description attribute given some string value to be included
-   as the value of the attribute.  */
-
-static void
-add_desc_attribute (dw_die_ref die, const char *name_string)
-{
-  if (!flag_describe_dies || (dwarf_version < 3 && dwarf_strict))
-    return;
-
-  if (name_string == NULL || *name_string == 0)
-    return;
-
-  if (demangle_name_func)
-    name_string = (*demangle_name_func) (name_string);
-
-  add_AT_string (die, DW_AT_description, name_string);
-}
-
-/* Generate a DW_AT_description attribute given some decl to be included
-   as the value of the attribute.  */
-
-static void
-add_desc_attribute (dw_die_ref die, tree decl)
-{
-  tree decl_name;
-
-  if (!flag_describe_dies || (dwarf_version < 3 && dwarf_strict))
-    return;
-
-  if (decl == NULL_TREE || !DECL_P (decl))
-    return;
-  decl_name = DECL_NAME (decl);
-
-  if (decl_name != NULL && IDENTIFIER_POINTER (decl_name) != NULL)
-    {
-      const char *name = dwarf2_name (decl, 0);
-      add_desc_attribute (die, name ? name : IDENTIFIER_POINTER (decl_name));
-    }
-  else
-    {
-      char *desc = print_generic_expr_to_str (decl);
-      add_desc_attribute (die, desc);
-      free (desc);
     }
 }
 
@@ -20598,7 +20564,7 @@ static void
 add_scalar_info (dw_die_ref die, enum dwarf_attribute attr, tree value,
 		 int forms, struct loc_descr_context *context)
 {
-  dw_die_ref context_die, decl_die = NULL;
+  dw_die_ref context_die, decl_die;
   dw_loc_list_ref list;
   bool strip_conversions = true;
   bool placeholder_seen = false;
@@ -20675,7 +20641,7 @@ add_scalar_info (dw_die_ref die, enum dwarf_attribute attr, tree value,
 
       if (decl != NULL_TREE)
 	{
-	  decl_die = lookup_decl_die (decl);
+	  dw_die_ref decl_die = lookup_decl_die (decl);
 
 	  /* ??? Can this happen, or should the variable have been bound
 	     first?  Probably it can, since I imagine that we try to create
@@ -20684,12 +20650,8 @@ add_scalar_info (dw_die_ref die, enum dwarf_attribute attr, tree value,
 	     later parameter.  */
 	  if (decl_die != NULL)
 	    {
-	      if (get_AT (decl_die, DW_AT_location)
-		  || get_AT (decl_die, DW_AT_const_value))
-		{
-		  add_AT_die_ref (die, attr, decl_die);
-		  return;
-		}
+	      add_AT_die_ref (die, attr, decl_die);
+	      return;
 	    }
 	}
     }
@@ -20733,19 +20695,15 @@ add_scalar_info (dw_die_ref die, enum dwarf_attribute attr, tree value,
       || placeholder_seen)
     return;
 
-  if (!decl_die)
-    {
-      if (current_function_decl == 0)
-	context_die = comp_unit_die ();
-      else
-	context_die = lookup_decl_die (current_function_decl);
+  if (current_function_decl == 0)
+    context_die = comp_unit_die ();
+  else
+    context_die = lookup_decl_die (current_function_decl);
 
-      decl_die = new_die (DW_TAG_variable, context_die, value);
-      add_AT_flag (decl_die, DW_AT_artificial, 1);
-      add_type_attribute (decl_die, TREE_TYPE (value), TYPE_QUAL_CONST, false,
-			  context_die);
-    }
-
+  decl_die = new_die (DW_TAG_variable, context_die, value);
+  add_AT_flag (decl_die, DW_AT_artificial, 1);
+  add_type_attribute (decl_die, TREE_TYPE (value), TYPE_QUAL_CONST, false,
+		      context_die);
   add_AT_location_description (decl_die, DW_AT_location, list);
   add_AT_die_ref (die, attr, decl_die);
 }
@@ -20930,16 +20888,8 @@ add_subscript_info (dw_die_ref type_die, tree type, bool collapse_p)
 
 	  if (!get_AT (subrange_die, DW_AT_lower_bound))
 	    add_bound_info (subrange_die, DW_AT_lower_bound, lower, NULL);
-	  if (!get_AT (subrange_die, DW_AT_upper_bound)
-	      && !get_AT (subrange_die, DW_AT_count))
-	    {
-	      if (upper)
-		add_bound_info (subrange_die, DW_AT_upper_bound, upper, NULL);
-	      else if ((is_c () || is_cxx ()) && COMPLETE_TYPE_P (type))
-		/* Zero-length array.  */
-		add_bound_info (subrange_die, DW_AT_count,
-				build_int_cst (TREE_TYPE (lower), 0), NULL);
-	    }
+	  if (upper && !get_AT (subrange_die, DW_AT_upper_bound))
+	    add_bound_info (subrange_die, DW_AT_upper_bound, upper, NULL);
 	}
 
       /* Otherwise we have an array type with an unspecified length.  The
@@ -21138,30 +21088,28 @@ add_prototyped_attribute (dw_die_ref die, tree func_type)
    by looking in the type declaration, the object declaration equate table or
    the block mapping.  */
 
-static inline void
+static inline dw_die_ref
 add_abstract_origin_attribute (dw_die_ref die, tree origin)
 {
   dw_die_ref origin_die = NULL;
 
-  /* For late LTO debug output we want to refer directly to the abstract
-     DIE in the early debug rather to the possibly existing concrete
-     instance and avoid creating that just for this purpose.  */
-  sym_off_pair *desc;
-  if (in_lto_p
-      && external_die_map
-      && (desc = external_die_map->get (origin)))
-    {
-      add_AT_external_die_ref (die, DW_AT_abstract_origin,
-			       desc->sym, desc->off);
-      return;
-    }
-
   if (DECL_P (origin))
-    origin_die = lookup_decl_die (origin);
+    {
+      dw_die_ref c;
+      origin_die = lookup_decl_die (origin);
+      /* "Unwrap" the decls DIE which we put in the imported unit context.
+         We are looking for the abstract copy here.  */
+      if (in_lto_p
+	  && origin_die
+	  && (c = get_AT_ref (origin_die, DW_AT_abstract_origin))
+	  /* ???  Identify this better.  */
+	  && c->with_offset)
+	origin_die = c;
+    }
   else if (TYPE_P (origin))
     origin_die = lookup_type_die (origin);
   else if (TREE_CODE (origin) == BLOCK)
-    origin_die = lookup_block_die (origin);
+    origin_die = BLOCK_DIE (origin);
 
   /* XXX: Functions that are never lowered don't always have correct block
      trees (in the case of java, they simply have no block tree, in some other
@@ -21174,6 +21122,7 @@ add_abstract_origin_attribute (dw_die_ref die, tree origin)
 
   if (origin_die)
     add_AT_die_ref (die, DW_AT_abstract_origin, origin_die);
+  return origin_die;
 }
 
 /* We do not currently support the pure_virtual attribute.  */
@@ -21282,17 +21231,12 @@ add_name_and_src_coords_attributes (dw_die_ref die, tree decl,
       const char *name = dwarf2_name (decl, 0);
       if (name)
 	add_name_attribute (die, name);
-      else
-	add_desc_attribute (die, decl);
-
       if (! DECL_ARTIFICIAL (decl))
 	add_src_coords_attributes (die, decl);
 
       if (!no_linkage_name)
 	add_linkage_name (die, decl);
     }
-  else
-    add_desc_attribute (die, decl);
 
 #ifdef VMS_DEBUGGING_INFO
   /* Get the function's name, as described by its RTL.  This may be different
@@ -21374,6 +21318,22 @@ dwarf2out_vms_debug_main_pointer (void)
     }
 }
 #endif /* VMS_DEBUGGING_INFO */
+
+/* Push a new declaration scope.  */
+
+static void
+push_decl_scope (tree scope)
+{
+  vec_safe_push (decl_scope_table, scope);
+}
+
+/* Pop a declaration scope.  */
+
+static inline void
+pop_decl_scope (void)
+{
+  decl_scope_table->pop ();
+}
 
 /* walk_tree helper function for uses_local_type, below.  */
 
@@ -22306,18 +22266,21 @@ gen_formal_types_die (tree function_or_method_type, dw_die_ref context_die)
 	break;
 
       /* Output a (nameless) DIE to represent the formal parameter itself.  */
-      parm_die = gen_formal_parameter_die (formal_type, NULL,
-					   true /* Emit name attribute.  */,
-					   context_die);
-      if (TREE_CODE (function_or_method_type) == METHOD_TYPE
-	  && link == first_parm_type)
+      if (!POINTER_BOUNDS_TYPE_P (formal_type))
 	{
-	  add_AT_flag (parm_die, DW_AT_artificial, 1);
-	  if (dwarf_version >= 3 || !dwarf_strict)
-	    add_AT_die_ref (context_die, DW_AT_object_pointer, parm_die);
+	  parm_die = gen_formal_parameter_die (formal_type, NULL,
+					       true /* Emit name attribute.  */,
+					       context_die);
+	  if (TREE_CODE (function_or_method_type) == METHOD_TYPE
+	      && link == first_parm_type)
+	    {
+	      add_AT_flag (parm_die, DW_AT_artificial, 1);
+	      if (dwarf_version >= 3 || !dwarf_strict)
+		add_AT_die_ref (context_die, DW_AT_object_pointer, parm_die);
+	    }
+	  else if (arg && DECL_ARTIFICIAL (arg))
+	    add_AT_flag (parm_die, DW_AT_artificial, 1);
 	}
-      else if (arg && DECL_ARTIFICIAL (arg))
-	add_AT_flag (parm_die, DW_AT_artificial, 1);
 
       link = TREE_CHAIN (link);
       if (arg)
@@ -22357,6 +22320,7 @@ gen_type_die_for_member (tree type, tree member, dw_die_ref context_die)
       dw_die_ref type_die;
       gcc_assert (!decl_ultimate_origin (member));
 
+      push_decl_scope (type);
       type_die = lookup_type_die_strip_naming_typedef (type);
       if (TREE_CODE (member) == FUNCTION_DECL)
 	gen_subprogram_die (member, type_die);
@@ -22378,6 +22342,8 @@ gen_type_die_for_member (tree type, tree member, dw_die_ref context_die)
 	}
       else
 	gen_variable_die (member, NULL_TREE, type_die);
+
+      pop_decl_scope ();
     }
 }
 
@@ -22469,15 +22435,14 @@ dwarf2out_abstract_function (tree decl)
   if (DECL_IGNORED_P (decl))
     return;
 
-  /* In LTO we're all set.  We already created abstract instances
-     early and we want to avoid creating a concrete instance of that
-     if we don't output it.  */
-  if (in_lto_p)
-    return;
-
   old_die = lookup_decl_die (decl);
+  /* With early debug we always have an old DIE unless we are in LTO
+     and the user did not compile but only link with debug.  */
+  if (in_lto_p && ! old_die)
+    return;
   gcc_assert (old_die != NULL);
-  if (get_AT (old_die, DW_AT_inline))
+  if (get_AT (old_die, DW_AT_inline)
+      || get_AT (old_die, DW_AT_abstract_origin))
     /* We've already generated the abstract instance.  */
     return;
 
@@ -22588,7 +22553,7 @@ gen_call_site_die (tree decl, dw_die_ref subr_die,
 	 && block != DECL_INITIAL (decl)
 	 && TREE_CODE (block) == BLOCK)
     {
-      stmt_die = lookup_block_die (block);
+      stmt_die = BLOCK_DIE (block);
       if (stmt_die)
 	break;
       block = BLOCK_SUPERCONTEXT (block);
@@ -22776,23 +22741,26 @@ gen_subprogram_die (tree decl, dw_die_ref context_die)
 	 apply; we just use the old DIE.  */
       expanded_location s = expand_location (DECL_SOURCE_LOCATION (decl));
       struct dwarf_file_data * file_index = lookup_filename (s.file);
-      if (((is_unit_die (old_die->die_parent)
-	    /* This condition fixes the inconsistency/ICE with the
-	       following Fortran test (or some derivative thereof) while
-	       building libgfortran:
+      if ((is_cu_die (old_die->die_parent)
+	   /* This condition fixes the inconsistency/ICE with the
+	      following Fortran test (or some derivative thereof) while
+	      building libgfortran:
 
-		  module some_m
-		  contains
-		     logical function funky (FLAG)
-		       funky = .true.
-		    end function
-		  end module
-	     */
-	    || (old_die->die_parent
-		&& old_die->die_parent->die_tag == DW_TAG_module)
-	    || local_scope_p (old_die->die_parent)
-	    || context_die == NULL)
+		 module some_m
+		 contains
+		    logical function funky (FLAG)
+		      funky = .true.
+		   end function
+		 end module
+	   */
+	   || (old_die->die_parent
+	       && old_die->die_parent->die_tag == DW_TAG_module)
+	   || context_die == NULL)
 	   && (DECL_ARTIFICIAL (decl)
+	       /* The location attributes may be in the abstract origin
+		  which in the case of LTO might be not available to
+		  look at.  */
+	       || get_AT (old_die, DW_AT_abstract_origin)
 	       || (get_AT_file (old_die, DW_AT_decl_file) == file_index
 		   && (get_AT_unsigned (old_die, DW_AT_decl_line)
 		       == (unsigned) s.line)
@@ -22800,10 +22768,6 @@ gen_subprogram_die (tree decl, dw_die_ref context_die)
 		       || s.column == 0
 		       || (get_AT_unsigned (old_die, DW_AT_decl_column)
 			   == (unsigned) s.column)))))
-	  /* With LTO if there's an abstract instance for
-	     the old DIE, this is a concrete instance and
-	     thus re-use the DIE.  */
-	  || get_AT (old_die, DW_AT_abstract_origin))
 	{
 	  subr_die = old_die;
 
@@ -23183,7 +23147,7 @@ gen_subprogram_die (tree decl, dw_die_ref context_die)
 	    gen_formal_parameter_pack_die (generic_decl_parm,
 					   parm, subr_die,
 					   &parm);
-	  else if (parm)
+	  else if (parm && !POINTER_BOUNDS_P (parm))
 	    {
 	      dw_die_ref parm_die = gen_decl_die (parm, NULL, NULL, subr_die);
 
@@ -23266,7 +23230,6 @@ gen_subprogram_die (tree decl, dw_die_ref context_die)
 	      dw_die_ref die = NULL;
 	      rtx tloc = NULL_RTX, tlocc = NULL_RTX;
 	      rtx arg, next_arg;
-	      tree arg_decl = NULL_TREE;
 
 	      for (arg = (ca_loc->call_arg_loc_note != NULL_RTX
 			  ? XEXP (ca_loc->call_arg_loc_note, 0)
@@ -23331,7 +23294,6 @@ gen_subprogram_die (tree decl, dw_die_ref context_die)
 		      tdie = lookup_decl_die (tdecl);
 		      if (tdie == NULL)
 			continue;
-		      arg_decl = tdecl;
 		    }
 		  else
 		    continue;
@@ -23348,7 +23310,6 @@ gen_subprogram_die (tree decl, dw_die_ref context_die)
 		    die = gen_call_site_die (decl, subr_die, ca_loc);
 		  cdie = new_die (dwarf_TAG (DW_TAG_call_site_parameter), die,
 				  NULL_TREE);
-		  add_desc_attribute (cdie, arg_decl);
 		  if (reg != NULL)
 		    add_AT_loc (cdie, DW_AT_location, reg);
 		  else if (tdie != NULL)
@@ -24020,7 +23981,7 @@ add_high_low_attributes (tree stmt, dw_die_ref die)
 	}
       if (attr != NULL
 	  && ((*ranges_table)[attr->dw_attr_val.v.val_offset].num
-	      == (int)BLOCK_NUMBER (superblock))
+	      == BLOCK_NUMBER (superblock))
 	  && BLOCK_FRAGMENT_CHAIN (superblock))
 	{
 	  unsigned long off = attr->dw_attr_val.v.val_offset;
@@ -24030,7 +23991,7 @@ add_high_low_attributes (tree stmt, dw_die_ref die)
 	    {
 	      ++supercnt;
 	      gcc_checking_assert ((*ranges_table)[off + supercnt].num
-				   == (int)BLOCK_NUMBER (chain));
+				   == BLOCK_NUMBER (chain));
 	    }
 	  gcc_checking_assert ((*ranges_table)[off + supercnt + 1].num == 0);
 	  for (chain = BLOCK_FRAGMENT_CHAIN (stmt);
@@ -24074,26 +24035,46 @@ add_high_low_attributes (tree stmt, dw_die_ref die)
 static void
 gen_lexical_block_die (tree stmt, dw_die_ref context_die)
 {
-  dw_die_ref old_die = lookup_block_die (stmt);
+  dw_die_ref old_die = BLOCK_DIE (stmt);
   dw_die_ref stmt_die = NULL;
   if (!old_die)
     {
       stmt_die = new_die (DW_TAG_lexical_block, context_die, stmt);
-      equate_block_to_die (stmt, stmt_die);
+      BLOCK_DIE (stmt) = stmt_die;
     }
 
-  if (BLOCK_ABSTRACT_ORIGIN (stmt))
+  if (BLOCK_ABSTRACT (stmt))
     {
-      /* If this is an inlined or conrecte instance, create a new lexical
-	 die for anything below to attach DW_AT_abstract_origin to.  */
       if (old_die)
-	stmt_die = new_die (DW_TAG_lexical_block, context_die, stmt);
+	{
+	  /* This must have been generated early and it won't even
+	     need location information since it's a DW_AT_inline
+	     function.  */
+	  if (flag_checking)
+	    for (dw_die_ref c = context_die; c; c = c->die_parent)
+	      if (c->die_tag == DW_TAG_inlined_subroutine
+		  || c->die_tag == DW_TAG_subprogram)
+		{
+		  gcc_assert (get_AT (c, DW_AT_inline));
+		  break;
+		}
+	  return;
+	}
+    }
+  else if (BLOCK_ABSTRACT_ORIGIN (stmt))
+    {
+      /* If this is an inlined instance, create a new lexical die for
+	 anything below to attach DW_AT_abstract_origin to.  */
+      if (old_die)
+	{
+	  stmt_die = new_die (DW_TAG_lexical_block, context_die, stmt);
+	  BLOCK_DIE (stmt) = stmt_die;
+	  old_die = NULL;
+	}
 
       tree origin = block_ultimate_origin (stmt);
-      if (origin != NULL_TREE && (origin != stmt || old_die))
+      if (origin != NULL_TREE && origin != stmt)
 	add_abstract_origin_attribute (stmt_die, origin);
-
-      old_die = NULL;
     }
 
   if (old_die)
@@ -24102,7 +24083,7 @@ gen_lexical_block_die (tree stmt, dw_die_ref context_die)
   /* A non abstract block whose blocks have already been reordered
      should have the instruction range for this block.  If so, set the
      high/low attributes.  */
-  if (!early_dwarf && TREE_ASM_WRITTEN (stmt))
+  if (!early_dwarf && !BLOCK_ABSTRACT (stmt) && TREE_ASM_WRITTEN (stmt))
     {
       gcc_assert (stmt_die);
       add_high_low_attributes (stmt, stmt_die);
@@ -24116,38 +24097,32 @@ gen_lexical_block_die (tree stmt, dw_die_ref context_die)
 static void
 gen_inlined_subroutine_die (tree stmt, dw_die_ref context_die)
 {
-  tree decl = block_ultimate_origin (stmt);
+  tree decl;
+
+  /* The instance of function that is effectively being inlined shall not
+     be abstract.  */
+  gcc_assert (! BLOCK_ABSTRACT (stmt));
+
+  decl = block_ultimate_origin (stmt);
 
   /* Make sure any inlined functions are known to be inlineable.  */
   gcc_checking_assert (DECL_ABSTRACT_P (decl)
 		       || cgraph_function_possibly_inlined_p (decl));
 
-  dw_die_ref subr_die = new_die (DW_TAG_inlined_subroutine, context_die, stmt);
-
-  if (call_arg_locations || debug_inline_points)
-    equate_block_to_die (stmt, subr_die);
-  add_abstract_origin_attribute (subr_die, decl);
-  if (TREE_ASM_WRITTEN (stmt))
-    add_high_low_attributes (stmt, subr_die);
-  add_call_src_coords_attributes (stmt, subr_die);
-
-  /* The inliner creates an extra BLOCK for the parameter setup,
-     we want to merge that with the actual outermost BLOCK of the
-     inlined function to avoid duplicate locals in consumers.
-     Do that by doing the recursion to subblocks on the single subblock
-     of STMT.  */
-  bool unwrap_one = false;
-  if (BLOCK_SUBBLOCKS (stmt) && !BLOCK_CHAIN (BLOCK_SUBBLOCKS (stmt)))
+  if (! BLOCK_ABSTRACT (stmt))
     {
-      tree origin = block_ultimate_origin (BLOCK_SUBBLOCKS (stmt));
-      if (origin
-	  && TREE_CODE (origin) == BLOCK
-	  && BLOCK_SUPERCONTEXT (origin) == decl)
-	unwrap_one = true;
+      dw_die_ref subr_die
+	= new_die (DW_TAG_inlined_subroutine, context_die, stmt);
+
+      if (call_arg_locations || debug_inline_points)
+	BLOCK_DIE (stmt) = subr_die;
+      add_abstract_origin_attribute (subr_die, decl);
+      if (TREE_ASM_WRITTEN (stmt))
+        add_high_low_attributes (stmt, subr_die);
+      add_call_src_coords_attributes (stmt, subr_die);
+
+      decls_for_scope (stmt, subr_die);
     }
-  decls_for_scope (stmt, subr_die, !unwrap_one);
-  if (unwrap_one)
-    decls_for_scope (BLOCK_SUBBLOCKS (stmt), subr_die);
 }
 
 /* Generate a DIE for a field in a record, or structure.  CTX is required: see
@@ -24256,7 +24231,6 @@ gen_producer_string (void)
       case OPT_U:
       case OPT_SPECIAL_unknown:
       case OPT_SPECIAL_ignore:
-      case OPT_SPECIAL_deprecated:
       case OPT_SPECIAL_program_name:
       case OPT_SPECIAL_input_file:
       case OPT_grecord_gcc_switches:
@@ -24264,8 +24238,6 @@ gen_producer_string (void)
       case OPT_fdiagnostics_show_location_:
       case OPT_fdiagnostics_show_option:
       case OPT_fdiagnostics_show_caret:
-      case OPT_fdiagnostics_show_labels:
-      case OPT_fdiagnostics_show_line_numbers:
       case OPT_fdiagnostics_color_:
       case OPT_fverbose_asm:
       case OPT____:
@@ -24279,8 +24251,6 @@ gen_producer_string (void)
       case OPT_fmacro_prefix_map_:
       case OPT_ffile_prefix_map_:
       case OPT_fcompare_debug:
-      case OPT_fchecking:
-      case OPT_fchecking_:
 	/* Ignore these.  */
 	continue;
       default:
@@ -24340,8 +24310,6 @@ highest_c_language (const char *lang1, const char *lang2)
   if (strcmp ("GNU C++98", lang1) == 0 || strcmp ("GNU C++98", lang2) == 0)
     return "GNU C++98";
 
-  if (strcmp ("GNU C2X", lang1) == 0 || strcmp ("GNU C2X", lang2) == 0)
-    return "GNU C2X";
   if (strcmp ("GNU C17", lang1) == 0 || strcmp ("GNU C17", lang2) == 0)
     return "GNU C17";
   if (strcmp ("GNU C11", lang1) == 0 || strcmp ("GNU C11", lang2) == 0)
@@ -24421,8 +24389,7 @@ gen_compile_unit_die (const char *filename)
 
 	  if (dwarf_version >= 5 /* || !dwarf_strict */)
 	    if (strcmp (language_string, "GNU C11") == 0
-		|| strcmp (language_string, "GNU C17") == 0
-		|| strcmp (language_string, "GNU C2X"))
+		|| strcmp (language_string, "GNU C17") == 0)
 	      language = DW_LANG_C11;
 	}
     }
@@ -24461,8 +24428,6 @@ gen_compile_unit_die (const char *filename)
 	language = DW_LANG_ObjC;
       else if (strcmp (language_string, "GNU Objective-C++") == 0)
 	language = DW_LANG_ObjC_plus_plus;
-      else if (strcmp (language_string, "GNU D") == 0)
-	language = DW_LANG_D;
       else if (dwarf_version >= 5 || !dwarf_strict)
 	{
 	  if (strcmp (language_string, "GNU Go") == 0)
@@ -24472,9 +24437,6 @@ gen_compile_unit_die (const char *filename)
   /* Use a degraded Fortran setting in strict DWARF2 so is_fortran works.  */
   else if (strncmp (language_string, "GNU Fortran", 11) == 0)
     language = DW_LANG_Fortran90;
-  /* Likewise for Ada.  */
-  else if (strcmp (language_string, "GNU Ada") == 0)
-    language = DW_LANG_Ada83;
 
   add_AT_unsigned (die, DW_AT_language, language);
 
@@ -25151,7 +25113,9 @@ gen_struct_or_union_type_die (tree type, dw_die_ref context_die,
       if (type_die->die_parent == NULL)
 	add_child_die (scope_die, type_die);
 
+      push_decl_scope (type);
       gen_member_die (type, type_die);
+      pop_decl_scope ();
 
       add_gnat_descriptive_type_attribute (type_die, type, context_die);
       if (TYPE_ARTIFICIAL (type))
@@ -25305,12 +25269,14 @@ gen_tagged_type_die (tree type,
 		     dw_die_ref context_die,
 		     enum debug_info_usage usage)
 {
+  int need_pop;
+
   if (type == NULL_TREE
       || !is_tagged_type (type))
     return;
 
   if (TREE_ASM_WRITTEN (type))
-    ;
+    need_pop = 0;
   /* If this is a nested type whose containing class hasn't been written
      out yet, writing it out will cover this one, too.  This does not apply
      to instantiations of member class templates; they need to be added to
@@ -25327,7 +25293,9 @@ gen_tagged_type_die (tree type,
 	return;
 
       /* If that failed, attach ourselves to the stub.  */
+      push_decl_scope (TYPE_CONTEXT (type));
       context_die = lookup_type_die (TYPE_CONTEXT (type));
+      need_pop = 1;
     }
   else if (TYPE_CONTEXT (type) != NULL_TREE
 	   && (TREE_CODE (TYPE_CONTEXT (type)) == FUNCTION_DECL))
@@ -25340,9 +25308,13 @@ gen_tagged_type_die (tree type,
 	 specification.  */
       if (context_die && is_declaration_die (context_die))
 	context_die = NULL;
+      need_pop = 0;
     }
   else
-    context_die = declare_in_namespace (type, context_die);
+    {
+      context_die = declare_in_namespace (type, context_die);
+      need_pop = 0;
+    }
 
   if (TREE_CODE (type) == ENUMERAL_TYPE)
     {
@@ -25353,6 +25325,9 @@ gen_tagged_type_die (tree type,
     }
   else
     gen_struct_or_union_type_die (type, context_die, usage);
+
+  if (need_pop)
+    pop_decl_scope ();
 
   /* Don't set TREE_ASM_WRITTEN on an incomplete struct; we want to fix
      it up if it is ever completed.  gen_*_type_die will set it for us
@@ -25556,6 +25531,7 @@ gen_type_die_with_usage (tree type, dw_die_ref context_die,
     case FIXED_POINT_TYPE:
     case COMPLEX_TYPE:
     case BOOLEAN_TYPE:
+    case POINTER_BOUNDS_TYPE:
       /* No DIEs needed for fundamental types.  */
       break;
 
@@ -25645,32 +25621,22 @@ gen_block_die (tree stmt, dw_die_ref context_die)
     /* The outer scopes for inlinings *must* always be represented.  We
        generate DW_TAG_inlined_subroutine DIEs for them.  (See below.) */
     must_output_die = 1;
-  else if (lookup_block_die (stmt))
-    /* If we already have a DIE then it was filled early.  Meanwhile
-       we might have pruned all BLOCK_VARS as optimized out but we
-       still want to generate high/low PC attributes so output it.  */
-    must_output_die = 1;
-  else if (TREE_USED (stmt)
-	   || TREE_ASM_WRITTEN (stmt))
+  else
     {
       /* Determine if this block directly contains any "significant"
 	 local declarations which we will need to output DIEs for.  */
       if (debug_info_level > DINFO_LEVEL_TERSE)
-	{
-	  /* We are not in terse mode so any local declaration that
-	     is not ignored for debug purposes counts as being a
-	     "significant" one.  */
-	  if (BLOCK_NUM_NONLOCALIZED_VARS (stmt))
-	    must_output_die = 1;
-	  else
-	    for (tree var = BLOCK_VARS (stmt); var; var = DECL_CHAIN (var))
-	      if (!DECL_IGNORED_P (var))
-		{
-		  must_output_die = 1;
-		  break;
-		}
-	}
-      else if (!dwarf2out_ignore_block (stmt))
+	/* We are not in terse mode so *any* local declaration counts
+	   as being a "significant" one.  */
+	must_output_die = ((BLOCK_VARS (stmt) != NULL
+			    || BLOCK_NUM_NONLOCALIZED_VARS (stmt))
+			   && (TREE_USED (stmt)
+			       || TREE_ASM_WRITTEN (stmt)
+			       || BLOCK_ABSTRACT (stmt)));
+      else if ((TREE_USED (stmt)
+		|| TREE_ASM_WRITTEN (stmt)
+		|| BLOCK_ABSTRACT (stmt))
+      	       && !dwarf2out_ignore_block (stmt))
 	must_output_die = 1;
     }
 
@@ -25684,7 +25650,23 @@ gen_block_die (tree stmt, dw_die_ref context_die)
   if (must_output_die)
     {
       if (inlined_func)
-	gen_inlined_subroutine_die (stmt, context_die);
+	{
+	  /* If STMT block is abstract, that means we have been called
+	     indirectly from dwarf2out_abstract_function.
+	     That function rightfully marks the descendent blocks (of
+	     the abstract function it is dealing with) as being abstract,
+	     precisely to prevent us from emitting any
+	     DW_TAG_inlined_subroutine DIE as a descendent
+	     of an abstract function instance. So in that case, we should
+	     not call gen_inlined_subroutine_die.
+
+	     Later though, when cgraph asks dwarf2out to emit info
+	     for the concrete instance of the function decl into which
+	     the concrete instance of STMT got inlined, the later will lead
+	     to the generation of a DW_TAG_inlined_subroutine DIE.  */
+	  if (! BLOCK_ABSTRACT (stmt))
+	    gen_inlined_subroutine_die (stmt, context_die);
+	}
       else
 	gen_lexical_block_die (stmt, context_die);
     }
@@ -25762,7 +25744,7 @@ process_scope_var (tree stmt, tree decl, tree origin, dw_die_ref context_die)
    all of its sub-blocks.  */
 
 static void
-decls_for_scope (tree stmt, dw_die_ref context_die, bool recurse)
+decls_for_scope (tree stmt, dw_die_ref context_die)
 {
   tree decl;
   unsigned int i;
@@ -25805,16 +25787,15 @@ decls_for_scope (tree stmt, dw_die_ref context_die, bool recurse)
 
   /* Output the DIEs to represent all sub-blocks (and the items declared
      therein) of this block.  */
-  if (recurse)
-    for (subblocks = BLOCK_SUBBLOCKS (stmt);
-	 subblocks != NULL;
-	 subblocks = BLOCK_CHAIN (subblocks))
-      gen_block_die (subblocks, context_die);
+  for (subblocks = BLOCK_SUBBLOCKS (stmt);
+       subblocks != NULL;
+       subblocks = BLOCK_CHAIN (subblocks))
+    gen_block_die (subblocks, context_die);
 }
 
 /* Is this a typedef we can avoid emitting?  */
 
-static bool
+bool
 is_redundant_typedef (const_tree decl)
 {
   if (TYPE_DECL_IS_STUB (decl))
@@ -26047,7 +26028,7 @@ declare_in_namespace (tree thing, dw_die_ref context_die)
 
   if (ns_context != context_die)
     {
-      if (is_fortran () || is_dlang ())
+      if (is_fortran ())
 	return ns_context;
       if (DECL_P (thing))
 	gen_decl_die (thing, NULL, NULL, ns_context);
@@ -26070,7 +26051,7 @@ gen_namespace_die (tree decl, dw_die_ref context_die)
     {
       /* Output a real namespace or module.  */
       context_die = setup_namespace_context (decl, comp_unit_die ());
-      namespace_die = new_die (is_fortran () || is_dlang ()
+      namespace_die = new_die (is_fortran ()
 			       ? DW_TAG_module : DW_TAG_namespace,
 			       context_die, decl);
       /* For Fortran modules defined in different CU don't add src coords.  */
@@ -26130,13 +26111,19 @@ gen_decl_die (tree decl, tree origin, struct vlr_context *ctx,
   if (DECL_P (decl_or_origin) && DECL_IGNORED_P (decl_or_origin))
     return NULL;
 
+  /* Ignore pointer bounds decls.  */
+  if (DECL_P (decl_or_origin)
+      && TREE_TYPE (decl_or_origin)
+      && POINTER_BOUNDS_P (decl_or_origin))
+    return NULL;
+
   switch (TREE_CODE (decl_or_origin))
     {
     case ERROR_MARK:
       break;
 
     case CONST_DECL:
-      if (!is_fortran () && !is_ada () && !is_dlang ())
+      if (!is_fortran () && !is_ada ())
 	{
 	  /* The individual enumerators of an enum type get output when we output
 	     the Dwarf representation of the relevant enum type itself.  */
@@ -26463,7 +26450,7 @@ dwarf2out_late_global_decl (tree decl)
 {
   /* Fill-in any location information we were unable to determine
      on the first pass.  */
-  if (VAR_P (decl))
+  if (VAR_P (decl) && !POINTER_BOUNDS_P (decl))
     {
       dw_die_ref die = lookup_decl_die (decl);
 
@@ -26712,11 +26699,8 @@ dwarf2out_decl (tree decl)
     case FUNCTION_DECL:
       /* If we're a nested function, initially use a parent of NULL; if we're
 	 a plain function, this will be fixed up in decls_for_scope.  If
-	 we're a method, it will be ignored, since we already have a DIE.
-	 Avoid doing this late though since clones of class methods may
-	 otherwise end up in limbo and create type DIEs late.  */
-      if (early_dwarf
-	  && decl_function_context (decl)
+	 we're a method, it will be ignored, since we already have a DIE.  */
+      if (decl_function_context (decl)
 	  /* But if we're in terse mode, we don't care about scope.  */
 	  && debug_info_level > DINFO_LEVEL_TERSE)
 	context_die = NULL;
@@ -26736,7 +26720,7 @@ dwarf2out_decl (tree decl)
     case CONST_DECL:
       if (debug_info_level <= DINFO_LEVEL_TERSE)
 	return;
-      if (!is_fortran () && !is_ada () && !is_dlang ())
+      if (!is_fortran () && !is_ada ())
 	return;
       if (TREE_STATIC (decl) && decl_function_context (decl))
 	context_die = lookup_decl_die (DECL_CONTEXT (decl));
@@ -27460,7 +27444,7 @@ dwarf2out_inline_entry (tree block)
 				      true));
 
   gcc_assert (inlined_function_outer_scope_p (block));
-  gcc_assert (!lookup_block_die (block));
+  gcc_assert (!BLOCK_DIE (block));
 
   if (BLOCK_FRAGMENT_ORIGIN (block))
     block = BLOCK_FRAGMENT_ORIGIN (block);
@@ -27828,10 +27812,8 @@ dwarf2out_source_line (unsigned int line, unsigned int column,
 
       if (is_stmt != table->is_stmt)
 	{
-#if HAVE_GAS_LOC_STMT
 	  fputs (" is_stmt ", asm_out_file);
 	  putc (is_stmt ? '1' : '0', asm_out_file);
-#endif
 	}
       if (SUPPORTS_DISCRIMINATOR && discriminator != 0)
 	{
@@ -28084,7 +28066,7 @@ output_macinfo_op (macinfo_entry *ref)
       node = find_AT_string (ref->info);
       gcc_assert (node
 		  && (node->form == DW_FORM_strp
-		      || node->form == dwarf_FORM (DW_FORM_strx)));
+		      || node->form == DW_FORM_GNU_str_index));
       dw2_asm_output_data (1, ref->code,
 			   ref->code == DW_MACRO_define_strp
 			   ? "Define macro strp"
@@ -28264,12 +28246,6 @@ save_macinfo_strings (void)
                 && (debug_str_section->common.flags & SECTION_MERGE) != 0)
               set_indirect_string (find_AT_string (ref->info));
             break;
-	  case DW_MACINFO_start_file:
-	    /* -gsplit-dwarf -g3 will also output filename as indirect
-	       string.  */
-	    if (!dwarf_split_debug_info)
-	      break;
-	    /* Fall through. */
 	  case DW_MACRO_define_strp:
 	  case DW_MACRO_undef_strp:
             set_indirect_string (find_AT_string (ref->info));
@@ -28646,6 +28622,9 @@ dwarf2out_init (const char *filename ATTRIBUTE_UNUSED)
   /* Allocate the cached_dw_loc_list_table.  */
   cached_dw_loc_list_table = hash_table<dw_loc_list_hasher>::create_ggc (10);
 
+  /* Allocate the initial hunk of the decl_scope_table.  */
+  vec_alloc (decl_scope_table, 256);
+
   /* Allocate the initial hunk of the abbrev_die_table.  */
   vec_alloc (abbrev_die_table, 256);
   /* Zero-th entry is allocated, but unused.  */
@@ -28718,7 +28697,7 @@ index_string (indirect_string_node **h, unsigned int *index)
   indirect_string_node *node = *h;
 
   find_string_form (node);
-  if (node->form == dwarf_FORM (DW_FORM_strx) && node->refcount > 0)
+  if (node->form == DW_FORM_GNU_str_index && node->refcount > 0)
     {
       gcc_assert (node->index == NO_INDEX_ASSIGNED);
       node->index = *index;
@@ -28736,7 +28715,7 @@ output_index_string_offset (indirect_string_node **h, unsigned int *offset)
 {
   indirect_string_node *node = *h;
 
-  if (node->form == dwarf_FORM (DW_FORM_strx) && node->refcount > 0)
+  if (node->form == DW_FORM_GNU_str_index && node->refcount > 0)
     {
       /* Assert that this node has been assigned an index.  */
       gcc_assert (node->index != NO_INDEX_ASSIGNED
@@ -28756,7 +28735,7 @@ output_index_string (indirect_string_node **h, unsigned int *cur_idx)
 {
   struct indirect_string_node *node = *h;
 
-  if (node->form == dwarf_FORM (DW_FORM_strx) && node->refcount > 0)
+  if (node->form == DW_FORM_GNU_str_index && node->refcount > 0)
     {
       /* Assert that the strings are output in the same order as their
          indexes were assigned.  */
@@ -28764,19 +28743,6 @@ output_index_string (indirect_string_node **h, unsigned int *cur_idx)
       assemble_string (node->str, strlen (node->str) + 1);
       *cur_idx += 1;
     }
-  return 1;
-}
-
-/* A helper function for output_indirect_strings.  Counts the number
-   of index strings offsets.  Must match the logic of the functions
-   output_index_string[_offsets] above.  */
-int
-count_index_strings (indirect_string_node **h, unsigned int *last_idx)
-{
-  struct indirect_string_node *node = *h;
-
-  if (node->form == dwarf_FORM (DW_FORM_strx) && node->refcount > 0)
-    *last_idx += 1;
   return 1;
 }
 
@@ -28817,33 +28783,6 @@ output_indirect_strings (void)
 					  output_indirect_string> (DW_FORM_strp);
 
       switch_to_section (debug_str_offsets_section);
-      /* For DWARF5 the .debug_str_offsets[.dwo] section needs a unit
-	 header.  Note that we don't need to generate a label to the
-	 actual index table following the header here, because this is
-	 for the split dwarf case only.  In an .dwo file there is only
-	 one string offsets table (and one debug info section).  But
-	 if we would start using string offset tables for the main (or
-	 skeleton) unit, then we have to add a DW_AT_str_offsets_base
-	 pointing to the actual index after the header.  Split dwarf
-	 units will never have a string offsets base attribute.  When
-	 a split unit is moved into a .dwp file the string offsets can
-	 be found through the .debug_cu_index section table.  */
-      if (dwarf_version >= 5)
-	{
-	  unsigned int last_idx = 0;
-	  unsigned long str_offsets_length;
-
-	  debug_str_hash->traverse_noresize
-	    <unsigned int *, count_index_strings> (&last_idx);
-	  str_offsets_length = last_idx * DWARF_OFFSET_SIZE + 4;
-	  if (DWARF_INITIAL_LENGTH_SIZE - DWARF_OFFSET_SIZE == 4)
-	    dw2_asm_output_data (4, 0xffffffff,
-				 "Escape value for 64-bit DWARF extension");
-	  dw2_asm_output_data (DWARF_OFFSET_SIZE, str_offsets_length,
-			       "Length of string offsets unit");
-	  dw2_asm_output_data (2, 5, "DWARF string offsets version");
-	  dw2_asm_output_data (2, 0, "Header zero padding");
-	}
       debug_str_hash->traverse_noresize
 	<unsigned int *, output_index_string_offset> (&offset);
       switch_to_section (debug_str_dwo_section);
@@ -28890,19 +28829,6 @@ output_addr_table_entry (addr_table_entry **slot, unsigned int *cur_index)
       default:
         gcc_unreachable ();
     }
-  return 1;
-}
-
-/* A helper function for dwarf2out_finish.  Counts the number
-   of indexed addresses.  Must match the logic of the functions
-   output_addr_table_entry above.  */
-int
-count_index_addrs (addr_table_entry **slot, unsigned int *last_idx)
-{
-  addr_table_entry *entry = *slot;
-
-  if (entry->refcount > 0)
-    *last_idx += 1;
   return 1;
 }
 
@@ -29139,7 +29065,6 @@ prune_unused_types_walk_local_classes (dw_die_ref die)
     case DW_TAG_structure_type:
     case DW_TAG_union_type:
     case DW_TAG_class_type:
-    case DW_TAG_interface_type:
       break;
 
     case DW_TAG_subprogram:
@@ -29173,7 +29098,6 @@ prune_unused_types_walk (dw_die_ref die)
     case DW_TAG_structure_type:
     case DW_TAG_union_type:
     case DW_TAG_class_type:
-    case DW_TAG_interface_type:
       if (die->die_perennial_p)
 	break;
 
@@ -29200,6 +29124,7 @@ prune_unused_types_walk (dw_die_ref die)
     case DW_TAG_volatile_type:
     case DW_TAG_typedef:
     case DW_TAG_array_type:
+    case DW_TAG_interface_type:
     case DW_TAG_friend:
     case DW_TAG_enumeration_type:
     case DW_TAG_subroutine_type:
@@ -29771,14 +29696,9 @@ resolve_addr_in_expr (dw_attr_node *a, dw_loc_descr_ref loc)
 	  }
 	break;
       case DW_OP_GNU_addr_index:
-      case DW_OP_addrx:
       case DW_OP_GNU_const_index:
-      case DW_OP_constx:
-	if ((loc->dw_loc_opc == DW_OP_GNU_addr_index
-	     || loc->dw_loc_opc == DW_OP_addrx)
-	    || ((loc->dw_loc_opc == DW_OP_GNU_const_index
-		 || loc->dw_loc_opc == DW_OP_constx)
-		&& loc->dtprel))
+	if (loc->dw_loc_opc == DW_OP_GNU_addr_index
+            || (loc->dw_loc_opc == DW_OP_GNU_const_index && loc->dtprel))
           {
             rtx rtl = loc->dw_loc_oprnd1.val_entry->addr.rtl;
             if (!resolve_one_addr (&rtl))
@@ -30564,9 +30484,7 @@ hash_loc_operands (dw_loc_descr_ref loc, inchash::hash &hstate)
       inchash::add_rtx (val1->v.val_addr, hstate);
       break;
     case DW_OP_GNU_addr_index:
-    case DW_OP_addrx:
     case DW_OP_GNU_const_index:
-    case DW_OP_constx:
       {
         if (loc->dtprel)
           {
@@ -30807,9 +30725,7 @@ compare_loc_operands (dw_loc_descr_ref x, dw_loc_descr_ref y)
     hash_addr:
       return rtx_equal_p (valx1->v.val_addr, valy1->v.val_addr);
     case DW_OP_GNU_addr_index:
-    case DW_OP_addrx:
     case DW_OP_GNU_const_index:
-    case DW_OP_constx:
       {
         rtx ax1 = valx1->val_entry->addr.rtl;
         rtx ay1 = valy1->val_entry->addr.rtl;
@@ -31104,7 +31020,7 @@ reset_dies (dw_die_ref die)
    and generate the DWARF-2 debugging info.  */
 
 static void
-dwarf2out_finish (const char *filename)
+dwarf2out_finish (const char *)
 {
   comdat_type_node *ctnode;
   dw_die_ref main_comp_unit_die;
@@ -31184,12 +31100,6 @@ dwarf2out_finish (const char *filename)
 #endif
   resolve_addr (comp_unit_die ());
   move_marked_base_types ();
-
-  if (dump_file)
-    {
-      fprintf (dump_file, "DWARF for %s\n", filename);
-      print_die (comp_unit_die (), dump_file);
-    }
 
   /* Initialize sections and labels used for actual assembler output.  */
   unsigned generation = init_sections_and_labels (false);
@@ -31300,15 +31210,9 @@ dwarf2out_finish (const char *filename)
     {
       if (have_location_lists)
 	{
-	  /* Since we generate the loclists in the split DWARF .dwo
-	     file itself, we don't need to generate a loclists_base
-	     attribute for the split compile unit DIE.  That attribute
-	     (and using relocatable sec_offset FORMs) isn't allowed
-	     for a split compile unit.  Only if the .debug_loclists
-	     section was in the main file, would we need to generate a
-	     loclists_base attribute here (for the full or skeleton
-	     unit DIE).  */
-
+	  if (dwarf_version >= 5)
+	    add_AT_loclistsptr (comp_unit_die (), DW_AT_loclists_base,
+				loc_section_label);
 	  /* optimize_location_lists calculates the size of the lists,
 	     so index them first, and assign indices to the entries.
 	     Although optimize_location_lists will remove entries from
@@ -31413,28 +31317,6 @@ dwarf2out_finish (const char *filename)
 	}
 
       switch_to_section (debug_addr_section);
-      /* GNU DebugFission https://gcc.gnu.org/wiki/DebugFission
-	 which GCC uses to implement -gsplit-dwarf as DWARF GNU extension
-	 before DWARF5, didn't have a header for .debug_addr units.
-	 DWARF5 specifies a small header when address tables are used.  */
-      if (dwarf_version >= 5)
-	{
-	  unsigned int last_idx = 0;
-	  unsigned long addrs_length;
-
-	  addr_index_table->traverse_noresize
-	    <unsigned int *, count_index_addrs> (&last_idx);
-	  addrs_length = last_idx * DWARF2_ADDR_SIZE + 4;
-
-	  if (DWARF_INITIAL_LENGTH_SIZE - DWARF_OFFSET_SIZE == 4)
-	    dw2_asm_output_data (4, 0xffffffff,
-				 "Escape value for 64-bit DWARF extension");
-	  dw2_asm_output_data (DWARF_OFFSET_SIZE, addrs_length,
-			       "Length of Address Unit");
-	  dw2_asm_output_data (2, 5, "DWARF addr version");
-	  dw2_asm_output_data (1, DWARF2_ADDR_SIZE, "Size of Address");
-	  dw2_asm_output_data (1, 0, "Size of Segment Descriptor");
-	}
       ASM_OUTPUT_LABEL (asm_out_file, debug_addr_section_label);
       output_addr_table ();
     }
@@ -31885,30 +31767,7 @@ dwarf2out_early_finish (const char *filename)
      sure to adjust the phase after annotating the LTRANS CU DIE.  */
   if (in_lto_p)
     {
-      /* Force DW_TAG_imported_unit to be created now, otherwise
-	 we might end up without it or ordered after DW_TAG_inlined_subroutine
-	 referencing DIEs from it.  */
-      if (! flag_wpa && flag_incremental_link != INCREMENTAL_LINK_LTO)
-	{
-	  unsigned i;
-	  tree tu;
-	  if (external_die_map)
-	    FOR_EACH_VEC_SAFE_ELT (all_translation_units, i, tu)
-	      if (sym_off_pair *desc = external_die_map->get (tu))
-		{
-		  dw_die_ref import = new_die (DW_TAG_imported_unit,
-					       comp_unit_die (), NULL_TREE);
-		  add_AT_external_die_ref (import, DW_AT_import,
-					   desc->sym, desc->off);
-		}
-	}
-
       early_dwarf_finished = true;
-      if (dump_file)
-	{
-	  fprintf (dump_file, "LTO EARLY DWARF for %s\n", filename);
-	  print_die (comp_unit_die (), dump_file);
-	}
       return;
     }
 
@@ -31986,11 +31845,6 @@ dwarf2out_early_finish (const char *filename)
 
   /* The early debug phase is now finished.  */
   early_dwarf_finished = true;
-  if (dump_file)
-    {
-      fprintf (dump_file, "EARLY DWARF for %s\n", filename);
-      print_die (comp_unit_die (), dump_file);
-    }
 
   /* Do not generate DWARF assembler now when not producing LTO bytecode.  */
   if ((!flag_generate_lto && !flag_generate_offload)
@@ -32134,6 +31988,7 @@ dwarf2out_c_finalize (void)
   cached_next_real_insn = NULL;
   used_rtx_array = NULL;
   incomplete_types = NULL;
+  decl_scope_table = NULL;
   debug_info_section = NULL;
   debug_skeleton_info_section = NULL;
   debug_abbrev_section = NULL;

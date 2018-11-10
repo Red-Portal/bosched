@@ -24,9 +24,6 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 
 
 #include "libgfortran.h"
-#include "io.h"
-#include "async.h"
-
 #include <assert.h>
 #include <string.h>
 #include <errno.h>
@@ -114,71 +111,52 @@ estr_write (const char *str)
 }
 
 
-/* Write a vector of strings to standard error.  This function is
-   async-signal-safe.  */
+/* st_vprintf()-- vsnprintf-like function for error output.  We use a
+   stack allocated buffer for formatting; since this function might be
+   called from within a signal handler, printing directly to stderr
+   with vfprintf is not safe since the stderr locking might lead to a
+   deadlock.  */
 
-ssize_t
-estr_writev (const struct iovec *iov, int iovcnt)
-{
-#ifdef HAVE_WRITEV
-  return writev (STDERR_FILENO, iov, iovcnt);
-#else
-  ssize_t w = 0;
-  for (int i = 0; i < iovcnt; i++)
-    {
-      ssize_t r = write (STDERR_FILENO, iov[i].iov_base, iov[i].iov_len);
-      if (r == -1)
-	return r;
-      w += r;
-    }
-  return w;
-#endif
-}
+#define ST_VPRINTF_SIZE 512
 
-
-#ifndef HAVE_VSNPRINTF
-static int
-gf_vsnprintf (char *str, size_t size, const char *format, va_list ap)
+int
+st_vprintf (const char *format, va_list ap)
 {
   int written;
+  char buffer[ST_VPRINTF_SIZE];
 
+#ifdef HAVE_VSNPRINTF
+  written = vsnprintf(buffer, ST_VPRINTF_SIZE, format, ap);
+#else
   written = vsprintf(buffer, format, ap);
 
-  if (written >= size - 1)
+  if (written >= ST_VPRINTF_SIZE - 1)
     {
       /* The error message was longer than our buffer.  Ouch.  Because
 	 we may have messed up things badly, report the error and
 	 quit.  */
-#define ERROR_MESSAGE "Internal error: buffer overrun in gf_vsnprintf()\n"
-      write (STDERR_FILENO, buffer, size - 1);
-      write (STDERR_FILENO, ERROR_MESSAGE, strlen (ERROR_MESSAGE));
+#define ERROR_MESSAGE "Internal error: buffer overrun in st_vprintf()\n"
+      write (STDERR_FILENO, buffer, ST_VPRINTF_SIZE - 1);
+      write (STDERR_FILENO, ERROR_MESSAGE, strlen(ERROR_MESSAGE));
       sys_abort ();
 #undef ERROR_MESSAGE
 
     }
+#endif
+
+  written = write (STDERR_FILENO, buffer, written);
   return written;
 }
 
-#define vsnprintf gf_vsnprintf
-#endif
-
-
-/* printf() like function for for printing to stderr.  Uses a stack
-   allocated buffer and doesn't lock stderr, so it should be safe to
-   use from within a signal handler.  */
-
-#define ST_ERRBUF_SIZE 512
 
 int
 st_printf (const char * format, ...)
 {
-  char buffer[ST_ERRBUF_SIZE];
   int written;
   va_list ap;
   va_start (ap, format);
-  written = vsnprintf (buffer, ST_ERRBUF_SIZE, format, ap);
+  written = st_vprintf (format, ap);
   va_end (ap);
-  written = write (STDERR_FILENO, buffer, written);
   return written;
 }
 
@@ -359,19 +337,12 @@ void
 os_error (const char *message)
 {
   char errmsg[STRERR_MAXSZ];
-  struct iovec iov[5];
   recursion_check ();
-  iov[0].iov_base = (char*) "Operating system error: ";
-  iov[0].iov_len = strlen (iov[0].iov_base);
-  iov[1].iov_base = gf_strerror (errno, errmsg, STRERR_MAXSZ);
-  iov[1].iov_len = strlen (iov[1].iov_base);
-  iov[2].iov_base = (char*) "\n";
-  iov[2].iov_len = 1;
-  iov[3].iov_base = (char*) message;
-  iov[3].iov_len = strlen (message);
-  iov[4].iov_base = (char*) "\n";
-  iov[4].iov_len = 1;
-  estr_writev (iov, 5);
+  estr_write ("Operating system error: ");
+  estr_write (gf_strerror (errno, errmsg, STRERR_MAXSZ));
+  estr_write ("\n");
+  estr_write (message);
+  estr_write ("\n");
   exit_error (1);
 }
 iexport(os_error);
@@ -383,25 +354,14 @@ iexport(os_error);
 void
 runtime_error (const char *message, ...)
 {
-  char buffer[ST_ERRBUF_SIZE];
-  struct iovec iov[3];
   va_list ap;
-  int written;
 
   recursion_check ();
-  iov[0].iov_base = (char*) "Fortran runtime error: ";
-  iov[0].iov_len = strlen (iov[0].iov_base);
+  estr_write ("Fortran runtime error: ");
   va_start (ap, message);
-  written = vsnprintf (buffer, ST_ERRBUF_SIZE, message, ap);
+  st_vprintf (message, ap);
   va_end (ap);
-  if (written >= 0)
-    {
-      iov[1].iov_base = buffer;
-      iov[1].iov_len = written;
-      iov[2].iov_base = (char*) "\n";
-      iov[2].iov_len = 1;
-      estr_writev (iov, 3);
-    }
+  estr_write ("\n");
   exit_error (2);
 }
 iexport(runtime_error);
@@ -412,27 +372,15 @@ iexport(runtime_error);
 void
 runtime_error_at (const char *where, const char *message, ...)
 {
-  char buffer[ST_ERRBUF_SIZE];
   va_list ap;
-  struct iovec iov[4];
-  int written;
 
   recursion_check ();
-  iov[0].iov_base = (char*) where;
-  iov[0].iov_len = strlen (where);
-  iov[1].iov_base = (char*) "\nFortran runtime error: ";
-  iov[1].iov_len = strlen (iov[1].iov_base);
+  estr_write (where);
+  estr_write ("\nFortran runtime error: ");
   va_start (ap, message);
-  written = vsnprintf (buffer, ST_ERRBUF_SIZE, message, ap);
+  st_vprintf (message, ap);
   va_end (ap);
-  if (written >= 0)
-    {
-      iov[2].iov_base = buffer;
-      iov[2].iov_len = written;
-      iov[3].iov_base = (char*) "\n";
-      iov[3].iov_len = 1;
-      estr_writev (iov, 4);
-    }
+  estr_write ("\n");
   exit_error (2);
 }
 iexport(runtime_error_at);
@@ -441,26 +389,14 @@ iexport(runtime_error_at);
 void
 runtime_warning_at (const char *where, const char *message, ...)
 {
-  char buffer[ST_ERRBUF_SIZE];
   va_list ap;
-  struct iovec iov[4];
-  int written;
 
-  iov[0].iov_base = (char*) where;
-  iov[0].iov_len = strlen (where);
-  iov[1].iov_base = (char*) "\nFortran runtime warning: ";
-  iov[1].iov_len = strlen (iov[1].iov_base);
+  estr_write (where);
+  estr_write ("\nFortran runtime warning: ");
   va_start (ap, message);
-  written = vsnprintf (buffer, ST_ERRBUF_SIZE, message, ap);
+  st_vprintf (message, ap);
   va_end (ap);
-  if (written >= 0)
-    {
-      iov[2].iov_base = buffer;
-      iov[2].iov_len = written;
-      iov[3].iov_base = (char*) "\n";
-      iov[3].iov_len = 1;
-      estr_writev (iov, 4);
-    }
+  estr_write ("\n");
 }
 iexport(runtime_warning_at);
 
@@ -471,17 +407,11 @@ iexport(runtime_warning_at);
 void
 internal_error (st_parameter_common *cmp, const char *message)
 {
-  struct iovec iov[3];
-
   recursion_check ();
   show_locus (cmp);
-  iov[0].iov_base = (char*) "Internal Error: ";
-  iov[0].iov_len = strlen (iov[0].iov_base);
-  iov[1].iov_base = (char*) message;
-  iov[1].iov_len = strlen (message);
-  iov[2].iov_base = (char*) "\n";
-  iov[2].iov_len = 1;
-  estr_writev (iov, 3);
+  estr_write ("Internal Error: ");
+  estr_write (message);
+  estr_write ("\n");
 
   /* This function call is here to get the main.o object file included
      when linking statically. This works because error.o is supposed to
@@ -596,41 +526,24 @@ translate_error (int code)
 }
 
 
-/* Worker function for generate_error and generate_error_async.  Return true
-   if a straight return is to be done, zero if the program should abort. */
+/* generate_error()-- Come here when an error happens.  This
+ * subroutine is called if it is possible to continue on after the error.
+ * If an IOSTAT or IOMSG variable exists, we set it.  If IOSTAT or
+ * ERR labels are present, we return, otherwise we terminate the program
+ * after printing a message.  The error code is always required but the
+ * message parameter can be NULL, in which case a string describing
+ * the most recent operating system error is used. */
 
-bool
-generate_error_common (st_parameter_common *cmp, int family, const char *message)
+void
+generate_error (st_parameter_common *cmp, int family, const char *message)
 {
   char errmsg[STRERR_MAXSZ];
-
-#if ASYNC_IO
-  gfc_unit *u;
-
-  NOTE ("Entering generate_error_common");
-
-  u = thread_unit;
-  if (u && u->au)
-    {
-      if (u->au->error.has_error)
-	return true;
-
-      if (__gthread_equal (u->au->thread, __gthread_self ()))
-	{
-	  u->au->error.has_error = 1;
-	  u->au->error.cmp = cmp;
-	  u->au->error.family = family;
-	  u->au->error.message = message;
-	  return true;
-	}
-    }
-#endif
 
   /* If there was a previous error, don't mask it with another
      error message, EOF or EOR condition.  */
 
   if ((cmp->flags & IOPARM_LIBRETURN_MASK) == IOPARM_LIBRETURN_ERROR)
-    return true;
+    return;
 
   /* Set the error status.  */
   if ((cmp->flags & IOPARM_HAS_IOSTAT))
@@ -649,61 +562,36 @@ generate_error_common (st_parameter_common *cmp, int family, const char *message
   switch (family)
     {
     case LIBERROR_EOR:
-      cmp->flags |= IOPARM_LIBRETURN_EOR;  NOTE("EOR");
+      cmp->flags |= IOPARM_LIBRETURN_EOR;
       if ((cmp->flags & IOPARM_EOR))
-	return true;
+	return;
       break;
 
     case LIBERROR_END:
-      cmp->flags |= IOPARM_LIBRETURN_END; NOTE("END");
+      cmp->flags |= IOPARM_LIBRETURN_END;
       if ((cmp->flags & IOPARM_END))
-	return true;
+	return;
       break;
 
     default:
-      cmp->flags |= IOPARM_LIBRETURN_ERROR; NOTE("ERROR");
+      cmp->flags |= IOPARM_LIBRETURN_ERROR;
       if ((cmp->flags & IOPARM_ERR))
-	return true;
+	return;
       break;
     }
 
   /* Return if the user supplied an iostat variable.  */
   if ((cmp->flags & IOPARM_HAS_IOSTAT))
-    return true;
+    return;
 
-  /* Return code, caller is responsible for terminating
-   the program if necessary.  */
+  /* Terminate the program */
 
   recursion_check ();
   show_locus (cmp);
-  struct iovec iov[3];
-  iov[0].iov_base = (char*) "Fortran runtime error: ";
-  iov[0].iov_len = strlen (iov[0].iov_base);
-  iov[1].iov_base = (char*) message;
-  iov[1].iov_len = strlen (message);
-  iov[2].iov_base = (char*) "\n";
-  iov[2].iov_len = 1;
-  estr_writev (iov, 3);
-  return false;
-}
-
-/* generate_error()-- Come here when an error happens.  This
- * subroutine is called if it is possible to continue on after the error.
- * If an IOSTAT or IOMSG variable exists, we set it.  If IOSTAT or
- * ERR labels are present, we return, otherwise we terminate the program
- * after printing a message.  The error code is always required but the
- * message parameter can be NULL, in which case a string describing
- * the most recent operating system error is used.
- * If the error is for an asynchronous unit and if the program is currently
- * executing the asynchronous thread, just mark the error and return.  */
-
-void
-generate_error (st_parameter_common *cmp, int family, const char *message)
-{
-  if (generate_error_common (cmp, family, message))
-    return;
-
-  exit_error(2);
+  estr_write ("Fortran runtime error: ");
+  estr_write (message);
+  estr_write ("\n");
+  exit_error (2);
 }
 iexport(generate_error);
 
@@ -717,14 +605,9 @@ generate_warning (st_parameter_common *cmp, const char *message)
     message = " ";
 
   show_locus (cmp);
-  struct iovec iov[3];
-  iov[0].iov_base = (char*) "Fortran runtime warning: ";
-  iov[0].iov_len = strlen (iov[0].iov_base);
-  iov[1].iov_base = (char*) message;
-  iov[1].iov_len = strlen (message);
-  iov[2].iov_base = (char*) "\n";
-  iov[2].iov_len = 1;
-  estr_writev (iov, 3);
+  estr_write ("Fortran runtime warning: ");
+  estr_write (message);
+  estr_write ("\n");
 }
 
 
@@ -755,7 +638,6 @@ bool
 notify_std (st_parameter_common *cmp, int std, const char * message)
 {
   int warning;
-  struct iovec iov[3];
 
   if (!compile_options.pedantic)
     return true;
@@ -768,25 +650,17 @@ notify_std (st_parameter_common *cmp, int std, const char * message)
     {
       recursion_check ();
       show_locus (cmp);
-      iov[0].iov_base = (char*) "Fortran runtime error: ";
-      iov[0].iov_len = strlen (iov[0].iov_base);
-      iov[1].iov_base = (char*) message;
-      iov[1].iov_len = strlen (message);
-      iov[2].iov_base = (char*) "\n";
-      iov[2].iov_len = 1;
-      estr_writev (iov, 3);
+      estr_write ("Fortran runtime error: ");
+      estr_write (message);
+      estr_write ("\n");
       exit_error (2);
     }
   else
     {
       show_locus (cmp);
-      iov[0].iov_base = (char*) "Fortran runtime warning: ";
-      iov[0].iov_len = strlen (iov[0].iov_base);
-      iov[1].iov_base = (char*) message;
-      iov[1].iov_len = strlen (message);
-      iov[2].iov_base = (char*) "\n";
-      iov[2].iov_len = 1;
-      estr_writev (iov, 3);
+      estr_write ("Fortran runtime warning: ");
+      estr_write (message);
+      estr_write ("\n");
     }
   return false;
 }

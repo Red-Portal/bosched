@@ -1,7 +1,7 @@
 /* { dg-do compile } */
 /* { dg-options "-O2 -fdump-tree-optimized" } */
 
-#if defined(__hppa__) || defined(__v850__)
+#ifdef __hppa__
 #define REGISTER "1"
 #else
 #ifdef __moxie__

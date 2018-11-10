@@ -34,7 +34,7 @@
 int
 acc_async_test (int async)
 {
-  if (!async_valid_p (async))
+  if (async < acc_async_sync)
     gomp_fatal ("invalid async argument: %d", async);
 
   struct goacc_thread *thr = goacc_thread ();
@@ -59,7 +59,7 @@ acc_async_test_all (void)
 void
 acc_wait (int async)
 {
-  if (!async_valid_p (async))
+  if (async < acc_async_sync)
     gomp_fatal ("invalid async argument: %d", async);
 
   struct goacc_thread *thr = goacc_thread ();
@@ -117,7 +117,7 @@ acc_async_wait_all (void)
 void
 acc_wait_all_async (int async)
 {
-  if (!async_valid_p (async))
+  if (async < acc_async_sync)
     gomp_fatal ("invalid async argument: %d", async);
 
   struct goacc_thread *thr = goacc_thread ();

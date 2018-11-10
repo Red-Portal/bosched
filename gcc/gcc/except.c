@@ -1510,8 +1510,12 @@ finish_eh_generation (void)
     sjlj_build_landing_pads ();
   else
     dw2_build_landing_pads ();
-
   break_superblocks ();
+
+  if (targetm_common.except_unwind_info (&global_options) == UI_SJLJ
+      /* Kludge for Alpha (see alpha_gp_save_rtx).  */
+      || single_succ_edge (ENTRY_BLOCK_PTR_FOR_FN (cfun))->insns.r)
+    commit_edge_insertions ();
 
   /* Redirect all EH edges from the post_landing_pad to the landing pad.  */
   FOR_EACH_BB_FN (bb, cfun)
@@ -1542,11 +1546,6 @@ finish_eh_generation (void)
 		       : EDGE_ABNORMAL);
 	}
     }
-
-  if (targetm_common.except_unwind_info (&global_options) == UI_SJLJ
-      /* Kludge for Alpha (see alpha_gp_save_rtx).  */
-      || single_succ_edge (ENTRY_BLOCK_PTR_FOR_FN (cfun))->insns.r)
-    commit_edge_insertions ();
 }
 
 /* This section handles removing dead code for flow.  */
@@ -3189,8 +3188,7 @@ output_function_exception_table (int section)
   rtx personality = get_personality_function (current_function_decl);
 
   /* Not all functions need anything.  */
-  if (!crtl->uses_eh_lsda
-      || targetm_common.except_unwind_info (&global_options) == UI_NONE)
+  if (!crtl->uses_eh_lsda)
     return;
 
   /* No need to emit any boilerplate stuff for the cold part.  */

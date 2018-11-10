@@ -71,8 +71,13 @@ class SpinMutex : public StaticSpinMutex {
 
 class BlockingMutex {
  public:
+#if SANITIZER_WINDOWS
+  // Windows does not currently support LinkerInitialized
+  explicit BlockingMutex(LinkerInitialized);
+#else
   explicit constexpr BlockingMutex(LinkerInitialized)
-      : opaque_storage_ {0, }, owner_ {0} {}
+      : opaque_storage_ {0, }, owner_(0) {}
+#endif
   BlockingMutex();
   void Lock();
   void Unlock();
@@ -85,10 +90,8 @@ class BlockingMutex {
   // checks that the mutex is owned, and assumes callers to be generally
   // well-behaved.
   void CheckLocked();
-
  private:
-  // Solaris mutex_t has a member that requires 64-bit alignment.
-  ALIGNED(8) uptr opaque_storage_[10];
+  uptr opaque_storage_[10];
   uptr owner_;  // for debugging
 };
 

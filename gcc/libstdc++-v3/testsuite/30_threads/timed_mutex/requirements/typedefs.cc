@@ -1,4 +1,5 @@
 // { dg-do compile { target c++11 } }
+// { dg-require-cstdint "" }
 // { dg-require-gthreads-timed "" }
 
 // 2008-07-23 Chris Fairles <chris.fairles@gmail.com>

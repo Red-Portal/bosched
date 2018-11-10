@@ -387,20 +387,7 @@ match_data_constant (gfc_expr **result)
       return m;
     }
   else if (m == MATCH_YES)
-    {
-      /* F2018:R845 data-stmt-constant is initial-data-target.
-	 A data-stmt-constant shall be ... initial-data-target if and
-	 only if the corresponding data-stmt-object has the POINTER
-	 attribute. ...  If data-stmt-constant is initial-data-target
-	 the corresponding data statement object shall be
-	 data-pointer-initialization compatible (7.5.4.6) with the initial
-	 data target; the data statement object is initially associated
-	 with the target.  */
-      if ((*result)->symtree->n.sym->attr.save
-	  && (*result)->symtree->n.sym->attr.target)
-	return m;
-      gfc_free_expr (*result);
-    }
+    gfc_free_expr (*result);
 
   gfc_current_locus = old_loc;
 
@@ -1231,39 +1218,28 @@ get_proc_name (const char *name, gfc_symbol **result, bool module_fcn_entry)
 	  && sym->attr.proc != 0
 	  && (sym->attr.subroutine || sym->attr.function || sym->attr.entry)
 	  && sym->attr.if_source != IFSRC_UNKNOWN)
-	{
-	  gfc_error_now ("Procedure %qs at %C is already defined at %L",
-			 name, &sym->declared_at);
-	  return true;
-	}
+	gfc_error_now ("Procedure %qs at %C is already defined at %L",
+		       name, &sym->declared_at);
+
       if (sym->attr.flavor != 0
 	  && sym->attr.entry && sym->attr.if_source != IFSRC_UNKNOWN)
-	{
-	  gfc_error_now ("Procedure %qs at %C is already defined at %L",
-			 name, &sym->declared_at);
-	  return true;
-	}
+	gfc_error_now ("Procedure %qs at %C is already defined at %L",
+		       name, &sym->declared_at);
 
       if (sym->attr.external && sym->attr.procedure
 	  && gfc_current_state () == COMP_CONTAINS)
-	{
-	  gfc_error_now ("Contained procedure %qs at %C clashes with "
-			 "procedure defined at %L",
-			 name, &sym->declared_at);
-	  return true;
-	}
+	gfc_error_now ("Contained procedure %qs at %C clashes with "
+			"procedure defined at %L",
+		       name, &sym->declared_at);
 
       /* Trap a procedure with a name the same as interface in the
 	 encompassing scope.  */
       if (sym->attr.generic != 0
 	  && (sym->attr.subroutine || sym->attr.function)
 	  && !sym->attr.mod_proc)
-	{
-	  gfc_error_now ("Name %qs at %C is already defined"
-			 " as a generic interface at %L",
-			 name, &sym->declared_at);
-	  return true;
-	}
+	gfc_error_now ("Name %qs at %C is already defined"
+		       " as a generic interface at %L",
+		       name, &sym->declared_at);
 
       /* Trap declarations of attributes in encompassing scope.  The
 	 signature for this is that ts.kind is set.  Legitimate
@@ -1274,11 +1250,8 @@ get_proc_name (const char *name, gfc_symbol **result, bool module_fcn_entry)
 	  && gfc_current_ns->parent != NULL
 	  && sym->attr.access == 0
 	  && !module_fcn_entry)
-	{
-	  gfc_error_now ("Procedure %qs at %C has an explicit interface "
+	gfc_error_now ("Procedure %qs at %C has an explicit interface "
 		       "from a previous declaration",  name);
-	  return true;
-	}
     }
 
   /* C1246 (R1225) MODULE shall appear only in the function-stmt or
@@ -1290,23 +1263,17 @@ get_proc_name (const char *name, gfc_symbol **result, bool module_fcn_entry)
       && !current_attr.module_procedure
       && sym->attr.proc == PROC_MODULE
       && gfc_state_stack->state == COMP_CONTAINS)
-    {
-      gfc_error_now ("Procedure %qs defined in interface body at %L "
-		     "clashes with internal procedure defined at %C",
-		     name, &sym->declared_at);
-      return true;
-    }
+    gfc_error_now ("Procedure %qs defined in interface body at %L "
+		   "clashes with internal procedure defined at %C",
+		    name, &sym->declared_at);
 
   if (sym && !sym->gfc_new
       && sym->attr.flavor != FL_UNKNOWN
       && sym->attr.referenced == 0 && sym->attr.subroutine == 1
       && gfc_state_stack->state == COMP_CONTAINS
       && gfc_state_stack->previous->state == COMP_SUBROUTINE)
-    {
-      gfc_error_now ("Procedure %qs at %C is already defined at %L",
-		     name, &sym->declared_at);
-      return true;
-    }
+    gfc_error_now ("Procedure %qs at %C is already defined at %L",
+		    name, &sym->declared_at);
 
   if (gfc_current_ns->parent == NULL || *result == NULL)
     return rc;
@@ -1443,7 +1410,7 @@ gfc_verify_c_interop_param (gfc_symbol *sym)
 	     not have the allocatable, pointer, or optional attributes,
 	     according to J3/04-007, section 5.1.  */
 	  if (sym->attr.allocatable == 1
-	      && !gfc_notify_std (GFC_STD_F2018, "Variable %qs at %L with "
+	      && !gfc_notify_std (GFC_STD_F2008_TS, "Variable %qs at %L with "
 				  "ALLOCATABLE attribute in procedure %qs "
 				  "with BIND(C)", sym->name,
 				  &(sym->declared_at),
@@ -1451,7 +1418,7 @@ gfc_verify_c_interop_param (gfc_symbol *sym)
 	    retval = false;
 
 	  if (sym->attr.pointer == 1
-	      && !gfc_notify_std (GFC_STD_F2018, "Variable %qs at %L with "
+	      && !gfc_notify_std (GFC_STD_F2008_TS, "Variable %qs at %L with "
 				  "POINTER attribute in procedure %qs "
 				  "with BIND(C)", sym->name,
 				  &(sym->declared_at),
@@ -1476,7 +1443,7 @@ gfc_verify_c_interop_param (gfc_symbol *sym)
 	      retval = false;
 	    }
 	  else if (sym->attr.optional == 1
-		   && !gfc_notify_std (GFC_STD_F2018, "Variable %qs "
+		   && !gfc_notify_std (GFC_STD_F2008_TS, "Variable %qs "
 				       "at %L with OPTIONAL attribute in "
 				       "procedure %qs which is BIND(C)",
 				       sym->name, &(sym->declared_at),
@@ -1487,7 +1454,7 @@ gfc_verify_c_interop_param (gfc_symbol *sym)
 	     either assumed size or explicit shape. Deferred shape is already
 	     covered by the pointer/allocatable attribute.  */
 	  if (sym->as != NULL && sym->as->type == AS_ASSUMED_SHAPE
-	      && !gfc_notify_std (GFC_STD_F2018, "Assumed-shape array %qs "
+	      && !gfc_notify_std (GFC_STD_F2008_TS, "Assumed-shape array %qs "
 				  "at %L as dummy argument to the BIND(C) "
 				  "procedure %qs at %L", sym->name,
 				  &(sym->declared_at),
@@ -2460,7 +2427,7 @@ variable_decl (int elem)
 	    }
 
 	  if (not_constant)
-	    {
+	    { 
 	      gfc_error ("Explicit shaped array with nonconstant bounds at %C");
 	      m = MATCH_ERROR;
 	      goto cleanup;
@@ -2549,7 +2516,7 @@ variable_decl (int elem)
     }
 
   /* %FILL components may not have initializers.  */
-  if (gfc_str_startswith (name, "%FILL") && gfc_match_eos () != MATCH_YES)
+  if (strncmp (name, "%FILL", 5) == 0 && gfc_match_eos () != MATCH_YES)
     {
       gfc_error ("%qs entity cannot have an initializer at %C", "%FILL");
       m = MATCH_ERROR;
@@ -2564,12 +2531,13 @@ variable_decl (int elem)
       gfc_find_symbol (name, gfc_current_ns, 1, &sym);
       if (sym != NULL && sym->attr.cray_pointee)
 	{
+	  sym->ts.type = current_ts.type;
+	  sym->ts.kind = current_ts.kind;
+	  sym->ts.u.cl = cl;
+	  sym->ts.u.derived = current_ts.u.derived;
+	  sym->ts.is_c_interop = current_ts.is_c_interop;
+	  sym->ts.is_iso_c = current_ts.is_iso_c;
 	  m = MATCH_YES;
-	  if (!gfc_add_type (sym, &current_ts, &gfc_current_locus))
-	    {
-	      m = MATCH_ERROR;
-	      goto cleanup;
-	    }
 
 	  /* Check to see if we have an array specification.  */
 	  if (cp_as != NULL)
@@ -3897,7 +3865,8 @@ gfc_match_decl_type_spec (gfc_typespec *ts, int implicit_flag)
 	      gfc_error ("Assumed type at %C is not allowed for components");
 	      return MATCH_ERROR;
 	    }
-	  if (!gfc_notify_std (GFC_STD_F2018, "Assumed type at %C"))
+	  if (!gfc_notify_std (GFC_STD_F2008_TS, "Assumed type "
+			       "at %C"))
 	    return MATCH_ERROR;
 	  ts->type = BT_ASSUMED;
 	  return MATCH_YES;
@@ -4755,10 +4724,9 @@ match_attr_spec (void)
 {
   /* Modifiers that can exist in a type statement.  */
   enum
-  { GFC_DECL_BEGIN = 0, DECL_ALLOCATABLE = GFC_DECL_BEGIN,
-    DECL_IN = INTENT_IN, DECL_OUT = INTENT_OUT, DECL_INOUT = INTENT_INOUT,
-    DECL_DIMENSION, DECL_EXTERNAL,
-    DECL_INTRINSIC, DECL_OPTIONAL,
+  { GFC_DECL_BEGIN = 0,
+    DECL_ALLOCATABLE = GFC_DECL_BEGIN, DECL_DIMENSION, DECL_EXTERNAL,
+    DECL_IN, DECL_OUT, DECL_INOUT, DECL_INTRINSIC, DECL_OPTIONAL,
     DECL_PARAMETER, DECL_POINTER, DECL_PROTECTED, DECL_PRIVATE,
     DECL_STATIC, DECL_AUTOMATIC,
     DECL_PUBLIC, DECL_SAVE, DECL_TARGET, DECL_VALUE, DECL_VOLATILE,
@@ -4768,9 +4736,6 @@ match_attr_spec (void)
 
 /* GFC_DECL_END is the sentinel, index starts at 0.  */
 #define NUM_DECL GFC_DECL_END
-
-  /* Make sure that values from sym_intent are safe to be used here.  */
-  gcc_assert (INTENT_IN > 0);
 
   locus start, seen_at[NUM_DECL];
   int seen[NUM_DECL];
@@ -4889,12 +4854,13 @@ match_attr_spec (void)
 		      if (match_string_p ("nt"))
 			{
 			  /* Matched "intent".  */
-			  d = match_intent_spec ();
-			  if (d == INTENT_UNKNOWN)
-			    {
-			      m = MATCH_ERROR;
-			      goto cleanup;
-			    }
+			  /* TODO: Call match_intent_spec from here.  */
+			  if (gfc_match (" ( in out )") == MATCH_YES)
+			    d = DECL_INOUT;
+			  else if (gfc_match (" ( in )") == MATCH_YES)
+			    d = DECL_IN;
+			  else if (gfc_match (" ( out )") == MATCH_YES)
+			    d = DECL_OUT;
 			}
 		    }
 		  else if (ch == 'r')
@@ -5647,8 +5613,8 @@ verify_bind_c_sym (gfc_symbol *tmp_sym, gfc_typespec *ts,
 	if (tmp_sym->ts.u.cl == NULL || tmp_sym->ts.u.cl->length == NULL
 	    || tmp_sym->ts.u.cl->length->expr_type != EXPR_CONSTANT
 	    || mpz_cmp_si (tmp_sym->ts.u.cl->length->value.integer, 1) != 0)
-	  gfc_error ("Return type of BIND(C) function %qs of character "
-		     "type at %L must have length 1", tmp_sym->name,
+	  gfc_error ("Return type of BIND(C) function %qs at %L cannot "
+			 "be a character string", tmp_sym->name,
 			 &(tmp_sym->declared_at));
     }
 
@@ -5884,7 +5850,8 @@ gfc_match_data_decl (void)
       if (current_attr.pointer && gfc_comp_struct (gfc_current_state ()))
 	goto ok;
 
-      if (current_attr.allocatable && gfc_current_state () == COMP_DERIVED)
+      if (current_attr.allocatable && gfc_current_state () == COMP_DERIVED
+	  && current_ts.u.derived == gfc_current_block ())
 	goto ok;
 
       gfc_find_symbol (current_ts.u.derived->name,
@@ -6483,7 +6450,7 @@ add_hidden_procptr_result (gfc_symbol *sym)
       gfc_symtree *stree;
       if (case1)
 	gfc_get_sym_tree ("ppr@", gfc_current_ns, &stree, false);
-      else
+      else if (case2)
 	{
 	  gfc_symtree *st2;
 	  gfc_get_sym_tree ("ppr@", gfc_current_ns->parent, &stree, false);
@@ -7831,7 +7798,7 @@ gfc_match_end (gfc_statement *st)
     {
     case COMP_ASSOCIATE:
     case COMP_BLOCK:
-      if (gfc_str_startswith (block_name, "block@"))
+      if (!strncmp (block_name, "block@", strlen("block@")))
 	block_name = NULL;
       break;
 
@@ -9892,23 +9859,6 @@ gfc_match_type (gfc_statement *st)
 	  *st = ST_DERIVED_DECL;
 	  return m;
 	}
-<<<<<<< HEAD
-    }
-  else
-    {
-      /* Here we have "TYPE <name>". Check for <TYPE IS (> or a PDT declaration
-	 like <type name(parameter)>.  */
-      gfc_gobble_whitespace ();
-      bool paren = gfc_peek_ascii_char () == '(';
-      if (paren)
-	{
-	  if (strcmp ("is", name) == 0)
-	    goto typeis;
-	  else
-	    goto derived;
-	}
-=======
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
     }
   else
     {
@@ -9930,14 +9880,6 @@ gfc_match_type (gfc_statement *st)
   *st = ST_WRITE;
   return gfc_match_print ();
 
-<<<<<<< HEAD
-  /* Treat TYPE... like PRINT...  */
-  gfc_current_locus = old_loc;
-  *st = ST_WRITE;
-  return gfc_match_print ();
-
-=======
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
 derived:
   gfc_current_locus = old_loc;
   *st = ST_DERIVED_DECL;

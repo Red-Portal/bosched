@@ -46,6 +46,10 @@ func (TestDeps) StopCPUProfile() {
 	pprof.StopCPUProfile()
 }
 
+func (TestDeps) WriteHeapProfile(w io.Writer) error {
+	return pprof.WriteHeapProfile(w)
+}
+
 func (TestDeps) WriteProfileTo(name string, w io.Writer, debug int) error {
 	return pprof.Lookup(name).WriteTo(w, debug)
 }

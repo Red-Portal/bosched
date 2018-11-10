@@ -1,6 +1,5 @@
 // PR c++/77742
-// { dg-do compile { target c++17 } }
-// { dg-options "-Wall" }
+// { dg-options "-Wall -std=c++17" }
 
 #include <new>
 

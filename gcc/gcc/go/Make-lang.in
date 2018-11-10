@@ -139,9 +139,6 @@ lang_checks += check-go
 lang_checks_parallelized += check-go
 check_go_parallelize = 10
 
-# No go-specific selftests
-selftest-go:
-
 # Install hooks.
 
 go.install-common: installdirs

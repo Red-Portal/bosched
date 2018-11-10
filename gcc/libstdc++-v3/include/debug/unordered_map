@@ -34,16 +34,6 @@
 #if __cplusplus < 201103L
 # include <bits/c++0x_warning.h>
 #else
-# include <bits/c++config.h>
-namespace std _GLIBCXX_VISIBILITY(default) { namespace __debug {
-  template<typename _Key, typename _Tp, typename _Hash, typename _Pred,
-	   typename _Allocator>
-    class unordered_map;
-  template<typename _Key, typename _Tp, typename _Hash, typename _Pred,
-	   typename _Allocator>
-    class unordered_multimap;
-} } // namespace std::__debug
-
 # include <unordered_map>
 
 #include <debug/safe_unordered_container.h>
@@ -75,11 +65,6 @@ namespace __debug
       typedef typename _Base::const_local_iterator
 						_Base_const_local_iterator;
       typedef typename _Base::local_iterator	_Base_local_iterator;
-
-      template<typename _ItT, typename _SeqT, typename _CatT>
-	friend class ::__gnu_debug::_Safe_iterator;
-      template<typename _ItT, typename _SeqT>
-	friend class ::__gnu_debug::_Safe_local_iterator;
 
     public:
       typedef typename _Base::size_type			size_type;
@@ -114,8 +99,8 @@ namespace __debug
 		      const hasher& __hf = hasher(),
 		      const key_equal& __eql = key_equal(),
 		      const allocator_type& __a = allocator_type())
-	: _Base(__gnu_debug::__base(
-		  __glibcxx_check_valid_constructor_range(__first, __last)),
+	: _Base(__gnu_debug::__base(__gnu_debug::__check_valid_range(__first,
+								     __last)),
 		__gnu_debug::__base(__last), __n,
 		__hf, __eql, __a) { }
 
@@ -217,69 +202,69 @@ namespace __debug
 
       iterator
       begin() noexcept
-      { return { _Base::begin(), this }; }
+      { return iterator(_Base::begin(), this); }
 
       const_iterator
       begin() const noexcept
-      { return { _Base::begin(), this }; }
+      { return const_iterator(_Base::begin(), this); }
 
       iterator
       end() noexcept
-      { return { _Base::end(), this }; }
+      { return iterator(_Base::end(), this); }
 
       const_iterator
       end() const noexcept
-      { return { _Base::end(), this }; }
+      { return const_iterator(_Base::end(), this); }
 
       const_iterator
       cbegin() const noexcept
-      { return { _Base::cbegin(), this }; }
+      { return const_iterator(_Base::begin(), this); }
 
       const_iterator
       cend() const noexcept
-      { return { _Base::cend(), this }; }
+      { return const_iterator(_Base::end(), this); }
 
       // local versions
       local_iterator
       begin(size_type __b)
       {
 	__glibcxx_check_bucket_index(__b);
-	return { _Base::begin(__b), this };
+	return local_iterator(_Base::begin(__b), this);
       }
 
       local_iterator
       end(size_type __b)
       {
 	__glibcxx_check_bucket_index(__b);
-	return { _Base::end(__b), this };
+	return local_iterator(_Base::end(__b), this);
       }
 
       const_local_iterator
       begin(size_type __b) const
       {
 	__glibcxx_check_bucket_index(__b);
-	return { _Base::begin(__b), this };
+	return const_local_iterator(_Base::begin(__b), this);
       }
 
       const_local_iterator
       end(size_type __b) const
       {
 	__glibcxx_check_bucket_index(__b);
-	return { _Base::end(__b), this };
+	return const_local_iterator(_Base::end(__b), this);
       }
 
       const_local_iterator
       cbegin(size_type __b) const
       {
 	__glibcxx_check_bucket_index(__b);
-	return { _Base::cbegin(__b), this };
+	return const_local_iterator(_Base::cbegin(__b), this);
       }
 
       const_local_iterator
       cend(size_type __b) const
       {
 	__glibcxx_check_bucket_index(__b);
-	return { _Base::cend(__b), this };
+	return const_local_iterator(_Base::cend(__b), this);
       }
 
       size_type
@@ -305,9 +290,10 @@ namespace __debug
 	emplace(_Args&&... __args)
 	{
 	  size_type __bucket_count = this->bucket_count();
-	  auto __res = _Base::emplace(std::forward<_Args>(__args)...);
+	  std::pair<_Base_iterator, bool> __res
+	    = _Base::emplace(std::forward<_Args>(__args)...);
 	  _M_check_rehashed(__bucket_count);
-	  return { { __res.first, this }, __res.second };
+	  return std::make_pair(iterator(__res.first, this), __res.second);
 	}
 
       template<typename... _Args>
@@ -316,10 +302,10 @@ namespace __debug
 	{
 	  __glibcxx_check_insert(__hint);
 	  size_type __bucket_count = this->bucket_count();
-	  auto __it = _Base::emplace_hint(__hint.base(),
-					  std::forward<_Args>(__args)...);
+	  _Base_iterator __it = _Base::emplace_hint(__hint.base(),
+					std::forward<_Args>(__args)...);
 	  _M_check_rehashed(__bucket_count);
-	  return { __it, this };
+	  return iterator(__it, this);
 	}
 
       std::pair<iterator, bool>
@@ -328,7 +314,7 @@ namespace __debug
 	size_type __bucket_count = this->bucket_count();
 	auto __res = _Base::insert(__obj);
 	_M_check_rehashed(__bucket_count);
-	return { { __res.first, this }, __res.second };
+	return { iterator(__res.first, this), __res.second };
       }
 
       // _GLIBCXX_RESOLVE_LIB_DEFECTS
@@ -339,7 +325,7 @@ namespace __debug
 	size_type __bucket_count = this->bucket_count();
 	auto __res = _Base::insert(std::move(__x));
 	_M_check_rehashed(__bucket_count);
-	return { { __res.first, this }, __res.second };
+	return { iterator(__res.first, this), __res.second };
       }
 
       template<typename _Pair, typename = typename
@@ -349,9 +335,10 @@ namespace __debug
 	insert(_Pair&& __obj)
 	{
 	  size_type __bucket_count = this->bucket_count();
-	  auto __res = _Base::insert(std::forward<_Pair>(__obj));
+	  std::pair<_Base_iterator, bool> __res =
+	    _Base::insert(std::forward<_Pair>(__obj));
 	  _M_check_rehashed(__bucket_count);
-	  return { { __res.first, this }, __res.second };
+	  return std::make_pair(iterator(__res.first, this), __res.second);
 	}
 
       iterator
@@ -359,9 +346,9 @@ namespace __debug
       {
 	__glibcxx_check_insert(__hint);
 	size_type __bucket_count = this->bucket_count();
-	auto __it = _Base::insert(__hint.base(), __obj);
+	_Base_iterator __it = _Base::insert(__hint.base(), __obj);
 	_M_check_rehashed(__bucket_count);
-	return { __it, this };
+	return iterator(__it, this);
       }
 
       // _GLIBCXX_RESOLVE_LIB_DEFECTS
@@ -373,7 +360,7 @@ namespace __debug
 	size_type __bucket_count = this->bucket_count();
 	auto __it = _Base::insert(__hint.base(), std::move(__x));
 	_M_check_rehashed(__bucket_count);
-	return { __it, this };
+	return iterator(__it, this);
       }
 
       template<typename _Pair, typename = typename
@@ -384,9 +371,10 @@ namespace __debug
 	{
 	  __glibcxx_check_insert(__hint);
 	  size_type __bucket_count = this->bucket_count();
-	  auto __it = _Base::insert(__hint.base(), std::forward<_Pair>(__obj));
+	  _Base_iterator __it =
+	    _Base::insert(__hint.base(), std::forward<_Pair>(__obj));
 	  _M_check_rehashed(__bucket_count);
-	  return { __it, this };
+	  return iterator(__it, this);
 	}
 
       void
@@ -416,81 +404,82 @@ namespace __debug
 
 #if __cplusplus > 201402L
       template <typename... _Args>
-	pair<iterator, bool>
-	try_emplace(const key_type& __k, _Args&&... __args)
-	{
+        pair<iterator, bool>
+        try_emplace(const key_type& __k, _Args&&... __args)
+        {
 	  auto __res = _Base::try_emplace(__k,
 					  std::forward<_Args>(__args)...);
-	  return { { __res.first, this }, __res.second };
+	  return { iterator(__res.first, this), __res.second };
 	}
 
       template <typename... _Args>
-	pair<iterator, bool>
-	try_emplace(key_type&& __k, _Args&&... __args)
-	{
+        pair<iterator, bool>
+        try_emplace(key_type&& __k, _Args&&... __args)
+        {
 	  auto __res = _Base::try_emplace(std::move(__k),
 					  std::forward<_Args>(__args)...);
-	  return { { __res.first, this }, __res.second };
+	  return { iterator(__res.first, this), __res.second };
 	}
 
       template <typename... _Args>
-	iterator
-	try_emplace(const_iterator __hint, const key_type& __k,
-		    _Args&&... __args)
-	{
+        iterator
+        try_emplace(const_iterator __hint, const key_type& __k,
+                    _Args&&... __args)
+        {
 	  __glibcxx_check_insert(__hint);
-	  return { _Base::try_emplace(__hint.base(), __k,
-				      std::forward<_Args>(__args)...),
-		   this };
+	  return iterator(_Base::try_emplace(__hint.base(), __k,
+					     std::forward<_Args>(__args)...),
+			  this);
 	}
 
       template <typename... _Args>
-	iterator
-	try_emplace(const_iterator __hint, key_type&& __k, _Args&&... __args)
-	{
+        iterator
+        try_emplace(const_iterator __hint, key_type&& __k, _Args&&... __args)
+        {
 	  __glibcxx_check_insert(__hint);
-	  return { _Base::try_emplace(__hint.base(), std::move(__k),
-				      std::forward<_Args>(__args)...),
-		   this };
+	  return iterator(_Base::try_emplace(__hint.base(), std::move(__k),
+					     std::forward<_Args>(__args)...),
+			  this);
 	}
 
       template <typename _Obj>
-	pair<iterator, bool>
-	insert_or_assign(const key_type& __k, _Obj&& __obj)
-	{
+        pair<iterator, bool>
+        insert_or_assign(const key_type& __k, _Obj&& __obj)
+        {
 	  auto __res = _Base::insert_or_assign(__k,
 					       std::forward<_Obj>(__obj));
-	  return { { __res.first, this }, __res.second };
+	  return { iterator(__res.first, this), __res.second };
 	}
 
       template <typename _Obj>
-	pair<iterator, bool>
-	insert_or_assign(key_type&& __k, _Obj&& __obj)
-	{
+        pair<iterator, bool>
+        insert_or_assign(key_type&& __k, _Obj&& __obj)
+        {
 	  auto __res = _Base::insert_or_assign(std::move(__k),
 					       std::forward<_Obj>(__obj));
-	  return { { __res.first, this }, __res.second };
+	  return { iterator(__res.first, this), __res.second };
 	}
 
       template <typename _Obj>
-	iterator
-	insert_or_assign(const_iterator __hint, const key_type& __k,
-			 _Obj&& __obj)
-	{
+        iterator
+        insert_or_assign(const_iterator __hint, const key_type& __k,
+                         _Obj&& __obj)
+        {
 	  __glibcxx_check_insert(__hint);
-	  return { _Base::insert_or_assign(__hint.base(), __k,
-					   std::forward<_Obj>(__obj)),
-		   this };
+	  return iterator(_Base::insert_or_assign(__hint.base(), __k,
+						  std::forward<_Obj>(__obj)),
+			  this);
 	}
 
       template <typename _Obj>
-	iterator
-	insert_or_assign(const_iterator __hint, key_type&& __k, _Obj&& __obj)
-	{
+        iterator
+        insert_or_assign(const_iterator __hint, key_type&& __k, _Obj&& __obj)
+        {
 	  __glibcxx_check_insert(__hint);
-	  return { _Base::insert_or_assign(__hint.base(), std::move(__k),
-					   std::forward<_Obj>(__obj)),
-		   this };
+	  return iterator(_Base::insert_or_assign(__hint.base(),
+						  std::move(__k),
+						  std::forward<_Obj>(__obj)),
+			  this);
 	}
 #endif // C++17
 
@@ -502,15 +491,23 @@ namespace __debug
       extract(const_iterator __position)
       {
 	__glibcxx_check_erase(__position);
-	return _M_extract(__position.base());
+	_Base_const_iterator __victim = __position.base();
+	this->_M_invalidate_if(
+	    [__victim](_Base_const_iterator __it) { return __it == __victim; }
+	    );
+	this->_M_invalidate_local_if(
+	    [__victim](_Base_const_local_iterator __it) {
+		return __it._M_curr() == __victim._M_cur;
+	    });
+	return _Base::extract(__position.base());
       }
 
       node_type
       extract(const key_type& __key)
       {
-	const auto __position = _Base::find(__key);
-	if (__position != _Base::end())
-	  return _M_extract(__position);
+	const auto __position = find(__key);
+	if (__position != end())
+	  return extract(__position);
 	return {};
       }
 
@@ -518,15 +515,15 @@ namespace __debug
       insert(node_type&& __nh)
       {
 	auto __ret = _Base::insert(std::move(__nh));
-	return
-	  { { __ret.position, this }, __ret.inserted, std::move(__ret.node) };
+	iterator __pos = iterator(__ret.position, this);
+	return { __pos, __ret.inserted, std::move(__ret.node) };
       }
 
       iterator
       insert(const_iterator __hint, node_type&& __nh)
       {
 	__glibcxx_check_insert(__hint);
-	return { _Base::insert(__hint.base(), std::move(__nh)), this };
+	return iterator(_Base::insert(__hint.base(), std::move(__nh)), this);
       }
 
       using _Base::merge;
@@ -534,34 +531,45 @@ namespace __debug
 
       iterator
       find(const key_type& __key)
-      { return { _Base::find(__key), this }; }
+      { return iterator(_Base::find(__key), this); }
 
       const_iterator
       find(const key_type& __key) const
-      { return { _Base::find(__key), this }; }
+      { return const_iterator(_Base::find(__key), this); }
 
       std::pair<iterator, iterator>
       equal_range(const key_type& __key)
       {
-	auto __res = _Base::equal_range(__key);
-	return { { __res.first, this }, { __res.second, this } };
+	std::pair<_Base_iterator, _Base_iterator> __res =
+	  _Base::equal_range(__key);
+	return std::make_pair(iterator(__res.first, this),
+			      iterator(__res.second, this));
       }
 
       std::pair<const_iterator, const_iterator>
       equal_range(const key_type& __key) const
       {
-	auto __res = _Base::equal_range(__key);
-	return { { __res.first, this }, { __res.second, this } };
+	std::pair<_Base_const_iterator, _Base_const_iterator> __res =
+	  _Base::equal_range(__key);
+	return std::make_pair(const_iterator(__res.first, this),
+			      const_iterator(__res.second, this));
       }
 
       size_type
       erase(const key_type& __key)
       {
 	size_type __ret(0);
-	auto __victim = _Base::find(__key);
+	_Base_iterator __victim(_Base::find(__key));
 	if (__victim != _Base::end())
 	  {
-	    _M_erase(__victim);
+	    this->_M_invalidate_if([__victim](_Base_const_iterator __it)
+			    { return __it == __victim; });
+	    this->_M_invalidate_local_if(
+			    [__victim](_Base_const_local_iterator __it)
+			    { return __it._M_curr() == __victim._M_cur; });
+	    size_type __bucket_count = this->bucket_count();
+	    _Base::erase(__victim);
+	    _M_check_rehashed(__bucket_count);
 	    __ret = 1;
 	  }
 	return __ret;
@@ -571,33 +579,43 @@ namespace __debug
       erase(const_iterator __it)
       {
 	__glibcxx_check_erase(__it);
-	return { _M_erase(__it.base()), this };
+	_Base_const_iterator __victim = __it.base();
+	this->_M_invalidate_if([__victim](_Base_const_iterator __it)
+			{ return __it == __victim; });
+	this->_M_invalidate_local_if(
+			[__victim](_Base_const_local_iterator __it)
+			{ return __it._M_curr() == __victim._M_cur; });
+	size_type __bucket_count = this->bucket_count();
+	_Base_iterator __next = _Base::erase(__it.base());
+	_M_check_rehashed(__bucket_count);
+	return iterator(__next, this);
       }
 
       iterator
       erase(iterator __it)
-      {
-	__glibcxx_check_erase(__it);
-	return { _M_erase(__it.base()), this };
-      }
+      { return erase(const_iterator(__it)); }
 
       iterator
       erase(const_iterator __first, const_iterator __last)
       {
 	__glibcxx_check_erase_range(__first, __last);
-	for (auto __tmp = __first.base(); __tmp != __last.base(); ++__tmp)
+	for (_Base_const_iterator __tmp = __first.base();
+	     __tmp != __last.base(); ++__tmp)
 	  {
-	    _GLIBCXX_DEBUG_VERIFY(__tmp != _Base::cend(),
+	    _GLIBCXX_DEBUG_VERIFY(__tmp != _Base::end(),
 				  _M_message(__gnu_debug::__msg_valid_range)
 				  ._M_iterator(__first, "first")
 				  ._M_iterator(__last, "last"));
-	    _M_invalidate(__tmp);
+	    this->_M_invalidate_if([__tmp](_Base_const_iterator __it)
+			    { return __it == __tmp; });
+	    this->_M_invalidate_local_if(
+			    [__tmp](_Base_const_local_iterator __it)
+			    { return __it._M_curr() == __tmp._M_cur; });
 	  }
-
 	size_type __bucket_count = this->bucket_count();
-	auto __next = _Base::erase(__first.base(), __last.base());
+	_Base_iterator __next = _Base::erase(__first.base(), __last.base());
 	_M_check_rehashed(__bucket_count);
-	return { __next, this };
+	return iterator(__next, this);
       }
 
       _Base&
@@ -613,35 +631,6 @@ namespace __debug
 	if (__prev_count != this->bucket_count())
 	  this->_M_invalidate_locals();
       }
-
-      void
-      _M_invalidate(_Base_const_iterator __victim)
-      {
-	this->_M_invalidate_if(
-	  [__victim](_Base_const_iterator __it) { return __it == __victim; });
-	this->_M_invalidate_local_if(
-	  [__victim](_Base_const_local_iterator __it)
-	  { return __it._M_curr() == __victim._M_cur; });
-      }
-
-      _Base_iterator
-      _M_erase(_Base_const_iterator __victim)
-      {
-	_M_invalidate(__victim);
-	size_type __bucket_count = this->bucket_count();
-	_Base_iterator __next = _Base::erase(__victim);
-	_M_check_rehashed(__bucket_count);
-	return __next;
-      }
-
-#if __cplusplus > 201402L
-      node_type
-      _M_extract(_Base_const_iterator __victim)
-      {
-	_M_invalidate(__victim);
-	return _Base::extract(__victim);
-      }
-#endif
     };
 
 #if __cpp_deduction_guides >= 201606
@@ -763,11 +752,6 @@ namespace __debug
       typedef typename _Base::const_local_iterator _Base_const_local_iterator;
       typedef typename _Base::local_iterator	   _Base_local_iterator;
 
-      template<typename _ItT, typename _SeqT, typename _CatT>
-	friend class ::__gnu_debug::_Safe_iterator;
-      template<typename _ItT, typename _SeqT>
-	friend class ::__gnu_debug::_Safe_local_iterator;
-
     public:
       typedef typename _Base::size_type			size_type;
       typedef typename _Base::hasher			hasher;
@@ -784,7 +768,7 @@ namespace __debug
       typedef __gnu_debug::_Safe_local_iterator<
 	_Base_local_iterator, unordered_multimap>	local_iterator;
       typedef __gnu_debug::_Safe_local_iterator<
-	_Base_const_local_iterator, unordered_multimap>	const_local_iterator;
+	_Base_const_local_iterator, unordered_multimap> const_local_iterator;
 
       unordered_multimap() = default;
 
@@ -801,8 +785,8 @@ namespace __debug
 			   const hasher& __hf = hasher(),
 			   const key_equal& __eql = key_equal(),
 			   const allocator_type& __a = allocator_type())
-	: _Base(__gnu_debug::__base(
-		  __glibcxx_check_valid_constructor_range(__first, __last)),
+	: _Base(__gnu_debug::__base(__gnu_debug::__check_valid_range(__first,
+								     __last)),
 		__gnu_debug::__base(__last), __n,
 		__hf, __eql, __a) { }
 
@@ -901,69 +885,69 @@ namespace __debug
 
       iterator
       begin() noexcept
-      { return { _Base::begin(), this }; }
+      { return iterator(_Base::begin(), this); }
 
       const_iterator
       begin() const noexcept
-      { return { _Base::begin(), this }; }
+      { return const_iterator(_Base::begin(), this); }
 
       iterator
       end() noexcept
-      { return { _Base::end(), this }; }
+      { return iterator(_Base::end(), this); }
 
       const_iterator
       end() const noexcept
-      { return { _Base::end(), this }; }
+      { return const_iterator(_Base::end(), this); }
 
       const_iterator
       cbegin() const noexcept
-      { return { _Base::cbegin(), this }; }
+      { return const_iterator(_Base::begin(), this); }
 
       const_iterator
       cend() const noexcept
-      { return { _Base::cend(), this }; }
+      { return const_iterator(_Base::end(), this); }
 
       // local versions
       local_iterator
       begin(size_type __b)
       {
 	__glibcxx_check_bucket_index(__b);
-	return { _Base::begin(__b), this };
+	return local_iterator(_Base::begin(__b), this);
       }
 
       local_iterator
       end(size_type __b)
       {
 	__glibcxx_check_bucket_index(__b);
-	return { _Base::end(__b), this };
+	return local_iterator(_Base::end(__b), this);
       }
 
       const_local_iterator
       begin(size_type __b) const
       {
 	__glibcxx_check_bucket_index(__b);
-	return { _Base::begin(__b), this };
+	return const_local_iterator(_Base::begin(__b), this);
       }
 
       const_local_iterator
       end(size_type __b) const
       {
 	__glibcxx_check_bucket_index(__b);
-	return { _Base::end(__b), this };
+	return const_local_iterator(_Base::end(__b), this);
       }
 
       const_local_iterator
       cbegin(size_type __b) const
       {
 	__glibcxx_check_bucket_index(__b);
-	return { _Base::cbegin(__b), this };
+	return const_local_iterator(_Base::cbegin(__b), this);
       }
 
       const_local_iterator
       cend(size_type __b) const
       {
 	__glibcxx_check_bucket_index(__b);
-	return { _Base::cend(__b), this };
+	return const_local_iterator(_Base::cend(__b), this);
       }
 
       size_type
@@ -989,9 +973,10 @@ namespace __debug
 	emplace(_Args&&... __args)
 	{
 	  size_type __bucket_count = this->bucket_count();
-	  auto __it = _Base::emplace(std::forward<_Args>(__args)...);
+	  _Base_iterator __it
+	    = _Base::emplace(std::forward<_Args>(__args)...);
 	  _M_check_rehashed(__bucket_count);
-	  return { __it, this };
+	  return iterator(__it, this);
 	}
 
       template<typename... _Args>
@@ -1000,19 +985,19 @@ namespace __debug
 	{
 	  __glibcxx_check_insert(__hint);
 	  size_type __bucket_count = this->bucket_count();
-	  auto __it = _Base::emplace_hint(__hint.base(),
-					  std::forward<_Args>(__args)...);
+	  _Base_iterator __it = _Base::emplace_hint(__hint.base(),
+					std::forward<_Args>(__args)...);
 	  _M_check_rehashed(__bucket_count);
-	  return { __it, this };
+	  return iterator(__it, this);
 	}
 
       iterator
       insert(const value_type& __obj)
       {
 	size_type __bucket_count = this->bucket_count();
-	auto __it = _Base::insert(__obj);
+	_Base_iterator __it = _Base::insert(__obj);
 	_M_check_rehashed(__bucket_count);
-	return { __it, this };
+	return iterator(__it, this);
       }
 
       // _GLIBCXX_RESOLVE_LIB_DEFECTS
@@ -1031,9 +1016,9 @@ namespace __debug
       {
 	__glibcxx_check_insert(__hint);
 	size_type __bucket_count = this->bucket_count();
-	auto __it = _Base::insert(__hint.base(), __obj);
+	_Base_iterator __it = _Base::insert(__hint.base(), __obj);
 	_M_check_rehashed(__bucket_count);
-	return { __it, this };
+	return iterator(__it, this);
       }
 
       // _GLIBCXX_RESOLVE_LIB_DEFECTS
@@ -1045,7 +1030,7 @@ namespace __debug
 	size_type __bucket_count = this->bucket_count();
 	auto __it = _Base::insert(__hint.base(), std::move(__x));
 	_M_check_rehashed(__bucket_count);
-	return { __it, this };
+	return iterator(__it, this);
       }
 
       template<typename _Pair, typename = typename
@@ -1055,9 +1040,9 @@ namespace __debug
 	insert(_Pair&& __obj)
 	{
 	  size_type __bucket_count = this->bucket_count();
-	  auto __it = _Base::insert(std::forward<_Pair>(__obj));
+	  _Base_iterator __it = _Base::insert(std::forward<_Pair>(__obj));
 	  _M_check_rehashed(__bucket_count);
-	  return { __it, this };
+	  return iterator(__it, this);
 	}
 
       template<typename _Pair, typename = typename
@@ -1068,9 +1053,10 @@ namespace __debug
 	{
 	  __glibcxx_check_insert(__hint);
 	  size_type __bucket_count = this->bucket_count();
-	  auto __it = _Base::insert(__hint.base(), std::forward<_Pair>(__obj));
+	  _Base_iterator __it =
+	    _Base::insert(__hint.base(), std::forward<_Pair>(__obj));
 	  _M_check_rehashed(__bucket_count);
-	  return { __it, this };
+	  return iterator(__it, this);
 	}
 
       void
@@ -1101,27 +1087,35 @@ namespace __debug
       extract(const_iterator __position)
       {
 	__glibcxx_check_erase(__position);
-	return _M_extract(__position.base());
+	_Base_const_iterator __victim = __position.base();
+	this->_M_invalidate_if(
+	    [__victim](_Base_const_iterator __it) { return __it == __victim; }
+	    );
+	this->_M_invalidate_local_if(
+	    [__victim](_Base_const_local_iterator __it) {
+		return __it._M_curr() == __victim._M_cur;
+	    });
+	return _Base::extract(__position.base());
       }
 
       node_type
       extract(const key_type& __key)
       {
-	const auto __position = _Base::find(__key);
-	if (__position != _Base::end())
-	  return _M_extract(__position);
+	const auto __position = find(__key);
+	if (__position != end())
+	  return extract(__position);
 	return {};
       }
 
       iterator
       insert(node_type&& __nh)
-      { return { _Base::insert(std::move(__nh)), this }; }
+      { return iterator(_Base::insert(std::move(__nh)), this); }
 
       iterator
       insert(const_iterator __hint, node_type&& __nh)
       {
 	__glibcxx_check_insert(__hint);
-	return { _Base::insert(__hint.base(), std::move(__nh)), this };
+	return iterator(_Base::insert(__hint.base(), std::move(__nh)), this);
       }
 
       using _Base::merge;
@@ -1129,24 +1123,28 @@ namespace __debug
 
       iterator
       find(const key_type& __key)
-      { return { _Base::find(__key), this }; }
+      { return iterator(_Base::find(__key), this); }
 
       const_iterator
       find(const key_type& __key) const
-      { return { _Base::find(__key), this }; }
+      { return const_iterator(_Base::find(__key), this); }
 
       std::pair<iterator, iterator>
       equal_range(const key_type& __key)
       {
-	auto __res = _Base::equal_range(__key);
-	return { { __res.first, this }, { __res.second, this } };
+	std::pair<_Base_iterator, _Base_iterator> __res =
+	  _Base::equal_range(__key);
+	return std::make_pair(iterator(__res.first, this),
+			      iterator(__res.second, this));
       }
 
       std::pair<const_iterator, const_iterator>
       equal_range(const key_type& __key) const
       {
-	auto __res = _Base::equal_range(__key);
-	return { { __res.first, this }, { __res.second, this } };
+	std::pair<_Base_const_iterator, _Base_const_iterator> __res =
+	  _Base::equal_range(__key);
+	return std::make_pair(const_iterator(__res.first, this),
+			      const_iterator(__res.second, this));
       }
 
       size_type
@@ -1154,14 +1152,18 @@ namespace __debug
       {
 	size_type __ret(0);
 	size_type __bucket_count = this->bucket_count();
-	auto __pair = _Base::equal_range(__key);
-	for (auto __victim = __pair.first; __victim != __pair.second;)
+	std::pair<_Base_iterator, _Base_iterator> __pair =
+	  _Base::equal_range(__key);
+	for (_Base_iterator __victim = __pair.first; __victim != __pair.second;)
 	  {
-	    _M_invalidate(__victim);
-	    __victim = _Base::erase(__victim);
+	    this->_M_invalidate_if([__victim](_Base_const_iterator __it)
+			    { return __it == __victim; });
+	    this->_M_invalidate_local_if(
+			    [__victim](_Base_const_local_iterator __it)
+			    { return __it._M_curr() == __victim._M_cur; });
+	    _Base::erase(__victim++);
 	    ++__ret;
 	  }
-
 	_M_check_rehashed(__bucket_count);
 	return __ret;
       }
@@ -1170,33 +1172,43 @@ namespace __debug
       erase(const_iterator __it)
       {
 	__glibcxx_check_erase(__it);
-	return { _M_erase(__it.base()), this };
+	_Base_const_iterator __victim = __it.base();
+	this->_M_invalidate_if([__victim](_Base_const_iterator __it)
+			{ return __it == __victim; });
+	this->_M_invalidate_local_if(
+			[__victim](_Base_const_local_iterator __it)
+			{ return __it._M_curr() == __victim._M_cur; });
+	size_type __bucket_count = this->bucket_count();
+	_Base_iterator __next = _Base::erase(__it.base());
+	_M_check_rehashed(__bucket_count);
+	return iterator(__next, this);
       }
 
       iterator
       erase(iterator __it)
-      {
-	__glibcxx_check_erase(__it);
-	return { _M_erase(__it.base()), this };
-      }
+      { return erase(const_iterator(__it)); }
 
       iterator
       erase(const_iterator __first, const_iterator __last)
       {
 	__glibcxx_check_erase_range(__first, __last);
-	for (auto __tmp = __first.base(); __tmp != __last.base(); ++__tmp)
+	for (_Base_const_iterator __tmp = __first.base();
+	     __tmp != __last.base(); ++__tmp)
 	  {
-	    _GLIBCXX_DEBUG_VERIFY(__tmp != _Base::cend(),
+	    _GLIBCXX_DEBUG_VERIFY(__tmp != _Base::end(),
 				  _M_message(__gnu_debug::__msg_valid_range)
 				  ._M_iterator(__first, "first")
 				  ._M_iterator(__last, "last"));
-	    _M_invalidate(__tmp);
+	    this->_M_invalidate_if([__tmp](_Base_const_iterator __it)
+			    { return __it == __tmp; });
+	    this->_M_invalidate_local_if(
+			    [__tmp](_Base_const_local_iterator __it)
+			    { return __it._M_curr() == __tmp._M_cur; });
 	  }
-
 	size_type __bucket_count = this->bucket_count();
-	auto __next = _Base::erase(__first.base(), __last.base());
+	_Base_iterator __next = _Base::erase(__first.base(), __last.base());
 	_M_check_rehashed(__bucket_count);
-	return { __next, this };
+	return iterator(__next, this);
       }
 
       _Base&
@@ -1212,35 +1224,6 @@ namespace __debug
 	if (__prev_count != this->bucket_count())
 	  this->_M_invalidate_locals();
       }
-
-      void
-      _M_invalidate(_Base_const_iterator __victim)
-      {
-	this->_M_invalidate_if(
-	  [__victim](_Base_const_iterator __it) { return __it == __victim; });
-	this->_M_invalidate_local_if(
-	  [__victim](_Base_const_local_iterator __it)
-	  { return __it._M_curr() == __victim._M_cur; });
-      }
-
-      _Base_iterator
-      _M_erase(_Base_const_iterator __victim)
-      {
-	_M_invalidate(__victim);
-	size_type __bucket_count = this->bucket_count();
-	_Base_iterator __next = _Base::erase(__victim);
-	_M_check_rehashed(__bucket_count);
-	return __next;
-      }
-
-#if __cplusplus > 201402L
-      node_type
-      _M_extract(_Base_const_iterator __victim)
-      {
-	_M_invalidate(__victim);
-	return _Base::extract(__victim);
-      }
-#endif
     };
 
 #if __cpp_deduction_guides >= 201606

@@ -22,6 +22,8 @@ template <class PrimaryAllocator, class AllocatorCache,
           class SecondaryAllocator>  // NOLINT
 class CombinedAllocator {
  public:
+  typedef typename SecondaryAllocator::FailureHandler FailureHandler;
+
   void InitLinkerInitialized(s32 release_to_os_interval_ms) {
     primary_.Init(release_to_os_interval_ms);
     secondary_.InitLinkerInitialized();
@@ -38,12 +40,8 @@ class CombinedAllocator {
     // Returning 0 on malloc(0) may break a lot of code.
     if (size == 0)
       size = 1;
-    if (size + alignment < size) {
-      Report("WARNING: %s: CombinedAllocator allocation overflow: "
-             "0x%zx bytes with 0x%zx alignment requested\n",
-             SanitizerToolName, size, alignment);
-      return nullptr;
-    }
+    if (size + alignment < size)
+      return FailureHandler::OnBadRequest();
     uptr original_size = size;
     // If alignment requirements are to be fulfilled by the frontend allocator
     // rather than by the primary or secondary, passing an alignment lower than
@@ -62,6 +60,8 @@ class CombinedAllocator {
       res = cache->Allocate(&primary_, primary_.ClassID(size));
     else
       res = secondary_.Allocate(&stats_, original_size, alignment);
+    if (!res)
+      return FailureHandler::OnOOM();
     if (alignment > 8)
       CHECK_EQ(reinterpret_cast<uptr>(res) & (alignment - 1), 0);
     return res;
@@ -73,10 +73,6 @@ class CombinedAllocator {
 
   void SetReleaseToOSIntervalMs(s32 release_to_os_interval_ms) {
     primary_.SetReleaseToOSIntervalMs(release_to_os_interval_ms);
-  }
-
-  void ForceReleaseToOS() {
-    primary_.ForceReleaseToOS();
   }
 
   void Deallocate(AllocatorCache *cache, void *p) {

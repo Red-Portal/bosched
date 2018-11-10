@@ -1725,7 +1725,7 @@ package body Ada.Containers.Multiway_Trees is
    end Parent;
 
    -------------------
-   -- Prepend_Child --
+   -- Prepent_Child --
    -------------------
 
    procedure Prepend_Child

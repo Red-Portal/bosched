@@ -18,7 +18,6 @@
 // { dg-options "-DUSE_FILESYSTEM_TS -lstdc++fs" }
 // { dg-do run { target c++11 } }
 // { dg-require-filesystem-ts "" }
-// { dg-xfail-if "symlinks not supported" { *-*-mingw* } }
 
 #include <experimental/filesystem>
 #include <testsuite_hooks.h>

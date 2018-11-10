@@ -179,7 +179,7 @@ package body Switch is
    end Is_Switch;
 
    -----------------
-   -- Switch_Last --
+   -- Switch_last --
    -----------------
 
    function Switch_Last (Switch_Chars : String) return Natural is

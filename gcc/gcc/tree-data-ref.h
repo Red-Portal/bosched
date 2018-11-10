@@ -23,7 +23,6 @@ along with GCC; see the file COPYING3.  If not see
 
 #include "graphds.h"
 #include "tree-chrec.h"
-#include "opt-problem.h"
 
 /*
   innermost_loop_behavior describes the evolution of the address of the memory
@@ -422,8 +421,7 @@ typedef struct data_dependence_relation *ddr_p;
 #define DDR_COULD_BE_INDEPENDENT_P(DDR) (DDR)->could_be_independent_p
 
 
-opt_result dr_analyze_innermost (innermost_loop_behavior *, tree,
-				 struct loop *, const gimple *);
+bool dr_analyze_innermost (innermost_loop_behavior *, tree, struct loop *);
 extern bool compute_data_dependences_for_loop (struct loop *, bool,
 					       vec<loop_p> *,
 					       vec<data_reference_p> *,
@@ -445,8 +443,8 @@ extern void free_dependence_relation (struct data_dependence_relation *);
 extern void free_dependence_relations (vec<ddr_p> );
 extern void free_data_ref (data_reference_p);
 extern void free_data_refs (vec<data_reference_p> );
-extern opt_result find_data_references_in_stmt (struct loop *, gimple *,
-						vec<data_reference_p> *);
+extern bool find_data_references_in_stmt (struct loop *, gimple *,
+					  vec<data_reference_p> *);
 extern bool graphite_find_data_references_in_stmt (edge, loop_p, gimple *,
 						   vec<data_reference_p> *);
 tree find_data_references_in_loop (struct loop *, vec<data_reference_p> *);
@@ -481,7 +479,7 @@ extern bool dr_may_alias_p (const struct data_reference *,
 extern bool dr_equal_offsets_p (struct data_reference *,
                                 struct data_reference *);
 
-extern opt_result runtime_alias_check_p (ddr_p, struct loop *, bool);
+extern bool runtime_alias_check_p (ddr_p, struct loop *, bool);
 extern int data_ref_compare_tree (tree, tree);
 extern void prune_runtime_alias_test_list (vec<dr_with_seg_len_pair_t> *,
 					   poly_uint64);

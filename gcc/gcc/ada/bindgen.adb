@@ -745,14 +745,10 @@ package body Bindgen is
          WBI ("      Default_Stack_Size : Integer;");
          WBI ("      pragma Import (C, Default_Stack_Size, " &
               """__gl_default_stack_size"");");
-
-         if Sec_Stack_Used then
-            WBI ("      Default_Secondary_Stack_Size : " &
-                 "System.Parameters.Size_Type;");
-            WBI ("      pragma Import (C, Default_Secondary_Stack_Size, " &
-                 """__gnat_default_ss_size"");");
-         end if;
-
+         WBI ("      Default_Secondary_Stack_Size : " &
+              "System.Parameters.Size_Type;");
+         WBI ("      pragma Import (C, Default_Secondary_Stack_Size, " &
+              """__gnat_default_ss_size"");");
          WBI ("      Leap_Seconds_Support : Integer;");
          WBI ("      pragma Import (C, Leap_Seconds_Support, " &
               """__gl_leap_seconds_support"");");

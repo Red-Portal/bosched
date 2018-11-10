@@ -234,11 +234,13 @@ func lockPath(tpkg *types.Package, typ types.Type) typePath {
 		return nil
 	}
 
-	// We're looking for cases in which a pointer to this type
-	// is a sync.Locker, but a value is not. This differentiates
+	// We're looking for cases in which a reference to this type
+	// can be locked, but a value cannot. This differentiates
 	// embedded interfaces from embedded values.
-	if types.Implements(types.NewPointer(typ), lockerType) && !types.Implements(typ, lockerType) {
-		return []types.Type{typ}
+	if plock := types.NewMethodSet(types.NewPointer(typ)).Lookup(tpkg, "Lock"); plock != nil {
+		if lock := types.NewMethodSet(typ).Lookup(tpkg, "Lock"); lock == nil {
+			return []types.Type{typ}
+		}
 	}
 
 	nfields := styp.NumFields()
@@ -251,16 +253,4 @@ func lockPath(tpkg *types.Package, typ types.Type) typePath {
 	}
 
 	return nil
-}
-
-var lockerType *types.Interface
-
-// Construct a sync.Locker interface type.
-func init() {
-	nullary := types.NewSignature(nil, nil, nil, false) // func()
-	methods := []*types.Func{
-		types.NewFunc(token.NoPos, nil, "Lock", nullary),
-		types.NewFunc(token.NoPos, nil, "Unlock", nullary),
-	}
-	lockerType = types.NewInterface(methods, nil).Complete()
 }

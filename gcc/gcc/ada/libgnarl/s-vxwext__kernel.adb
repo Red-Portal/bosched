@@ -85,9 +85,9 @@ package body System.VxWorks.Ext is
       return ERROR;
    end taskMaskAffinitySet;
 
-   ---------------
-   -- Task_Cont --
-   ---------------
+   --------------
+   -- taskCont --
+   --------------
 
    function Task_Cont (tid : t_id) return int is
       function taskCont (tid : t_id) return int;
@@ -96,9 +96,9 @@ package body System.VxWorks.Ext is
       return taskCont (tid);
    end Task_Cont;
 
-   ---------------
-   -- Task_Stop --
-   ---------------
+   --------------
+   -- taskStop --
+   --------------
 
    function Task_Stop (tid : t_id) return int is
       function taskStop (tid : t_id) return int;

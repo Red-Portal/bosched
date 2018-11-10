@@ -1,5 +1,4 @@
 ! { dg-do run }
-! { dg-options "-std=legacy" }
 ! { dg-timeout-factor 2.0 }
 
   call test

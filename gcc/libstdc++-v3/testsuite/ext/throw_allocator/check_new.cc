@@ -17,7 +17,6 @@
 // <http://www.gnu.org/licenses/>.
 
 // { dg-require-time "" }
-// { dg-require-cstdint "" }
 
 #include <cstdlib>
 #include <ext/throw_allocator.h>

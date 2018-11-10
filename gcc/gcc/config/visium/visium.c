@@ -280,19 +280,17 @@ static HOST_WIDE_INT visium_constant_alignment (const_tree, HOST_WIDE_INT);
 #undef  TARGET_LEGITIMATE_CONSTANT_P
 #define TARGET_LEGITIMATE_CONSTANT_P visium_legitimate_constant_p
 
-#undef  TARGET_LRA_P
+#undef TARGET_LRA_P
 #define TARGET_LRA_P hook_bool_void_false
 
 #undef  TARGET_LEGITIMATE_ADDRESS_P
 #define TARGET_LEGITIMATE_ADDRESS_P visium_legitimate_address_p
 
-#undef  TARGET_PRINT_OPERAND_PUNCT_VALID_P
+#undef TARGET_PRINT_OPERAND_PUNCT_VALID_P
 #define TARGET_PRINT_OPERAND_PUNCT_VALID_P visium_print_operand_punct_valid_p
-
-#undef  TARGET_PRINT_OPERAND
+#undef TARGET_PRINT_OPERAND
 #define TARGET_PRINT_OPERAND visium_print_operand
-
-#undef  TARGET_PRINT_OPERAND_ADDRESS
+#undef TARGET_PRINT_OPERAND_ADDRESS
 #define TARGET_PRINT_OPERAND_ADDRESS visium_print_operand_address
 
 #undef  TARGET_ATTRIBUTE_TABLE
@@ -349,29 +347,26 @@ static HOST_WIDE_INT visium_constant_alignment (const_tree, HOST_WIDE_INT);
 #undef  TARGET_TRAMPOLINE_INIT
 #define TARGET_TRAMPOLINE_INIT visium_trampoline_init
 
-#undef  TARGET_MD_ASM_ADJUST
+#undef TARGET_MD_ASM_ADJUST
 #define TARGET_MD_ASM_ADJUST visium_md_asm_adjust
 
-#undef  TARGET_FLAGS_REGNUM
+#undef TARGET_FLAGS_REGNUM
 #define TARGET_FLAGS_REGNUM FLAGS_REGNUM
 
-#undef  TARGET_HARD_REGNO_NREGS
+#undef TARGET_HARD_REGNO_NREGS
 #define TARGET_HARD_REGNO_NREGS visium_hard_regno_nregs
 
-#undef  TARGET_HARD_REGNO_MODE_OK
+#undef TARGET_HARD_REGNO_MODE_OK
 #define TARGET_HARD_REGNO_MODE_OK visium_hard_regno_mode_ok
 
-#undef  TARGET_MODES_TIEABLE_P
+#undef TARGET_MODES_TIEABLE_P
 #define TARGET_MODES_TIEABLE_P visium_modes_tieable_p
 
-#undef  TARGET_CAN_CHANGE_MODE_CLASS
+#undef TARGET_CAN_CHANGE_MODE_CLASS
 #define TARGET_CAN_CHANGE_MODE_CLASS visium_can_change_mode_class
 
-#undef  TARGET_CONSTANT_ALIGNMENT
+#undef TARGET_CONSTANT_ALIGNMENT
 #define TARGET_CONSTANT_ALIGNMENT visium_constant_alignment
-
-#undef  TARGET_HAVE_SPECULATION_SAFE_VALUE
-#define TARGET_HAVE_SPECULATION_SAFE_VALUE speculation_safe_value_not_needed
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 
@@ -448,12 +443,12 @@ visium_option_override (void)
 
   /* Align functions on 256-byte (32-quadword) for GR5 and 64-byte (8-quadword)
      boundaries for GR6 so they start a new burst mode window.  */
-  if (flag_align_functions && !str_align_functions)
+  if (align_functions == 0)
     {
       if (visium_cpu == PROCESSOR_GR6)
-	str_align_functions = "64";
+	align_functions = 64;
       else
-	str_align_functions = "256";
+	align_functions = 256;
 
       /* Allow the size of compilation units to double because of inlining.
 	 In practice the global size of the object code is hardly affected
@@ -464,25 +459,26 @@ visium_option_override (void)
     }
 
   /* Likewise for loops.  */
-  if (flag_align_loops && !str_align_loops)
+  if (align_loops == 0)
     {
       if (visium_cpu == PROCESSOR_GR6)
-	str_align_loops = "64";
+	align_loops = 64;
       else
 	{
+	  align_loops = 256;
 	  /* But not if they are too far away from a 256-byte boundary.  */
-	  str_align_loops = "256:32:8";
+	  align_loops_max_skip = 31;
 	}
     }
 
   /* Align all jumps on quadword boundaries for the burst mode, and even
      on 8-quadword boundaries for GR6 so they start a new window.  */
-  if (flag_align_jumps && !str_align_jumps)
+  if (align_jumps == 0)
     {
       if (visium_cpu == PROCESSOR_GR6)
-	str_align_jumps = "64";
+	align_jumps = 64;
       else
-	str_align_jumps = "8";
+	align_jumps = 8;
     }
 
   /* We register a machine-specific pass.  This pass must be scheduled as

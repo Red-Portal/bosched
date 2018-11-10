@@ -38,7 +38,8 @@ with Ada.Containers.Functional_Vectors;
 generic
    type Index_Type is range <>;
    type Element_Type (<>) is private;
-   Max_Size_In_Storage_Elements : Natural;
+   Max_Size_In_Storage_Elements : Natural :=
+                                    Element_Type'Max_Size_In_Storage_Elements;
    --  Maximum size of Vector elements in bytes. This has the same meaning as
    --  in Ada.Containers.Bounded_Holders, with the same restrictions. Note that
    --  setting this too small can lead to erroneous execution; see comments in

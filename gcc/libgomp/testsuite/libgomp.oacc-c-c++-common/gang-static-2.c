@@ -1,23 +1,25 @@
+/* { dg-do run { target openacc_nvidia_accel_selected } } */
+/* This code uses nvptx inline assembly guarded with acc_on_device, which is
+   not optimized away at -O0, and then confuses the target assembler.
+   { dg-skip-if "" { *-*-* } { "-O0" } { "" } } */
+
 #include <assert.h>
 #include <openacc.h>
-#include <gomp-constants.h>
 
 #define N 100
 
 #define GANG_ID(I)						\
-  (acc_on_device (acc_device_not_host)				\
-   ? __builtin_goacc_parlevel_id (GOMP_DIM_GANG)					\
-   : (I))
+  (acc_on_device (acc_device_nvidia)				\
+   ? ({unsigned __r;						\
+       __asm__ volatile ("mov.u32 %0,%%ctaid.x;" : "=r" (__r));	\
+       __r; }) : (I))
 
 void
 test_static(int *a, int num_gangs, int sarg)
 {
   int i, j;
 
-  if (acc_on_device (acc_device_host))
-    return;
-
-   if (sarg == 0)
+  if (sarg == 0)
     sarg = 1;
 
   for (i = 0; i < N / sarg; i++)
@@ -29,9 +31,6 @@ void
 test_nonstatic(int *a, int gangs)
 {
   int i, j;
-
-  if (acc_on_device (acc_device_host))
-    return;
 
   for (i = 0; i < N; i+=gangs)
     for (j = 0; j < gangs; j++)

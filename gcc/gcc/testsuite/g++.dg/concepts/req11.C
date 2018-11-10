@@ -1,5 +1,4 @@
-// { dg-do compile { target c++17 } }
-// { dg-options "-fconcepts" }
+// { dg-options "-std=c++17 -fconcepts" }
 
 // Check that we can evaluate constant requires-expressions
 // as constant expressions, for the curious case when they

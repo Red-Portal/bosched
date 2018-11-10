@@ -15,11 +15,9 @@ using namespace std;
 
 const int ArraySize = 12;
 
-template <class> class Array_RC;
-
 template <class Type>
-class Array {
-  friend class Array_RC<Type>;
+class Array { // { dg-error "" } .struct Array_RC redecl.*
+friend class Array_RC;
 public:
     Array(const Type *ar, int sz) { init(ar,sz); }
     virtual ~Array() { delete [] ia; }
@@ -78,8 +76,8 @@ Array_RC<Type>::Array_RC(const Type *ar, int sz) : Array<Type>(ar, sz) {}
 
 template <class Type>
 Type &Array_RC<Type>::operator[](int ix) {
-    assert(ix >= 0 && ix < this->size);
-    return this->ia[ix];
+    assert(ix >= 0 && ix < size);// { dg-error "" } member .size.*
+    return ia[ix];// { dg-error "" } member .ia.*
 }
 
 //    -------------------   Test routine   ----------------------

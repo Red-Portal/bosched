@@ -318,8 +318,8 @@ static string_table *afdo_string_table;
 /* Store the AutoFDO source profile.  */
 static autofdo_source_profile *afdo_source_profile;
 
-/* gcov_summary structure to store the profile_info.  */
-static gcov_summary *afdo_profile_info;
+/* gcov_ctr_summary structure to store the profile_info.  */
+static struct gcov_ctr_summary *afdo_profile_info;
 
 /* Helper functions.  */
 
@@ -354,10 +354,17 @@ get_combined_location (location_t loc, tree decl)
 static tree
 get_function_decl_from_block (tree block)
 {
-  if (!inlined_function_outer_scope_p (block))
+  tree decl;
+
+  if (LOCATION_LOCUS (BLOCK_SOURCE_LOCATION (block)) == UNKNOWN_LOCATION)
     return NULL_TREE;
 
-  return BLOCK_ABSTRACT_ORIGIN (block);
+  for (decl = BLOCK_ABSTRACT_ORIGIN (block);
+       decl && (TREE_CODE (decl) == BLOCK);
+       decl = BLOCK_ABSTRACT_ORIGIN (decl))
+    if (TREE_CODE (decl) == FUNCTION_DECL)
+      break;
+  return decl;
 }
 
 /* Store inline stack for STMT in STACK.  */
@@ -860,6 +867,7 @@ autofdo_source_profile::read ()
       function_instance::function_instance_stack stack;
       function_instance *s = function_instance::read_function_instance (
           &stack, gcov_read_counter ());
+      afdo_profile_info->sum_all += s->total_count ();
       map_[s->name ()] = s;
     }
   return true;
@@ -950,6 +958,23 @@ read_profile (void)
 
   /* autofdo_module_profile.  */
   fake_read_autofdo_module_profile ();
+
+  /* Read in the working set.  */
+  if (gcov_read_unsigned () != GCOV_TAG_AFDO_WORKING_SET)
+    {
+      error ("cannot read working set from %s", auto_profile_file);
+      return;
+    }
+
+  /* Skip the length of the section.  */
+  gcov_read_unsigned ();
+  gcov_working_set_t set[128];
+  for (unsigned i = 0; i < 128; i++)
+    {
+      set[i].num_counters = gcov_read_unsigned ();
+      set[i].min_counter = gcov_read_counter ();
+    }
+  add_working_set (set);
 }
 
 /* From AutoFDO profiles, find values inside STMT for that we want to measure
@@ -1657,9 +1682,11 @@ read_autofdo_file (void)
   if (auto_profile_file == NULL)
     auto_profile_file = DEFAULT_AUTO_PROFILE_FILE;
 
-  autofdo::afdo_profile_info = XNEW (gcov_summary);
+  autofdo::afdo_profile_info = (struct gcov_ctr_summary *)xcalloc (
+      1, sizeof (struct gcov_ctr_summary));
   autofdo::afdo_profile_info->runs = 1;
   autofdo::afdo_profile_info->sum_max = 0;
+  autofdo::afdo_profile_info->sum_all = 0;
 
   /* Read the profile from the profile file.  */
   autofdo::read_profile ();
@@ -1686,7 +1713,7 @@ afdo_callsite_hot_enough_for_early_inline (struct cgraph_edge *edge)
   if (count > 0)
     {
       bool is_hot;
-      gcov_summary *saved_profile_info = profile_info;
+      const struct gcov_ctr_summary *saved_profile_info = profile_info;
       /* At early inline stage, profile_info is not set yet. We need to
          temporarily set it to afdo_profile_info to calculate hotness.  */
       profile_info = autofdo::afdo_profile_info;

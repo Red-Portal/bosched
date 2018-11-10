@@ -14,7 +14,7 @@ end module global
 
 program snafu
 !  use global
-  implicit type (t3) (z)  ! { dg-error "has not been declared" }
+  implicit type (t3) (z)
 
   call foo (zin) ! { dg-error "defined|Type mismatch" }
 

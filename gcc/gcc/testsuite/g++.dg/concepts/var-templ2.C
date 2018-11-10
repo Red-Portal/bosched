@@ -1,6 +1,5 @@
 // PR c++/67139
-// { dg-do compile { target c++17 } }
-// { dg-options "-fconcepts" }
+// { dg-options "-std=c++17 -fconcepts" }
 
 template <class T>
 constexpr typename T::type::value_type _v = T::type::value;

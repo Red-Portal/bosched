@@ -13,15 +13,14 @@
 #include "lsan_common.h"
 
 #include "sanitizer_common/sanitizer_common.h"
-#include "sanitizer_common/sanitizer_flag_parser.h"
 #include "sanitizer_common/sanitizer_flags.h"
+#include "sanitizer_common/sanitizer_flag_parser.h"
 #include "sanitizer_common/sanitizer_placement_new.h"
 #include "sanitizer_common/sanitizer_procmaps.h"
-#include "sanitizer_common/sanitizer_report_decorator.h"
 #include "sanitizer_common/sanitizer_stackdepot.h"
 #include "sanitizer_common/sanitizer_stacktrace.h"
 #include "sanitizer_common/sanitizer_suppressions.h"
-#include "sanitizer_common/sanitizer_thread_registry.h"
+#include "sanitizer_common/sanitizer_report_decorator.h"
 #include "sanitizer_common/sanitizer_tls_get_addr.h"
 
 #if CAN_SANITIZE_LEAKS
@@ -103,7 +102,7 @@ InternalMmapVector<RootRegion> const *GetRootRegions() { return root_regions; }
 void InitializeRootRegions() {
   CHECK(!root_regions);
   ALIGNED(64) static char placeholder[sizeof(InternalMmapVector<RootRegion>)];
-  root_regions = new (placeholder) InternalMmapVector<RootRegion>();  // NOLINT
+  root_regions = new(placeholder) InternalMmapVector<RootRegion>(1);
 }
 
 const char *MaybeCallLsanDefaultOptions() {
@@ -213,10 +212,9 @@ void ForEachExtraStackRangeCb(uptr begin, uptr end, void* arg) {
 // Scans thread data (stacks and TLS) for heap pointers.
 static void ProcessThreads(SuspendedThreadsList const &suspended_threads,
                            Frontier *frontier) {
-  InternalMmapVector<uptr> registers(suspended_threads.RegisterCount());
+  InternalScopedBuffer<uptr> registers(suspended_threads.RegisterCount());
   uptr registers_begin = reinterpret_cast<uptr>(registers.data());
-  uptr registers_end =
-      reinterpret_cast<uptr>(registers.data() + registers.size());
+  uptr registers_end = registers_begin + registers.size();
   for (uptr i = 0; i < suspended_threads.ThreadCount(); i++) {
     tid_t os_id = static_cast<tid_t>(suspended_threads.GetThreadID(i));
     LOG_THREADS("Processing thread %d.\n", os_id);
@@ -411,9 +409,8 @@ static void MarkInvalidPCCb(uptr chunk, void *arg) {
   }
 }
 
-// On Linux, treats all chunks allocated from ld-linux.so as reachable, which
-// covers dynamically allocated TLS blocks, internal dynamic loader's loaded
-// modules accounting etc.
+// On Linux, handles dynamically allocated TLS blocks by treating all chunks
+// allocated from ld-linux.so as reachable.
 // Dynamic TLS blocks contain the TLS variables of dynamically loaded modules.
 // They are allocated with a __libc_memalign() call in allocate_and_init()
 // (elf/dl-tls.c). Glibc won't tell us the address ranges occupied by those
@@ -444,7 +441,7 @@ void ProcessPC(Frontier *frontier) {
 // Sets the appropriate tag on each chunk.
 static void ClassifyAllChunks(SuspendedThreadsList const &suspended_threads) {
   // Holds the flood fill frontier.
-  Frontier frontier;
+  Frontier frontier(1);
 
   ForEachChunk(CollectIgnoredCb, &frontier);
   ProcessGlobalRegions(&frontier);
@@ -506,7 +503,7 @@ static void CollectLeaksCb(uptr chunk, void *arg) {
 }
 
 static void PrintMatchedSuppressions() {
-  InternalMmapVector<Suppression *> matched;
+  InternalMmapVector<Suppression *> matched(1);
   GetSuppressionContext()->GetMatched(&matched);
   if (!matched.size())
     return;
@@ -525,36 +522,11 @@ struct CheckForLeaksParam {
   LeakReport leak_report;
 };
 
-static void ReportIfNotSuspended(ThreadContextBase *tctx, void *arg) {
-  const InternalMmapVector<tid_t> &suspended_threads =
-      *(const InternalMmapVector<tid_t> *)arg;
-  if (tctx->status == ThreadStatusRunning) {
-    uptr i = InternalLowerBound(suspended_threads, 0, suspended_threads.size(),
-                                tctx->os_id, CompareLess<int>());
-    if (i >= suspended_threads.size() || suspended_threads[i] != tctx->os_id)
-      Report("Running thread %d was not suspended. False leaks are possible.\n",
-             tctx->os_id);
-  };
-}
-
-static void ReportUnsuspendedThreads(
-    const SuspendedThreadsList &suspended_threads) {
-  InternalMmapVector<tid_t> threads(suspended_threads.ThreadCount());
-  for (uptr i = 0; i < suspended_threads.ThreadCount(); ++i)
-    threads[i] = suspended_threads.GetThreadID(i);
-
-  Sort(threads.data(), threads.size());
-
-  GetThreadRegistryLocked()->RunCallbackForEachThreadLocked(
-      &ReportIfNotSuspended, &threads);
-}
-
 static void CheckForLeaksCallback(const SuspendedThreadsList &suspended_threads,
                                   void *arg) {
   CheckForLeaksParam *param = reinterpret_cast<CheckForLeaksParam *>(arg);
   CHECK(param);
   CHECK(!param->success);
-  ReportUnsuspendedThreads(suspended_threads);
   ClassifyAllChunks(suspended_threads);
   ForEachChunk(CollectLeaksCb, &param->leak_report);
   // Clean up for subsequent leak checks. This assumes we did not overwrite any
@@ -709,7 +681,7 @@ void LeakReport::ReportTopLeaks(uptr num_leaks_to_report) {
   uptr unsuppressed_count = UnsuppressedLeakCount();
   if (num_leaks_to_report > 0 && num_leaks_to_report < unsuppressed_count)
     Printf("The %zu top leak(s):\n", num_leaks_to_report);
-  Sort(leaks_.data(), leaks_.size(), &LeakComparator);
+  InternalSort(&leaks_, leaks_.size(), LeakComparator);
   uptr leaks_reported = 0;
   for (uptr i = 0; i < leaks_.size(); i++) {
     if (leaks_[i].is_suppressed) continue;

@@ -1,6 +1,6 @@
 /* PR rtl-optimization/80747 */
 /* { dg-do compile } */
-/* { dg-options "-fprofile-use -freorder-blocks-and-partition -O1 -foptimize-sibling-calls -Wno-missing-profile" } */
+/* { dg-options "-fprofile-use -freorder-blocks-and-partition -O1 -foptimize-sibling-calls" } */
 
 int
 foo (int a)

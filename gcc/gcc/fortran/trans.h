@@ -485,8 +485,7 @@ tree gfc_build_compare_string (tree, tree, tree, tree, int, enum tree_code);
 void gfc_conv_expr (gfc_se * se, gfc_expr * expr);
 void gfc_conv_expr_val (gfc_se * se, gfc_expr * expr);
 void gfc_conv_expr_lhs (gfc_se * se, gfc_expr * expr);
-void gfc_conv_expr_reference (gfc_se * se, gfc_expr * expr,
-			      bool add_clobber = false);
+void gfc_conv_expr_reference (gfc_se * se, gfc_expr *);
 void gfc_conv_expr_type (gfc_se * se, gfc_expr *, tree);
 
 
@@ -917,8 +916,6 @@ extern GTY(()) tree gfor_fndecl_sr_kind;
 extern GTY(()) tree gfor_fndecl_ieee_procedure_entry;
 extern GTY(()) tree gfor_fndecl_ieee_procedure_exit;
 
-/* RANDOM_INIT.  */
-extern GTY(()) tree gfor_fndecl_random_init;
 
 /* True if node is an integer constant.  */
 #define INTEGER_CST_P(node) (TREE_CODE(node) == INTEGER_CST)

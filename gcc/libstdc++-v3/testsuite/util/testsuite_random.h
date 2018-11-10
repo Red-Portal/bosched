@@ -113,10 +113,7 @@ namespace __gnu_test
   discrete_pdf(int k, std::initializer_list<double> wl)
   {
     if (!wl.size())
-      {
-	static std::initializer_list<double> one = { 1.0 };
-	wl = one;
-      }
+      wl = { 1.0 };
 
     if (k < 0 || (std::size_t)k >= wl.size())
       return 0.0;

@@ -332,11 +332,7 @@ func TestVendor12156(t *testing.T) {
 
 // Module legacy support does path rewriting very similar to vendoring.
 
-<<<<<<< HEAD
-func TestLegacyMod(t *testing.T) {
-=======
 func TestModLegacy(t *testing.T) {
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
 	tg := testgo(t)
 	defer tg.cleanup()
 	tg.setenv("GOPATH", filepath.Join(tg.pwd(), "testdata/modlegacy"))
@@ -351,11 +347,7 @@ func TestModLegacy(t *testing.T) {
 	tg.run("build", "old/p1", "new/p1")
 }
 
-<<<<<<< HEAD
-func TestLegacyModGet(t *testing.T) {
-=======
 func TestModLegacyGet(t *testing.T) {
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
 	testenv.MustHaveExternalNetwork(t)
 
 	tg := testgo(t)

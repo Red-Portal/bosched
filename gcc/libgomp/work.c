@@ -27,13 +27,10 @@
    of threads.  */
 
 #include "libgomp.h"
-#include "bo_scheduling.h"
-
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 
-typedef unsigned long long region_id_t;
 
 /* Allocate a new work share structure, preferably from current team's
    free gomp_work_share cache.  */
@@ -206,7 +203,7 @@ gomp_work_share_start (bool ordered)
    This version does imply a barrier at the end of the work-share.  */
 
 void
-gomp_work_share_end (region_id_t region_id)
+gomp_work_share_end (void)
 {
   struct gomp_thread *thr = gomp_thread ();
   struct gomp_team *team = thr->ts.team;
@@ -228,12 +225,6 @@ gomp_work_share_end (region_id_t region_id)
 	{
 	  team->work_shares_to_free = thr->ts.work_share;
 	  free_work_share (team, thr->ts.last_work_share);
-
-      struct gomp_task_icv *icv = gomp_icv (false);
-      if(sched == GFS_RUNTIME, && is_bo_schedule(icv->run_sched_var))
-      {
-          bo_schedule_end(region_id);
-      }
 	}
     }
 
@@ -245,7 +236,7 @@ gomp_work_share_end (region_id_t region_id)
    This version implies a cancellable barrier at the end of the work-share.  */
 
 bool
-gomp_work_share_end_cancel (region_id_t region_id)
+gomp_work_share_end_cancel (void)
 {
   struct gomp_thread *thr = gomp_thread ();
   struct gomp_team *team = thr->ts.team;
@@ -260,12 +251,6 @@ gomp_work_share_end_cancel (region_id_t region_id)
 	{
 	  team->work_shares_to_free = thr->ts.work_share;
 	  free_work_share (team, thr->ts.last_work_share);
-
-      struct gomp_task_icv *icv = gomp_icv (false);
-      if(sched == GFS_RUNTIME, && is_bo_schedule(icv->run_sched_var))
-      {
-          bo_schedule_end(region_id);
-      }
 	}
     }
   thr->ts.last_work_share = NULL;
@@ -277,7 +262,7 @@ gomp_work_share_end_cancel (region_id_t region_id)
    This version does NOT imply a barrier at the end of the work-share.  */
 
 void
-gomp_work_share_end_nowait (region_id_t region_id)
+gomp_work_share_end_nowait (void)
 {
   struct gomp_thread *thr = gomp_thread ();
   struct gomp_team *team = thr->ts.team;
@@ -307,12 +292,6 @@ gomp_work_share_end_nowait (region_id_t region_id)
     {
       team->work_shares_to_free = thr->ts.work_share;
       free_work_share (team, thr->ts.last_work_share);
-
-      struct gomp_task_icv *icv = gomp_icv (false);
-      if(sched == GFS_RUNTIME, && is_bo_schedule(icv->run_sched_var))
-      {
-          bo_schedule_end(region_id);
-      }
     }
   thr->ts.last_work_share = NULL;
 }

@@ -1,5 +1,5 @@
 ! { dg-do compile }
-! { dg-options "-std=f2008" }
+! { dg-options "-std=f2008ts" }
 !
 ! F2018 permits ERROR STOP in PURE procedures
 !

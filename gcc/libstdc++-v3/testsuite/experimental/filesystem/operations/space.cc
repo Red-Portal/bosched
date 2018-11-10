@@ -30,16 +30,9 @@ namespace fs = std::experimental::filesystem;
 void
 test01()
 {
-<<<<<<< HEAD
-  const fs::path root = __gnu_test::root_path();
-  fs::space_info s = fs::space(root);
-  std::error_code ec = make_error_code(std::errc::invalid_argument);
-  s = fs::space(root, ec);
-=======
   fs::space_info s = fs::space("/");
   std::error_code ec = make_error_code(std::errc::invalid_argument);
   s = fs::space("/", ec);
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
   VERIFY( !ec );
 
   s = fs::space(__gnu_test::nonexistent_path(), ec);

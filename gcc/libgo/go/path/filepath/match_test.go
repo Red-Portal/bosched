@@ -10,7 +10,6 @@ import (
 	"io/ioutil"
 	"os"
 	. "path/filepath"
-	"reflect"
 	"runtime"
 	"sort"
 	"strings"
@@ -371,20 +370,5 @@ func TestWindowsGlob(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-	}
-}
-
-func TestNonWindowsGlobEscape(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skipf("skipping non-windows specific test")
-	}
-	pattern := `\match.go`
-	want := []string{"match.go"}
-	matches, err := Glob(pattern)
-	if err != nil {
-		t.Fatalf("Glob error for %q: %s", pattern, err)
-	}
-	if !reflect.DeepEqual(matches, want) {
-		t.Fatalf("Glob(%#q) = %v want %v", pattern, matches, want)
 	}
 }

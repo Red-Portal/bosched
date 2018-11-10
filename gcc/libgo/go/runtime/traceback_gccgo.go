@@ -110,14 +110,9 @@ func showframe(name string, gp *g) bool {
 }
 
 // isExportedRuntime reports whether name is an exported runtime function.
-// It is only for runtime functions, so ASCII A-Z is fine. Here also check
-// for mangled functions from runtime/<...>, which will be prefixed with
-// "runtime..z2f".
+// It is only for runtime functions, so ASCII A-Z is fine.
 func isExportedRuntime(name string) bool {
 	const n = len("runtime.")
-	if hasprefix(name, "runtime..z2f") {
-		return true
-	}
 	return len(name) > n && name[:n] == "runtime." && 'A' <= name[n] && name[n] <= 'Z'
 }
 
@@ -146,8 +141,8 @@ func goroutineheader(gp *g) {
 	}
 
 	// Override.
-	if gpstatus == _Gwaiting && gp.waitreason != waitReasonZero {
-		status = gp.waitreason.String()
+	if gpstatus == _Gwaiting && gp.waitreason != "" {
+		status = gp.waitreason
 	}
 
 	// approx time the G is blocked, in minutes
@@ -191,7 +186,7 @@ func tracebackothers(me *g) {
 	if gp != nil && gp != me {
 		print("\n")
 		goroutineheader(gp)
-		gp.traceback = (uintptr)(noescape(unsafe.Pointer(&tb)))
+		gp.traceback = (*tracebackg)(noescape(unsafe.Pointer(&tb)))
 		getTraceback(me, gp)
 		printtrace(tb.locbuf[:tb.c], nil)
 		printcreatedby(gp)
@@ -225,7 +220,7 @@ func tracebackothers(me *g) {
 			print("\tgoroutine in C code; stack unavailable\n")
 			printcreatedby(gp)
 		} else {
-			gp.traceback = (uintptr)(noescape(unsafe.Pointer(&tb)))
+			gp.traceback = (*tracebackg)(noescape(unsafe.Pointer(&tb)))
 			getTraceback(me, gp)
 			printtrace(tb.locbuf[:tb.c], nil)
 			printcreatedby(gp)

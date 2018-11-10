@@ -32,7 +32,7 @@ func IntoGoAndBack() {
 
 func testSigprocmask(t *testing.T) {
 	if r := C.RunSigThread(); r != 0 {
-		t.Errorf("pthread_create/pthread_join failed: %d", r)
+		t.Error("pthread_create/pthread_join failed")
 	}
 	if !blocked {
 		t.Error("Go runtime unblocked SIGIO")

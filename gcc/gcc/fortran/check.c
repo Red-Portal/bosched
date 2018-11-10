@@ -148,21 +148,6 @@ int_or_real_or_char_check_f2003 (gfc_expr *e, int n)
   return true;
 }
 
-/* Check that an expression is an intrinsic type.  */
-static bool
-intrinsic_type_check (gfc_expr *e, int n)
-{
-  if (e->ts.type != BT_INTEGER && e->ts.type != BT_REAL
-      && e->ts.type != BT_COMPLEX && e->ts.type != BT_CHARACTER
-      && e->ts.type != BT_LOGICAL)
-    {
-      gfc_error ("%qs argument of %qs intrinsic at %L must be of intrinsic type",
-		 gfc_current_intrinsic_arg[n]->name,
-		 gfc_current_intrinsic, &e->where);
-      return false;
-    }
-  return true;
-}
 
 /* Check that an expression is real or complex.  */
 
@@ -1151,7 +1136,7 @@ gfc_check_atomic (gfc_expr *atom, int atom_no, gfc_expr *value, int val_no,
       if (!kind_value_check (stat, stat_no, gfc_default_integer_kind))
 	return false;
 
-      if (!gfc_notify_std (GFC_STD_F2018, "STAT= argument to %s at %L",
+      if (!gfc_notify_std (GFC_STD_F2008_TS, "STAT= argument to %s at %L",
 			   gfc_current_intrinsic, &stat->where))
 	return false;
     }
@@ -1364,7 +1349,7 @@ gfc_check_event_query (gfc_expr *event, gfc_expr *count, gfc_expr *stat)
       if (!variable_check (stat, 2, false))
 	return false;
 
-      if (!gfc_notify_std (GFC_STD_F2018, "STAT= argument to %s at %L",
+      if (!gfc_notify_std (GFC_STD_F2008_TS, "STAT= argument to %s at %L",
 			   gfc_current_intrinsic, &stat->where))
 	return false;
     }
@@ -3321,10 +3306,18 @@ gfc_check_minloc_maxloc (gfc_actual_arglist *ap)
     {
       if (!type_check (b, 4, BT_LOGICAL) || !scalar_check (b,4))
 	return false;
+
+      /* TODO: Remove this once BACK is actually implemented.  */
+      if (b->expr_type != EXPR_CONSTANT || b->value.logical != 0)
+	{
+	  gfc_error ("BACK argument to %qs intrinsic not yet "
+		     "implemented", gfc_current_intrinsic);
+	  return false;
+	}
     }
   else
     {
-      b = gfc_get_logical_expr (gfc_logical_4_kind, NULL, 0);
+      b = gfc_get_logical_expr (gfc_default_logical_kind, NULL, 0);
       ap->next->next->next->next->expr = b;
     }
 
@@ -3351,82 +3344,6 @@ gfc_check_minloc_maxloc (gfc_actual_arglist *ap)
 				 "arguments '%s' and '%s' for intrinsic %s",
 				 gfc_current_intrinsic_arg[0]->name,
 				 gfc_current_intrinsic_arg[2]->name,
-				 gfc_current_intrinsic))
-    return false;
-
-  if (!kind_check (k, 1, BT_INTEGER))
-    return false;
-
-  return true;
-}
-
-/* Check function for findloc.  Mostly like gfc_check_minloc_maxloc
-   above, with the additional "value" argument.  */
-
-bool
-gfc_check_findloc (gfc_actual_arglist *ap)
-{
-  gfc_expr *a, *v, *m, *d, *k, *b;
-
-  a = ap->expr;
-  if (!intrinsic_type_check (a, 0) || !array_check (a, 0))
-    return false;
-
-  v = ap->next->expr;
-  if (!scalar_check (v,1))
-    return false;
-
-  /* Check if the type is compatible.  */
-
-  if ((a->ts.type == BT_LOGICAL && v->ts.type != BT_LOGICAL)
-      || (a->ts.type != BT_LOGICAL && v->ts.type == BT_LOGICAL))
-    {
-      gfc_error ("Argument %qs of %qs intrinsic at %L must be in type "
-		 "conformance to argument %qs at %L",
-		 gfc_current_intrinsic_arg[0]->name,
-		 gfc_current_intrinsic, &a->where,
-		 gfc_current_intrinsic_arg[1]->name, &v->where);
-    }
-	 
-  d = ap->next->next->expr;
-  m = ap->next->next->next->expr;
-  k = ap->next->next->next->next->expr;
-  b = ap->next->next->next->next->next->expr;
-
-  if (b)
-    {
-      if (!type_check (b, 5, BT_LOGICAL) || !scalar_check (b,4))
-	return false;
-    }
-  else
-    {
-      b = gfc_get_logical_expr (gfc_logical_4_kind, NULL, 0);
-      ap->next->next->next->next->next->expr = b;
-    }
-
-  if (m == NULL && d != NULL && d->ts.type == BT_LOGICAL
-      && ap->next->name == NULL)
-    {
-      m = d;
-      d = NULL;
-      ap->next->next->expr = NULL;
-      ap->next->next->next->expr = m;
-    }
-
-  if (!dim_check (d, 2, false))
-    return false;
-
-  if (!dim_rank_check (d, a, 0))
-    return false;
-
-  if (m != NULL && !type_check (m, 3, BT_LOGICAL))
-    return false;
-
-  if (m != NULL
-      && !gfc_check_conformance (a, m,
-				 "arguments '%s' and '%s' for intrinsic %s",
-				 gfc_current_intrinsic_arg[0]->name,
-				 gfc_current_intrinsic_arg[3]->name,
 				 gfc_current_intrinsic))
     return false;
 
@@ -4836,7 +4753,7 @@ gfc_check_c_f_pointer (gfc_expr *cptr, gfc_expr *fptr, gfc_expr *shape)
     }
 
   if (fptr->rank > 0 && !is_c_interoperable (fptr, &msg, false, true))
-    return gfc_notify_std (GFC_STD_F2018, "Noninteroperable array FPTR "
+    return gfc_notify_std (GFC_STD_F2008_TS, "Noninteroperable array FPTR "
 			   "at %L to C_F_POINTER: %s", &fptr->where, msg);
 
   return true;
@@ -4877,7 +4794,7 @@ gfc_check_c_f_procpointer (gfc_expr *cptr, gfc_expr *fptr)
     }
 
   if (!attr.is_bind_c)
-    return gfc_notify_std (GFC_STD_F2018, "Noninteroperable procedure "
+    return gfc_notify_std (GFC_STD_F2008_TS, "Noninteroperable procedure "
 			   "pointer at %L to C_F_PROCPOINTER", &fptr->where);
 
   return true;
@@ -4920,7 +4837,7 @@ gfc_check_c_funloc (gfc_expr *x)
     }
 
   if (!attr.is_bind_c)
-    return gfc_notify_std (GFC_STD_F2018, "Noninteroperable procedure "
+    return gfc_notify_std (GFC_STD_F2008_TS, "Noninteroperable procedure "
 			   "at %L to C_FUNLOC", &x->where);
   return true;
 }
@@ -4974,7 +4891,7 @@ gfc_check_c_loc (gfc_expr *x)
 	}
 
       if (x->rank
-	  && !gfc_notify_std (GFC_STD_F2018,
+	  && !gfc_notify_std (GFC_STD_F2008_TS,
 			      "Noninteroperable array at %L as"
 			      " argument to C_LOC: %s", &x->where, msg))
 	  return false;
@@ -5358,7 +5275,7 @@ gfc_check_num_images (gfc_expr *distance, gfc_expr *failed)
       if (!scalar_check (distance, 0))
 	return false;
 
-      if (!gfc_notify_std (GFC_STD_F2018, "DISTANCE= argument to "
+      if (!gfc_notify_std (GFC_STD_F2008_TS, "DISTANCE= argument to "
 			   "NUM_IMAGES at %L", &distance->where))
 	return false;
     }
@@ -5371,7 +5288,7 @@ gfc_check_num_images (gfc_expr *distance, gfc_expr *failed)
       if (!scalar_check (failed, 1))
 	return false;
 
-      if (!gfc_notify_std (GFC_STD_F2018, "FAILED= argument to "
+      if (!gfc_notify_std (GFC_STD_F2008_TS, "FAILED= argument to "
 			   "NUM_IMAGES at %L", &failed->where))
 	return false;
     }
@@ -5457,7 +5374,7 @@ gfc_check_this_image (gfc_expr *coarray, gfc_expr *dim, gfc_expr *distance)
       if (!scalar_check (distance, 2))
 	return false;
 
-      if (!gfc_notify_std (GFC_STD_F2018, "DISTANCE= argument to "
+      if (!gfc_notify_std (GFC_STD_F2008_TS, "DISTANCE= argument to "
 			   "THIS_IMAGE at %L", &distance->where))
 	return false;
 
@@ -5871,27 +5788,6 @@ gfc_check_mvbits (gfc_expr *from, gfc_expr *frompos, gfc_expr *len,
     return false;
 
   if (!less_than_bitsize2 ("to", to, "topos", topos, "len", len))
-    return false;
-
-  return true;
-}
-
-
-/* Check the arguments for RANDOM_INIT.  */
-
-bool
-gfc_check_random_init (gfc_expr *repeatable, gfc_expr *image_distinct)
-{
-  if (!type_check (repeatable, 0, BT_LOGICAL))
-    return false;
-
-  if (!scalar_check (repeatable, 0))
-    return false;
-
-  if (!type_check (image_distinct, 1, BT_LOGICAL))
-    return false;
-
-  if (!scalar_check (image_distinct, 1))
     return false;
 
   return true;

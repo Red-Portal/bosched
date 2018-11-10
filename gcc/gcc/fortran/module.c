@@ -2125,7 +2125,6 @@ DECL_MIO_NAME (procedure_type)
 DECL_MIO_NAME (ref_type)
 DECL_MIO_NAME (sym_flavor)
 DECL_MIO_NAME (sym_intent)
-DECL_MIO_NAME (inquiry_type)
 #undef DECL_MIO_NAME
 
 /* Symbol attributes are stored in list with the first three elements
@@ -3141,15 +3140,6 @@ static const mstring ref_types[] = {
     minit ("ARRAY", REF_ARRAY),
     minit ("COMPONENT", REF_COMPONENT),
     minit ("SUBSTRING", REF_SUBSTRING),
-    minit ("INQUIRY", REF_INQUIRY),
-    minit (NULL, -1)
-};
-
-static const mstring inquiry_types[] = {
-    minit ("RE", INQUIRY_RE),
-    minit ("IM", INQUIRY_IM),
-    minit ("KIND", INQUIRY_KIND),
-    minit ("LEN", INQUIRY_LEN),
     minit (NULL, -1)
 };
 
@@ -3179,10 +3169,6 @@ mio_ref (gfc_ref **rp)
       mio_expr (&r->u.ss.start);
       mio_expr (&r->u.ss.end);
       mio_charlen (&r->u.ss.length);
-      break;
-
-    case REF_INQUIRY:
-      r->u.i = MIO_NAME (inquiry_type) (r->u.i, inquiry_types);
       break;
     }
 
@@ -4573,6 +4559,9 @@ load_generic_interfaces (void)
 	  /* Decide if we need to load this one or not.  */
 	  p = find_use_name_n (name, &i, false);
 
+	  st = find_symbol (gfc_current_ns->sym_root,
+			    name, module_name, 1);
+
 	  if (!p || gfc_find_symbol (p, NULL, 0, &sym))
 	    {
 	      /* Skip the specific names for these cases.  */
@@ -4580,9 +4569,6 @@ load_generic_interfaces (void)
 
 	      continue;
 	    }
-
-	  st = find_symbol (gfc_current_ns->sym_root,
-			    name, module_name, 1);
 
 	  /* If the symbol exists already and is being USEd without being
 	     in an ONLY clause, do not load a new symtree(11.3.2).  */
@@ -4805,7 +4791,7 @@ load_omp_udrs (void)
       mio_pool_string (&name);
       gfc_clear_ts (&ts);
       mio_typespec (&ts);
-      if (gfc_str_startswith (name, "operator "))
+      if (strncmp (name, "operator ", sizeof ("operator ") - 1) == 0)
 	{
 	  const char *p = name + sizeof ("operator ") - 1;
 	  if (strcmp (p, "+") == 0)
@@ -5247,8 +5233,8 @@ read_module (void)
 
 	  /* Exception: Always import vtabs & vtypes.  */
 	  if (p == NULL && name[0] == '_'
-	      && (gfc_str_startswith (name, "__vtab_")
-		  || gfc_str_startswith (name, "__vtype_")))
+	      && (strncmp (name, "__vtab_", 5) == 0
+		  || strncmp (name, "__vtype_", 6) == 0))
 	    p = name;
 
 	  /* Skip symtree nodes not in an ONLY clause, unless there
@@ -5333,8 +5319,8 @@ read_module (void)
 		sym->attr.use_rename = 1;
 
 	      if (name[0] != '_'
-		  || (!gfc_str_startswith (name, "__vtab_")
-		      && !gfc_str_startswith (name, "__vtype_")))
+		  || (strncmp (name, "__vtab_", 5) != 0
+		      && strncmp (name, "__vtype_", 6) != 0))
 		sym->attr.use_only = only_flag;
 
 	      /* Store the symtree pointing to this symbol.  */

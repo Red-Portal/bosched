@@ -1829,6 +1829,9 @@ static const struct attribute_spec rs6000_attribute_table[] =
 #undef TARGET_INVALID_ARG_FOR_UNPROTOTYPED_FN
 #define TARGET_INVALID_ARG_FOR_UNPROTOTYPED_FN invalid_arg_for_unprototyped_fn
 
+#undef TARGET_ASM_LOOP_ALIGN_MAX_SKIP
+#define TARGET_ASM_LOOP_ALIGN_MAX_SKIP rs6000_loop_align_max_skip
+
 #undef TARGET_MD_ASM_ADJUST
 #define TARGET_MD_ASM_ADJUST rs6000_md_asm_adjust
 
@@ -4196,6 +4199,67 @@ rs6000_option_override_internal (bool global_init_p)
 
   gcc_assert (cpu_index >= 0);
 
+  if (have_cpu)
+    {
+#ifndef HAVE_AS_POWER9
+      if (processor_target_table[rs6000_cpu_index].processor 
+	  == PROCESSOR_POWER9)
+	{
+	  have_cpu = false;
+	  warning (0, "will not generate power9 instructions because "
+		   "assembler lacks power9 support");
+	}
+#endif
+#ifndef HAVE_AS_POWER8
+      if (processor_target_table[rs6000_cpu_index].processor
+	  == PROCESSOR_POWER8)
+	{
+	  have_cpu = false;
+	  warning (0, "will not generate power8 instructions because "
+		   "assembler lacks power8 support");
+	}
+#endif
+#ifndef HAVE_AS_POPCNTD
+      if (processor_target_table[rs6000_cpu_index].processor
+	  == PROCESSOR_POWER7)
+	{
+	  have_cpu = false;
+	  warning (0, "will not generate power7 instructions because "
+		   "assembler lacks power7 support");
+	}
+#endif
+#ifndef HAVE_AS_DFP
+      if (processor_target_table[rs6000_cpu_index].processor
+	  == PROCESSOR_POWER6)
+	{
+	  have_cpu = false;
+	  warning (0, "will not generate power6 instructions because "
+		   "assembler lacks power6 support");
+	}
+#endif
+#ifndef HAVE_AS_POPCNTB
+      if (processor_target_table[rs6000_cpu_index].processor
+	  == PROCESSOR_POWER5)
+	{
+	  have_cpu = false;
+	  warning (0, "will not generate power5 instructions because "
+		   "assembler lacks power5 support");
+	}
+#endif
+
+      if (!have_cpu)
+	{
+	  /* PowerPC 64-bit LE requires at least ISA 2.07.  */
+	  const char *default_cpu = (!TARGET_POWERPC64
+				     ? "powerpc"
+				     : (BYTES_BIG_ENDIAN
+					? "powerpc64"
+					: "powerpc64le"));
+
+	  rs6000_cpu_index = cpu_index = rs6000_cpu_name_lookup (default_cpu);
+	}
+    }
+
   /* If we have a cpu, either through an explicit -mcpu=<xxx> or if the
      compiler was configured with --with-cpu=<xxx>, replace all of the ISA bits
      with those from the cpu, except for options that were explicitly set.  If
@@ -5342,30 +5406,29 @@ rs6000_option_override_internal (bool global_init_p)
 	  if (rs6000_cpu == PROCESSOR_TITAN
 	      || rs6000_cpu == PROCESSOR_CELL)
 	    {
-	      if (flag_align_functions && !str_align_functions)
-		str_align_functions = "8";
-	      if (flag_align_jumps && !str_align_jumps)
-		str_align_jumps = "8";
-	      if (flag_align_loops && !str_align_loops)
-		str_align_loops = "8";
+	      if (align_functions <= 0)
+		align_functions = 8;
+	      if (align_jumps <= 0)
+		align_jumps = 8;
+	      if (align_loops <= 0)
+		align_loops = 8;
 	    }
 	  if (rs6000_align_branch_targets)
 	    {
-	      if (flag_align_functions && !str_align_functions)
-		str_align_functions = "16";
-	      if (flag_align_jumps && !str_align_jumps)
-		str_align_jumps = "16";
-	      if (flag_align_loops && !str_align_loops)
+	      if (align_functions <= 0)
+		align_functions = 16;
+	      if (align_jumps <= 0)
+		align_jumps = 16;
+	      if (align_loops <= 0)
 		{
 		  can_override_loop_align = 1;
-		  str_align_loops = "16";
+		  align_loops = 16;
 		}
 	    }
-
-	  if (flag_align_jumps && !str_align_jumps)
-	    str_align_jumps = "16";
-	  if (flag_align_loops && !str_align_loops)
-	    str_align_loops = "16";
+	  if (align_jumps_max_skip <= 0)
+	    align_jumps_max_skip = 15;
+	  if (align_loops_max_skip <= 0)
+	    align_loops_max_skip = 15;
 	}
 
       /* Arrange to save and restore machine status around nested functions.  */
@@ -5659,7 +5722,7 @@ rs6000_builtin_mask_for_load (void)
 }
 
 /* Implement LOOP_ALIGN. */
-align_flags
+int
 rs6000_loop_align (rtx label)
 {
   basic_block bb;
@@ -5667,7 +5730,7 @@ rs6000_loop_align (rtx label)
 
   /* Don't override loop alignment if -falign-loops was specified. */
   if (!can_override_loop_align)
-    return align_loops;
+    return align_loops_log;
 
   bb = BLOCK_FOR_INSN (label);
   ninsns = num_loop_insns(bb->loop_father);
@@ -5680,9 +5743,16 @@ rs6000_loop_align (rtx label)
 	  || rs6000_cpu == PROCESSOR_POWER7
 	  || rs6000_cpu == PROCESSOR_POWER8
 	  || rs6000_cpu == PROCESSOR_POWER9))
-    return align_flags (5);
+    return 5;
   else
-    return align_loops;
+    return align_loops_log;
+}
+
+/* Implement TARGET_LOOP_ALIGN_MAX_SKIP. */
+static int
+rs6000_loop_align_max_skip (rtx_insn *label)
+{
+  return (1 << rs6000_loop_align (label)) - 1;
 }
 
 /* Return true iff, data reference of TYPE can reach vector alignment (16)
@@ -5969,7 +6039,6 @@ rs6000_density_test (rs6000_cost_data *data)
   struct loop *loop = data->loop_info;
   basic_block *bbs = get_loop_body (loop);
   int nbbs = loop->num_nodes;
-  loop_vec_info loop_vinfo = loop_vec_info_for_loop (data->loop_info);
   int vec_cost = data->cost[vect_body], not_vec_cost = 0;
   int i, density_pct;
 
@@ -5981,7 +6050,7 @@ rs6000_density_test (rs6000_cost_data *data)
       for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
 	{
 	  gimple *stmt = gsi_stmt (gsi);
-	  stmt_vec_info stmt_info = loop_vinfo->lookup_stmt (stmt);
+	  stmt_vec_info stmt_info = vinfo_for_stmt (stmt);
 
 	  if (!STMT_VINFO_RELEVANT_P (stmt_info)
 	      && !STMT_VINFO_IN_PATTERN_P (stmt_info))
@@ -31963,19 +32032,20 @@ rs6000_output_function_epilogue (FILE *file)
       /* Language type.  Unfortunately, there does not seem to be any
 	 official way to discover the language being compiled, so we
 	 use language_string.
-	 C is 0.  Fortran is 1.  Ada is 3.  C++ is 9.
+	 C is 0.  Fortran is 1.  Pascal is 2.  Ada is 3.  C++ is 9.
 	 Java is 13.  Objective-C is 14.  Objective-C++ isn't assigned
-	 a number, so for now use 9.  LTO, Go, D and JIT aren't assigned
-	 numbers either, so for now use 0.  */
+	 a number, so for now use 9.  LTO, Go and JIT aren't assigned numbers
+	 either, so for now use 0.  */
       if (lang_GNU_C ()
 	  || ! strcmp (language_string, "GNU GIMPLE")
 	  || ! strcmp (language_string, "GNU Go")
-	  || ! strcmp (language_string, "GNU D")
 	  || ! strcmp (language_string, "libgccjit"))
 	i = 0;
       else if (! strcmp (language_string, "GNU F77")
 	       || lang_GNU_Fortran ())
 	i = 1;
+      else if (! strcmp (language_string, "GNU Pascal"))
+	i = 2;
       else if (! strcmp (language_string, "GNU Ada"))
 	i = 3;
       else if (lang_GNU_CXX ()
@@ -37049,6 +37119,13 @@ rs6000_xcoff_visibility (tree decl)
   };
 
   enum symbol_visibility vis = DECL_VISIBILITY (decl);
+
+  if (TREE_CODE (decl) == FUNCTION_DECL
+      && cgraph_node::get (decl)
+      && cgraph_node::get (decl)->instrumentation_clone
+      && cgraph_node::get (decl)->instrumented_version)
+    vis = DECL_VISIBILITY (cgraph_node::get (decl)->instrumented_version->decl);
+
   return visibility_types[vis];
 }
 #endif

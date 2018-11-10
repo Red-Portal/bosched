@@ -11,8 +11,6 @@ void test_mismatching_types (const char *msg)
 /* { dg-begin-multiline-output "" }
    printf("hello %i", msg);
                  ~^   ~~~
-                  |   |
-                  int const char *
                  %s
    { dg-end-multiline-output "" } */
 
@@ -21,9 +19,6 @@ void test_mismatching_types (const char *msg)
 /* { dg-begin-multiline-output "" }
    printf("hello %s", 42);
                  ~^   ~~
-                  |   |
-                  |   int
-                  char *
                  %d
    { dg-end-multiline-output "" } */
 
@@ -31,8 +26,6 @@ void test_mismatching_types (const char *msg)
 /* { dg-begin-multiline-output "" }
    printf("hello %i", (long)0);
                  ~^   ~~~~~~~
-                  |   |
-                  int long int
                  %li
    { dg-end-multiline-output "" } */
 }
@@ -44,13 +37,9 @@ void test_multiple_arguments (void)
 /* { dg-begin-multiline-output "" }
    printf ("arg0: %i  arg1: %s arg 2: %i",
                             ~^
-                             |
-                             char *
                             %d
            100, 101, 102);
                 ~~~           
-                |
-                int
    { dg-end-multiline-output "" } */
 }
 
@@ -61,13 +50,9 @@ void test_multiple_arguments_2 (int i, int j)
 /* { dg-begin-multiline-output "" }
    printf ("arg0: %i  arg1: %s arg 2: %i",
                             ~^
-                             |
-                             char *
                             %d
            100, i + j, 102);
                 ~~~~~         
-                  |
-                  int
    { dg-end-multiline-output "" } */
 }
 
@@ -87,8 +72,6 @@ void multiline_format_string (void) {
             ~~
            "d"
            ~^
-            |
-            int
    { dg-end-multiline-output "" } */
 }
 
@@ -101,8 +84,6 @@ void test_hex (const char *msg)
 /* { dg-begin-multiline-output "" }
    printf("hello \x25\x69", msg);
                  ~~~~^~~~   ~~~
-                     |      |
-                     int    const char *
                  \x25s
    { dg-end-multiline-output "" } */
 }
@@ -116,8 +97,6 @@ void test_oct (const char *msg)
 /* { dg-begin-multiline-output "" }
    printf("hello \045\151", msg);
                  ~~~~^~~~   ~~~
-                     |      |
-                     int    const char *
                  \045s
    { dg-end-multiline-output "" } */
 }
@@ -133,15 +112,11 @@ void test_multiple (const char *msg)
           ^~~~~~~~
           msg);
           ~~~
-          |
-          const char *
   { dg-end-multiline-output "" } */
 
 /* { dg-begin-multiline-output "" }
    printf("prefix"  "\x25"  "\151"  "suffix",
                      ~~~~~~~~^~~~
-                             |
-                             int
                      \x25"  "s
   { dg-end-multiline-output "" } */
 }
@@ -152,8 +127,6 @@ void test_u8 (const char *msg)
 /* { dg-begin-multiline-output "" }
    printf(u8"hello %i", msg);
                    ~^   ~~~
-                    |   |
-                    int const char *
                    %s
    { dg-end-multiline-output "" } */
 }
@@ -164,8 +137,6 @@ void test_param (long long_i, long long_j)
 /* { dg-begin-multiline-output "" }
    printf ("foo %s bar", long_i + long_j);
                 ~^       ~~~~~~~~~~~~~~~
-                 |              |
-                 char *         long int
                 %ld
    { dg-end-multiline-output "" } */
 }
@@ -176,8 +147,6 @@ void test_field_width_specifier (long l, int i1, int i2)
 /* { dg-begin-multiline-output "" }
    printf (" %*.*d ", l, i1, i2);
              ~^~~~    ~
-              |       |
-              int     long int
    { dg-end-multiline-output "" } */
 }
 
@@ -189,16 +158,12 @@ void test_field_width_specifier_2 (char *d, long foo, long bar)
   /* { dg-begin-multiline-output "" }
    __builtin_sprintf (d, " %*ld ", foo, foo);
                            ~^~~    ~~~
-                            |      |
-                            int    long int
    { dg-end-multiline-output "" } */
 
   __builtin_sprintf (d, " %*ld ", foo + bar, foo); /* { dg-warning "28: field width specifier '\\*' expects argument of type 'int', but argument 3 has type 'long int'" } */
   /* { dg-begin-multiline-output "" }
    __builtin_sprintf (d, " %*ld ", foo + bar, foo);
                            ~^~~    ~~~~~~~~~
-                            |          |
-                            int        long int
    { dg-end-multiline-output "" } */
 }
 
@@ -208,16 +173,12 @@ void test_field_precision_specifier (char *d, long foo, long bar)
   /* { dg-begin-multiline-output "" }
    __builtin_sprintf (d, " %.*ld ", foo, foo);
                            ~~^~~    ~~~
-                             |      |
-                             int    long int
    { dg-end-multiline-output "" } */
 
   __builtin_sprintf (d, " %.*ld ", foo + bar, foo); /* { dg-warning "29: field precision specifier '\\.\\*' expects argument of type 'int', but argument 3 has type 'long int'" } */
   /* { dg-begin-multiline-output "" }
    __builtin_sprintf (d, " %.*ld ", foo + bar, foo);
                            ~~^~~    ~~~~~~~~~
-                             |          |
-                             int        long int
    { dg-end-multiline-output "" } */
 }
 
@@ -280,14 +241,10 @@ void test_macro (const char *msg)
 /* { dg-begin-multiline-output "" }
    printf("hello " INT_FMT " world", msg);
           ^~~~~~~~                   ~~~
-                                     |
-                                     const char *
    { dg-end-multiline-output "" } */
 /* { dg-begin-multiline-output "" }
  #define INT_FMT "%i"
                   ~^
-                   |
-                   int
                   %s
    { dg-end-multiline-output "" } */
 #undef INT_FMT
@@ -300,22 +257,17 @@ void test_macro_2 (const char *msg)
 /* { dg-begin-multiline-output "" }
    printf("hello %" PRIu32 " world", msg);
           ^~~~~~~~~                  ~~~
-                                     |
-                                     const char *
    { dg-end-multiline-output "" } */
 /* { dg-begin-multiline-output "" }
  #define PRIu32 "u"
                  ^
-                 |
-                 unsigned int
    { dg-end-multiline-output "" } */
 #undef PRIu32
 }
 
 void test_macro_3 (const char *msg)
 {
-#define FMT_STRING "hello %i world" /* { dg-line test_macro_3_macro_line } */
-  /* { dg-warning "20: format '%i' expects argument of type 'int', but argument 2 has type 'const char \\*'" "" { target *-*-*} .-1 } */
+#define FMT_STRING "hello %i world" /* { dg-warning "20: format '%i' expects argument of type 'int', but argument 2 has type 'const char \\*' " } */
   printf(FMT_STRING, msg);  /* { dg-message "10: in expansion of macro 'FMT_STRING" } */
 /* { dg-begin-multiline-output "" }
  #define FMT_STRING "hello %i world"
@@ -324,14 +276,6 @@ void test_macro_3 (const char *msg)
 /* { dg-begin-multiline-output "" }
    printf(FMT_STRING, msg);
           ^~~~~~~~~~
-   { dg-end-multiline-output "" } */
-/* { dg-message "28: format string is defined here" "" { target *-*-* } test_macro_3_macro_line } */
-/* { dg-begin-multiline-output "" }
- #define FMT_STRING "hello %i world"
-                           ~^
-                            |
-                            int
-                           %s
    { dg-end-multiline-output "" } */
 #undef FMT_STRING
 }
@@ -351,8 +295,6 @@ void test_macro_4 (const char *msg)
 /* { dg-begin-multiline-output "" }
  #define FMT_STRING "hello %i world"
                            ~^
-                            |
-                            int
                            %s
    { dg-end-multiline-output "" } */
 #undef FMT_STRING
@@ -365,14 +307,10 @@ void test_non_contiguous_strings (void)
   /* { dg-begin-multiline-output "" }
    __builtin_printf(" %" "d ", 0.5);
                     ^~~~       ~~~
-                               |
-                               double
    { dg-end-multiline-output "" } */
   /* { dg-begin-multiline-output "" }
    __builtin_printf(" %" "d ", 0.5);
                       ~~~~^
-                          |
-                          int
                       %" "f
    { dg-end-multiline-output "" } */
 }
@@ -386,7 +324,5 @@ void test_const_arrays (void)
   /* { dg-begin-multiline-output "" }
    __builtin_printf(a, 0.5);
                     ^  ~~~
-                       |
-                       double
    { dg-end-multiline-output "" } */
 }

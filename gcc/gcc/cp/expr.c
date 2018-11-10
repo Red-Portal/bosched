@@ -144,7 +144,7 @@ mark_use (tree expr, bool rvalue_p, bool read_p,
 	    input_location = loc;
 	  expr = process_outer_var_ref (expr, tf_warning_or_error, true);
 	  if (!(TREE_TYPE (oexpr)
-		&& TYPE_REF_P (TREE_TYPE (oexpr))))
+		&& TREE_CODE (TREE_TYPE (oexpr)) == REFERENCE_TYPE))
 	    expr = convert_from_reference (expr);
 	}
       break;
@@ -169,7 +169,7 @@ mark_use (tree expr, bool rvalue_p, bool read_p,
 	    {
 	      /* Look through capture by reference.  */
 	      tree cap = DECL_CAPTURED_VARIABLE (ref);
-	      if (!TYPE_REF_P (TREE_TYPE (cap))
+	      if (TREE_CODE (TREE_TYPE (cap)) != REFERENCE_TYPE
 		  && decl_constant_var_p (cap))
 		{
 		  tree val = RECUR (cap);
@@ -353,13 +353,7 @@ fold_for_warn (tree x)
   /* It's not generally safe to fully fold inside of a template, so
      call fold_non_dependent_expr instead.  */
   if (processing_template_decl)
-    {
-      tree f = fold_non_dependent_expr (x, tf_none);
-      if (f == error_mark_node)
-	return x;
-      else
-	return f;
-    }
+    return fold_non_dependent_expr (x);
 
   return c_fully_fold (x, /*for_init*/false, /*maybe_constp*/NULL);
 }

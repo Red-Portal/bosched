@@ -31,4 +31,3 @@ test01()
 // { dg-error "hash function must be invocable" "" { target *-*-* } 0 }
 // { dg-error "key equality predicate must be invocable" "" { target *-*-* } 0 }
 // { dg-prune-output "use of deleted function" }
-// { dg-prune-output "must have the same value_type as its allocator" }

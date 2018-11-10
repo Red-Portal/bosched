@@ -1,13 +1,3 @@
-<<<<<<< HEAD
-2018-10-31  Joseph Myers  <joseph@codesourcery.com>
-
-	PR bootstrap/82856
-	* Makefile.am: Include multilib.am.
-	(AUTOMAKE_OPTIONS): Remove 1.9.5.
-	* configure.ac: Remove AC_PREREQ.  Quote argument to
-	AC_RUN_IFELSE.
-	* Makefile.in, aclocal.m4, configure: Regenerate.
-=======
 2018-07-26  Release Manager
 
 	* GCC 8.2.0 released.
@@ -15,7 +5,6 @@
 2018-05-02  Release Manager
 
 	* GCC 8.1.0 released.
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
 
 2018-04-24  H.J. Lu  <hongjiu.lu@intel.com>
 
@@ -270,7 +259,7 @@
 	* configure: Regenerate.
 
 2008-09-26  Peter O'Gorman  <pogma@thewrittenword.com>
-	    Steve Ellcey  <sje@cup.hp.com>
+            Steve Ellcey  <sje@cup.hp.com>
 
 	* configure: Regenerate for new libtool.
 	* Makefile.in: Ditto.

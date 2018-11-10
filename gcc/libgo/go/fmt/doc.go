@@ -45,8 +45,6 @@
 		%q	a double-quoted string safely escaped with Go syntax
 		%x	base 16, lower-case, two characters per byte
 		%X	base 16, upper-case, two characters per byte
-	Slice:
-		%p	address of 0th element in base 16 notation, with leading 0x
 	Pointer:
 		%p	base 16 notation, with leading 0x
 		The %b, %d, %o, %x and %X verbs also work with pointers,
@@ -64,7 +62,7 @@
 	laid out like this:
 		struct:             {field0 field1 ...}
 		array, slice:       [elem0 elem1 ...]
-		maps:               map[key1:value1 key2:value2 ...]
+		maps:               map[key1:value1 key2:value2]
 		pointer to above:   &{}, &[], &map[]
 
 	Width is specified by an optional decimal number immediately preceding the verb.
@@ -97,11 +95,10 @@
 
 	For floating-point values, width sets the minimum width of the field and
 	precision sets the number of places after the decimal, if appropriate,
-	except that for %g/%G precision sets the maximum number of significant
-	digits (trailing zeros are removed). For example, given 12.345 the format
-	%6.3f prints 12.345 while %.3g prints 12.3. The default precision for %e, %f
-	and %#g is 6; for %g it is the smallest number of digits necessary to identify
-	the value uniquely.
+	except that for %g/%G precision sets the total number of significant
+	digits. For example, given 12.345 the format %6.3f prints 12.345 while
+	%.3g prints 12.3. The default precision for %e, %f and %#g is 6; for %g it
+	is the smallest number of digits necessary to identify the value uniquely.
 
 	For complex numbers, the width and precision apply to the two
 	components independently and the result is parenthesized, so %f applied
@@ -282,11 +279,9 @@
 	The verbs behave analogously to those of Printf.
 	For example, %x will scan an integer as a hexadecimal number,
 	and %v will scan the default representation format for the value.
-	The Printf verbs %p and %T and the flags # and + are not implemented.
-	The verbs %e %E %f %F %g and %G are all equivalent and scan any
-	floating-point or complex value. For float and complex literals in
-	scientific notation, both the decimal (e) and binary (p) exponent
-	formats are supported (for example: "2.3e+7" and "4.5p-8").
+	The Printf verbs %p and %T and the flags # and + are not implemented,
+	and the verbs %e %E %f %F %g and %G are all equivalent and scan any
+	floating-point or complex value.
 
 	Input processed by verbs is implicitly space-delimited: the
 	implementation of every verb except %c starts by discarding

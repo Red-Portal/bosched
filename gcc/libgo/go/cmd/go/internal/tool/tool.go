@@ -18,7 +18,7 @@ import (
 
 var CmdTool = &base.Command{
 	Run:       runTool,
-	UsageLine: "go tool [-n] command [args...]",
+	UsageLine: "tool [-n] command [args...]",
 	Short:     "run specified go tool",
 	Long: `
 Tool runs the go tool command identified by the arguments.

@@ -1,5 +1,4 @@
 ! { dg-do run }
-! { dg-options "-std=legacy" }
 ! { dg-require-effective-target tls_runtime }
 use omp_lib
   common /tlsblock/ x, y

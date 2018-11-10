@@ -2,12 +2,13 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build !js,!plan9,!windows
+// +build !plan9,!windows
 
 package net
 
 import (
 	"context"
+	"internal/testenv"
 	"math/rand"
 	"runtime"
 	"sync"
@@ -83,14 +84,9 @@ func TestTCPSpuriousConnSetupCompletion(t *testing.T) {
 // Issue 19289.
 // Test that a canceled Dial does not cause a subsequent Dial to succeed.
 func TestTCPSpuriousConnSetupCompletionWithCancel(t *testing.T) {
-<<<<<<< HEAD
-	mustHaveExternalNetwork(t)
-
-=======
 	if testenv.Builder() == "" {
 		testenv.MustHaveExternalNetwork(t)
 	}
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
 	defer dnsWaitGroup.Wait()
 	t.Parallel()
 	const tries = 10000

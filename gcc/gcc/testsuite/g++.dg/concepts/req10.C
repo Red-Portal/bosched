@@ -1,5 +1,4 @@
-// { dg-do compile { target c++17 } }
-// { dg-options "-fconcepts" }
+// { dg-options "-std=c++17 -fconcepts" }
 
 // Test that standard conversions are checked with
 // implicit conversion constraints.

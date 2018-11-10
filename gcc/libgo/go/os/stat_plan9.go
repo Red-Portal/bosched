@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-const bitSize16 = 2
+const _BIT16SZ = 2
 
 func fileInfoFromStat(d *syscall.Dir) FileInfo {
 	fs := &fileStat{
@@ -35,10 +35,6 @@ func fileInfoFromStat(d *syscall.Dir) FileInfo {
 	if d.Type != 'M' {
 		fs.mode |= ModeDevice
 	}
-	// Consider all files served by #c as character device files.
-	if d.Type == 'c' {
-		fs.mode |= ModeCharDevice
-	}
 	return fs
 }
 
@@ -50,7 +46,7 @@ func dirstat(arg interface{}) (*syscall.Dir, error) {
 	size := syscall.STATFIXLEN + 16*4
 
 	for i := 0; i < 2; i++ {
-		buf := make([]byte, bitSize16+size)
+		buf := make([]byte, _BIT16SZ+size)
 
 		var n int
 		switch a := arg.(type) {
@@ -64,7 +60,7 @@ func dirstat(arg interface{}) (*syscall.Dir, error) {
 			panic("phase error in dirstat")
 		}
 
-		if n < bitSize16 {
+		if n < _BIT16SZ {
 			return nil, &PathError{"stat", name, err}
 		}
 

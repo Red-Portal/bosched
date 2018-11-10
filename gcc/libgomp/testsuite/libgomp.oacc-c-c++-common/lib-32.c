@@ -127,7 +127,7 @@ main (int argc, char **argv)
       h[i] = i + 10;
     }
 
-  acc_copyout_finalize (h, S);
+  acc_copyout (h, S);
   d = NULL;
   if (!shared_mem)
     if (acc_is_present (h, S))
@@ -236,7 +236,7 @@ main (int argc, char **argv)
 	abort ();
     }
 
-  acc_delete_finalize (h, S);
+  acc_delete (h, S);
   d = NULL;
   if (!shared_mem)
     if (acc_is_present (h, S))

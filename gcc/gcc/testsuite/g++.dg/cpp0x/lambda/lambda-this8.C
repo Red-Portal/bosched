@@ -6,21 +6,21 @@
 struct test {
   template<typename T>
   std::function<void()> broken(int x) {
-    return [=] { +x; print<T>(); }; // { dg-warning "implicit capture" "" { target c++2a } }
+    return [=] { +x; print<T>(); };
   }
 
   std::function<void()> works0() {
-    return [=] { print<int>(); }; // { dg-warning "implicit capture" "" { target c++2a } }
+    return [=] { print<int>(); };
   }
 
   template<typename T>
   std::function<void()> works1() {
-    return [=] { print<int>(); }; // { dg-warning "implicit capture" "" { target c++2a } }
+    return [=] { print<int>(); };
   }
 
   template<typename T>
   std::function<void()> works2() {
-    return [=] { this->print<T>(); }; // { dg-warning "implicit capture" "" { target c++2a } }
+    return [=] { this->print<T>(); };
   }
 
   template<typename T>

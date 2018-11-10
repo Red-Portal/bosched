@@ -1,4 +1,4 @@
-/* { dg-skip-if "Array too big" { "avr-*-*" "pdp11-*-*" } } */
+/* { dg-skip-if "Array too big" { "avr-*-*" } } */
 
 typedef __SIZE_TYPE__ size_t;
 

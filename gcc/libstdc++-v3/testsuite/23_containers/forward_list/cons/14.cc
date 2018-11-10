@@ -26,9 +26,9 @@ void test01()
 {
   using namespace std;
   using list = forward_list<int>;
-  using alloc_type = allocator<list>;
-  forward_list<list, scoped_allocator_adaptor<alloc_type>> l;
+  forward_list<list, scoped_allocator_adaptor<list::allocator_type>> l;
 
   // Check for forward_list(size_type, const allocator_type&)
   l.emplace_front(1u);
 }
+

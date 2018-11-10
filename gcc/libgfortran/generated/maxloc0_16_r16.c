@@ -47,6 +47,7 @@ maxloc0_16_r16 (gfc_array_i16 * const restrict retarray,
   index_type rank;
   index_type n;
 
+  assert(back == 0);
   rank = GFC_DESCRIPTOR_RANK (array);
   if (rank <= 0)
     runtime_error ("Rank of array needs to be > 0");
@@ -100,9 +101,13 @@ maxloc0_16_r16 (gfc_array_i16 * const restrict retarray,
 #endif
   while (base)
     {
+      do
+	{
 	  /* Implementation start.  */
 
 #if defined(GFC_REAL_16_QUIET_NAN)
+	}
+      while (0);
       if (unlikely (!fast))
 	{
 	  do
@@ -121,29 +126,15 @@ maxloc0_16_r16 (gfc_array_i16 * const restrict retarray,
 	  if (likely (fast))
 	    continue;
 	}
-      else
+      else do
+	{
 #endif
-        if (back)
-      	  do
-            {
-	      if (unlikely (*base >= maxval))
-	       {
-	         maxval = *base;
-	      	 for (n = 0; n < rank; n++)
-		   dest[n * dstride] = count[n] + 1;
-	       }
-	     base += sstride[0];
-	   }
-         while (++count[0] != extent[0]);
-       else
-         do
-	   {
-	     if (unlikely (*base > maxval))
-	       {
-	         maxval = *base;
-		 for (n = 0; n < rank; n++)
-		   dest[n * dstride] = count[n] + 1;
-	       }
+	  if (*base > maxval)
+	    {
+	      maxval = *base;
+	      for (n = 0; n < rank; n++)
+		dest[n * dstride] = count[n] + 1;
+	    }
 	  /* Implementation end.  */
 	  /* Advance to the next element.  */
 	  base += sstride[0];
@@ -176,6 +167,7 @@ maxloc0_16_r16 (gfc_array_i16 * const restrict retarray,
   }
 }
 
+
 extern void mmaxloc0_16_r16 (gfc_array_i16 * const restrict, 
 	gfc_array_r16 * const restrict, gfc_array_l1 * const restrict,
 	GFC_LOGICAL_4);
@@ -198,6 +190,7 @@ mmaxloc0_16_r16 (gfc_array_i16 * const restrict retarray,
   index_type n;
   int mask_kind;
 
+  assert(back == 0);
   rank = GFC_DESCRIPTOR_RANK (array);
   if (rank <= 0)
     runtime_error ("Rank of array needs to be > 0");
@@ -268,8 +261,12 @@ mmaxloc0_16_r16 (gfc_array_i16 * const restrict retarray,
 #endif
   while (base)
     {
+      do
+	{
 	  /* Implementation start.  */
 
+	}
+      while (0);
       if (unlikely (!fast))
 	{
 	  do
@@ -297,28 +294,14 @@ mmaxloc0_16_r16 (gfc_array_i16 * const restrict retarray,
 	  if (likely (fast))
 	    continue;
 	}
-      else
-        if (back)
-	  do
+      else do
+	{
+	  if (*mbase && *base > maxval)
 	    {
-	      if (*mbase && *base >= maxval)
-	        {
-	          maxval = *base;
-	          for (n = 0; n < rank; n++)
-		    dest[n * dstride] = count[n] + 1;
-		}
-	      base += sstride[0];
+	      maxval = *base;
+	      for (n = 0; n < rank; n++)
+		dest[n * dstride] = count[n] + 1;
 	    }
-	  while (++count[0] != extent[0]);
-	else
-	  do
-	    {
-	      if (*mbase && unlikely (*base > maxval))
-	        {
-		  maxval = *base;
-		  for (n = 0; n < rank; n++)
-		    dest[n * dstride] = count[n] + 1;
-	        }
 	  /* Implementation end.  */
 	  /* Advance to the next element.  */
 	  base += sstride[0];

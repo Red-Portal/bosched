@@ -79,8 +79,6 @@ init_flow (struct function *the_fun)
     = EXIT_BLOCK_PTR_FOR_FN (the_fun);
   EXIT_BLOCK_PTR_FOR_FN (the_fun)->prev_bb
     = ENTRY_BLOCK_PTR_FOR_FN (the_fun);
-  the_fun->cfg->edge_flags_allocated = EDGE_ALL_FLAGS;
-  the_fun->cfg->bb_flags_allocated = BB_ALL_FLAGS;
 }
 
 /* Helper function for remove_edge and clear_edges.  Frees edge structure
@@ -547,8 +545,8 @@ DEBUG_FUNCTION void
 debug (edge_def &ref)
 {
   /* FIXME (crowl): Is this desireable?  */
-  dump_edge_info (stderr, &ref, TDF_NONE, false);
-  dump_edge_info (stderr, &ref, TDF_NONE, true);
+  dump_edge_info (stderr, &ref, 0, false);
+  dump_edge_info (stderr, &ref, 0, true);
 }
 
 DEBUG_FUNCTION void

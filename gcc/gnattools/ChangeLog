@@ -1,24 +1,12 @@
-<<<<<<< HEAD
-2018-10-31  Joseph Myers  <joseph@codesourcery.com>
-
-	PR bootstrap/82856
-	* configure.ac: Remove AC_PREREQ.
-	* configure: Regenerate.
-
-2018-10-29  Tamar Christina  <tamar.christina@arm.com>
-=======
 2018-11-06  Eric Botcazou  <ebotcazou@adacore.com>
 
 	PR ada/81878
 	Revert
 	2018-11-02  Tamar Christina  <tamar.christina@arm.com>
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
 
 	PR ada/81878
 	* Makefile.in (TOOLS_FLAGS_TO_PASS_NATIVE): Add -B ../../.
 
-<<<<<<< HEAD
-=======
 	2017-08-17  Richard Biener  <rguenther@suse.de>
 
 	PR ada/81878
@@ -39,7 +27,6 @@
 
 	* GCC 8.1.0 released.
 
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
 2017-08-17  Richard Biener  <rguenther@suse.de>
 
 	PR ada/81878

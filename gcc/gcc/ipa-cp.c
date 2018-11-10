@@ -314,7 +314,7 @@ public:
   inline bool set_to_bottom ();
   bool meet_with (const value_range *p_vr);
   bool meet_with (const ipcp_vr_lattice &other);
-  void init () { gcc_assert (m_vr.undefined_p ()); }
+  void init () { m_vr.type = VR_UNDEFINED; }
   void print (FILE * f);
 
 private:
@@ -403,6 +403,16 @@ ipa_get_poly_ctx_lat (struct ipa_node_params *info, int i)
 {
   struct ipcp_param_lattices *plats = ipa_get_parm_lattices (info, i);
   return &plats->ctxlat;
+}
+
+/* Return the lattice corresponding to the value range of the Ith formal
+   parameter of the function described by INFO.  */
+
+static inline ipcp_vr_lattice *
+ipa_get_vr_lat (struct ipa_node_params *info, int i)
+{
+  struct ipcp_param_lattices *plats = ipa_get_parm_lattices (info, i);
+  return &plats->m_value_range;
 }
 
 /* Return whether LAT is a lattice with a single constant and without an
@@ -628,7 +638,8 @@ determine_versionability (struct cgraph_node *node,
   if (DECL_EXTERNAL (node->decl))
     for (cgraph_edge *edge = node->callees; !reason && edge;
 	 edge = edge->next_callee)
-      if (fndecl_built_in_p (edge->callee->decl, BUILT_IN_NORMAL))
+      if (DECL_BUILT_IN (edge->callee->decl)
+	  && DECL_BUILT_IN_CLASS (edge->callee->decl) == BUILT_IN_NORMAL)
         {
 	  if (DECL_FUNCTION_CODE (edge->callee->decl) == BUILT_IN_VA_ARG_PACK)
 	    reason = "external function which calls va_arg_pack";
@@ -914,21 +925,28 @@ ipcp_vr_lattice::meet_with (const value_range *p_vr)
   return meet_with_1 (p_vr);
 }
 
-/* Meet the current value of the lattice with value range described by
-   OTHER_VR lattice.  Return TRUE if anything changed.  */
+/* Meet the current value of the lattice with value ranfge described by
+   OTHER_VR lattice.  */
 
 bool
 ipcp_vr_lattice::meet_with_1 (const value_range *other_vr)
 {
+  tree min = m_vr.min, max = m_vr.max;
+  value_range_type type = m_vr.type;
+
   if (bottom_p ())
     return false;
 
-  if (other_vr->varying_p ())
+  if (other_vr->type == VR_VARYING)
     return set_to_bottom ();
 
-  value_range save (m_vr);
-  m_vr.union_ (other_vr);
-  return !m_vr.ignore_equivs_equal_p (save);
+  vrp_meet (&m_vr, other_vr);
+  if (type != m_vr.type
+      || min != m_vr.min
+      || max != m_vr.max)
+    return true;
+  else
+    return false;
 }
 
 /* Return true if value range information in the lattice is yet unknown.  */
@@ -936,7 +954,7 @@ ipcp_vr_lattice::meet_with_1 (const value_range *other_vr)
 bool
 ipcp_vr_lattice::top_p () const
 {
-  return m_vr.undefined_p ();
+  return m_vr.type == VR_UNDEFINED;
 }
 
 /* Return true if value range information in the lattice is known to be
@@ -945,7 +963,7 @@ ipcp_vr_lattice::top_p () const
 bool
 ipcp_vr_lattice::bottom_p () const
 {
-  return m_vr.varying_p ();
+  return m_vr.type == VR_VARYING;
 }
 
 /* Set value range information in the lattice to bottom.  Return true if it
@@ -954,9 +972,9 @@ ipcp_vr_lattice::bottom_p () const
 bool
 ipcp_vr_lattice::set_to_bottom ()
 {
-  if (m_vr.varying_p ())
+  if (m_vr.type == VR_VARYING)
     return false;
-  m_vr.set_varying ();
+  m_vr.type = VR_VARYING;
   return true;
 }
 
@@ -1159,7 +1177,7 @@ initialize_node_lattices (struct cgraph_node *node)
   int i;
 
   gcc_checking_assert (node->has_gimple_body_p ());
-  if (node->local.local)
+  if (cgraph_local_p (node))
     {
       int caller_count = 0;
       node->call_for_symbol_thunks_and_aliases (count_callers, &caller_count,
@@ -1875,11 +1893,12 @@ ipa_vr_operation_and_type_effects (value_range *dst_vr, value_range *src_vr,
 				   enum tree_code operation,
 				   tree dst_type, tree src_type)
 {
-  *dst_vr = value_range ();
+  memset (dst_vr, 0, sizeof (*dst_vr));
   extract_range_from_unary_expr (dst_vr, operation, dst_type, src_vr, src_type);
-  if (dst_vr->varying_p () || dst_vr->undefined_p ())
+  if (dst_vr->type == VR_RANGE || dst_vr->type == VR_ANTI_RANGE)
+    return true;
+  else
     return false;
-  return true;
 }
 
 /* Propagate value range across jump function JFUNC that is associated with
@@ -1932,7 +1951,11 @@ propagate_vr_across_jump_function (cgraph_edge *cs, ipa_jump_func *jfunc,
 	  if (TREE_OVERFLOW_P (val))
 	    val = drop_tree_overflow (val);
 
-	  value_range tmpvr (VR_RANGE, val, val);
+	  value_range tmpvr;
+	  memset (&tmpvr, 0, sizeof (tmpvr));
+	  tmpvr.type = VR_RANGE;
+	  tmpvr.min = val;
+	  tmpvr.max = val;
 	  return dest_lat->meet_with (&tmpvr);
 	}
     }
@@ -1941,7 +1964,7 @@ propagate_vr_across_jump_function (cgraph_edge *cs, ipa_jump_func *jfunc,
   if (jfunc->m_vr
       && ipa_vr_operation_and_type_effects (&vr, jfunc->m_vr, NOP_EXPR,
 					    param_type,
-					    jfunc->m_vr->type ()))
+					    TREE_TYPE (jfunc->m_vr->min)))
     return dest_lat->meet_with (&vr);
   else
     return dest_lat->set_to_bottom ();
@@ -2247,6 +2270,24 @@ propagate_constants_across_call (struct cgraph_edge *cs)
   parms_count = ipa_get_param_count (callee_info);
   if (parms_count == 0)
     return false;
+
+  /* No propagation through instrumentation thunks is available yet.
+     It should be possible with proper mapping of call args and
+     instrumented callee params in the propagation loop below.  But
+     this case mostly occurs when legacy code calls instrumented code
+     and it is not a primary target for optimizations.
+     We detect instrumentation thunks in aliases and thunks chain by
+     checking instrumentation_clone flag for chain source and target.
+     Going through instrumentation thunks we always have it changed
+     from 0 to 1 and all other nodes do not change it.  */
+  if (!cs->callee->instrumentation_clone
+      && callee->instrumentation_clone)
+    {
+      for (i = 0; i < parms_count; i++)
+	ret |= set_all_contains_variable (ipa_get_parm_lattices (callee_info,
+								 i));
+      return ret;
+    }
 
   /* If this call goes through a thunk we must not propagate to the first (0th)
      parameter.  However, we might need to uncover a thunk from below a series
@@ -2888,7 +2929,7 @@ estimate_local_effects (struct cgraph_node *node)
 		     "known contexts, code not going to grow.\n");
 	}
       else if (good_cloning_opportunity_p (node,
-					   MIN ((base_time - time).to_int (),
+					   MAX ((base_time - time).to_int (),
 						65536),
 					   stats.freq_sum, stats.count_sum,
 					   size))
@@ -3264,9 +3305,8 @@ ipcp_propagate_stage (struct ipa_topo_info *topo)
 				   ipa_get_param_count (info));
 	initialize_node_lattices (node);
       }
-    ipa_fn_summary *s = ipa_fn_summaries->get (node);
-    if (node->definition && !node->alias && s != NULL)
-      overall_size += s->self_size;
+    if (node->definition && !node->alias)
+      overall_size += ipa_fn_summaries->get (node)->self_size;
     max_count = max_count.max (node->count.ipa ());
   }
 
@@ -3352,56 +3392,54 @@ ipcp_discover_new_direct_edges (struct cgraph_node *node,
     ipa_update_overall_fn_summary (node);
 }
 
-class edge_clone_summary;
-static call_summary <edge_clone_summary *> *edge_clone_summaries = NULL;
+/* Vector of pointers which for linked lists of clones of an original crgaph
+   edge. */
 
-/* Edge clone summary.  */
+static vec<cgraph_edge *> next_edge_clone;
+static vec<cgraph_edge *> prev_edge_clone;
 
-struct edge_clone_summary
+static inline void
+grow_edge_clone_vectors (void)
 {
-  /* Default constructor.  */
-  edge_clone_summary (): prev_clone (NULL), next_clone (NULL) {}
+  if (next_edge_clone.length ()
+      <=  (unsigned) symtab->edges_max_uid)
+    next_edge_clone.safe_grow_cleared (symtab->edges_max_uid + 1);
+  if (prev_edge_clone.length ()
+      <=  (unsigned) symtab->edges_max_uid)
+    prev_edge_clone.safe_grow_cleared (symtab->edges_max_uid + 1);
+}
 
-  /* Default destructor.  */
-  ~edge_clone_summary ()
-  {
-    if (prev_clone)
-      edge_clone_summaries->get (prev_clone)->next_clone = next_clone;
-    if (next_clone)
-      edge_clone_summaries->get (next_clone)->prev_clone = prev_clone;
-  }
+/* Edge duplication hook to grow the appropriate linked list in
+   next_edge_clone. */
 
-  cgraph_edge *prev_clone;
-  cgraph_edge *next_clone;
-};
-
-class edge_clone_summary_t:
-  public call_summary <edge_clone_summary *>
+static void
+ipcp_edge_duplication_hook (struct cgraph_edge *src, struct cgraph_edge *dst,
+			    void *)
 {
-public:
-  edge_clone_summary_t (symbol_table *symtab):
-    call_summary <edge_clone_summary *> (symtab)
-    {
-      m_initialize_when_cloning = true;
-    }
+  grow_edge_clone_vectors ();
 
-  virtual void duplicate (cgraph_edge *src_edge, cgraph_edge *dst_edge,
-			  edge_clone_summary *src_data,
-			  edge_clone_summary *dst_data);
-};
+  struct cgraph_edge *old_next = next_edge_clone[src->uid];
+  if (old_next)
+    prev_edge_clone[old_next->uid] = dst;
+  prev_edge_clone[dst->uid] = src;
 
-/* Edge duplication hook.  */
+  next_edge_clone[dst->uid] = old_next;
+  next_edge_clone[src->uid] = dst;
+}
 
-void
-edge_clone_summary_t::duplicate (cgraph_edge *src_edge, cgraph_edge *dst_edge,
-				 edge_clone_summary *src_data,
-				 edge_clone_summary *dst_data)
+/* Hook that is called by cgraph.c when an edge is removed.  */
+
+static void
+ipcp_edge_removal_hook (struct cgraph_edge *cs, void *)
 {
-  if (src_data->next_clone)
-    edge_clone_summaries->get (src_data->next_clone)->prev_clone = dst_edge;
-  dst_data->prev_clone = src_edge;
-  dst_data->next_clone = src_data->next_clone;
-  src_data->next_clone = dst_edge;
+  grow_edge_clone_vectors ();
+
+  struct cgraph_edge *prev = prev_edge_clone[cs->uid];
+  struct cgraph_edge *next = next_edge_clone[cs->uid];
+  if (prev)
+    next_edge_clone[prev->uid] = next;
+  if (next)
+    prev_edge_clone[next->uid] = prev;
 }
 
 /* See if NODE is a clone with a known aggregate value at a given OFFSET of a
@@ -3529,8 +3567,7 @@ cgraph_edge_brings_value_p (cgraph_edge *cs,
 static inline struct cgraph_edge *
 get_next_cgraph_edge_clone (struct cgraph_edge *cs)
 {
-  edge_clone_summary *s = edge_clone_summaries->get (cs);
-  return s != NULL ? s->next_clone : NULL;
+  return next_edge_clone[cs->uid];
 }
 
 /* Given VAL that is intended for DEST, iterate over all its sources and if any
@@ -3834,7 +3871,7 @@ create_specialized_node (struct cgraph_node *node,
   bool have_self_recursive_calls = !self_recursive_calls.is_empty ();
   for (unsigned j = 0; j < self_recursive_calls.length (); j++)
     {
-      cgraph_edge *cs = get_next_cgraph_edge_clone (self_recursive_calls[j]);
+      cgraph_edge *cs = next_edge_clone[self_recursive_calls[j]->uid];
       /* Cloned edges can disappear during cloning as speculation can be
 	 resolved, check that we have one and that it comes from the last
 	 cloning.  */
@@ -3844,8 +3881,8 @@ create_specialized_node (struct cgraph_node *node,
 	 edge would confuse this mechanism, so let's check that does not
 	 happen.  */
       gcc_checking_assert (!cs
-			   || !get_next_cgraph_edge_clone (cs)
-			   || get_next_cgraph_edge_clone (cs)->caller != new_node);
+			   || !next_edge_clone[cs->uid]
+			   || next_edge_clone[cs->uid]->caller != new_node);
     }
   if (have_self_recursive_calls)
     new_node->expand_all_artificial_thunks ();
@@ -3930,7 +3967,9 @@ find_more_scalar_values_for_callers_subset (struct cgraph_node *node,
 
 	  if (i >= ipa_get_cs_argument_count (IPA_EDGE_REF (cs))
 	      || (i == 0
-		  && call_passes_through_thunk_p (cs)))
+		  && call_passes_through_thunk_p (cs))
+	      || (!cs->callee->instrumentation_clone
+		  && cs->callee->function_symbol ()->instrumentation_clone))
 	    {
 	      newval = NULL_TREE;
 	      break;
@@ -4930,8 +4969,8 @@ ipcp_store_bits_results (void)
       if (!found_useful_result)
 	continue;
 
-      ipcp_transformation_initialize ();
-      ipcp_transformation *ts = ipcp_transformation_sum->get_create (node);
+      ipcp_grow_transformations_if_necessary ();
+      ipcp_transformation_summary *ts = ipcp_get_transformation_summary (node);
       vec_safe_reserve_exact (ts->bits, count);
 
       for (unsigned i = 0; i < count; i++)
@@ -5003,8 +5042,8 @@ ipcp_store_vr_results (void)
       if (!found_useful_result)
 	continue;
 
-      ipcp_transformation_initialize ();
-      ipcp_transformation *ts = ipcp_transformation_sum->get_create (node);
+      ipcp_grow_transformations_if_necessary ();
+      ipcp_transformation_summary *ts = ipcp_get_transformation_summary (node);
       vec_safe_reserve_exact (ts->m_vr, count);
 
       for (unsigned i = 0; i < count; i++)
@@ -5016,9 +5055,9 @@ ipcp_store_vr_results (void)
 	      && !plats->m_value_range.top_p ())
 	    {
 	      vr.known = true;
-	      vr.type = plats->m_value_range.m_vr.kind ();
-	      vr.min = wi::to_wide (plats->m_value_range.m_vr.min ());
-	      vr.max = wi::to_wide (plats->m_value_range.m_vr.max ());
+	      vr.type = plats->m_value_range.m_vr.type;
+	      vr.min = wi::to_wide (plats->m_value_range.m_vr.min);
+	      vr.max = wi::to_wide (plats->m_value_range.m_vr.max);
 	    }
 	  else
 	    {
@@ -5036,13 +5075,17 @@ ipcp_store_vr_results (void)
 static unsigned int
 ipcp_driver (void)
 {
+  struct cgraph_2edge_hook_list *edge_duplication_hook_holder;
+  struct cgraph_edge_hook_list *edge_removal_hook_holder;
   struct ipa_topo_info topo;
-
-  if (edge_clone_summaries == NULL)
-    edge_clone_summaries = new edge_clone_summary_t (symtab);
 
   ipa_check_create_node_params ();
   ipa_check_create_edge_args ();
+  grow_edge_clone_vectors ();
+  edge_duplication_hook_holder
+    = symtab->add_edge_duplication_hook (&ipcp_edge_duplication_hook, NULL);
+  edge_removal_hook_holder
+    = symtab->add_edge_removal_hook (&ipcp_edge_removal_hook, NULL);
 
   if (dump_file)
     {
@@ -5065,8 +5108,10 @@ ipcp_driver (void)
 
   /* Free all IPCP structures.  */
   free_toporder_info (&topo);
-  delete edge_clone_summaries;
-  edge_clone_summaries = NULL;
+  next_edge_clone.release ();
+  prev_edge_clone.release ();
+  symtab->remove_edge_removal_hook (edge_removal_hook_holder);
+  symtab->remove_edge_duplication_hook (edge_duplication_hook_holder);
   ipa_free_all_structures_after_ipa_cp ();
   if (dump_file)
     fprintf (dump_file, "\nIPA constant propagation end\n");

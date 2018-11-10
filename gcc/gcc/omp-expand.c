@@ -2533,8 +2533,8 @@ expand_omp_for_generic (struct omp_region *region,
     tree *counts = NULL;
     int i;
     bool ordered_lastprivate = false;
-    region_id_t region = build_int_cst (long_long_unsigned_type_node,
-                                        static_cast<region_id_t>(region));
+    tree region_id = build_int_cst (long_long_unsigned_type_node,
+                                    (region_id_t)region);
 
     gcc_assert (!broken_loop || !in_combined_parallel);
     gcc_assert (fd->iter_type == long_integer_type_node
@@ -2765,8 +2765,17 @@ expand_omp_for_generic (struct omp_region *region,
                 t = build_call_expr (builtin_decl_explicit (start_fn),
                                      4, t0, t1, t3, t4);
             else
-                t = build_call_expr (builtin_decl_explicit (start_fn),
-                                     5, t0, t1, t2, t3, t4);
+            {
+                if(fd->sched_kind == OMP_CLAUSE_SCHEDULE_RUNTIME)
+                {
+                    t = build_call_expr (builtin_decl_explicit (start_fn),
+                                         6, t0, t1, t2, t3, t4, region_id);
+                }
+                {
+                    t = build_call_expr (builtin_decl_explicit (start_fn),
+                                         5, t0, t1, t2, t3, t4);
+                }
+            }
         }
         else
         {
@@ -2790,8 +2799,18 @@ expand_omp_for_generic (struct omp_region *region,
                 t = build_call_expr (bfn_decl, 7, t5, t0, t1, t2, t, t3, t4);
             }
             else
-                t = build_call_expr (builtin_decl_explicit (start_fn),
-                                     6, t5, t0, t1, t2, t3, t4);
+            {
+                if(fd->sched_kind == OMP_CLAUSE_SCHEDULE_RUNTIME)
+                {
+                    t = build_call_expr (builtin_decl_explicit (start_fn),
+                                         7, t5, t0, t1, t2, t3, t4, region_id);
+                }
+                {
+                    t = build_call_expr (builtin_decl_explicit (start_fn),
+                                         6, t5, t0, t1, t2, t3, t4);
+                    
+                }
+            }
         }
     }
     if (TREE_TYPE (t) != boolean_type_node)

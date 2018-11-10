@@ -1,6 +1,8 @@
+/* This code uses nvptx inline assembly guarded with acc_on_device, which is
+   not optimized away at -O0, and then confuses the target assembler.
+   { dg-skip-if "" { *-*-* } { "-O0" } { "" } } */
+
 #include <stdio.h>
-#include <openacc.h>
-#include <gomp-constants.h>
 
 #define N (32*32*32+17)
 
@@ -10,13 +12,13 @@ void __attribute__ ((noinline)) gang (int ary[N])
 #pragma acc loop gang
     for (unsigned ix = 0; ix < N; ix++)
       {
-	if (acc_on_device (acc_device_not_host))
+	if (__builtin_acc_on_device (5))
 	  {
-	    int g, w, v;
+	    int g = 0, w = 0, v = 0;
 
-	    g = __builtin_goacc_parlevel_id (GOMP_DIM_GANG);
-	    w = __builtin_goacc_parlevel_id (GOMP_DIM_WORKER);
-	    v = __builtin_goacc_parlevel_id (GOMP_DIM_VECTOR);
+	    __asm__ volatile ("mov.u32 %0,%%ctaid.x;" : "=r" (g));
+	    __asm__ volatile ("mov.u32 %0,%%tid.y;" : "=r" (w));
+	    __asm__ volatile ("mov.u32 %0,%%tid.x;" : "=r" (v));
 	    ary[ix] = (g << 16) | (w << 8) | v;
 	  }
 	else
@@ -36,7 +38,7 @@ int main ()
   
 #pragma acc parallel num_gangs(32) copy(ary) copy(ondev)
   {
-    ondev = acc_on_device (acc_device_not_host);
+    ondev = __builtin_acc_on_device (5);
     gang (ary);
   }
 

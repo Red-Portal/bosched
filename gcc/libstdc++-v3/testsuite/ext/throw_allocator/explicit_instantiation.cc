@@ -1,5 +1,4 @@
 // { dg-do compile }
-// { dg-require-cstdint "" }
 
 //
 // Copyright (C) 2007-2018 Free Software Foundation, Inc.

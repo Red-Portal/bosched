@@ -27,8 +27,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "flags.h"
 #include "diagnostic-core.h"
 
-/* Parse a RISC-V ISA string into an option mask.  Must clear or set all arch
-   dependent mask bits, in case more than one -march string is passed.  */
+/* Parse a RISC-V ISA string into an option mask.  */
 
 static void
 riscv_parse_arch_string (const char *isa, int *flags, location_t loc)
@@ -49,8 +48,6 @@ riscv_parse_arch_string (const char *isa, int *flags, location_t loc)
     {
       p++;
 
-      *flags &= ~MASK_RVE;
-
       *flags |= MASK_MUL;
       *flags |= MASK_ATOMIC;
       *flags |= MASK_HARD_FLOAT;
@@ -59,8 +56,6 @@ riscv_parse_arch_string (const char *isa, int *flags, location_t loc)
   else if (*p == 'i')
     {
       p++;
-
-      *flags &= ~MASK_RVE;
 
       *flags &= ~MASK_MUL;
       if (*p == 'm')
@@ -81,28 +76,6 @@ riscv_parse_arch_string (const char *isa, int *flags, location_t loc)
 	      p++;
 	    }
 	}
-    }
-  else if (*p == 'e')
-    {
-      p++;
-
-      *flags |= MASK_RVE;
-
-      if (*flags & MASK_64BIT)
-	{
-	  error ("RV64E is not a valid base ISA");
-	  return;
-	}
-
-      *flags &= ~MASK_MUL;
-      if (*p == 'm')
-	*flags |= MASK_MUL, p++;
-
-      *flags &= ~MASK_ATOMIC;
-      if (*p == 'a')
-	*flags |= MASK_ATOMIC, p++;
-
-      *flags &= ~(MASK_HARD_FLOAT | MASK_DOUBLE_FLOAT);
     }
   else
     {

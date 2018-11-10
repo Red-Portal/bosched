@@ -81,6 +81,8 @@ struct simple_case_node
   /* Label to jump to when node matches.  */
   tree m_code_label;
 };
+
+extern basic_block label_to_block_fn (struct function *, tree);
 
 static bool check_unique_operand_names (tree, tree, tree);
 static char *resolve_operand_name_1 (char *, tree, tree, tree);
@@ -851,8 +853,7 @@ emit_case_dispatch_table (tree index_expr, tree index_type,
   /* Output the table.  */
   emit_label (table_label);
 
-  if (CASE_VECTOR_PC_RELATIVE
-	  || (flag_pic && targetm.asm_out.generate_pic_addr_diff_vec ()))
+  if (CASE_VECTOR_PC_RELATIVE || flag_pic)
     emit_jump_table_data (gen_rtx_ADDR_DIFF_VEC (CASE_VECTOR_MODE,
 						 gen_rtx_LABEL_REF (Pmode,
 								    table_label),
@@ -905,7 +906,7 @@ expand_case (gswitch *stmt)
   /* Find the default case target label.  */
   tree default_lab = CASE_LABEL (gimple_switch_default_label (stmt));
   default_label = jump_target_rtx (default_lab);
-  basic_block default_bb = label_to_block (cfun, default_lab);
+  basic_block default_bb = label_to_block_fn (cfun, default_lab);
   edge default_edge = find_edge (bb, default_bb);
 
   /* Get upper and lower bounds of case values.  */

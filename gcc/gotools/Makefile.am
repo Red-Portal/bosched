@@ -15,7 +15,7 @@
 # along with this program; see the file COPYING3.  If not see
 # <http://www.gnu.org/licenses/>.
 
-ACLOCAL_AMFLAGS = -I ../config
+ACLOCAL_AMFLAGS = -I ./config -I ../config
 
 gcc_version := $(shell $(GCC_FOR_TARGET) -dumpversion)
 
@@ -123,7 +123,6 @@ MOSTLYCLEANFILES = \
 	*.sent
 
 mostlyclean-local:
-	-chmod -R u+w check-go-dir
 	rm -rf check-go-dir check-runtime-dir cgo-test-dir carchive-test-dir
 
 if NATIVE
@@ -229,7 +228,6 @@ ECHO_ENV = PATH=`echo $(abs_builddir):$${PATH} | sed 's,::*,:,g;s,^:*,,;s,:*$$,,
 
 # check-go-tool runs `go test cmd/go` in our environment.
 check-go-tool: go$(EXEEXT) $(noinst_PROGRAMS) check-head check-gccgo check-gcc
-	-chmod -R u+w check-go-dir
 	rm -rf check-go-dir cmd_go-testlog
 	$(MKDIR_P) check-go-dir/src/cmd/go
 	cp $(cmdsrcdir)/go/*.go check-go-dir/src/cmd/go/
@@ -299,10 +297,8 @@ check-carchive-test: go$(EXEEXT) $(noinst_PROGRAMS) check-head check-gccgo check
 # check-vet runs `go test cmd/vet` in our environment.
 check-vet: go$(EXEEXT) $(noinst_PROGRAMS) check-head check-gccgo check-gcc
 	rm -rf check-vet-dir cmd_vet-testlog
-	$(MKDIR_P) check-vet-dir/src/cmd/internal
+	$(MKDIR_P) check-vet-dir/src/cmd
 	cp -r $(cmdsrcdir)/vet check-vet-dir/src/cmd/
-	cp -r $(cmdsrcdir)/internal/objabi check-vet-dir/src/cmd/internal
-	cp $(libgodir)/objabi.go check-vet-dir/src/cmd/internal/objabi/
 	@abs_libgodir=`cd $(libgodir) && $(PWD_COMMAND)`; \
 	abs_checkdir=`cd check-vet-dir && $(PWD_COMMAND)`; \
 	echo "cd check-vet-dir/src/cmd/vet && $(ECHO_ENV) GOPATH=$${abs_checkdir} $(abs_builddir)/go$(EXEEXT) test -test.short -test.timeout=$(GOTOOLS_TEST_TIMEOUT)s -test.v" > cmd_vet-testlog

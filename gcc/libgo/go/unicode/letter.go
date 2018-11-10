@@ -206,10 +206,9 @@ func IsTitle(r rune) bool {
 }
 
 // to maps the rune using the specified case mapping.
-// It additionally reports whether caseRange contained a mapping for r.
-func to(_case int, r rune, caseRange []CaseRange) (mappedRune rune, foundMapping bool) {
+func to(_case int, r rune, caseRange []CaseRange) rune {
 	if _case < 0 || MaxCase <= _case {
-		return ReplacementChar, false // as reasonable an error as any
+		return ReplacementChar // as reasonable an error as any
 	}
 	// binary search over ranges
 	lo := 0
@@ -230,9 +229,9 @@ func to(_case int, r rune, caseRange []CaseRange) (mappedRune rune, foundMapping
 				// bit in the sequence offset.
 				// The constants UpperCase and TitleCase are even while LowerCase
 				// is odd so we take the low bit from _case.
-				return rune(cr.Lo) + ((r-rune(cr.Lo))&^1 | rune(_case&1)), true
+				return rune(cr.Lo) + ((r-rune(cr.Lo))&^1 | rune(_case&1))
 			}
-			return r + delta, true
+			return r + delta
 		}
 		if r < rune(cr.Lo) {
 			hi = m
@@ -240,13 +239,12 @@ func to(_case int, r rune, caseRange []CaseRange) (mappedRune rune, foundMapping
 			lo = m + 1
 		}
 	}
-	return r, false
+	return r
 }
 
 // To maps the rune to the specified case: UpperCase, LowerCase, or TitleCase.
 func To(_case int, r rune) rune {
-	r, _ = to(_case, r, CaseRanges)
-	return r
+	return to(_case, r, CaseRanges)
 }
 
 // ToUpper maps the rune to upper case.
@@ -284,8 +282,8 @@ func ToTitle(r rune) rune {
 
 // ToUpper maps the rune to upper case giving priority to the special mapping.
 func (special SpecialCase) ToUpper(r rune) rune {
-	r1, hadMapping := to(UpperCase, r, []CaseRange(special))
-	if r1 == r && !hadMapping {
+	r1 := to(UpperCase, r, []CaseRange(special))
+	if r1 == r {
 		r1 = ToUpper(r)
 	}
 	return r1
@@ -293,8 +291,8 @@ func (special SpecialCase) ToUpper(r rune) rune {
 
 // ToTitle maps the rune to title case giving priority to the special mapping.
 func (special SpecialCase) ToTitle(r rune) rune {
-	r1, hadMapping := to(TitleCase, r, []CaseRange(special))
-	if r1 == r && !hadMapping {
+	r1 := to(TitleCase, r, []CaseRange(special))
+	if r1 == r {
 		r1 = ToTitle(r)
 	}
 	return r1
@@ -302,8 +300,8 @@ func (special SpecialCase) ToTitle(r rune) rune {
 
 // ToLower maps the rune to lower case giving priority to the special mapping.
 func (special SpecialCase) ToLower(r rune) rune {
-	r1, hadMapping := to(LowerCase, r, []CaseRange(special))
-	if r1 == r && !hadMapping {
+	r1 := to(LowerCase, r, []CaseRange(special))
+	if r1 == r {
 		r1 = ToLower(r)
 	}
 	return r1

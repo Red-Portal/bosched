@@ -29,7 +29,6 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #include <unistd.h>
 #endif
 
-#include <string.h>
 
 /* Fortran 2008 demands: If any exception (14) is signaling on that image, the
    processor shall issue a warning indicating which exceptions are signaling;
@@ -41,8 +40,7 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 static void
 report_exception (void)
 {
-  struct iovec iov[8];
-  int set_excepts, iovcnt = 1;
+  int set_excepts;
 
   if (!compile_options.fpe_summary)
     return;
@@ -51,62 +49,33 @@ report_exception (void)
   if ((set_excepts & compile_options.fpe_summary) == 0)
     return;
 
-  iov[0].iov_base = (char*) "Note: The following floating-point exceptions are signalling:";
-  iov[0].iov_len = strlen (iov[0].iov_base);
+  estr_write ("Note: The following floating-point exceptions are signalling:");
 
   if ((compile_options.fpe_summary & GFC_FPE_INVALID)
       && (set_excepts & GFC_FPE_INVALID))
-    {
-      iov[iovcnt].iov_base = (char*) " IEEE_INVALID_FLAG";
-      iov[iovcnt].iov_len = strlen (iov[iovcnt].iov_base);
-      iovcnt++;
-    }
+    estr_write (" IEEE_INVALID_FLAG");
 
   if ((compile_options.fpe_summary & GFC_FPE_ZERO)
       && (set_excepts & GFC_FPE_ZERO))
-    {
-      iov[iovcnt].iov_base = (char*) " IEEE_DIVIDE_BY_ZERO";
-      iov[iovcnt].iov_len = strlen (iov[iovcnt].iov_base);
-      iovcnt++;
-    }
+    estr_write (" IEEE_DIVIDE_BY_ZERO");
 
   if ((compile_options.fpe_summary & GFC_FPE_OVERFLOW)
       && (set_excepts & GFC_FPE_OVERFLOW))
-    {
-      iov[iovcnt].iov_base = (char*) " IEEE_OVERFLOW_FLAG";
-      iov[iovcnt].iov_len = strlen (iov[iovcnt].iov_base);
-      iovcnt++;
-    }
+    estr_write (" IEEE_OVERFLOW_FLAG");
 
   if ((compile_options.fpe_summary & GFC_FPE_UNDERFLOW)
       && (set_excepts & GFC_FPE_UNDERFLOW))
-    {
-      iov[iovcnt].iov_base = (char*) " IEEE_UNDERFLOW_FLAG";
-      iov[iovcnt].iov_len = strlen (iov[iovcnt].iov_base);
-      iovcnt++;
-    }
+    estr_write (" IEEE_UNDERFLOW_FLAG");
 
   if ((compile_options.fpe_summary & GFC_FPE_DENORMAL)
       && (set_excepts & GFC_FPE_DENORMAL))
-    {
-      iov[iovcnt].iov_base = (char*) " IEEE_DENORMAL";
-      iov[iovcnt].iov_len = strlen (iov[iovcnt].iov_base);
-      iovcnt++;
-    }
+    estr_write (" IEEE_DENORMAL");
 
   if ((compile_options.fpe_summary & GFC_FPE_INEXACT)
       && (set_excepts & GFC_FPE_INEXACT))
-    {
-      iov[iovcnt].iov_base = (char*) " IEEE_INEXACT_FLAG";
-      iov[iovcnt].iov_len = strlen (iov[iovcnt].iov_base);
-      iovcnt++;
-    }
+    estr_write (" IEEE_INEXACT_FLAG");
 
-  iov[iovcnt].iov_base = (char*) "\n";
-  iov[iovcnt].iov_len = 1;
-  iovcnt++;
-
-  estr_writev (iov, iovcnt);
+  estr_write ("\n");
 }
 
 
@@ -137,14 +106,9 @@ stop_string (const char *string, size_t len, bool quiet)
       report_exception ();
       if (string)
 	{
-	  struct iovec iov[3];
-	  iov[0].iov_base = (char*) "STOP ";
-	  iov[0].iov_len = strlen (iov[0].iov_base);
-	  iov[1].iov_base = (char*) string;
-	  iov[1].iov_len = len;
-	  iov[2].iov_base = (char*) "\n";
-	  iov[2].iov_len = 1;
-	  estr_writev (iov, 3);
+	  estr_write ("STOP ");
+	  (void) write (STDERR_FILENO, string, len);
+	  estr_write ("\n");
 	}
     }
   exit (0);
@@ -164,15 +128,10 @@ error_stop_string (const char *string, size_t len, bool quiet)
 {
   if (!quiet)
     {
-      struct iovec iov[3];
       report_exception ();
-      iov[0].iov_base = (char*) "ERROR STOP ";
-      iov[0].iov_len = strlen (iov[0].iov_base);
-      iov[1].iov_base = (char*) string;
-      iov[1].iov_len = len;
-      iov[2].iov_base = (char*) "\n";
-      iov[2].iov_len = 1;
-      estr_writev (iov, 3);
+      estr_write ("ERROR STOP ");
+      (void) write (STDERR_FILENO, string, len);
+      estr_write ("\n");
     }
   exit_error (1);
 }

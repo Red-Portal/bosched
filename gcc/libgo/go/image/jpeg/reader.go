@@ -4,7 +4,7 @@
 
 // Package jpeg implements a JPEG image decoder and encoder.
 //
-// JPEG is defined in ITU-T T.81: https://www.w3.org/Graphics/JPEG/itu-t81.pdf.
+// JPEG is defined in ITU-T T.81: http://www.w3.org/Graphics/JPEG/itu-t81.pdf.
 package jpeg
 
 import (
@@ -62,13 +62,13 @@ const (
 	comMarker  = 0xfe // COMment.
 	// "APPlication specific" markers aren't part of the JPEG spec per se,
 	// but in practice, their use is described at
-	// https://www.sno.phy.queensu.ca/~phil/exiftool/TagNames/JPEG.html
+	// http://www.sno.phy.queensu.ca/~phil/exiftool/TagNames/JPEG.html
 	app0Marker  = 0xe0
 	app14Marker = 0xee
 	app15Marker = 0xef
 )
 
-// See https://www.sno.phy.queensu.ca/~phil/exiftool/TagNames/JPEG.html#Adobe
+// See http://www.sno.phy.queensu.ca/~phil/exiftool/TagNames/JPEG.html#Adobe
 const (
 	adobeTransformUnknown = 0
 	adobeTransformYCbCr   = 1
@@ -89,8 +89,7 @@ var unzig = [blockSize]int{
 	53, 60, 61, 54, 47, 55, 62, 63,
 }
 
-// Deprecated: Reader is not used by the image/jpeg package and should
-// not be used by others. It is kept for compatibility.
+// Deprecated: Reader is deprecated.
 type Reader interface {
 	io.ByteReader
 	io.Reader
@@ -685,7 +684,7 @@ func (d *decoder) applyBlack() (image.Image, error) {
 
 	// If the 4-component JPEG image isn't explicitly marked as "Unknown (RGB
 	// or CMYK)" as per
-	// https://www.sno.phy.queensu.ca/~phil/exiftool/TagNames/JPEG.html#Adobe
+	// http://www.sno.phy.queensu.ca/~phil/exiftool/TagNames/JPEG.html#Adobe
 	// we assume that it is YCbCrK. This matches libjpeg's jdapimin.c.
 	if d.adobeTransform != adobeTransformUnknown {
 		// Convert the YCbCr part of the YCbCrK to RGB, invert the RGB to get
@@ -748,7 +747,7 @@ func (d *decoder) isRGB() bool {
 		return false
 	}
 	if d.adobeTransformValid && d.adobeTransform == adobeTransformUnknown {
-		// https://www.sno.phy.queensu.ca/~phil/exiftool/TagNames/JPEG.html#Adobe
+		// http://www.sno.phy.queensu.ca/~phil/exiftool/TagNames/JPEG.html#Adobe
 		// says that 0 means Unknown (and in practice RGB) and 1 means YCbCr.
 		return true
 	}

@@ -36,11 +36,9 @@ proc scan-rtl-dump { args } {
 	return
     }
     if { [llength $args] >= 3 } {
-	scan-dump "rtl" [lindex $args 0] \
-		  "\[0-9\]\[0-9\]\[0-9\]r.[lindex $args 1]" "" [lindex $args 2]
+	scan-dump "rtl" [lindex $args 0] "\[0-9\]\[0-9\]\[0-9\]r.[lindex $args 1]" [lindex $args 2]
     } else {
-	scan-dump "rtl" [lindex $args 0] \
-		  "\[0-9\]\[0-9\]\[0-9\]r.[lindex $args 1]" ""
+	scan-dump "rtl" [lindex $args 0] "\[0-9\]\[0-9\]\[0-9\]r.[lindex $args 1]"
     }
 }
 
@@ -54,20 +52,19 @@ force_conventional_output_for scan-rtl-dump
 proc scan-rtl-dump-times { args } {
 
     if { [llength $args] < 3 } {
-	error "scan-rtl-dump-times: too few arguments"
+	error "scan-rtl-dump: too few arguments"
 	return
     }
     if { [llength $args] > 4 } {
-	error "scan-rtl-dump-times: too many arguments"
+	error "scan-rtl-dump: too many arguments"
 	return
     }
     if { [llength $args] >= 4 } {
 	scan-dump-times "rtl" [lindex $args 0] [lindex $args 1] \
-			"\[0-9\]\[0-9\]\[0-9\]r.[lindex $args 2]" "" \
-			[lindex $args 3]
+			"\[0-9\]\[0-9\]\[0-9\]r.[lindex $args 2]" [lindex $args 3]
     } else {
 	scan-dump-times "rtl" [lindex $args 0] [lindex $args 1] \
-			"\[0-9\]\[0-9\]\[0-9\]r.[lindex $args 2]" ""
+			"\[0-9\]\[0-9\]\[0-9\]r.[lindex $args 2]"
     }
 }
 
@@ -90,11 +87,10 @@ proc scan-rtl-dump-not { args } {
     }
     if { [llength $args] >= 3 } {
 	scan-dump-not "rtl" [lindex $args 0] \
-		      "\[0-9\]\[0-9\]\[0-9\]r.[lindex $args 1]" "" \
-		      [lindex $args 2]
+		      "\[0-9\]\[0-9\]\[0-9\]r.[lindex $args 1]" [lindex $args 2]
     } else {
 	scan-dump-not "rtl" [lindex $args 0] \
-		      "\[0-9\]\[0-9\]\[0-9\]r.[lindex $args 1]" ""
+		      "\[0-9\]\[0-9\]\[0-9\]r.[lindex $args 1]"
     }
 }
 
@@ -118,11 +114,10 @@ proc scan-rtl-dump-dem { args } {
     }
     if { [llength $args] >= 3 } {
 	scan-dump-dem "rtl" [lindex $args 0] \
-		      "\[0-9\]\[0-9\]\[0-9\]r.[lindex $args 1]" "" \
-		      [lindex $args 2]
+		      "\[0-9\]\[0-9\]\[0-9\]r.[lindex $args 1]" [lindex $args 2]
     } else {
 	scan-dump-dem "rtl" [lindex $args 0] \
-		      "\[0-9\]\[0-9\]\[0-9\]r.[lindex $args 1]" ""
+		      "\[0-9\]\[0-9\]\[0-9\]r.[lindex $args 1]"
     }
 }
 
@@ -146,10 +141,10 @@ proc scan-rtl-dump-dem-not { args } {
     if { [llength $args] >= 3 } {
 	scan-dump-dem-not "rtl" [lindex $args 0] \
 			  "\[0-9\]\[0-9\]\[0-9\]r.[lindex $args 1]" \
-			  "" [lindex $args 2]
+			  [lindex $args 2]
     } else {
 	scan-dump-dem-not "rtl" [lindex $args 0] \
-			  "\[0-9\]\[0-9\]\[0-9\]r.[lindex $args 1]" ""
+			  "\[0-9\]\[0-9\]\[0-9\]r.[lindex $args 1]"
     }
 }
 

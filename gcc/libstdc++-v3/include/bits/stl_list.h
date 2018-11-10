@@ -243,13 +243,13 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 	return __tmp;
       }
 
-      friend bool
-      operator==(const _Self& __x, const _Self& __y) _GLIBCXX_NOEXCEPT
-      { return __x._M_node == __y._M_node; }
+      bool
+      operator==(const _Self& __x) const _GLIBCXX_NOEXCEPT
+      { return _M_node == __x._M_node; }
 
-      friend bool
-      operator!=(const _Self& __x, const _Self& __y) _GLIBCXX_NOEXCEPT
-      { return __x._M_node != __y._M_node; }
+      bool
+      operator!=(const _Self& __x) const _GLIBCXX_NOEXCEPT
+      { return _M_node != __x._M_node; }
 
       // The only member points to the %list element.
       __detail::_List_node_base* _M_node;
@@ -327,17 +327,29 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 	return __tmp;
       }
 
-      friend bool
-      operator==(const _Self& __x, const _Self& __y) _GLIBCXX_NOEXCEPT
-      { return __x._M_node == __y._M_node; }
+      bool
+      operator==(const _Self& __x) const _GLIBCXX_NOEXCEPT
+      { return _M_node == __x._M_node; }
 
-      friend bool
-      operator!=(const _Self& __x, const _Self& __y) _GLIBCXX_NOEXCEPT
-      { return __x._M_node != __y._M_node; }
+      bool
+      operator!=(const _Self& __x) const _GLIBCXX_NOEXCEPT
+      { return _M_node != __x._M_node; }
 
       // The only member points to the %list element.
       const __detail::_List_node_base* _M_node;
     };
+
+  template<typename _Val>
+    inline bool
+    operator==(const _List_iterator<_Val>& __x,
+	       const _List_const_iterator<_Val>& __y) _GLIBCXX_NOEXCEPT
+    { return __x._M_node == __y._M_node; }
+
+  template<typename _Val>
+    inline bool
+    operator!=(const _List_iterator<_Val>& __x,
+	       const _List_const_iterator<_Val>& __y) _GLIBCXX_NOEXCEPT
+    { return __x._M_node != __y._M_node; }
 
 _GLIBCXX_BEGIN_NAMESPACE_CXX11
   /// See bits/stl_deque.h's _Deque_base for an explanation.
@@ -1662,18 +1674,6 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
       { splice(__position, std::move(__x), __first, __last); }
 #endif
 
-    private:
-#if __cplusplus > 201703L
-# define __cpp_lib_list_remove_return_type 201806L
-      typedef size_type __remove_return_type;
-# define _GLIBCXX_LIST_REMOVE_RETURN_TYPE_TAG \
-      __attribute__((__abi_tag__("__cxx20")))
-#else
-      typedef void __remove_return_type;
-# define _GLIBCXX_LIST_REMOVE_RETURN_TYPE_TAG
-#endif
-    public:
-
       /**
        *  @brief  Remove all elements equal to value.
        *  @param  __value  The value to remove.
@@ -1685,8 +1685,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  touched in any way.  Managing the pointer is the user's
        *  responsibility.
        */
-      _GLIBCXX_LIST_REMOVE_RETURN_TYPE_TAG
-      __remove_return_type
+      void
       remove(const _Tp& __value);
 
       /**
@@ -1701,7 +1700,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  responsibility.
        */
       template<typename _Predicate>
-	__remove_return_type
+	void
 	remove_if(_Predicate);
 
       /**
@@ -1714,8 +1713,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  the pointed-to memory is not touched in any way.  Managing
        *  the pointer is the user's responsibility.
        */
-      _GLIBCXX_LIST_REMOVE_RETURN_TYPE_TAG
-      __remove_return_type
+      void
       unique();
 
       /**
@@ -1731,10 +1729,8 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  Managing the pointer is the user's responsibility.
        */
       template<typename _BinaryPredicate>
-	__remove_return_type
+	void
 	unique(_BinaryPredicate);
-
-#undef _GLIBCXX_LIST_REMOVE_RETURN_TYPE_TAG
 
       /**
        *  @brief  Merge sorted lists.

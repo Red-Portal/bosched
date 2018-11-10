@@ -113,14 +113,9 @@ function switch_flags (flags)
 # Return bit-field initializers for option flags FLAGS.
 function switch_bit_fields (flags)
 {
-	uinteger_flag = ""
 	vn = var_name(flags);
 	if (host_wide_int[vn] == "yes")
 		hwi = "Host_Wide_Int"
-	else if (flag_set_p("Host_Wide_Int", flags)) {
-		hwi = "Host_Wide_Int"
-		uinteger_flag = flag_init("UInteger", flags)
-	}
 	else
 		hwi = ""
 	result = ""
@@ -131,20 +126,6 @@ function switch_bit_fields (flags)
 		sep_args--
 	result = result sep_args ", "
 
-	if (uinteger_flag == "")
-		uinteger_flag = flag_init("UInteger", flags)
-
-	hwi_flag = flag_init("Host_Wide_Int", hwi)
-	byte_size_flag = flag_init("ByteSize", flags)
-
-	if (substr(byte_size_flag, 1, 1) != "0"	\
-	    && substr(uinteger_flag, 1, 1) == "0" \
-	    && substr(hwi_flag, 1, 1) == "0")
-	  print "#error only UInteger amd Host_Wide_Int options can specify a ByteSize suffix"
-
-	# The following flags need to be in the same order as
-	# the corresponding members of struct cl_option defined
-	# in gcc/opts.h.
 	result = result \
 	  flag_init("SeparateAlias", flags) \
 	  flag_init("NegativeAlias", flags) \
@@ -152,11 +133,10 @@ function switch_bit_fields (flags)
 	  flag_init("RejectDriver", flags) \
 	  flag_init("RejectNegative", flags) \
 	  flag_init("JoinedOrMissing", flags) \
-	  uinteger_flag \
-	  hwi_flag \
+	  flag_init("UInteger", flags) \
+	  flag_init("Host_Wide_Int", hwi) \
 	  flag_init("ToLower", flags) \
-	  flag_init("Report", flags) \
-	  byte_size_flag
+	  flag_init("Report", flags)
 
 	sub(", $", "", result)
 	return result
@@ -219,8 +199,6 @@ function var_type(flags)
 	}
 	else if (!flag_set_p("Joined.*", flags) && !flag_set_p("Separate", flags))
 		return "int "
-	else if (flag_set_p("Host_Wide_Int", flags))
-		return "HOST_WIDE_INT "
 	else if (flag_set_p("UInteger", flags))
 		return "int "
 	else
@@ -232,13 +210,8 @@ function var_type(flags)
 # type instead of int to save space.
 function var_type_struct(flags)
 {
-	if (flag_set_p("UInteger", flags)) {
-		if (host_wide_int[var_name(flags)] == "yes")
-			return "HOST_WIDE_INT ";
-		if (flag_set_p("ByteSize", flags))
-			return "HOST_WIDE_INT "
-	  return "int "
-	}
+	if (flag_set_p("UInteger", flags))
+		return "int "
 	else if (flag_set_p("Enum.*", flags)) {
 		en = opt_args("Enum", flags);
 		return enum_type[en] " "
@@ -248,7 +221,7 @@ function var_type_struct(flags)
 			if (host_wide_int[var_name(flags)] == "yes")
 				return "HOST_WIDE_INT "
 			else
-				return "/* - */ int "
+				return "int "
 		}
 		else
 			return "signed char "
@@ -288,8 +261,6 @@ function var_set(flags)
 	}
 	if (var_type(flags) == "const char *")
 		return "0, CLVC_STRING, 0"
-	if (flag_set_p("ByteSize", flags))
-		return "0, CLVC_SIZE, 0"
 	return "0, CLVC_BOOLEAN, 0"
 }
 

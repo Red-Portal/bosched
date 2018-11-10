@@ -12,7 +12,6 @@ import (
 
 const (
 	ERROR_SHARING_VIOLATION      syscall.Errno = 32
-	ERROR_INVALID_NAME           syscall.Errno = 123
 	ERROR_NO_UNICODE_TRANSLATION syscall.Errno = 1113
 )
 
@@ -123,7 +122,6 @@ const (
 
 	WSAEMSGSIZE syscall.Errno = 10040
 
-	MSG_PEEK   = 0x2
 	MSG_TRUNC  = 0x0100
 	MSG_CTRUNC = 0x0200
 

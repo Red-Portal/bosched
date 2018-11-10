@@ -1,3 +1,5 @@
+// { dg-additional-options "-fno-exceptions" }
+
 // Defaults, if not "#include"d from ../libgomp.oacc-c++/routine-1-*.C.
 #ifndef TEMPLATE
 # define TEMPLATE

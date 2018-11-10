@@ -22,12 +22,8 @@
 
 // { dg-do compile }
 
-using __gnu_test::ExplicitConsAlloc;
-
 // libstdc++/50118
 template class std::multimap<int, int, std::less<int>,
-			     ExplicitConsAlloc<std::pair<const int, int> > >;
-#ifndef __STRICT_ANSI__
+			     __gnu_test::ExplicitConsAlloc<int> >;
 template class std::multimap<int, int, std::less<int>,
-			     ExplicitConsAlloc<char> >;
-#endif
+			     __gnu_test::ExplicitConsAlloc<char> >;

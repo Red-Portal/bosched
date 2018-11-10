@@ -1,4 +1,5 @@
 /* { dg-do compile } */
+/* { dg-additional-options "--param sccvn-max-scc-size=10" } */
 
 typedef int a __attribute__ ((__vector_size__ (16)));
 typedef struct

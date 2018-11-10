@@ -227,8 +227,6 @@ void sem_item::set_hash (hashval_t hash)
   m_hash_set = true;
 }
 
-hash_map<const_tree, hashval_t> sem_item::m_type_hash_cache;
-
 /* Semantic function constructor that uses STACK as bitmap memory stack.  */
 
 sem_function::sem_function (bitmap_obstack *stack)
@@ -305,6 +303,57 @@ sem_function::get_hash (void)
   return m_hash;
 }
 
+/* Return ture if A1 and A2 represent equivalent function attribute lists.
+   Based on comp_type_attributes.  */
+
+bool
+sem_item::compare_attributes (const_tree a1, const_tree a2)
+{
+  const_tree a;
+  if (a1 == a2)
+    return true;
+  for (a = a1; a != NULL_TREE; a = TREE_CHAIN (a))
+    {
+      const struct attribute_spec *as;
+      const_tree attr;
+
+      as = lookup_attribute_spec (get_attribute_name (a));
+      /* TODO: We can introduce as->affects_decl_identity
+	 and as->affects_decl_reference_identity if attribute mismatch
+	 gets a common reason to give up on merging.  It may not be worth
+	 the effort.
+	 For example returns_nonnull affects only references, while
+	 optimize attribute can be ignored because it is already lowered
+	 into flags representation and compared separately.  */
+      if (!as)
+        continue;
+
+      attr = lookup_attribute (as->name, CONST_CAST_TREE (a2));
+      if (!attr || !attribute_value_equal (a, attr))
+        break;
+    }
+  if (!a)
+    {
+      for (a = a2; a != NULL_TREE; a = TREE_CHAIN (a))
+	{
+	  const struct attribute_spec *as;
+
+	  as = lookup_attribute_spec (get_attribute_name (a));
+	  if (!as)
+	    continue;
+
+	  if (!lookup_attribute (as->name, CONST_CAST_TREE (a1)))
+	    break;
+	  /* We don't need to compare trees again, as we did this
+	     already in first loop.  */
+	}
+      if (!a)
+        return true;
+    }
+  /* TODO: As in comp_type_attributes we may want to introduce target hook.  */
+  return false;
+}
+
 /* Compare properties of symbols N1 and N2 that does not affect semantics of
    symbol itself but affects semantics of its references from USED_BY (which
    may be NULL if it is unknown).  If comparsion is false, symbols
@@ -378,8 +427,8 @@ sem_item::compare_referenced_symbol_properties (symtab_node *used_by,
 	 variables just compare attributes for references - the codegen
 	 for constructors is affected only by those attributes that we lower
 	 to explicit representation (such as DECL_ALIGN or DECL_SECTION).  */
-      if (!attribute_list_equal (DECL_ATTRIBUTES (n1->decl),
-				 DECL_ATTRIBUTES (n2->decl)))
+      if (!compare_attributes (DECL_ATTRIBUTES (n1->decl),
+			       DECL_ATTRIBUTES (n2->decl)))
 	return return_false_with_msg ("different var decl attributes");
       if (comp_type_attributes (TREE_TYPE (n1->decl),
 				TREE_TYPE (n2->decl)) != 1)
@@ -542,8 +591,6 @@ sem_function::equals_wpa (sem_item *item,
         return return_false_with_msg ("thunk fixed_offset mismatch");
       if (cnode->thunk.virtual_value != cnode2->thunk.virtual_value)
         return return_false_with_msg ("thunk virtual_value mismatch");
-      if (cnode->thunk.indirect_offset != cnode2->thunk.indirect_offset)
-        return return_false_with_msg ("thunk indirect_offset mismatch");
       if (cnode->thunk.this_adjusting != cnode2->thunk.this_adjusting)
         return return_false_with_msg ("thunk this_adjusting mismatch");
       if (cnode->thunk.virtual_offset_p != cnode2->thunk.virtual_offset_p)
@@ -611,7 +658,7 @@ sem_function::equals_wpa (sem_item *item,
   cl_optimization *opt1 = opts_for_fn (decl);
   cl_optimization *opt2 = opts_for_fn (item->decl);
 
-  if (opt1 != opt2 && !cl_optimization_option_eq (opt1, opt2))
+  if (opt1 != opt2 && memcmp (opt1, opt2, sizeof(cl_optimization)))
     {
       if (dump_file && (dump_flags & TDF_DETAILS))
 	{
@@ -665,8 +712,8 @@ sem_function::equals_wpa (sem_item *item,
   if (comp_type_attributes (TREE_TYPE (decl),
 			    TREE_TYPE (item->decl)) != 1)
     return return_false_with_msg ("different type attributes");
-  if (!attribute_list_equal (DECL_ATTRIBUTES (decl),
-			     DECL_ATTRIBUTES (item->decl)))
+  if (!compare_attributes (DECL_ATTRIBUTES (decl),
+			   DECL_ATTRIBUTES (item->decl)))
     return return_false_with_msg ("different decl attributes");
 
   /* The type of THIS pointer type memory location for
@@ -1152,7 +1199,6 @@ sem_function::merge (sem_item *alias_item)
 		     "can not create wrapper of stdarg function.\n");
 	}
       else if (ipa_fn_summaries
-	       && ipa_fn_summaries->get (alias) != NULL
 	       && ipa_fn_summaries->get (alias)->self_size <= 2)
 	{
 	  if (dump_file)
@@ -1174,7 +1220,8 @@ sem_function::merge (sem_item *alias_item)
 	 are not interposable.  */
       redirect_callers
 	= alias->get_availability () > AVAIL_INTERPOSABLE
-	  && original->get_availability () > AVAIL_INTERPOSABLE;
+	  && original->get_availability () > AVAIL_INTERPOSABLE
+	  && !alias->instrumented_version;
       /* TODO: We can redirect, but we need to produce alias of ORIGINAL
 	 with proper properties.  */
       if (!sem_item::compare_referenced_symbol_properties (NULL, original, alias,
@@ -1533,14 +1580,8 @@ sem_item::add_type (const_tree type, inchash::hash &hstate)
     }
   else if (RECORD_OR_UNION_TYPE_P (type))
     {
-      /* Incomplete types must be skipped here.  */
-      if (!COMPLETE_TYPE_P (type))
-	{
-	  hstate.add_int (RECORD_TYPE);
-	  return;
-	}
-
-      hashval_t *val = m_type_hash_cache.get (type);
+      gcc_checking_assert (COMPLETE_TYPE_P (type));
+      hashval_t *val = optimizer->m_type_hash_cache.get (type);
 
       if (!val)
 	{
@@ -1550,6 +1591,8 @@ sem_item::add_type (const_tree type, inchash::hash &hstate)
 	  hashval_t hash;
 
 	  hstate2.add_int (RECORD_TYPE);
+	  gcc_assert (COMPLETE_TYPE_P (type));
+
 	  for (f = TYPE_FIELDS (type), nf = 0; f; f = TREE_CHAIN (f))
 	    if (TREE_CODE (f) == FIELD_DECL)
 	      {
@@ -1560,7 +1603,7 @@ sem_item::add_type (const_tree type, inchash::hash &hstate)
 	  hstate2.add_int (nf);
 	  hash = hstate2.end ();
 	  hstate.add_hwi (hash);
-	  m_type_hash_cache.put (type, hash);
+	  optimizer->m_type_hash_cache.put (type, hash);
 	}
       else
         hstate.add_hwi (*val);
@@ -1936,8 +1979,8 @@ sem_variable::equals (tree t1, tree t2)
 
 	/* Type of the offset on MEM_REF does not matter.  */
 	return return_with_debug (sem_variable::equals (x1, x2)
-			          && known_eq (wi::to_poly_offset (y1),
-					       wi::to_poly_offset (y2)));
+			          && wi::to_offset  (y1)
+				     == wi::to_offset  (y2));
       }
     case ADDR_EXPR:
     case FDESC_EXPR:

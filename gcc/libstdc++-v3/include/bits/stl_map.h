@@ -227,12 +227,12 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 	  const _Compare& __comp = _Compare(),
 	  const allocator_type& __a = allocator_type())
       : _M_t(__comp, _Pair_alloc_type(__a))
-      { _M_t._M_insert_range_unique(__l.begin(), __l.end()); }
+      { _M_t._M_insert_unique(__l.begin(), __l.end()); }
 
       /// Allocator-extended default constructor.
       explicit
       map(const allocator_type& __a)
-      : _M_t(_Pair_alloc_type(__a)) { }
+      : _M_t(_Compare(), _Pair_alloc_type(__a)) { }
 
       /// Allocator-extended copy constructor.
       map(const map& __m, const allocator_type& __a)
@@ -246,15 +246,15 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 
       /// Allocator-extended initialier-list constructor.
       map(initializer_list<value_type> __l, const allocator_type& __a)
-      : _M_t(_Pair_alloc_type(__a))
-      { _M_t._M_insert_range_unique(__l.begin(), __l.end()); }
+      : _M_t(_Compare(), _Pair_alloc_type(__a))
+      { _M_t._M_insert_unique(__l.begin(), __l.end()); }
 
       /// Allocator-extended range constructor.
       template<typename _InputIterator>
 	map(_InputIterator __first, _InputIterator __last,
 	    const allocator_type& __a)
-	: _M_t(_Pair_alloc_type(__a))
-	{ _M_t._M_insert_range_unique(__first, __last); }
+	: _M_t(_Compare(), _Pair_alloc_type(__a))
+	{ _M_t._M_insert_unique(__first, __last); }
 #endif
 
       /**
@@ -270,7 +270,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       template<typename _InputIterator>
 	map(_InputIterator __first, _InputIterator __last)
 	: _M_t()
-	{ _M_t._M_insert_range_unique(__first, __last); }
+	{ _M_t._M_insert_unique(__first, __last); }
 
       /**
        *  @brief  Builds a %map from a range.
@@ -289,7 +289,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 	    const _Compare& __comp,
 	    const allocator_type& __a = allocator_type())
 	: _M_t(__comp, _Pair_alloc_type(__a))
-	{ _M_t._M_insert_range_unique(__first, __last); }
+	{ _M_t._M_insert_unique(__first, __last); }
 
 #if __cplusplus >= 201103L
       /**
@@ -889,7 +889,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       template<typename _InputIterator>
 	void
 	insert(_InputIterator __first, _InputIterator __last)
-	{ _M_t._M_insert_range_unique(__first, __last); }
+	{ _M_t._M_insert_unique(__first, __last); }
 
 #if __cplusplus > 201402L
 #define __cpp_lib_map_insertion 201411
@@ -1221,25 +1221,6 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 	{ return _M_t._M_count_tr(__x); }
 #endif
       //@}
-
-#if __cplusplus > 201703L
-      //@{
-      /**
-       *  @brief  Finds whether an element with the given key exists.
-       *  @param  __x  Key of (key, value) pairs to be located.
-       *  @return  True if there is an element with the specified key.
-       */
-      bool
-      contains(const key_type& __x) const
-      { return _M_t.find(__x) != _M_t.end(); }
-
-      template<typename _Kt>
-	auto
-	contains(const _Kt& __x) const
-	-> decltype(_M_t._M_find_tr(__x), void(), true)
-	{ return _M_t._M_find_tr(__x) != _M_t.end(); }
-      //@}
-#endif
 
       //@{
       /**

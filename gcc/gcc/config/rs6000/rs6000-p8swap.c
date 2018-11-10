@@ -772,6 +772,7 @@ rtx_is_swappable_p (rtx op, unsigned int *special)
 	  case UNSPEC_VSX_EXTRACT:
 	  case UNSPEC_VSX_SET:
 	  case UNSPEC_VSX_SLDWI:
+	  case UNSPEC_VSX_VEC_INIT:
 	  case UNSPEC_VSX_VSLO:
 	  case UNSPEC_VUNPACK_HI_SIGN:
 	  case UNSPEC_VUNPACK_HI_SIGN_DIRECT:

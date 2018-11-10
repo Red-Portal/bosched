@@ -1,5 +1,4 @@
 // { dg-do run { target c++14 } }
-// { dg-require-fileio "" }
 
 // Copyright (C) 2013-2018 Free Software Foundation, Inc.
 //

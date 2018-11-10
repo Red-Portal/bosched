@@ -16,86 +16,25 @@
 #include "runtime.h"
 #include "gogo.h"
 
-// Mark variables whose addresses are taken and do some other
-// cleanups.  This has to be done before the write barrier pass and
-// after the escape analysis pass.  It would be nice to do this
-// elsewhere but there isn't an obvious place.
+// Mark variables whose addresses are taken.  This has to be done
+// before the write barrier pass and after the escape analysis pass.
+// It would be nice to do this elsewhere but there isn't an obvious
+// place.
 
 class Mark_address_taken : public Traverse
 {
  public:
   Mark_address_taken(Gogo* gogo)
-    : Traverse(traverse_functions
-	       | traverse_statements
-	       | traverse_expressions),
-      gogo_(gogo), function_(NULL)
+    : Traverse(traverse_expressions),
+      gogo_(gogo)
   { }
-
-  int
-  function(Named_object*);
-
-  int
-  statement(Block*, size_t*, Statement*);
 
   int
   expression(Expression**);
 
  private:
-  // General IR.
   Gogo* gogo_;
-  // The function we are traversing.
-  Named_object* function_;
 };
-
-// Record a function.
-
-int
-Mark_address_taken::function(Named_object* no)
-{
-  go_assert(this->function_ == NULL);
-  this->function_ = no;
-  int t = no->func_value()->traverse(this);
-  this->function_ = NULL;
-
-  if (t == TRAVERSE_EXIT)
-    return t;
-  return TRAVERSE_SKIP_COMPONENTS;
-}
-
-// Traverse a statement.
-
-int
-Mark_address_taken::statement(Block* block, size_t* pindex, Statement* s)
-{
-  // If this is an assignment of the form s = append(s, ...), expand
-  // it now, so that we can assign it to the left hand side in the
-  // middle of the expansion and possibly skip a write barrier.
-  Assignment_statement* as = s->assignment_statement();
-  if (as != NULL && !as->lhs()->is_sink_expression())
-    {
-      Call_expression* rce = as->rhs()->call_expression();
-      if (rce != NULL
-	  && rce->builtin_call_expression() != NULL
-	  && (rce->builtin_call_expression()->code()
-	      == Builtin_call_expression::BUILTIN_APPEND)
-          && Expression::is_same_variable(as->lhs(), rce->args()->front()))
-	{
-	  Statement_inserter inserter = Statement_inserter(block, pindex);
-	  Expression* a =
-	    rce->builtin_call_expression()->flatten_append(this->gogo_,
-							   this->function_,
-							   &inserter,
-							   as->lhs(),
-							   block);
-	  go_assert(a == NULL);
-	  // That does the assignment, so remove this statement.
-	  Expression* e = Expression::make_boolean(true, s->location());
-	  Statement* dummy = Statement::make_statement(e, true);
-	  block->replace_statement(*pindex, dummy);
-	}
-    }
-  return TRAVERSE_CONTINUE;
-}
 
 // Mark variable addresses taken.
 
@@ -231,133 +170,6 @@ Check_escape::expression(Expression** pexpr)
   return TRAVERSE_CONTINUE;
 }
 
-// Collect all writebarrierrec functions.  This is used when compiling
-// the runtime package, to propagate //go:nowritebarrierrec.
-
-class Collect_writebarrierrec_functions : public Traverse
-{
- public:
-  Collect_writebarrierrec_functions(std::vector<Named_object*>* worklist)
-    : Traverse(traverse_functions),
-      worklist_(worklist)
-  { }
-
- private:
-  int
-  function(Named_object*);
-
-  // The collected functions are put here.
-  std::vector<Named_object*>* worklist_;
-};
-
-int
-Collect_writebarrierrec_functions::function(Named_object* no)
-{
-  if (no->is_function()
-      && no->func_value()->enclosing() == NULL
-      && (no->func_value()->pragmas() & GOPRAGMA_NOWRITEBARRIERREC) != 0)
-    {
-      go_assert((no->func_value()->pragmas() & GOPRAGMA_MARK) == 0);
-      this->worklist_->push_back(no);
-    }
-  return TRAVERSE_CONTINUE;
-}
-
-// Collect all callees of this function.  We only care about locally
-// defined, known, functions.
-
-class Collect_callees : public Traverse
-{
- public:
-  Collect_callees(std::vector<Named_object*>* worklist)
-    : Traverse(traverse_expressions),
-      worklist_(worklist)
-  { }
-
- private:
-  int
-  expression(Expression**);
-
-  // The collected callees are put here.
-  std::vector<Named_object*>* worklist_;
-};
-
-int
-Collect_callees::expression(Expression** pexpr)
-{
-  Call_expression* ce = (*pexpr)->call_expression();
-  if (ce != NULL)
-    {
-      Func_expression* fe = ce->fn()->func_expression();
-      if (fe != NULL)
-	{
-	  Named_object* no = fe->named_object();
-	  if (no->package() == NULL && no->is_function())
-	    {
-	      // The function runtime.systemstack is special, in that
-	      // it is a common way to call a function in the runtime:
-	      // mark its argument if we can.
-	      if (Gogo::unpack_hidden_name(no->name()) != "systemstack")
-		this->worklist_->push_back(no);
-	      else if (ce->args()->size() > 0)
-		{
-		  fe = ce->args()->front()->func_expression();
-		  if (fe != NULL)
-		    {
-		      no = fe->named_object();
-		      if (no->package() == NULL && no->is_function())
-			this->worklist_->push_back(no);
-		    }
-		}
-	    }
-	}
-    }
-  return TRAVERSE_CONTINUE;
-}
-
-// When compiling the runtime package, propagate //go:nowritebarrierrec
-// annotations.  A function marked as //go:nowritebarrierrec does not
-// permit write barriers, and also all the functions that it calls,
-// recursively, do not permit write barriers.  Except that a
-// //go:yeswritebarrierrec annotation permits write barriers even if
-// called by a //go:nowritebarrierrec function.  Here we turn
-// //go:nowritebarrierrec into //go:nowritebarrier, as appropriate.
-
-void
-Gogo::propagate_writebarrierrec()
-{
-  std::vector<Named_object*> worklist;
-  Collect_writebarrierrec_functions cwf(&worklist);
-  this->traverse(&cwf);
-
-  Collect_callees cc(&worklist);
-
-  while (!worklist.empty())
-    {
-      Named_object* no = worklist.back();
-      worklist.pop_back();
-
-      unsigned int pragmas = no->func_value()->pragmas();
-      if ((pragmas & GOPRAGMA_MARK) != 0)
-	{
-	  // We've already seen this function.
-	  continue;
-	}
-      if ((pragmas & GOPRAGMA_YESWRITEBARRIERREC) != 0)
-	{
-	  // We don't want to propagate //go:nowritebarrierrec into
-	  // this function or it's callees.
-	  continue;
-	}
-
-      no->func_value()->set_pragmas(pragmas
-				    | GOPRAGMA_NOWRITEBARRIER
-				    | GOPRAGMA_MARK);
-
-      no->func_value()->traverse(&cc);
-    }
-}
-
 // Add write barriers to the IR.  This are required by the concurrent
 // garbage collector.  A write barrier is needed for any write of a
 // pointer into memory controlled by the garbage collector.  Write
@@ -380,7 +192,7 @@ Gogo::propagate_writebarrierrec()
 // This is compatible with the definition in the runtime package.
 //
 // For types that are pointer shared (pointers, maps, chans, funcs),
-// we replaced the call to typedmemmove with gcWriteBarrier(&A, B).
+// we replaced the call to typedmemmove with writebarrierptr(&A, B).
 // As far as the GC is concerned, all pointers are the same, so it
 // doesn't need the type descriptor.
 //
@@ -391,7 +203,7 @@ Gogo::propagate_writebarrierrec()
 // runtime package, so we could optimize by only testing it once
 // between function calls.
 //
-// A slice could be handled with a call to gcWriteBarrier plus two
+// A slice could be handled with a call to writebarrierptr plus two
 // integer moves.
 
 // Traverse the IR adding write barriers.
@@ -401,7 +213,7 @@ class Write_barriers : public Traverse
  public:
   Write_barriers(Gogo* gogo)
     : Traverse(traverse_functions | traverse_variables | traverse_statements),
-      gogo_(gogo), function_(NULL), statements_added_()
+      gogo_(gogo), function_(NULL)
   { }
 
   int
@@ -418,8 +230,6 @@ class Write_barriers : public Traverse
   Gogo* gogo_;
   // Current function.
   Function* function_;
-  // Statements introduced.
-  Statement_inserter::Statements statements_added_;
 };
 
 // Traverse a function.  Just record it for later.
@@ -488,10 +298,9 @@ Write_barriers::variable(Named_object* no)
   Location loc = init->location();
   Expression* ref = Expression::make_var_reference(no, loc);
 
-  Statement_inserter inserter(this->gogo_, var, &this->statements_added_);
+  Statement_inserter inserter(this->gogo_, var);
   Statement* s = this->gogo_->assign_with_write_barrier(NULL, NULL, &inserter,
 							ref, init, loc);
-  this->statements_added_.insert(s);
 
   var->add_preinit_statement(this->gogo_, s);
   var->clear_init();
@@ -504,9 +313,6 @@ Write_barriers::variable(Named_object* no)
 int
 Write_barriers::statement(Block* block, size_t* pindex, Statement* s)
 {
-  if (this->statements_added_.find(s) != this->statements_added_.end())
-    return TRAVERSE_SKIP_COMPONENTS;
-
   switch (s->classification())
     {
     default:
@@ -549,7 +355,7 @@ Write_barriers::statement(Block* block, size_t* pindex, Statement* s)
 
 	Function* function = this->function_;
 	Location loc = init->location();
-	Statement_inserter inserter(block, pindex, &this->statements_added_);
+	Statement_inserter inserter(block, pindex);
 
 	// Insert the variable declaration statement with no
 	// initializer, so that the variable exists.
@@ -564,7 +370,6 @@ Write_barriers::statement(Block* block, size_t* pindex, Statement* s)
 								   &inserter,
 								   ref, init,
 								   loc);
-        this->statements_added_.insert(assign);
 
 	// Replace the old variable declaration statement with the new
 	// initialization.
@@ -575,10 +380,6 @@ Write_barriers::statement(Block* block, size_t* pindex, Statement* s)
     case Statement::STATEMENT_ASSIGNMENT:
       {
 	Assignment_statement* as = s->assignment_statement();
-
-	if (as->omit_write_barrier())
-	  break;
-
 	Expression* lhs = as->lhs();
 	Expression* rhs = as->rhs();
 
@@ -590,14 +391,12 @@ Write_barriers::statement(Block* block, size_t* pindex, Statement* s)
 	// Change the assignment to use a write barrier.
 	Function* function = this->function_;
 	Location loc = as->location();
-	Statement_inserter inserter =
-            Statement_inserter(block, pindex, &this->statements_added_);
+	Statement_inserter inserter = Statement_inserter(block, pindex);
 	Statement* assign = this->gogo_->assign_with_write_barrier(function,
 								   block,
 								   &inserter,
 								   lhs, rhs,
 								   loc);
-        this->statements_added_.insert(assign);
 	block->replace_statement(*pindex, assign);
       }
       break;
@@ -619,8 +418,6 @@ Gogo::add_write_barriers()
 
   if (this->compiling_runtime() && this->package_name() == "runtime")
     {
-      this->propagate_writebarrierrec();
-
       Check_escape chk(this);
       this->traverse(&chk);
     }
@@ -665,8 +462,8 @@ Gogo::assign_needs_write_barrier(Expression* lhs)
   if (!lhs->type()->has_pointer())
     return false;
 
-  // An assignment to a field or an array index is handled like an
-  // assignment to the struct.
+  // An assignment to a field is handled like an assignment to the
+  // struct.
   while (true)
     {
       // Nothing to do for a type that can not be in the heap, or a
@@ -679,22 +476,9 @@ Gogo::assign_needs_write_barrier(Expression* lhs)
 	return false;
 
       Field_reference_expression* fre = lhs->field_reference_expression();
-      if (fre != NULL)
-	{
-	  lhs = fre->expr();
-	  continue;
-	}
-
-      Array_index_expression* aie = lhs->array_index_expression();
-      if (aie != NULL
-	  && aie->end() == NULL
-	  && !aie->array()->type()->is_slice_type())
-	{
-	  lhs = aie->array();
-	  continue;
-	}
-
-      break;
+      if (fre == NULL)
+	break;
+      lhs = fre->expr();
     }
 
   // Nothing to do for an assignment to a temporary.
@@ -762,7 +546,9 @@ Gogo::assign_with_write_barrier(Function* function, Block* enclosing,
 				Statement_inserter* inserter, Expression* lhs,
 				Expression* rhs, Location loc)
 {
-  if (function != NULL && (function->pragmas() & GOPRAGMA_NOWRITEBARRIER) != 0)
+  if (function != NULL
+      && ((function->pragmas() & GOPRAGMA_NOWRITEBARRIER) != 0
+	  || (function->pragmas() & GOPRAGMA_NOWRITEBARRIERREC) != 0))
     go_error_at(loc, "write barrier prohibited");
 
   Type* type = lhs->type();
@@ -781,9 +567,7 @@ Gogo::assign_with_write_barrier(Function* function, Block* enclosing,
   inserter->insert(lhs_temp);
   lhs = Expression::make_temporary_reference(lhs_temp, loc);
 
-  if (!Type::are_identical(type, rhs->type(),
-			   Type::COMPARE_ERRORS | Type::COMPARE_TAGS,
-			   NULL)
+  if (!Type::are_identical(type, rhs->type(), false, NULL)
       && rhs->type()->interface_type() != NULL
       && !rhs->is_variable())
     {
@@ -826,7 +610,7 @@ Gogo::assign_with_write_barrier(Function* function, Block* enclosing,
     case Type::TYPE_MAP:
     case Type::TYPE_CHANNEL:
       // These types are all represented by a single pointer.
-      call = Runtime::make_call(Runtime::GCWRITEBARRIER, loc, 2, lhs, rhs);
+      call = Runtime::make_call(Runtime::WRITEBARRIERPTR, loc, 2, lhs, rhs);
       break;
 
     case Type::TYPE_STRING:

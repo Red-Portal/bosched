@@ -985,16 +985,6 @@ contains_abnormal_ssa_name_p (tree expr)
   code = TREE_CODE (expr);
   codeclass = TREE_CODE_CLASS (code);
 
-  if (code == CALL_EXPR)
-    {
-      tree arg;
-      call_expr_arg_iterator iter;
-      FOR_EACH_CALL_EXPR_ARG (arg, iter, expr)
-	if (contains_abnormal_ssa_name_p (arg))
-	  return true;
-      return false;
-    }
-
   if (code == SSA_NAME)
     return SSA_NAME_OCCURS_IN_ABNORMAL_PHI (expr) != 0;
 
@@ -1440,7 +1430,7 @@ find_givs_in_stmt_scev (struct ivopts_data *data, gimple *stmt, affine_iv *iv)
   /* If STMT could throw, then do not consider STMT as defining a GIV.
      While this will suppress optimizations, we can not safely delete this
      GIV and associated statements, even if it appears it is not used.  */
-  if (stmt_could_throw_p (cfun, stmt))
+  if (stmt_could_throw_p (stmt))
     return false;
 
   return true;
@@ -3222,7 +3212,7 @@ add_autoinc_candidates (struct ivopts_data *data, tree base, tree step,
      statement.  */
   if (use_bb->loop_father != data->current_loop
       || !dominated_by_p (CDI_DOMINATORS, data->current_loop->latch, use_bb)
-      || stmt_can_throw_internal (cfun, use->stmt)
+      || stmt_can_throw_internal (use->stmt)
       || !cst_and_fits_in_hwi (step))
     return;
 
@@ -7535,7 +7525,7 @@ tree_ssa_iv_optimize_loop (struct ivopts_data *data, struct loop *loop)
 
   gcc_assert (!data->niters);
   data->current_loop = loop;
-  data->loop_loc = find_loop_location (loop).get_location_t ();
+  data->loop_loc = find_loop_location (loop);
   data->speed = optimize_loop_for_speed_p (loop);
 
   if (dump_file && (dump_flags & TDF_DETAILS))

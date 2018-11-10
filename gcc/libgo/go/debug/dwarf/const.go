@@ -6,7 +6,7 @@
 
 package dwarf
 
-//go:generate stringer -type Attr -trimprefix=Attr
+import "strconv"
 
 // An Attr identifies the attribute type in a DWARF Entry's Field.
 type Attr uint32
@@ -86,11 +86,99 @@ const (
 	AttrDescription    Attr = 0x5A
 )
 
-func (a Attr) GoString() string {
-	if str, ok := _Attr_map[a]; ok {
-		return "dwarf.Attr" + str
+var attrNames = [...]string{
+	AttrSibling:        "Sibling",
+	AttrLocation:       "Location",
+	AttrName:           "Name",
+	AttrOrdering:       "Ordering",
+	AttrByteSize:       "ByteSize",
+	AttrBitOffset:      "BitOffset",
+	AttrBitSize:        "BitSize",
+	AttrStmtList:       "StmtList",
+	AttrLowpc:          "Lowpc",
+	AttrHighpc:         "Highpc",
+	AttrLanguage:       "Language",
+	AttrDiscr:          "Discr",
+	AttrDiscrValue:     "DiscrValue",
+	AttrVisibility:     "Visibility",
+	AttrImport:         "Import",
+	AttrStringLength:   "StringLength",
+	AttrCommonRef:      "CommonRef",
+	AttrCompDir:        "CompDir",
+	AttrConstValue:     "ConstValue",
+	AttrContainingType: "ContainingType",
+	AttrDefaultValue:   "DefaultValue",
+	AttrInline:         "Inline",
+	AttrIsOptional:     "IsOptional",
+	AttrLowerBound:     "LowerBound",
+	AttrProducer:       "Producer",
+	AttrPrototyped:     "Prototyped",
+	AttrReturnAddr:     "ReturnAddr",
+	AttrStartScope:     "StartScope",
+	AttrStrideSize:     "StrideSize",
+	AttrUpperBound:     "UpperBound",
+	AttrAbstractOrigin: "AbstractOrigin",
+	AttrAccessibility:  "Accessibility",
+	AttrAddrClass:      "AddrClass",
+	AttrArtificial:     "Artificial",
+	AttrBaseTypes:      "BaseTypes",
+	AttrCalling:        "Calling",
+	AttrCount:          "Count",
+	AttrDataMemberLoc:  "DataMemberLoc",
+	AttrDeclColumn:     "DeclColumn",
+	AttrDeclFile:       "DeclFile",
+	AttrDeclLine:       "DeclLine",
+	AttrDeclaration:    "Declaration",
+	AttrDiscrList:      "DiscrList",
+	AttrEncoding:       "Encoding",
+	AttrExternal:       "External",
+	AttrFrameBase:      "FrameBase",
+	AttrFriend:         "Friend",
+	AttrIdentifierCase: "IdentifierCase",
+	AttrMacroInfo:      "MacroInfo",
+	AttrNamelistItem:   "NamelistItem",
+	AttrPriority:       "Priority",
+	AttrSegment:        "Segment",
+	AttrSpecification:  "Specification",
+	AttrStaticLink:     "StaticLink",
+	AttrType:           "Type",
+	AttrUseLocation:    "UseLocation",
+	AttrVarParam:       "VarParam",
+	AttrVirtuality:     "Virtuality",
+	AttrVtableElemLoc:  "VtableElemLoc",
+	AttrAllocated:      "Allocated",
+	AttrAssociated:     "Associated",
+	AttrDataLocation:   "DataLocation",
+	AttrStride:         "Stride",
+	AttrEntrypc:        "Entrypc",
+	AttrUseUTF8:        "UseUTF8",
+	AttrExtension:      "Extension",
+	AttrRanges:         "Ranges",
+	AttrTrampoline:     "Trampoline",
+	AttrCallColumn:     "CallColumn",
+	AttrCallFile:       "CallFile",
+	AttrCallLine:       "CallLine",
+	AttrDescription:    "Description",
+}
+
+func (a Attr) String() string {
+	if int(a) < len(attrNames) {
+		s := attrNames[a]
+		if s != "" {
+			return s
+		}
 	}
-	return "dwarf." + a.String()
+	return strconv.Itoa(int(a))
+}
+
+func (a Attr) GoString() string {
+	if int(a) < len(attrNames) {
+		s := attrNames[a]
+		if s != "" {
+			return "dwarf.Attr" + s
+		}
+	}
+	return "dwarf.Attr(" + strconv.FormatInt(int64(a), 10) + ")"
 }
 
 // A format is a DWARF data encoding format.
@@ -129,8 +217,6 @@ const (
 	formGnuRefAlt  format = 0x1f20
 	formGnuStrpAlt format = 0x1f21
 )
-
-//go:generate stringer -type Tag -trimprefix=Tag
 
 // A Tag is the classification (the type) of an Entry.
 type Tag uint32
@@ -201,11 +287,88 @@ const (
 	TagTemplateAlias       Tag = 0x43
 )
 
-func (t Tag) GoString() string {
-	if t <= TagTemplateAlias {
-		return "dwarf.Tag" + t.String()
+var tagNames = [...]string{
+	TagArrayType:              "ArrayType",
+	TagClassType:              "ClassType",
+	TagEntryPoint:             "EntryPoint",
+	TagEnumerationType:        "EnumerationType",
+	TagFormalParameter:        "FormalParameter",
+	TagImportedDeclaration:    "ImportedDeclaration",
+	TagLabel:                  "Label",
+	TagLexDwarfBlock:          "LexDwarfBlock",
+	TagMember:                 "Member",
+	TagPointerType:            "PointerType",
+	TagReferenceType:          "ReferenceType",
+	TagCompileUnit:            "CompileUnit",
+	TagStringType:             "StringType",
+	TagStructType:             "StructType",
+	TagSubroutineType:         "SubroutineType",
+	TagTypedef:                "Typedef",
+	TagUnionType:              "UnionType",
+	TagUnspecifiedParameters:  "UnspecifiedParameters",
+	TagVariant:                "Variant",
+	TagCommonDwarfBlock:       "CommonDwarfBlock",
+	TagCommonInclusion:        "CommonInclusion",
+	TagInheritance:            "Inheritance",
+	TagInlinedSubroutine:      "InlinedSubroutine",
+	TagModule:                 "Module",
+	TagPtrToMemberType:        "PtrToMemberType",
+	TagSetType:                "SetType",
+	TagSubrangeType:           "SubrangeType",
+	TagWithStmt:               "WithStmt",
+	TagAccessDeclaration:      "AccessDeclaration",
+	TagBaseType:               "BaseType",
+	TagCatchDwarfBlock:        "CatchDwarfBlock",
+	TagConstType:              "ConstType",
+	TagConstant:               "Constant",
+	TagEnumerator:             "Enumerator",
+	TagFileType:               "FileType",
+	TagFriend:                 "Friend",
+	TagNamelist:               "Namelist",
+	TagNamelistItem:           "NamelistItem",
+	TagPackedType:             "PackedType",
+	TagSubprogram:             "Subprogram",
+	TagTemplateTypeParameter:  "TemplateTypeParameter",
+	TagTemplateValueParameter: "TemplateValueParameter",
+	TagThrownType:             "ThrownType",
+	TagTryDwarfBlock:          "TryDwarfBlock",
+	TagVariantPart:            "VariantPart",
+	TagVariable:               "Variable",
+	TagVolatileType:           "VolatileType",
+	TagDwarfProcedure:         "DwarfProcedure",
+	TagRestrictType:           "RestrictType",
+	TagInterfaceType:          "InterfaceType",
+	TagNamespace:              "Namespace",
+	TagImportedModule:         "ImportedModule",
+	TagUnspecifiedType:        "UnspecifiedType",
+	TagPartialUnit:            "PartialUnit",
+	TagImportedUnit:           "ImportedUnit",
+	TagMutableType:            "MutableType",
+	TagCondition:              "Condition",
+	TagSharedType:             "SharedType",
+	TagTypeUnit:               "TypeUnit",
+	TagRvalueReferenceType:    "RvalueReferenceType",
+	TagTemplateAlias:          "TemplateAlias",
+}
+
+func (t Tag) String() string {
+	if int(t) < len(tagNames) {
+		s := tagNames[t]
+		if s != "" {
+			return s
+		}
 	}
-	return "dwarf." + t.String()
+	return strconv.Itoa(int(t))
+}
+
+func (t Tag) GoString() string {
+	if int(t) < len(tagNames) {
+		s := tagNames[t]
+		if s != "" {
+			return "dwarf.Tag" + s
+		}
+	}
+	return "dwarf.Tag(" + strconv.FormatInt(int64(t), 10) + ")"
 }
 
 // Location expression operators.

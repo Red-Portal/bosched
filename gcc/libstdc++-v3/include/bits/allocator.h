@@ -88,15 +88,11 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       template<typename _Up, typename... _Args>
 	void
 	construct(_Up* __p, _Args&&... __args)
-	noexcept(noexcept(::new((void *)__p)
-			    _Up(std::forward<_Args>(__args)...)))
 	{ ::new((void *)__p) _Up(std::forward<_Args>(__args)...); }
 
       template<typename _Up>
 	void
-	destroy(_Up* __p)
-	noexcept(noexcept(__p->~_Up()))
-	{ __p->~_Up(); }
+	destroy(_Up* __p) { __p->~_Up(); }
 #endif
     };
 
@@ -132,33 +128,15 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       typedef true_type is_always_equal;
 #endif
 
-      // _GLIBCXX_RESOLVE_LIB_DEFECTS
-      // 3035. std::allocator's constructors should be constexpr
-      _GLIBCXX20_CONSTEXPR
-      allocator() _GLIBCXX_NOTHROW { }
+      allocator() throw() { }
 
-      _GLIBCXX20_CONSTEXPR
-      allocator(const allocator& __a) _GLIBCXX_NOTHROW
+      allocator(const allocator& __a) throw()
       : __allocator_base<_Tp>(__a) { }
 
-#if __cplusplus >= 201103L
-      // Avoid implicit deprecation.
-      allocator& operator=(const allocator&) = default;
-#endif
-
       template<typename _Tp1>
-	_GLIBCXX20_CONSTEXPR
-	allocator(const allocator<_Tp1>&) _GLIBCXX_NOTHROW { }
+	allocator(const allocator<_Tp1>&) throw() { }
 
-      ~allocator() _GLIBCXX_NOTHROW { }
-
-      friend bool
-      operator==(const allocator&, const allocator&) _GLIBCXX_NOTHROW
-      { return true; }
-
-      friend bool
-      operator!=(const allocator&, const allocator&) _GLIBCXX_NOTHROW
-      { return false; }
+      ~allocator() throw() { }
 
       // Inherit everything else.
     };
@@ -166,13 +144,25 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   template<typename _T1, typename _T2>
     inline bool
     operator==(const allocator<_T1>&, const allocator<_T2>&)
-    _GLIBCXX_NOTHROW
+    _GLIBCXX_USE_NOEXCEPT
+    { return true; }
+
+  template<typename _Tp>
+    inline bool
+    operator==(const allocator<_Tp>&, const allocator<_Tp>&)
+    _GLIBCXX_USE_NOEXCEPT
     { return true; }
 
   template<typename _T1, typename _T2>
     inline bool
     operator!=(const allocator<_T1>&, const allocator<_T2>&)
-    _GLIBCXX_NOTHROW
+    _GLIBCXX_USE_NOEXCEPT
+    { return false; }
+
+  template<typename _Tp>
+    inline bool
+    operator!=(const allocator<_Tp>&, const allocator<_Tp>&)
+    _GLIBCXX_USE_NOEXCEPT
     { return false; }
 
   // Invalid allocator<cv T> partial specializations.

@@ -21,14 +21,13 @@ func envOr(key, value string) string {
 var (
 	defaultGOROOT string // set by linker
 
-	GOROOT   = envOr("GOROOT", defaultGOROOT)
-	GOARCH   = envOr("GOARCH", defaultGOARCH)
-	GOOS     = envOr("GOOS", defaultGOOS)
-	GO386    = envOr("GO386", defaultGO386)
-	GOARM    = goarm()
-	GOMIPS   = gomips()
-	GOMIPS64 = gomips64()
-	Version  = version
+	GOROOT  = envOr("GOROOT", defaultGOROOT)
+	GOARCH  = envOr("GOARCH", defaultGOARCH)
+	GOOS    = envOr("GOOS", defaultGOOS)
+	GO386   = envOr("GO386", defaultGO386)
+	GOARM   = goarm()
+	GOMIPS  = gomips()
+	Version = version
 )
 
 func goarm() int {
@@ -51,15 +50,6 @@ func gomips() string {
 		return v
 	}
 	log.Fatalf("Invalid GOMIPS value. Must be hardfloat or softfloat.")
-	panic("unreachable")
-}
-
-func gomips64() string {
-	switch v := envOr("GOMIPS64", defaultGOMIPS64); v {
-	case "hardfloat", "softfloat":
-		return v
-	}
-	log.Fatalf("Invalid GOMIPS64 value. Must be hardfloat or softfloat.")
 	panic("unreachable")
 }
 
@@ -105,7 +95,6 @@ var (
 	Fieldtrack_enabled       int
 	Preemptibleloops_enabled int
 	Clobberdead_enabled      int
-	DebugCPU_enabled         int
 )
 
 // Toolchain experiments.
@@ -120,7 +109,6 @@ var exper = []struct {
 	{"framepointer", &framepointer_enabled},
 	{"preemptibleloops", &Preemptibleloops_enabled},
 	{"clobberdead", &Clobberdead_enabled},
-	{"debugcpu", &DebugCPU_enabled},
 }
 
 var defaultExpstring = Expstring()

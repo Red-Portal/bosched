@@ -290,7 +290,7 @@ do {						\
 
 #undef ASM_OUTPUT_ALIGN
 #define ASM_OUTPUT_ALIGN(FILE,LOG)	\
-    if ((LOG) != 0) fprintf ((FILE), "\t.align %d\n", 1 << (LOG))
+    if ((LOG)!=0) fprintf ((FILE), "\t.align %d\n", 1<<(LOG))
 
 /* Windows uses explicit import from shared libraries.  */
 #define MULTIPLE_SYMBOL_SPACES 1
@@ -377,6 +377,9 @@ do {						\
 #define DWARF2_UNWIND_INFO 0
 #endif
 #endif
+
+/* Don't assume anything about the header files.  */
+#define NO_IMPLICIT_EXTERN_C
 
 #undef PROFILE_HOOK
 #define PROFILE_HOOK(LABEL)						\
@@ -488,7 +491,3 @@ do {						\
 
 /* Static stack checking is supported by means of probes.  */
 #define STACK_CHECK_STATIC_BUILTIN 1
-
-#ifndef HAVE_GAS_ALIGNED_COMM
-# define HAVE_GAS_ALIGNED_COMM 0
-#endif

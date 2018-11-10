@@ -147,9 +147,6 @@ struct dw_trace_info
 
   /* True if we've seen different values incoming to beg_true_args_size.  */
   bool args_size_undefined;
-
-  /* True if we've seen an insn with a REG_ARGS_SIZE note before EH_HEAD.  */
-  bool args_size_defined_for_eh;
 };
 
 
@@ -944,9 +941,6 @@ notice_args_size (rtx_insn *insn)
   note = find_reg_note (insn, REG_ARGS_SIZE, NULL);
   if (note == NULL)
     return;
-
-  if (!cur_trace->eh_head)
-    cur_trace->args_size_defined_for_eh = true;
 
   args_size = get_args_size (note);
   delta = args_size - cur_trace->end_true_args_size;
@@ -2725,7 +2719,7 @@ before_next_cfi_note (rtx_insn *start)
 static void
 connect_traces (void)
 {
-  unsigned i, n;
+  unsigned i, n = trace_info.length ();
   dw_trace_info *prev_ti, *ti;
 
   /* ??? Ideally, we should have both queued and processed every trace.
@@ -2736,15 +2730,20 @@ connect_traces (void)
      these are not "real" instructions, and should not be considered.
      This could be generically useful for tablejump data as well.  */
   /* Remove all unprocessed traces from the list.  */
-  unsigned ix, ix2;
-  VEC_ORDERED_REMOVE_IF_FROM_TO (trace_info, ix, ix2, ti, 1,
-				 trace_info.length (), ti->beg_row == NULL);
-  FOR_EACH_VEC_ELT (trace_info, ix, ti)
-    gcc_assert (ti->end_row != NULL);
+  for (i = n - 1; i > 0; --i)
+    {
+      ti = &trace_info[i];
+      if (ti->beg_row == NULL)
+	{
+	  trace_info.ordered_remove (i);
+	  n -= 1;
+	}
+      else
+	gcc_assert (ti->end_row != NULL);
+    }
 
   /* Work from the end back to the beginning.  This lets us easily insert
      remember/restore_state notes in the correct order wrt other notes.  */
-  n = trace_info.length ();
   prev_ti = &trace_info[n - 1];
   for (i = n - 1; i > 0; --i)
     {
@@ -2826,17 +2825,11 @@ connect_traces (void)
 
 	  if (ti->switch_sections)
 	    prev_args_size = 0;
-
 	  if (ti->eh_head == NULL)
 	    continue;
+	  gcc_assert (!ti->args_size_undefined);
 
-	  /* We require either the incoming args_size values to match or the
-	     presence of an insn setting it before the first EH insn.  */
-	  gcc_assert (!ti->args_size_undefined || ti->args_size_defined_for_eh);
-
-	  /* In the latter case, we force the creation of a CFI note.  */
-	  if (ti->args_size_undefined
-	      || maybe_ne (ti->beg_delay_args_size, prev_args_size))
+	  if (maybe_ne (ti->beg_delay_args_size, prev_args_size))
 	    {
 	      /* ??? Search back to previous CFI note.  */
 	      add_cfi_insn = PREV_INSN (ti->eh_head);

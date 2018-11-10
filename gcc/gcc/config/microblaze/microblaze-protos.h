@@ -24,7 +24,6 @@
 
 #ifdef RTX_CODE
 extern int pic_address_needs_scratch (rtx);
-extern bool microblaze_constant_address_p (rtx x);
 extern void expand_block_move        (rtx *);
 extern void microblaze_expand_prologue (void);
 extern void microblaze_expand_epilogue (void);

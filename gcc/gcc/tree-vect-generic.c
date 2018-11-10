@@ -120,7 +120,7 @@ typedef tree (*elem_op_func) (gimple_stmt_iterator *,
 			      tree, tree, tree, tree, tree, enum tree_code,
 			      tree);
 
-tree
+static inline tree
 tree_vec_extract (gimple_stmt_iterator *gsi, tree type,
 		  tree t, tree bitsize, tree bitpos)
 {
@@ -1649,8 +1649,7 @@ expand_vector_operations_1 (gimple_stmt_iterator *gsi)
 
   /* The signedness is determined from input argument.  */
   if (code == VEC_UNPACK_FLOAT_HI_EXPR
-      || code == VEC_UNPACK_FLOAT_LO_EXPR
-      || code == VEC_PACK_FLOAT_EXPR)
+      || code == VEC_UNPACK_FLOAT_LO_EXPR)
     {
       type = TREE_TYPE (rhs1);
       /* We do not know how to scalarize those.  */
@@ -1667,8 +1666,6 @@ expand_vector_operations_1 (gimple_stmt_iterator *gsi)
       || code == VEC_WIDEN_MULT_ODD_EXPR
       || code == VEC_UNPACK_HI_EXPR
       || code == VEC_UNPACK_LO_EXPR
-      || code == VEC_UNPACK_FIX_TRUNC_HI_EXPR
-      || code == VEC_UNPACK_FIX_TRUNC_LO_EXPR
       || code == VEC_PACK_TRUNC_EXPR
       || code == VEC_PACK_SAT_EXPR
       || code == VEC_PACK_FIX_TRUNC_EXPR

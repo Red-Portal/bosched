@@ -1,4 +1,5 @@
-// { dg-do compile { target c++17 } }
+// { dg-do compile }
+// { dg-options "-std=c++17" }
 
 #include <cassert>
 #include <experimental/type_traits>

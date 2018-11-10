@@ -13,8 +13,4 @@ foo (int *p)
 }
 
 /* { dg-final { scan-tree-dump-times "Merging successful" 1 "store-merging" } } */
-<<<<<<< HEAD
-/* { dg-final { scan-tree-dump-times "New sequence of 1 stores to replace old one of 3 stores" 1 "store-merging" } } */
-=======
 /* { dg-final { scan-tree-dump-times "New sequence of 1 stmts to replace old one of 3 stmts" 1 "store-merging" } } */
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf

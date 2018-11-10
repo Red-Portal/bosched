@@ -99,10 +99,10 @@ overflow_warning (location_t loc, tree value, tree expr)
 
     case REAL_CST:
       warnfmt = (expr
-		 ? G_("floating point overflow in expression %qE "
-		      "of type %qT results in %qE")
-		 : G_("floating point overflow in expression of type %qT "
-		      "results in %qE"));
+		 ? G_ ("floating point overflow in expression %qE "
+		       "of type %qT results in %qE")
+		 : G_ ("floating point overflow in expression of type %qT "
+		       "results in %qE"));
       break;
 
     case FIXED_CST:
@@ -491,7 +491,6 @@ warn_logical_not_parentheses (location_t location, enum tree_code code,
       && integer_zerop (rhs))
     return;
 
-  auto_diagnostic_group d;
   if (warning_at (location, OPT_Wlogical_not_parentheses,
 		  "logical not is only applied to the left hand side of "
 		  "comparison")
@@ -702,7 +701,7 @@ sizeof_pointer_memaccess_warning (location_t *sizeof_arg_loc, tree callee,
   location_t loc;
 
   if (TREE_CODE (callee) != FUNCTION_DECL
-      || !fndecl_built_in_p (callee, BUILT_IN_NORMAL)
+      || DECL_BUILT_IN_CLASS (callee) != BUILT_IN_NORMAL
       || vec_safe_length (params) <= 1)
     return;
 
@@ -794,9 +793,7 @@ sizeof_pointer_memaccess_warning (location_t *sizeof_arg_loc, tree callee,
     {
       /* The argument type may be an array.  Diagnose bounded string
 	 copy functions that specify the bound in terms of the source
-	 argument rather than the destination unless they are equal
-	 to one another.  Handle constant sizes and also try to handle
-	 sizeof expressions involving VLAs.  */
+	 argument rather than the destination.  */
       if (strop && !cmp && fncode != BUILT_IN_STRNDUP && src)
 	{
 	  tem = tree_strip_nop_conversions (src);
@@ -809,21 +806,7 @@ sizeof_pointer_memaccess_warning (location_t *sizeof_arg_loc, tree callee,
 	  if (get_attr_nonstring_decl (tem, &dummy))
 	    return;
 
-<<<<<<< HEAD
-	  tree d = tree_strip_nop_conversions (dest);
-	  if (TREE_CODE (d) == ADDR_EXPR)
-	    d = TREE_OPERAND (d, 0);
-
-	  tree dstsz = TYPE_SIZE_UNIT (TREE_TYPE (d));
-	  tree srcsz = TYPE_SIZE_UNIT (TREE_TYPE (tem));
-
-	  if ((!dstsz
-	       || !srcsz
-	       || !operand_equal_p (dstsz, srcsz, OEP_LEXICOGRAPHIC))
-	      && operand_equal_p (tem, sizeof_arg[idx], OEP_ADDRESS_OF))
-=======
 	  if (operand_equal_p (tem, sizeof_arg[idx], OEP_ADDRESS_OF))
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
 	    warning_at (sizeof_arg_loc[idx], OPT_Wsizeof_pointer_memaccess,
 			"argument to %<sizeof%> in %qD call is the same "
 			"expression as the source; did you mean to use "
@@ -2237,7 +2220,6 @@ warn_duplicated_cond_add_or_warn (location_t loc, tree cond, vec<tree> **chain)
   FOR_EACH_VEC_ELT (**chain, ix, t)
     if (operand_equal_p (cond, t, 0))
       {
-	auto_diagnostic_group d;
 	if (warning_at (loc, OPT_Wduplicated_cond,
 			"duplicated %<if%> condition"))
 	  inform (EXPR_LOCATION (t), "previously used here");
@@ -2277,20 +2259,12 @@ diagnose_mismatched_attributes (tree olddecl, tree newdecl)
       && DECL_UNINLINABLE (olddecl)
       && lookup_attribute ("noinline", DECL_ATTRIBUTES (olddecl)))
     warned |= warning (OPT_Wattributes, "inline declaration of %qD follows "
-<<<<<<< HEAD
-		       "declaration with attribute %<noinline%>", newdecl);
-=======
 		       "declaration with attribute %qs", newdecl, "noinline");
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
   else if (DECL_DECLARED_INLINE_P (olddecl)
 	   && DECL_UNINLINABLE (newdecl)
 	   && lookup_attribute ("noinline", DECL_ATTRIBUTES (newdecl)))
     warned |= warning (OPT_Wattributes, "declaration of %q+D with attribute "
-<<<<<<< HEAD
-		       "%<noinline%> follows inline declaration", newdecl);
-=======
 		       "%qs follows inline declaration", newdecl, "noinline");
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
 
   return warned;
 }
@@ -2441,7 +2415,7 @@ warn_for_restrict (unsigned param_pos, tree *argarray, unsigned nargs)
     {
       arg = argarray[pos - 1];
       if (EXPR_HAS_LOCATION (arg))
-	richloc.add_range (EXPR_LOCATION (arg));
+	richloc.add_range (EXPR_LOCATION (arg), false);
     }
 
   return warning_n (&richloc, OPT_Wrestrict, arg_positions.length (),
@@ -2615,7 +2589,6 @@ warn_for_multistatement_macros (location_t body_loc, location_t next_loc,
 	return;
     }
 
-  auto_diagnostic_group d;
   if (warning_at (body_loc, OPT_Wmultistatement_macros,
 		  "macro expands to multiple statements"))
     inform (guard_loc, "some parts of macro expansion are not guarded by "

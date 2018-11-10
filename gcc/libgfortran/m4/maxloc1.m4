@@ -42,8 +42,6 @@ ARRAY_FUNCTION(0,
 #endif
 	result = 1;',
 `#if defined ('atype_nan`)
-     	     for (n = 0; n < len; n++, src += delta)
-	       {
 		if (*src >= maxval)
 		  {
 		    maxval = *src;
@@ -51,12 +49,10 @@ ARRAY_FUNCTION(0,
 		    break;
 		  }
 	      }
-#else
-	    n = 0;
-#endif
 	    for (; n < len; n++, src += delta)
 	      {
-		if (back ? *src >= maxval : *src > maxval)
+#endif
+		if (*src > maxval)
 		  {
 		    maxval = *src;
 		    result = (rtype_name)n + 1;
@@ -92,23 +88,13 @@ MASKED_ARRAY_FUNCTION(0,
 	      result = result2;
 	    else
 #endif
-	    if (back)
-	      for (; n < len; n++, src += delta, msrc += mdelta)
-	      	{
-		  if (*msrc && unlikely (*src >= maxval))
-		    {
-		      maxval = *src;
-		      result = (rtype_name)n + 1;
-		    }
-		}
-	    else
-	      for (; n < len; n++, src += delta, msrc += mdelta)
-	        {
-		  if (*msrc && unlikely (*src > maxval))
-		    {
-		      maxval = *src;
-		      result = (rtype_name)n + 1;
-		    }')
+	    for (; n < len; n++, src += delta, msrc += mdelta)
+	      {
+		if (*msrc && *src > maxval)
+		  {
+		    maxval = *src;
+		    result = (rtype_name)n + 1;
+		  }')
 
 SCALAR_ARRAY_FUNCTION(0)
 

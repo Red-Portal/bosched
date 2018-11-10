@@ -1,5 +1,6 @@
 // P0145R2: Refining Expression Order for C++
-// { dg-do run { target c++17 } }
+// { dg-do run }
+// { dg-options "-std=c++17" }
 
 extern "C" int printf (const char *, ...);
 void sink(...) { }

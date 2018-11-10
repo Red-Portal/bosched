@@ -869,11 +869,6 @@ class Expression
   bool
   is_local_variable() const;
 
-  // Return true if two expressions refer to the same variable or
-  // struct field.
-  static bool
-  is_same_variable(Expression*, Expression*);
-
   // Make the builtin function descriptor type, so that it can be
   // converted.
   static void
@@ -2407,10 +2402,6 @@ class Builtin_call_expression : public Call_expression
   static bool
   array_len_is_constant(Expression* expr);
 
-  Expression*
-  flatten_append(Gogo*, Named_object*, Statement_inserter*, Expression*,
-		 Block*);
-
  protected:
   // This overrides Call_expression::do_lower.
   Expression*
@@ -2467,6 +2458,8 @@ class Builtin_call_expression : public Call_expression
 
   Expression*
   lower_make(Statement_inserter*);
+
+  Expression* flatten_append(Gogo*, Named_object*, Statement_inserter*);
 
   bool
   check_int_value(Expression*, bool is_length, bool* small);
@@ -2778,10 +2771,12 @@ class Index_expression : public Parser_expression
 				this->location());
   }
 
-  // This shouldn't be called--we don't know yet.
   bool
-  do_must_eval_subexpressions_in_order(int*) const
-  { go_unreachable(); }
+  do_must_eval_subexpressions_in_order(int* skip) const
+  {
+    *skip = 1;
+    return true;
+  }
 
   void
   do_dump_expression(Ast_dump_context*) const;
@@ -2887,7 +2882,11 @@ class Array_index_expression : public Expression
   }
 
   bool
-  do_must_eval_subexpressions_in_order(int* skip) const;
+  do_must_eval_subexpressions_in_order(int* skip) const
+  {
+    *skip = 1;
+    return true;
+  }
 
   bool
   do_is_addressable() const;
@@ -2966,8 +2965,11 @@ class String_index_expression : public Expression
   }
 
   bool
-  do_must_eval_subexpressions_in_order(int*) const
-  { return true; }
+  do_must_eval_subexpressions_in_order(int* skip) const
+  {
+    *skip = 1;
+    return true;
+  }
 
   Bexpression*
   do_get_backend(Translate_context*);
@@ -3050,8 +3052,11 @@ class Map_index_expression : public Expression
   }
 
   bool
-  do_must_eval_subexpressions_in_order(int*) const
-  { return true; }
+  do_must_eval_subexpressions_in_order(int* skip) const
+  {
+    *skip = 1;
+    return true;
+  }
 
   // A map index expression is an lvalue but it is not addressable.
 

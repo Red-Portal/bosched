@@ -1722,7 +1722,7 @@ package body Ada.Containers.Indefinite_Multiway_Trees is
    end Parent;
 
    -------------------
-   -- Prepend_Child --
+   -- Prepent_Child --
    -------------------
 
    procedure Prepend_Child

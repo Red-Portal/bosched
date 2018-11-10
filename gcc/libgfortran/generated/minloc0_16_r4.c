@@ -47,6 +47,7 @@ minloc0_16_r4 (gfc_array_i16 * const restrict retarray,
   index_type rank;
   index_type n;
 
+  assert(back == 0);
   rank = GFC_DESCRIPTOR_RANK (array);
   if (rank <= 0)
     runtime_error ("Rank of array needs to be > 0");
@@ -100,9 +101,13 @@ minloc0_16_r4 (gfc_array_i16 * const restrict retarray,
 #endif
   while (base)
     {
+      do
+	{
 	  /* Implementation start.  */
 
 #if defined(GFC_REAL_4_QUIET_NAN)
+	}
+      while (0);
       if (unlikely (!fast))
 	{
 	  do
@@ -121,28 +126,14 @@ minloc0_16_r4 (gfc_array_i16 * const restrict retarray,
 	  if (likely (fast))
 	    continue;
 	}
-      else
-#endif
-    if (back)
-      do
+      else do
 	{
-	  if (unlikely (*base <= minval))
+#endif
+	  if (*base < minval)
 	    {
 	      minval = *base;
 	      for (n = 0; n < rank; n++)
 		dest[n * dstride] = count[n] + 1;
-	    }
-	  base += sstride[0];
-	}
-      while (++count[0] != extent[0]);
-    else
-      do
-        {
-	  if (unlikely (*base < minval))
-	    {
-	      minval = *base;
-	      for (n = 0; n < rank; n++)
-	        dest[n * dstride] = count[n] + 1;
 	    }
 	  /* Implementation end.  */
 	  /* Advance to the next element.  */
@@ -176,6 +167,7 @@ minloc0_16_r4 (gfc_array_i16 * const restrict retarray,
   }
 }
 
+
 extern void mminloc0_16_r4 (gfc_array_i16 * const restrict, 
 	gfc_array_r4 * const restrict, gfc_array_l1 * const restrict,
 	GFC_LOGICAL_4);
@@ -198,6 +190,7 @@ mminloc0_16_r4 (gfc_array_i16 * const restrict retarray,
   index_type n;
   int mask_kind;
 
+  assert(back == 0);
   rank = GFC_DESCRIPTOR_RANK (array);
   if (rank <= 0)
     runtime_error ("Rank of array needs to be > 0");
@@ -268,8 +261,12 @@ mminloc0_16_r4 (gfc_array_i16 * const restrict retarray,
 #endif
   while (base)
     {
+      do
+	{
 	  /* Implementation start.  */
 
+	}
+      while (0);
       if (unlikely (!fast))
 	{
 	  do
@@ -297,28 +294,14 @@ mminloc0_16_r4 (gfc_array_i16 * const restrict retarray,
 	  if (likely (fast))
 	    continue;
 	}
-        else
-        if (back)
-	  do
+      else do
+	{
+	  if (*mbase && *base < minval)
 	    {
-	      if (unlikely (*mbase && (*base <= minval)))
-	        {
-	      	  minval = *base;
-	      	  for (n = 0; n < rank; n++)
-		    dest[n * dstride] = count[n] + 1;
-	    	}
-		base += sstride[0];
+	      minval = *base;
+	      for (n = 0; n < rank; n++)
+		dest[n * dstride] = count[n] + 1;
 	    }
-	    while (++count[0] != extent[0]);
-	else
-	  do
-	    {
-	      if (unlikely (*mbase && (*base < minval)))
-		{
-		  minval = *base;
-		  for (n = 0; n < rank; n++)
-		    dest[n * dstride] = count[n] + 1;
-		}
 	  /* Implementation end.  */
 	  /* Advance to the next element.  */
 	  base += sstride[0];
@@ -353,6 +336,7 @@ mminloc0_16_r4 (gfc_array_i16 * const restrict retarray,
     }
   }
 }
+
 
 extern void sminloc0_16_r4 (gfc_array_i16 * const restrict, 
 	gfc_array_r4 * const restrict, GFC_LOGICAL_4 *, GFC_LOGICAL_4);

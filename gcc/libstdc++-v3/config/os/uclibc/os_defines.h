@@ -38,4 +38,7 @@
 
 #include <features.h>
 
+// We must not see the optimized string functions GNU libc defines.
+#define __NO_STRING_INLINES
+
 #endif

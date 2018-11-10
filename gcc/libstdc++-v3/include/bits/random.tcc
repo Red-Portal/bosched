@@ -128,10 +128,9 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
    */
   template<typename _UIntType, _UIntType __a, _UIntType __c, _UIntType __m>
     template<typename _Sseq>
-      auto
+      typename std::enable_if<std::is_class<_Sseq>::value>::type
       linear_congruential_engine<_UIntType, __a, __c, __m>::
       seed(_Sseq& __q)
-      -> _If_seed_seq<_Sseq>
       {
 	const _UIntType __k0 = __m == 0 ? std::numeric_limits<_UIntType>::digits
 	                                : std::__lg(__m);
@@ -347,11 +346,10 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	   _UIntType __b, size_t __t, _UIntType __c, size_t __l,
 	   _UIntType __f>
     template<typename _Sseq>
-      auto
+      typename std::enable_if<std::is_class<_Sseq>::value>::type
       mersenne_twister_engine<_UIntType, __w, __n, __m, __r, __a, __u, __d,
 			      __s, __b, __t, __c, __l, __f>::
       seed(_Sseq& __q)
-      -> _If_seed_seq<_Sseq>
       {
 	const _UIntType __upper_mask = (~_UIntType()) << __r;
 	const size_t __k = (__w + 31) / 32;
@@ -566,10 +564,9 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
   template<typename _UIntType, size_t __w, size_t __s, size_t __r>
     template<typename _Sseq>
-      auto
+      typename std::enable_if<std::is_class<_Sseq>::value>::type
       subtract_with_carry_engine<_UIntType, __w, __s, __r>::
       seed(_Sseq& __q)
-      -> _If_seed_seq<_Sseq>
       {
 	const size_t __k = (__w + 31) / 32;
 	uint_least32_t __arr[__r * __k];

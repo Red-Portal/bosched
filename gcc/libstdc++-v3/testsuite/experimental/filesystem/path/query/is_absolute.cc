@@ -29,25 +29,11 @@ using std::filesystem::path;
 void
 test01()
 {
-<<<<<<< HEAD
-  #ifdef _GLIBCXX_FILESYSTEM_IS_WINDOWS
-  const bool is_posix = false;
-#else
-  const bool is_posix = true;
-#endif
-
-  VERIFY( path("/").is_absolute() == is_posix );
-  VERIFY( path("/foo").is_absolute() == is_posix );
-  VERIFY( path("/foo/").is_absolute() == is_posix );
-  VERIFY( path("/foo/bar").is_absolute() == is_posix );
-  VERIFY( path("/foo/bar/").is_absolute() == is_posix );
-=======
   VERIFY( path("/").is_absolute() );
   VERIFY( path("/foo").is_absolute() );
   VERIFY( path("/foo/").is_absolute() );
   VERIFY( path("/foo/bar").is_absolute() );
   VERIFY( path("/foo/bar/").is_absolute() );
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
   VERIFY( ! path("foo").is_absolute() );
   VERIFY( ! path("foo/").is_absolute() );
   VERIFY( ! path("foo/bar").is_absolute() );
@@ -57,13 +43,6 @@ test01()
   VERIFY( ! path("c:foo/").is_absolute() );
   VERIFY( ! path("c:foo/bar").is_absolute() );
   VERIFY( ! path("c:foo/bar/").is_absolute() );
-<<<<<<< HEAD
-  VERIFY( path("c:/").is_absolute() == !is_posix );
-  VERIFY( path("c:/foo").is_absolute() == !is_posix );
-  VERIFY( path("c:/foo/").is_absolute() == !is_posix );
-  VERIFY( path("c:/foo/bar").is_absolute() == !is_posix );
-  VERIFY( path("c:/foo/bar/").is_absolute() == !is_posix );
-=======
 #ifdef _GLIBCXX_FILESYSTEM_IS_WINDOWS
   const bool drive_letter_is_root_name = true;
 #else
@@ -74,7 +53,6 @@ test01()
   VERIFY( path("c:/foo/").is_absolute() == drive_letter_is_root_name );
   VERIFY( path("c:/foo/bar").is_absolute() == drive_letter_is_root_name );
   VERIFY( path("c:/foo/bar/").is_absolute() == drive_letter_is_root_name );
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
 }
 
 int

@@ -37,7 +37,8 @@ type importer struct {
 	posInfoFormat bool
 	prevFile      string
 	prevLine      int
-	fake          fakeFileSet
+	fset          *token.FileSet
+	files         map[string]*token.File
 
 	// debugging support
 	debugFormat bool
@@ -50,16 +51,12 @@ type importer struct {
 // compromised, an error is returned.
 func BImportData(fset *token.FileSet, imports map[string]*types.Package, data []byte, path string) (_ int, pkg *types.Package, err error) {
 	// catch panics and return them as errors
-	const currentVersion = 6
-	version := -1 // unknown version
 	defer func() {
 		if e := recover(); e != nil {
+			// The package (filename) causing the problem is added to this
+			// error by a wrapper in the caller (Import in gcimporter.go).
 			// Return a (possibly nil or incomplete) package unchanged (see #16088).
-			if version > currentVersion {
-				err = fmt.Errorf("cannot import %q (%v), export data is newer version - update tool", path, e)
-			} else {
-				err = fmt.Errorf("cannot import %q (%v), possibly version skew - reinstall package", path, e)
-			}
+			err = fmt.Errorf("cannot import, possibly version skew (%v) - reinstall package", e)
 		}
 	}()
 
@@ -67,13 +64,11 @@ func BImportData(fset *token.FileSet, imports map[string]*types.Package, data []
 		imports:    imports,
 		data:       data,
 		importpath: path,
-		version:    version,
+		version:    -1,           // unknown version
 		strList:    []string{""}, // empty string is mapped to 0
 		pathList:   []string{""}, // empty string is mapped to 0
-		fake: fakeFileSet{
-			fset:  fset,
-			files: make(map[string]*token.File),
-		},
+		fset:       fset,
+		files:      make(map[string]*token.File),
 	}
 
 	// read version info
@@ -92,7 +87,7 @@ func BImportData(fset *token.FileSet, imports map[string]*types.Package, data []
 		p.posInfoFormat = p.int() != 0
 		versionstr = p.string()
 		if versionstr == "v1" {
-			version = 0
+			p.version = 0
 		}
 	} else {
 		// Go1.8 extensible encoding
@@ -100,25 +95,24 @@ func BImportData(fset *token.FileSet, imports map[string]*types.Package, data []
 		versionstr = p.rawStringln(b)
 		if s := strings.SplitN(versionstr, " ", 3); len(s) >= 2 && s[0] == "version" {
 			if v, err := strconv.Atoi(s[1]); err == nil && v > 0 {
-				version = v
+				p.version = v
 			}
 		}
 	}
-	p.version = version
 
 	// read version specific flags - extend as necessary
 	switch p.version {
-	// case currentVersion:
+	// case 6:
 	// 	...
 	//	fallthrough
-	case currentVersion, 5, 4, 3, 2, 1:
+	case 5, 4, 3, 2, 1:
 		p.debugFormat = p.rawStringln(p.rawByte()) == "debug"
 		p.trackAllTypes = p.int() != 0
 		p.posInfoFormat = p.int() != 0
 	case 0:
 		// Go1.7 encoding format - nothing to do here
 	default:
-		errorf("unknown bexport format version %d (%q)", p.version, versionstr)
+		errorf("unknown export format version %d (%q)", p.version, versionstr)
 	}
 
 	// --- generic export data ---
@@ -187,9 +181,6 @@ func (p *importer) pkg() *types.Package {
 		path = p.path()
 	} else {
 		path = p.string()
-	}
-	if p.version >= 6 {
-		p.int() // package height; unused by go/types
 	}
 
 	// we should never see an empty package name
@@ -266,7 +257,7 @@ func (p *importer) obj(tag int) {
 	case constTag:
 		pos := p.pos()
 		pkg, name := p.qualifiedName()
-		typ := p.typ(nil, nil)
+		typ := p.typ(nil)
 		val := p.value()
 		p.declare(types.NewConst(pos, pkg, name, typ, val))
 
@@ -274,16 +265,16 @@ func (p *importer) obj(tag int) {
 		// TODO(gri) verify type alias hookup is correct
 		pos := p.pos()
 		pkg, name := p.qualifiedName()
-		typ := p.typ(nil, nil)
+		typ := p.typ(nil)
 		p.declare(types.NewTypeName(pos, pkg, name, typ))
 
 	case typeTag:
-		p.typ(nil, nil)
+		p.typ(nil)
 
 	case varTag:
 		pos := p.pos()
 		pkg, name := p.qualifiedName()
-		typ := p.typ(nil, nil)
+		typ := p.typ(nil)
 		p.declare(types.NewVar(pos, pkg, name, typ))
 
 	case funcTag:
@@ -330,23 +321,15 @@ func (p *importer) pos() token.Pos {
 	p.prevFile = file
 	p.prevLine = line
 
-	return p.fake.pos(file, line)
-}
+	// Synthesize a token.Pos
 
-// Synthesize a token.Pos
-type fakeFileSet struct {
-	fset  *token.FileSet
-	files map[string]*token.File
-}
-
-func (s *fakeFileSet) pos(file string, line int) token.Pos {
 	// Since we don't know the set of needed file positions, we
 	// reserve maxlines positions per file.
 	const maxlines = 64 * 1024
-	f := s.files[file]
+	f := p.files[file]
 	if f == nil {
-		f = s.fset.AddFile(file, -1, maxlines)
-		s.files[file] = f
+		f = p.fset.AddFile(file, -1, maxlines)
+		p.files[file] = f
 		// Allocate the fake linebreak indices on first use.
 		// TODO(adonovan): opt: save ~512KB using a more complex scheme?
 		fakeLinesOnce.Do(func() {
@@ -396,11 +379,7 @@ func (t *dddSlice) String() string         { return "..." + t.elem.String() }
 // the package currently imported. The parent package is needed for
 // exported struct fields and interface methods which don't contain
 // explicit package information in the export data.
-//
-// A non-nil tname is used as the "owner" of the result type; i.e.,
-// the result type is the underlying type of tname. tname is used
-// to give interface methods a named receiver type where possible.
-func (p *importer) typ(parent *types.Package, tname *types.Named) types.Type {
+func (p *importer) typ(parent *types.Package) types.Type {
 	// if the type was seen before, i is its index (>= 0)
 	i := p.tagOrIndex()
 	if i >= 0 {
@@ -430,15 +409,15 @@ func (p *importer) typ(parent *types.Package, tname *types.Named) types.Type {
 		t0 := types.NewNamed(obj.(*types.TypeName), nil, nil)
 
 		// but record the existing type, if any
-		tname := obj.Type().(*types.Named) // tname is either t0 or the existing type
-		p.record(tname)
+		t := obj.Type().(*types.Named)
+		p.record(t)
 
 		// read underlying type
-		t0.SetUnderlying(p.typ(parent, t0))
+		t0.SetUnderlying(p.typ(parent))
 
 		// interfaces don't have associated methods
 		if types.IsInterface(t0) {
-			return tname
+			return t
 		}
 
 		// read associated methods
@@ -459,7 +438,7 @@ func (p *importer) typ(parent *types.Package, tname *types.Named) types.Type {
 			t0.AddMethod(types.NewFunc(pos, parent, name, sig))
 		}
 
-		return tname
+		return t
 
 	case arrayTag:
 		t := new(types.Array)
@@ -468,7 +447,7 @@ func (p *importer) typ(parent *types.Package, tname *types.Named) types.Type {
 		}
 
 		n := p.int64()
-		*t = *types.NewArray(p.typ(parent, nil), n)
+		*t = *types.NewArray(p.typ(parent), n)
 		return t
 
 	case sliceTag:
@@ -477,7 +456,7 @@ func (p *importer) typ(parent *types.Package, tname *types.Named) types.Type {
 			p.record(t)
 		}
 
-		*t = *types.NewSlice(p.typ(parent, nil))
+		*t = *types.NewSlice(p.typ(parent))
 		return t
 
 	case dddTag:
@@ -486,7 +465,7 @@ func (p *importer) typ(parent *types.Package, tname *types.Named) types.Type {
 			p.record(t)
 		}
 
-		t.elem = p.typ(parent, nil)
+		t.elem = p.typ(parent)
 		return t
 
 	case structTag:
@@ -504,7 +483,7 @@ func (p *importer) typ(parent *types.Package, tname *types.Named) types.Type {
 			p.record(t)
 		}
 
-		*t = *types.NewPointer(p.typ(parent, nil))
+		*t = *types.NewPointer(p.typ(parent))
 		return t
 
 	case signatureTag:
@@ -523,20 +502,18 @@ func (p *importer) typ(parent *types.Package, tname *types.Named) types.Type {
 		// cannot expect the interface type to appear in a cycle, as any
 		// such cycle must contain a named type which would have been
 		// first defined earlier.
-		// TODO(gri) Is this still true now that we have type aliases?
-		// See issue #23225.
 		n := len(p.typList)
 		if p.trackAllTypes {
 			p.record(nil)
 		}
 
-		var embeddeds []types.Type
+		var embeddeds []*types.Named
 		for n := p.int(); n > 0; n-- {
 			p.pos()
-			embeddeds = append(embeddeds, p.typ(parent, nil))
+			embeddeds = append(embeddeds, p.typ(parent).(*types.Named))
 		}
 
-		t := types.NewInterfaceType(p.methodList(parent, tname), embeddeds)
+		t := types.NewInterface(p.methodList(parent), embeddeds)
 		p.interfaceList = append(p.interfaceList, t)
 		if p.trackAllTypes {
 			p.typList[n] = t
@@ -549,8 +526,8 @@ func (p *importer) typ(parent *types.Package, tname *types.Named) types.Type {
 			p.record(t)
 		}
 
-		key := p.typ(parent, nil)
-		val := p.typ(parent, nil)
+		key := p.typ(parent)
+		val := p.typ(parent)
 		*t = *types.NewMap(key, val)
 		return t
 
@@ -560,29 +537,25 @@ func (p *importer) typ(parent *types.Package, tname *types.Named) types.Type {
 			p.record(t)
 		}
 
-		dir := chanDir(p.int())
-		val := p.typ(parent, nil)
+		var dir types.ChanDir
+		// tag values must match the constants in cmd/compile/internal/gc/go.go
+		switch d := p.int(); d {
+		case 1 /* Crecv */ :
+			dir = types.RecvOnly
+		case 2 /* Csend */ :
+			dir = types.SendOnly
+		case 3 /* Cboth */ :
+			dir = types.SendRecv
+		default:
+			errorf("unexpected channel dir %d", d)
+		}
+		val := p.typ(parent)
 		*t = *types.NewChan(dir, val)
 		return t
 
 	default:
 		errorf("unexpected type tag %d", i) // panics
 		panic("unreachable")
-	}
-}
-
-func chanDir(d int) types.ChanDir {
-	// tag values must match the constants in cmd/compile/internal/gc/go.go
-	switch d {
-	case 1 /* Crecv */ :
-		return types.RecvOnly
-	case 2 /* Csend */ :
-		return types.SendOnly
-	case 3 /* Cboth */ :
-		return types.SendRecv
-	default:
-		errorf("unexpected channel dir %d", d)
-		return 0
 	}
 }
 
@@ -600,7 +573,7 @@ func (p *importer) fieldList(parent *types.Package) (fields []*types.Var, tags [
 func (p *importer) field(parent *types.Package) (*types.Var, string) {
 	pos := p.pos()
 	pkg, name, alias := p.fieldName(parent)
-	typ := p.typ(parent, nil)
+	typ := p.typ(parent)
 	tag := p.string()
 
 	anonymous := false
@@ -624,30 +597,22 @@ func (p *importer) field(parent *types.Package) (*types.Var, string) {
 	return types.NewField(pos, pkg, name, typ, anonymous), tag
 }
 
-func (p *importer) methodList(parent *types.Package, baseType *types.Named) (methods []*types.Func) {
+func (p *importer) methodList(parent *types.Package) (methods []*types.Func) {
 	if n := p.int(); n > 0 {
 		methods = make([]*types.Func, n)
 		for i := range methods {
-			methods[i] = p.method(parent, baseType)
+			methods[i] = p.method(parent)
 		}
 	}
 	return
 }
 
-func (p *importer) method(parent *types.Package, baseType *types.Named) *types.Func {
+func (p *importer) method(parent *types.Package) *types.Func {
 	pos := p.pos()
 	pkg, name, _ := p.fieldName(parent)
-	// If we don't have a baseType, use a nil receiver.
-	// A receiver using the actual interface type (which
-	// we don't know yet) will be filled in when we call
-	// types.Interface.Complete.
-	var recv *types.Var
-	if baseType != nil {
-		recv = types.NewVar(token.NoPos, parent, "", baseType)
-	}
 	params, isddd := p.paramList()
 	result, _ := p.paramList()
-	sig := types.NewSignature(recv, params, result, isddd)
+	sig := types.NewSignature(nil, params, result, isddd)
 	return types.NewFunc(pos, pkg, name, sig)
 }
 
@@ -703,7 +668,7 @@ func (p *importer) paramList() (*types.Tuple, bool) {
 }
 
 func (p *importer) param(named bool) (*types.Var, bool) {
-	t := p.typ(nil, nil)
+	t := p.typ(nil)
 	td, isddd := t.(*dddSlice)
 	if isddd {
 		t = types.NewSlice(td.elem)

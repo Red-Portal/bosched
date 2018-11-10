@@ -1,8 +1,5 @@
 // { dg-do compile { target c++11 } }
-<<<<<<< HEAD
-=======
 // { dg-require-cstdint "" }
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
 // { dg-require-gthreads "" }
 
 // Copyright (C) 2018 Free Software Foundation, Inc.

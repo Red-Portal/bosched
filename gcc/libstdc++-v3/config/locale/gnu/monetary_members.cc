@@ -207,8 +207,6 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   }
 #endif
 
-  extern char __narrow_multibyte_chars(const char* s, __locale_t cloc);
-
   template<>
     void
     moneypunct<char, true>::_M_initialize_moneypunct(__c_locale __cloc,
@@ -243,13 +241,8 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	  // Named locale.
 	  _M_data->_M_decimal_point = *(__nl_langinfo_l(__MON_DECIMAL_POINT,
 							__cloc));
-	  const char* thousands_sep = __nl_langinfo_l(__MON_THOUSANDS_SEP,
-						      __cloc);
-	  if (thousands_sep[0] != '\0' && thousands_sep[1] != '\0')
-	    _M_data->_M_thousands_sep = __narrow_multibyte_chars(thousands_sep,
-								 __cloc);
-	  else
-	    _M_data->_M_thousands_sep = *thousands_sep;
+	  _M_data->_M_thousands_sep = *(__nl_langinfo_l(__MON_THOUSANDS_SEP,
+							__cloc));
 
 	  // Check for NULL, which implies no fractional digits.
 	  if (_M_data->_M_decimal_point == '\0')

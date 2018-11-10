@@ -131,40 +131,6 @@ Expression::determine_type_no_context()
   this->do_determine_type(&context);
 }
 
-// Return true if two expressions refer to the same variable or struct
-// field.  This can only be true when there are no side effects.
-
-bool
-Expression::is_same_variable(Expression* a, Expression* b)
-{
-  if (a->classification() != b->classification())
-    return false;
-
-  Var_expression* av = a->var_expression();
-  if (av != NULL)
-    return av->named_object() == b->var_expression()->named_object();
-
-  Field_reference_expression* af = a->field_reference_expression();
-  if (af != NULL)
-    {
-      Field_reference_expression* bf = b->field_reference_expression();
-      return (af->field_index() == bf->field_index()
-	      && Expression::is_same_variable(af->expr(), bf->expr()));
-    }
-
-  Unary_expression* au = a->unary_expression();
-  if (au != NULL)
-    {
-      Unary_expression* bu = b->unary_expression();
-      return (au->op() == OPERATOR_MULT
-	      && bu->op() == OPERATOR_MULT
-	      && Expression::is_same_variable(au->operand(),
-					      bu->operand()));
-    }
-
-  return false;
-}
-
 // Return an expression handling any conversions which must be done during
 // assignment.
 
@@ -178,10 +144,7 @@ Expression::convert_for_assignment(Gogo*, Type* lhs_type,
       || rhs->is_error_expression())
     return Expression::make_error(location);
 
-  bool are_identical = Type::are_identical(lhs_type, rhs_type,
-					   (Type::COMPARE_ERRORS
-					    | Type::COMPARE_TAGS),
-					   NULL);
+  bool are_identical = Type::are_identical(lhs_type, rhs_type, false, NULL);
   if (!are_identical && lhs_type->interface_type() != NULL)
     {
       if (rhs_type->interface_type() == NULL)
@@ -344,9 +307,7 @@ Expression::convert_interface_to_interface(Type *lhs_type, Expression* rhs,
                                            bool for_type_guard,
                                            Location location)
 {
-  if (Type::are_identical(lhs_type, rhs->type(),
-			  Type::COMPARE_ERRORS | Type::COMPARE_TAGS,
-			  NULL))
+  if (Type::are_identical(lhs_type, rhs->type(), false, NULL))
     return rhs;
 
   Interface_type* lhs_interface_type = lhs_type->interface_type();
@@ -3394,9 +3355,7 @@ Type_conversion_expression::do_is_static_initializer() const
   if (!this->expr_->is_static_initializer())
     return false;
 
-  if (Type::are_identical(type, expr_type,
-			  Type::COMPARE_ERRORS | Type::COMPARE_TAGS,
-			  NULL))
+  if (Type::are_identical(type, expr_type, false, NULL))
     return true;
 
   if (type->is_string_type() && expr_type->is_string_type())
@@ -3510,9 +3469,7 @@ Type_conversion_expression::do_get_backend(Translate_context* context)
   Btype* btype = type->get_backend(gogo);
   Location loc = this->location();
 
-  if (Type::are_identical(type, expr_type,
-			  Type::COMPARE_ERRORS | Type::COMPARE_TAGS,
-			  NULL))
+  if (Type::are_identical(type, expr_type, false, NULL))
     {
       Bexpression* bexpr = this->expr_->get_backend(context);
       return gogo->backend()->convert_expression(btype, bexpr, loc);
@@ -4496,8 +4453,7 @@ Unary_expression::do_get_backend(Translate_context* context)
 	      // initialize the value once, so we can use this directly
 	      // rather than copying it.  In that case we can't make it
 	      // read-only, because the program is permitted to change it.
-	      copy_to_heap = (context->function() != NULL
-                              || context->is_const());
+	      copy_to_heap = context->function() != NULL;
 	    }
 	  std::string asm_name(go_selectively_encode_id(var_name));
 	  Bvariable* implicit =
@@ -5442,10 +5398,7 @@ Binary_expression::lower_struct_comparison(Gogo* gogo,
   Struct_type* st2 = this->right_->type()->struct_type();
   if (st2 == NULL)
     return this;
-  if (st != st2
-      && !Type::are_identical(st, st2,
-			      Type::COMPARE_ERRORS | Type::COMPARE_TAGS,
-			      NULL))
+  if (st != st2 && !Type::are_identical(st, st2, false, NULL))
     return this;
   if (!Type::are_compatible_for_comparison(true, this->left_->type(),
 					   this->right_->type(), NULL))
@@ -5524,10 +5477,7 @@ Binary_expression::lower_array_comparison(Gogo* gogo,
   Array_type* at2 = this->right_->type()->array_type();
   if (at2 == NULL)
     return this;
-  if (at != at2
-      && !Type::are_identical(at, at2,
-			      Type::COMPARE_ERRORS | Type::COMPARE_TAGS,
-			      NULL))
+  if (at != at2 && !Type::are_identical(at, at2, false, NULL))
     return this;
   if (!Type::are_compatible_for_comparison(true, this->left_->type(),
 					   this->right_->type(), NULL))
@@ -6917,7 +6867,7 @@ Bound_method_expression::do_check_types(Gogo*)
 		 ? this->expr_type_
 		 : this->expr_->type());
   etype = etype->deref();
-  if (!Type::are_identical(rtype, etype, Type::COMPARE_TAGS, NULL))
+  if (!Type::are_identical(rtype, etype, true, NULL))
     this->report_error(_("method type does not match object type"));
 }
 
@@ -7424,32 +7374,7 @@ Builtin_call_expression::do_lower(Gogo*, Named_object* function,
 								  loc);
 	    Expression* e3 = Expression::make_temporary_reference(key_temp,
 								  loc);
-
-	    // If the call to delete is deferred, and is in a loop,
-	    // then the loop will only have a single instance of the
-	    // temporary variable.  Passing the address of the
-	    // temporary variable here means that the deferred call
-	    // will see the last value in the loop, not the current
-	    // value.  So for this unusual case copy the value into
-	    // the heap.
-	    if (!this->is_deferred())
-	      e3 = Expression::make_unary(OPERATOR_AND, e3, loc);
-	    else
-	      {
-		Expression* a = Expression::make_allocation(mt->key_type(),
-							    loc);
-		Temporary_statement* atemp =
-		  Statement::make_temporary(NULL, a, loc);
-		inserter->insert(atemp);
-
-		a = Expression::make_temporary_reference(atemp, loc);
-		a = Expression::make_dereference(a, NIL_CHECK_NOT_NEEDED, loc);
-		Statement* s = Statement::make_assignment(a, e3, loc);
-		inserter->insert(s);
-
-		e3 = Expression::make_temporary_reference(atemp, loc);
-	      }
-
+	    e3 = Expression::make_unary(OPERATOR_AND, e3, loc);
 	    return Runtime::make_call(Runtime::MAPDELETE, this->location(),
 				      3, e1, e2, e3);
 	  }
@@ -7495,7 +7420,7 @@ Builtin_call_expression::do_flatten(Gogo* gogo, Named_object* function,
       break;
 
     case BUILTIN_APPEND:
-      return this->flatten_append(gogo, function, inserter, NULL, NULL);
+      return this->flatten_append(gogo, function, inserter);
 
     case BUILTIN_COPY:
       {
@@ -7732,18 +7657,11 @@ Builtin_call_expression::lower_make(Statement_inserter* inserter)
 
 // Flatten a call to the predeclared append function.  We do this in
 // the flatten phase, not the lowering phase, so that we run after
-// type checking and after order_evaluations.  If ASSIGN_LHS is not
-// NULL, this append is the right-hand-side of an assignment and
-// ASSIGN_LHS is the left-hand-side; in that case, set LHS directly
-// rather than returning a slice.  This lets us omit a write barrier
-// in common cases like a = append(a, ...) when the slice does not
-// need to grow.  ENCLOSING is not NULL iff ASSIGN_LHS is not NULL.
+// type checking and after order_evaluations.
 
 Expression*
 Builtin_call_expression::flatten_append(Gogo* gogo, Named_object* function,
-					Statement_inserter* inserter,
-					Expression* assign_lhs,
-					Block* enclosing)
+					Statement_inserter* inserter)
 {
   if (this->is_error_expression())
     return this;
@@ -7760,8 +7678,6 @@ Builtin_call_expression::flatten_append(Gogo* gogo, Named_object* function,
   if (args->size() == 1)
     {
       // append(s) evaluates to s.
-      if (assign_lhs != NULL)
-	return NULL;
       return args->front();
     }
 
@@ -7878,46 +7794,14 @@ Builtin_call_expression::flatten_append(Gogo* gogo, Named_object* function,
   // FIXME: Mark this index as not requiring bounds checks.
   ref = Expression::make_index(ref, zero, ref2, NULL, loc);
 
-  if (assign_lhs == NULL)
-    {
-      Expression* rhs = Expression::make_conditional(cond, call, ref, loc);
+  Expression* rhs = Expression::make_conditional(cond, call, ref, loc);
 
-      gogo->lower_expression(function, inserter, &rhs);
-      gogo->flatten_expression(function, inserter, &rhs);
+  gogo->lower_expression(function, inserter, &rhs);
+  gogo->flatten_expression(function, inserter, &rhs);
 
-      ref = Expression::make_temporary_reference(s1tmp, loc);
-      Statement* assign = Statement::make_assignment(ref, rhs, loc);
-      inserter->insert(assign);
-    }
-  else
-    {
-      gogo->lower_expression(function, inserter, &cond);
-      gogo->flatten_expression(function, inserter, &cond);
-      gogo->lower_expression(function, inserter, &call);
-      gogo->flatten_expression(function, inserter, &call);
-      gogo->lower_expression(function, inserter, &ref);
-      gogo->flatten_expression(function, inserter, &ref);
-
-      Block* then_block = new Block(enclosing, loc);
-      Assignment_statement* assign =
-	Statement::make_assignment(assign_lhs, call, loc);
-      then_block->add_statement(assign);
-
-      Block* else_block = new Block(enclosing, loc);
-      assign = Statement::make_assignment(assign_lhs->copy(), ref, loc);
-      // This assignment will not change the pointer value, so it does
-      // not need a write barrier.
-      assign->set_omit_write_barrier();
-      else_block->add_statement(assign);
-
-      Statement* s = Statement::make_if_statement(cond, then_block,
-						  else_block, loc);
-      inserter->insert(s);
-
-      ref = Expression::make_temporary_reference(s1tmp, loc);
-      assign = Statement::make_assignment(ref, assign_lhs->copy(), loc);
-      inserter->insert(assign);
-    }
+  Expression* lhs = Expression::make_temporary_reference(s1tmp, loc);
+  Statement* assign = Statement::make_assignment(lhs, rhs, loc);
+  inserter->insert(assign);
 
   if (this->is_varargs())
     {
@@ -7954,17 +7838,12 @@ Builtin_call_expression::flatten_append(Gogo* gogo, Named_object* function,
 	  Expression* off = Expression::make_integer_ul(i, int_type, loc);
 	  ref2 = Expression::make_binary(OPERATOR_PLUS, ref2, off, loc);
 	  // FIXME: Mark this index as not requiring bounds checks.
-	  Expression* lhs = Expression::make_index(ref, ref2, NULL, NULL,
-						   loc);
+	  lhs = Expression::make_index(ref, ref2, NULL, NULL, loc);
 	  gogo->lower_expression(function, inserter, &lhs);
 	  gogo->flatten_expression(function, inserter, &lhs);
 	  // The flatten pass runs after the write barrier pass, so we
 	  // need to insert a write barrier here if necessary.
-	  // However, if ASSIGN_LHS is not NULL, we have been called
-	  // directly before the write barrier pass.
-	  Statement* assign;
-	  if (assign_lhs != NULL
-	      || !gogo->assign_needs_write_barrier(lhs))
+	  if (!gogo->assign_needs_write_barrier(lhs))
 	    assign = Statement::make_assignment(lhs, *pa, loc);
 	  else
 	    {
@@ -7975,9 +7854,6 @@ Builtin_call_expression::flatten_append(Gogo* gogo, Named_object* function,
 	  inserter->insert(assign);
 	}
     }
-
-  if (assign_lhs != NULL)
-    return NULL;
 
   return Expression::make_temporary_reference(s1tmp, loc);
 }
@@ -8185,13 +8061,9 @@ Builtin_call_expression::do_is_constant() const
 	  arg_type = arg_type->points_to();
 
 	if (arg_type->array_type() != NULL
-	    && arg_type->array_type()->length() != NULL)
-          {
-	    this->seen_ = true;
-	    bool ret = Builtin_call_expression::array_len_is_constant(arg);
-	    this->seen_ = false;
-	    return ret;
-          }
+	    && arg_type->array_type()->length() != NULL
+	    && Builtin_call_expression::array_len_is_constant(arg))
+	  return true;
 
 	if (this->code_ == BUILTIN_LEN && arg_type->is_string_type())
 	  {
@@ -8419,9 +8291,7 @@ Builtin_call_expression::do_numeric_constant_value(Numeric_constant* nc) const
 	  && !rnc.type()->is_abstract()
 	  && inc.type() != NULL
 	  && !inc.type()->is_abstract()
-	  && !Type::are_identical(rnc.type(), inc.type(),
-				  Type::COMPARE_ERRORS | Type::COMPARE_TAGS,
-				  NULL))
+	  && !Type::are_identical(rnc.type(), inc.type(), false, NULL))
 	return false;
 
       mpfr_t r;
@@ -8902,7 +8772,7 @@ Builtin_call_expression::do_check_types(Gogo*)
 	if (arg2_type->is_slice_type())
 	  {
 	    Type* e2 = arg2_type->array_type()->element_type();
-	    if (!Type::are_identical(e1, e2, Type::COMPARE_TAGS, NULL))
+	    if (!Type::are_identical(e1, e2, true, NULL))
 	      this->report_error(_("element types must be the same"));
 	  }
 	else if (arg2_type->is_string_type())
@@ -9040,8 +8910,7 @@ Builtin_call_expression::do_check_types(Gogo*)
 		 || args->back()->type()->is_error())
 	  this->set_is_error();
 	else if (!Type::are_identical(args->front()->type(),
-				      args->back()->type(),
-				      Type::COMPARE_TAGS, NULL))
+				      args->back()->type(), true, NULL))
 	  this->report_error(_("complex arguments must have identical types"));
 	else if (args->front()->type()->float_type() == NULL)
 	  this->report_error(_("complex arguments must have "
@@ -9067,10 +8936,6 @@ Builtin_call_expression::do_copy()
 
   if (this->varargs_are_lowered())
     bce->set_varargs_are_lowered();
-  if (this->is_deferred())
-    bce->set_is_deferred();
-  if (this->is_concurrent())
-    bce->set_is_concurrent();
   return bce;
 }
 
@@ -9653,16 +9518,8 @@ Call_expression::do_lower(Gogo* gogo, Named_object* function,
 
   // Recognize a call to a builtin function.
   if (fntype->is_builtin())
-    {
-      Builtin_call_expression* bce =
-	new Builtin_call_expression(gogo, this->fn_, this->args_,
-				    this->is_varargs_, loc);
-      if (this->is_deferred_)
-	bce->set_is_deferred();
-      if (this->is_concurrent_)
-	bce->set_is_concurrent();
-      return bce;
-    }
+    return new Builtin_call_expression(gogo, this->fn_, this->args_,
+				       this->is_varargs_, loc);
 
   // If this call returns multiple results, create a temporary
   // variable to hold them.
@@ -9774,9 +9631,13 @@ Call_expression::do_lower(Gogo* gogo, Named_object* function,
 					    "__builtin_return_address",
 					    0);
 	    }
-	  else if ((this->args_ == NULL || this->args_->size() == 0)
+	  else if (this->args_ != NULL
+		   && this->args_->size() == 1
 		   && n == "getcallersp")
 	    {
+	      // The actual argument to getcallersp is always the
+	      // address of a parameter; we don't need that for the
+	      // GCC builtin function, so we just ignore it.
 	      static Named_object* builtin_frame_address;
 	      return this->lower_to_builtin(&builtin_frame_address,
 					    "__builtin_frame_address",
@@ -9953,8 +9814,7 @@ Call_expression::do_flatten(Gogo* gogo, Named_object*,
       for (; pa != this->args_->end(); ++pa, ++pp)
 	{
 	  go_assert(pp != fntype->parameters()->end());
-	  if (Type::are_identical(pp->type(), (*pa)->type(),
-				  Type::COMPARE_TAGS, NULL))
+	  if (Type::are_identical(pp->type(), (*pa)->type(), true, NULL))
 	    args->push_back(*pa);
 	  else
 	    {
@@ -10331,10 +10191,6 @@ Call_expression::do_copy()
 
   if (this->varargs_are_lowered_)
     call->set_varargs_are_lowered();
-  if (this->is_deferred_)
-    call->set_is_deferred();
-  if (this->is_concurrent_)
-    call->set_is_concurrent();
   return call;
 }
 
@@ -11038,20 +10894,6 @@ Array_index_expression::do_check_types(Gogo*)
     }
 }
 
-// The subexpressions of an array index must be evaluated in order.
-// If this is indexing into an array, rather than a slice, then only
-// the index should be evaluated.  Since this is called for values on
-// the left hand side of an assigment, evaluating the array, meaning
-// copying the array, will cause a different array to be modified.
-
-bool
-Array_index_expression::do_must_eval_subexpressions_in_order(
-    int* skip) const
-{
-  *skip = this->array_->type()->is_slice_type() ? 0 : 1;
-  return true;
-}
-
 // Flatten array indexing by using temporary variables for slices and indexes.
 
 Expression*
@@ -11649,9 +11491,7 @@ Map_index_expression::do_flatten(Gogo* gogo, Named_object*,
       return Expression::make_error(loc);
     }
 
-  if (!Type::are_identical(mt->key_type(), this->index_->type(),
-			   Type::COMPARE_ERRORS | Type::COMPARE_TAGS,
-			   NULL))
+  if (!Type::are_identical(mt->key_type(), this->index_->type(), false, NULL))
     {
       if (this->index_->type()->interface_type() != NULL
 	  && !this->index_->is_variable())
@@ -12042,9 +11882,10 @@ Interface_field_reference_expression::do_flatten(Gogo*, Named_object*,
   if (!this->expr_->is_variable())
     {
       Temporary_statement* temp =
-	Statement::make_temporary(NULL, this->expr_, this->location());
+	Statement::make_temporary(this->expr_->type(), NULL, this->location());
       inserter->insert(temp);
-      this->expr_ = Expression::make_temporary_reference(temp, this->location());
+      this->expr_ = Expression::make_set_and_use_temporary(temp, this->expr_,
+							   this->location());
     }
   return this;
 }
@@ -13808,7 +13649,6 @@ Composite_literal_expression::do_lower(Gogo* gogo, Named_object* function,
 
   for (int depth = 0; depth < this->depth_; ++depth)
     {
-      type = type->deref();
       if (type->array_type() != NULL)
 	type = type->array_type()->element_type();
       else if (type->map_type() != NULL)
@@ -15969,8 +15809,7 @@ Type*
 Conditional_expression::do_type()
 {
   Type* result_type = Type::make_void_type();
-  if (Type::are_identical(this->then_->type(), this->else_->type(),
-			  Type::COMPARE_ERRORS | Type::COMPARE_TAGS,
+  if (Type::are_identical(this->then_->type(), this->else_->type(), false,
                           NULL))
     result_type = this->then_->type();
   else if (this->then_->is_nil_expression()

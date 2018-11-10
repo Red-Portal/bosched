@@ -18,9 +18,6 @@ import (
 // BUG(mikio): On NaCl, the ListenMulticastUDP function is not
 // implemented.
 
-// BUG(mikio): On JS, methods and functions related to UDPConn are not
-// implemented.
-
 // UDPAddr represents the address of a UDP end point.
 type UDPAddr struct {
 	IP   IP
@@ -211,8 +208,7 @@ func DialUDP(network string, laddr, raddr *UDPAddr) (*UDPConn, error) {
 	if raddr == nil {
 		return nil, &OpError{Op: "dial", Net: network, Source: laddr.opAddr(), Addr: nil, Err: errMissingAddress}
 	}
-	sd := &sysDialer{network: network, address: raddr.String()}
-	c, err := sd.dialUDP(context.Background(), laddr, raddr)
+	c, err := dialUDP(context.Background(), network, laddr, raddr)
 	if err != nil {
 		return nil, &OpError{Op: "dial", Net: network, Source: laddr.opAddr(), Addr: raddr.opAddr(), Err: err}
 	}
@@ -237,8 +233,7 @@ func ListenUDP(network string, laddr *UDPAddr) (*UDPConn, error) {
 	if laddr == nil {
 		laddr = &UDPAddr{}
 	}
-	sl := &sysListener{network: network, address: laddr.String()}
-	c, err := sl.listenUDP(context.Background(), laddr)
+	c, err := listenUDP(context.Background(), network, laddr)
 	if err != nil {
 		return nil, &OpError{Op: "listen", Net: network, Source: nil, Addr: laddr.opAddr(), Err: err}
 	}
@@ -271,8 +266,7 @@ func ListenMulticastUDP(network string, ifi *Interface, gaddr *UDPAddr) (*UDPCon
 	if gaddr == nil || gaddr.IP == nil {
 		return nil, &OpError{Op: "listen", Net: network, Source: nil, Addr: gaddr.opAddr(), Err: errMissingAddress}
 	}
-	sl := &sysListener{network: network, address: gaddr.String()}
-	c, err := sl.listenMulticastUDP(context.Background(), ifi, gaddr)
+	c, err := listenMulticastUDP(context.Background(), network, ifi, gaddr)
 	if err != nil {
 		return nil, &OpError{Op: "listen", Net: network, Source: nil, Addr: gaddr.opAddr(), Err: err}
 	}

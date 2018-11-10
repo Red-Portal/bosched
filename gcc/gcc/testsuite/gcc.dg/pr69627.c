@@ -11,8 +11,6 @@ foo ()
 /* { dg-begin-multiline-output "" }
    t[1] / s;
    ~~~~ ^
-    |
-    float
    { dg-end-multiline-output "" } */
 }
 
@@ -25,7 +23,5 @@ bar ()
 /* { dg-begin-multiline-output "" }
    t[1] / s[0];
    ~~~~ ^ ~~~~
-    |      |
-    float  const int *
    { dg-end-multiline-output "" } */
 }

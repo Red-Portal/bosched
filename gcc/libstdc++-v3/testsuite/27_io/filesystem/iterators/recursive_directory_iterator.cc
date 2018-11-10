@@ -60,7 +60,6 @@ test01()
   ++iter;
   VERIFY( iter == end(iter) );
 
-#if ! (defined (__MINGW32__) || defined(__MINGW64__))
   // Test inaccessible directory.
   ec = bad_ec;
   permissions(p, fs::perms::none, ec);
@@ -107,7 +106,6 @@ test01()
   iter.increment(ec);  // should fail to recurse into p/d1/d2, so skip it
   VERIFY( !ec );
   VERIFY( iter == end(iter) );
-#endif
 
   permissions(p/"d1/d2", fs::perms::owner_all, ec);
   remove_all(p, ec);
@@ -173,7 +171,7 @@ test05()
 {
   auto p = __gnu_test::nonexistent_path();
   create_directory(p);
-  create_directory(p / "x");
+  create_directory_symlink(p, p / "l");
   fs::recursive_directory_iterator it(p), endit;
   VERIFY( begin(it) == it );
   static_assert( noexcept(begin(it)), "begin is noexcept" );

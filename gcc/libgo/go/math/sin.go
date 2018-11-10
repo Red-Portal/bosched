@@ -137,7 +137,9 @@ func cos(x float64) float64 {
 
 	// make argument positive
 	sign := false
-	x = Abs(x)
+	if x < 0 {
+		x = -x
+	}
 
 	j := int64(x * M4PI) // integer part of x/(Pi/4), as integer for tests on the phase angle
 	y := float64(j)      // integer part of x/(Pi/4), as float

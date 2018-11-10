@@ -6,12 +6,11 @@
 //===----------------------------------------------------------------------===//
 //
 // This file contains the unwind.h-based (aka "slow") stack unwinding routines
-// available to the tools on Linux, Android, NetBSD, FreeBSD, and Solaris.
+// available to the tools on Linux, Android, NetBSD and FreeBSD.
 //===----------------------------------------------------------------------===//
 
 #include "sanitizer_platform.h"
-#if SANITIZER_FREEBSD || SANITIZER_LINUX || SANITIZER_NETBSD || \
-    SANITIZER_SOLARIS
+#if SANITIZER_FREEBSD || SANITIZER_LINUX || SANITIZER_NETBSD
 #include "sanitizer_common.h"
 #include "sanitizer_stacktrace.h"
 
@@ -147,7 +146,7 @@ void BufferedStackTrace::SlowUnwindStackWithContext(uptr pc, void *context,
 
   void *map = acquire_my_map_info_list();
   CHECK(map);
-  InternalMmapVector<backtrace_frame_t> frames(kStackTraceMax);
+  InternalScopedBuffer<backtrace_frame_t> frames(kStackTraceMax);
   // siginfo argument appears to be unused.
   sptr res = unwind_backtrace_signal_arch(/* siginfo */ 0, context, map,
                                           frames.data(),
@@ -165,5 +164,4 @@ void BufferedStackTrace::SlowUnwindStackWithContext(uptr pc, void *context,
 
 }  // namespace __sanitizer
 
-#endif  // SANITIZER_FREEBSD || SANITIZER_LINUX || SANITIZER_NETBSD ||
-        // SANITIZER_SOLARIS
+#endif  // SANITIZER_FREEBSD || SANITIZER_LINUX || SANITIZER_NETBSD

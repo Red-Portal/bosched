@@ -18,8 +18,6 @@ int x = 6;
 void
 main_test(void)
 {
-  inside_main = 1;
-
 #ifdef __OPTIMIZE__
   const char *foo;
   int i;
@@ -62,12 +60,8 @@ main_test(void)
     abort ();
 
   inside_main = 0;
-  /* The following call may or may not be folded depending on
-     the optimization level, and when it isn't folded (such
-     as may be the case with -Og) it may or may not result in
-     a library call, depending on whether or not it's expanded
-     inline (e.g., powerpc64 makes a call while x86_64 expands
-     it inline).  */
+  /* This will result in strlen call, because larger
+     array is bigger than its initializer.  */
   if (strlen (larger + (x++ & 7)) != 5)
     abort ();
   if (x != 8)

@@ -174,6 +174,10 @@ const char *Symbolizer::PlatformDemangle(const char *name) {
   return name;
 }
 
+void Symbolizer::PlatformPrepareForSandboxing() {
+  // Do nothing.
+}
+
 namespace {
 struct ScopedHandle {
   ScopedHandle() : h_(nullptr) {}

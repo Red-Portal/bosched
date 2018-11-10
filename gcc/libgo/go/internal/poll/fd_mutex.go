@@ -34,8 +34,6 @@ const (
 	mutexWMask   = (1<<20 - 1) << 43
 )
 
-const overflowMsg = "too many concurrent operations on a single file or socket (max 1048575)"
-
 // Read operations must do rwlock(true)/rwunlock(true).
 //
 // Write operations must do rwlock(false)/rwunlock(false).
@@ -58,7 +56,7 @@ func (mu *fdMutex) incref() bool {
 		}
 		new := old + mutexRef
 		if new&mutexRefMask == 0 {
-			panic(overflowMsg)
+			panic("inconsistent poll.fdMutex")
 		}
 		if atomic.CompareAndSwapUint64(&mu.state, old, new) {
 			return true
@@ -77,7 +75,7 @@ func (mu *fdMutex) increfAndClose() bool {
 		// Mark as closed and acquire a reference.
 		new := (old | mutexClosed) + mutexRef
 		if new&mutexRefMask == 0 {
-			panic(overflowMsg)
+			panic("inconsistent poll.fdMutex")
 		}
 		// Remove all read and write waiters.
 		new &^= mutexRMask | mutexWMask
@@ -138,13 +136,13 @@ func (mu *fdMutex) rwlock(read bool) bool {
 			// Lock is free, acquire it.
 			new = (old | mutexBit) + mutexRef
 			if new&mutexRefMask == 0 {
-				panic(overflowMsg)
+				panic("inconsistent poll.fdMutex")
 			}
 		} else {
 			// Wait for lock.
 			new = old + mutexWait
 			if new&mutexMask == 0 {
-				panic(overflowMsg)
+				panic("inconsistent poll.fdMutex")
 			}
 		}
 		if atomic.CompareAndSwapUint64(&mu.state, old, new) {

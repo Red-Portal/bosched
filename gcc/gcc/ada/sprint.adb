@@ -3110,6 +3110,28 @@ package body Sprint is
             Sprint_Indented_List (Component_Clauses (Node));
             Write_Indent_Str ("end record;");
 
+         when N_Reduction_Expression =>
+            Write_Str (" for");
+
+            if Present (Iterator_Specification (Node)) then
+               Sprint_Node (Iterator_Specification (Node));
+            else
+               Sprint_Node (Loop_Parameter_Specification (Node));
+            end if;
+
+            Write_Str (" => ");
+            Sprint_Node (Expression (Node));
+            null;
+
+         when N_Reduction_Expression_Parameter =>
+            Write_Char ('<');
+
+            if Present (Expression (Node)) then
+               Sprint_Node (Expression (Node));
+            end if;
+
+            Write_Char ('>');
+
          when N_Reference =>
             Sprint_Node (Prefix (Node));
             Write_Str_With_Col_Check_Sloc ("'reference");
@@ -3540,14 +3562,15 @@ package body Sprint is
       --  where the aspects are printed inside the package specification.
 
       if Has_Aspects (Node)
-        and then not Nkind_In (Node, N_Generic_Package_Declaration,
-                                     N_Package_Declaration)
-        and then not Is_Empty_List (Aspect_Specifications (Node))
+         and then not Nkind_In (Node, N_Package_Declaration,
+                                      N_Generic_Package_Declaration)
       then
          Sprint_Aspect_Specifications (Node, Semicolon => True);
       end if;
 
-      if Nkind (Node) in N_Subexpr and then Do_Range_Check (Node) then
+      if Nkind (Node) in N_Subexpr
+        and then Do_Range_Check (Node)
+      then
          Write_Str ("}");
       end if;
 

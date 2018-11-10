@@ -1,5 +1,6 @@
 // PR c++/84325
-// { dg-do compile { target c++17 } }
+// { dg-do compile }
+// { dg-options "-std=c++17" }
 
 struct seconds { int i_{0}; constexpr seconds (int) {} };
 template <char... _Digits> constexpr seconds operator""_s() {

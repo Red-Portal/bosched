@@ -38,8 +38,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "langhooks.h"
 
 static bool prefer_and_bit_test (scalar_int_mode, int);
-static void do_jump (tree, rtx_code_label *, rtx_code_label *,
-		     profile_probability);
 static void do_jump_by_parts_greater (scalar_int_mode, tree, tree, int,
 				      rtx_code_label *, rtx_code_label *,
 				      profile_probability);
@@ -120,6 +118,38 @@ restore_pending_stack_adjust (saved_pending_stack_adjust *save)
     }
 }
 
+/* Expand conditional expressions.  */
+
+/* Generate code to evaluate EXP and jump to LABEL if the value is zero.  */
+
+void
+jumpifnot (tree exp, rtx_code_label *label, profile_probability prob)
+{
+  do_jump (exp, label, NULL, prob.invert ());
+}
+
+void
+jumpifnot_1 (enum tree_code code, tree op0, tree op1, rtx_code_label *label,
+	     profile_probability prob)
+{
+  do_jump_1 (code, op0, op1, label, NULL, prob.invert ());
+}
+
+/* Generate code to evaluate EXP and jump to LABEL if the value is nonzero.  */
+
+void
+jumpif (tree exp, rtx_code_label *label, profile_probability prob)
+{
+  do_jump (exp, NULL, label, prob);
+}
+
+void
+jumpif_1 (enum tree_code code, tree op0, tree op1,
+	  rtx_code_label *label, profile_probability prob)
+{
+  do_jump_1 (code, op0, op1, NULL, label, prob);
+}
+
 /* Used internally by prefer_and_bit_test.  */
 
 static GTY(()) rtx and_reg;
@@ -167,7 +197,7 @@ prefer_and_bit_test (scalar_int_mode mode, int bitnum)
    OP0 CODE OP1 .  IF_FALSE_LABEL and IF_TRUE_LABEL like in do_jump.
    PROB is probability of jump to if_true_label.  */
 
-static void
+void
 do_jump_1 (enum tree_code code, tree op0, tree op1,
 	   rtx_code_label *if_false_label, rtx_code_label *if_true_label,
 	   profile_probability prob)
@@ -387,7 +417,7 @@ do_jump_1 (enum tree_code code, tree op0, tree op1,
 
    PROB is probability of jump to if_true_label.  */
 
-static void
+void
 do_jump (tree exp, rtx_code_label *if_false_label,
 	 rtx_code_label *if_true_label, profile_probability prob)
 {
@@ -437,7 +467,6 @@ do_jump (tree exp, rtx_code_label *if_false_label,
       /* FALLTHRU */
     case NON_LVALUE_EXPR:
     case ABS_EXPR:
-    case ABSU_EXPR:
     case NEGATE_EXPR:
     case LROTATE_EXPR:
     case RROTATE_EXPR:
@@ -916,43 +945,6 @@ split_comparison (enum rtx_code code, machine_mode mode,
     }
 }
 
-/* Generate code to evaluate EXP and jump to LABEL if the value is nonzero.
-   PROB is probability of jump to LABEL.  */
-
-void
-jumpif (tree exp, rtx_code_label *label, profile_probability prob)
-{
-  do_jump (exp, NULL, label, prob);
-}
-
-/* Similar to jumpif but dealing with exploded comparisons of the type
-   OP0 CODE OP1 .  LABEL and PROB are like in jumpif.  */
-
-void
-jumpif_1 (enum tree_code code, tree op0, tree op1, rtx_code_label *label,
-	  profile_probability prob)
-{
-  do_jump_1 (code, op0, op1, NULL, label, prob);
-}
-
-/* Generate code to evaluate EXP and jump to LABEL if the value is zero.
-   PROB is probability of jump to LABEL.  */
-
-void
-jumpifnot (tree exp, rtx_code_label *label, profile_probability prob)
-{
-  do_jump (exp, label, NULL, prob.invert ());
-}
-
-/* Similar to jumpifnot but dealing with exploded comparisons of the type
-   OP0 CODE OP1 .  LABEL and PROB are like in jumpifnot.  */
-
-void
-jumpifnot_1 (enum tree_code code, tree op0, tree op1, rtx_code_label *label,
-	     profile_probability prob)
-{
-  do_jump_1 (code, op0, op1, label, NULL, prob.invert ());
-}
 
 /* Like do_compare_and_jump but expects the values to compare as two rtx's.
    The decision as to signed or unsigned comparison must be made by the caller.

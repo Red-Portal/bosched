@@ -77,7 +77,7 @@ cp_convert_to_pointer (tree type, tree expr, bool dofold,
   tree intype = TREE_TYPE (expr);
   enum tree_code form;
   tree rval;
-  location_t loc = cp_expr_loc_or_loc (expr, input_location);
+  location_t loc = EXPR_LOC_OR_LOC (expr, input_location);
 
   if (intype == error_mark_node)
     return error_mark_node;
@@ -122,7 +122,7 @@ cp_convert_to_pointer (tree type, tree expr, bool dofold,
 
   form = TREE_CODE (intype);
 
-  if (INDIRECT_TYPE_P (intype))
+  if (POINTER_TYPE_P (intype))
     {
       intype = TYPE_MAIN_VARIANT (intype);
 
@@ -322,7 +322,7 @@ build_up_reference (tree type, tree arg, int flags, tree decl,
   tree argtype = TREE_TYPE (arg);
   tree target_type = TREE_TYPE (type);
 
-  gcc_assert (TYPE_REF_P (type));
+  gcc_assert (TREE_CODE (type) == REFERENCE_TYPE);
 
   if ((flags & DIRECT_BIND) && ! lvalue_p (arg))
     {
@@ -381,8 +381,7 @@ diagnose_ref_binding (location_t loc, tree reftype, tree intype, tree decl)
 {
   tree ttl = TREE_TYPE (reftype);
 
-  if (!TYPE_REF_IS_RVALUE (reftype)
-      && !CP_TYPE_CONST_NON_VOLATILE_P (ttl))
+  if (!CP_TYPE_CONST_NON_VOLATILE_P (ttl))
     {
       const char *msg;
 
@@ -419,7 +418,7 @@ convert_to_reference (tree reftype, tree expr, int convtype,
   tree rval = NULL_TREE;
   tree rval_as_conversion = NULL_TREE;
   bool can_convert_intype_to_type;
-  location_t loc = cp_expr_loc_or_loc (expr, input_location);
+  location_t loc = EXPR_LOC_OR_LOC (expr, input_location);
 
   if (TREE_CODE (type) == FUNCTION_TYPE
       && TREE_TYPE (expr) == unknown_type_node)
@@ -430,8 +429,8 @@ convert_to_reference (tree reftype, tree expr, int convtype,
 
   intype = TREE_TYPE (expr);
 
-  gcc_assert (!TYPE_REF_P (intype));
-  gcc_assert (TYPE_REF_P (reftype));
+  gcc_assert (TREE_CODE (intype) != REFERENCE_TYPE);
+  gcc_assert (TREE_CODE (reftype) == REFERENCE_TYPE);
 
   intype = TYPE_MAIN_VARIANT (intype);
 
@@ -534,7 +533,7 @@ tree
 convert_from_reference (tree val)
 {
   if (TREE_TYPE (val)
-      && TYPE_REF_P (TREE_TYPE (val)))
+      && TREE_CODE (TREE_TYPE (val)) == REFERENCE_TYPE)
     {
       tree t = TREE_TYPE (TREE_TYPE (val));
       tree ref = build1 (INDIRECT_REF, t, val);
@@ -602,27 +601,16 @@ cp_fold_convert (tree type, tree expr)
   tree conv;
   if (TREE_TYPE (expr) == type)
     conv = expr;
-  else if (TREE_CODE (expr) == PTRMEM_CST
-	   && same_type_p (TYPE_PTRMEM_CLASS_TYPE (type),
-			   PTRMEM_CST_CLASS (expr)))
+  else if (TREE_CODE (expr) == PTRMEM_CST)
     {
       /* Avoid wrapping a PTRMEM_CST in NOP_EXPR.  */
       conv = copy_node (expr);
       TREE_TYPE (conv) = type;
     }
-<<<<<<< HEAD
-  else if (TYPE_PTRMEM_P (type))
-    {
-      conv = convert_ptrmem (type, expr, true, false,
-			     tf_warning_or_error);
-      conv = cp_fully_fold (conv);
-    }
-=======
   else if (TREE_CODE (expr) == CONSTRUCTOR
 	   && TYPE_PTRMEMFUNC_P (type))
     conv = build_ptrmemfunc (TYPE_PTRMEMFUNC_FN_TYPE (type), expr,
 			     true, false, tf_warning_or_error);
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
   else
     {
       conv = fold_convert (type, expr);
@@ -674,7 +662,7 @@ cp_convert_and_check (tree type, tree expr, tsubst_flags_t complain)
       folded_result = fold_simple (folded_result);
       if (!TREE_OVERFLOW_P (folded)
 	  && folded_result != error_mark_node)
-	warnings_for_convert_and_check (cp_expr_loc_or_loc (expr, input_location),
+	warnings_for_convert_and_check (EXPR_LOC_OR_LOC (expr, input_location),
 					type, folded, folded_result);
     }
 
@@ -693,7 +681,7 @@ ocp_convert (tree type, tree expr, int convtype, int flags,
   enum tree_code code = TREE_CODE (type);
   const char *invalid_conv_diag;
   tree e1;
-  location_t loc = cp_expr_loc_or_loc (expr, input_location);
+  location_t loc = EXPR_LOC_OR_LOC (expr, input_location);
   bool dofold = (convtype & CONV_FOLD);
 
   if (error_operand_p (e) || type == error_mark_node)
@@ -718,15 +706,6 @@ ocp_convert (tree type, tree expr, int convtype, int flags,
     }
   if (error_operand_p (e))
     return error_mark_node;
-
-  if (NULLPTR_TYPE_P (type) && null_ptr_cst_p (e))
-    {
-      if (complain & tf_warning)
-	maybe_warn_zero_as_null_pointer_constant (e, loc);
-
-      if (!TREE_SIDE_EFFECTS (e))
-	return nullptr_node;
-    }
 
   if (MAYBE_CLASS_TYPE_P (type) && (convtype & CONV_FORCE_TEMP))
     /* We need a new temporary; don't take this shortcut.  */;
@@ -849,7 +828,13 @@ ocp_convert (tree type, tree expr, int convtype, int flags,
       /* Ignore any integer overflow caused by the conversion.  */
       return ignore_overflows (converted, e);
     }
-  if (INDIRECT_TYPE_P (type) || TYPE_PTRMEM_P (type))
+  if (NULLPTR_TYPE_P (type) && e && null_ptr_cst_p (e))
+    {
+      if (complain & tf_warning)
+	maybe_warn_zero_as_null_pointer_constant (e, loc);
+      return nullptr_node;
+    }
+  if (POINTER_TYPE_P (type) || TYPE_PTRMEM_P (type))
     return cp_convert_to_pointer (type, e, dofold, complain);
   if (code == VECTOR_TYPE)
     {
@@ -969,7 +954,7 @@ cp_get_fndecl_from_callee (tree fn, bool fold /* = true */)
   tree type = TREE_TYPE (fn);
   if (type == unknown_type_node)
     return NULL_TREE;
-  gcc_assert (INDIRECT_TYPE_P (type));
+  gcc_assert (POINTER_TYPE_P (type));
   if (fold)
     fn = maybe_constant_init (fn);
   STRIP_NOPS (fn);
@@ -1008,7 +993,7 @@ maybe_warn_nodiscard (tree expr, impl_conv_void implicit)
   tree call = expr;
   if (TREE_CODE (expr) == TARGET_EXPR)
     call = TARGET_EXPR_INITIAL (expr);
-  location_t loc = cp_expr_loc_or_loc (call, input_location);
+  location_t loc = EXPR_LOC_OR_LOC (call, input_location);
   tree callee = cp_get_callee (call);
   if (!callee)
     return;
@@ -1016,7 +1001,7 @@ maybe_warn_nodiscard (tree expr, impl_conv_void implicit)
   tree type = TREE_TYPE (callee);
   if (TYPE_PTRMEMFUNC_P (type))
     type = TYPE_PTRMEMFUNC_FN_TYPE (type);
-  if (INDIRECT_TYPE_P (type))
+  if (POINTER_TYPE_P (type))
     type = TREE_TYPE (type);
 
   tree rettype = TREE_TYPE (type);
@@ -1024,7 +1009,6 @@ maybe_warn_nodiscard (tree expr, impl_conv_void implicit)
   if (implicit != ICV_CAST && fn
       && lookup_attribute ("nodiscard", DECL_ATTRIBUTES (fn)))
     {
-      auto_diagnostic_group d;
       if (warning_at (loc, OPT_Wunused_result,
 		      "ignoring return value of %qD, "
 		      "declared with attribute nodiscard", fn))
@@ -1033,7 +1017,6 @@ maybe_warn_nodiscard (tree expr, impl_conv_void implicit)
   else if (implicit != ICV_CAST
 	   && lookup_attribute ("nodiscard", TYPE_ATTRIBUTES (rettype)))
     {
-      auto_diagnostic_group d;
       if (warning_at (loc, OPT_Wunused_result,
 		      "ignoring returned value of type %qT, "
 		      "declared with attribute nodiscard", rettype))
@@ -1052,7 +1035,6 @@ maybe_warn_nodiscard (tree expr, impl_conv_void implicit)
 	 result is used, so handle that case here.  */
       if (fn)
 	{
-	  auto_diagnostic_group d;
 	  if (warning_at (loc, OPT_Wunused_result,
 			  "ignoring return value of %qD, "
 			  "declared with attribute warn_unused_result",
@@ -1088,7 +1070,7 @@ maybe_warn_nodiscard (tree expr, impl_conv_void implicit)
 tree
 convert_to_void (tree expr, impl_conv_void implicit, tsubst_flags_t complain)
 {
-  location_t loc = cp_expr_loc_or_loc (expr, input_location);
+  location_t loc = EXPR_LOC_OR_LOC (expr, input_location);
 
   if (expr == error_mark_node
       || TREE_TYPE (expr) == error_mark_node)
@@ -1174,7 +1156,8 @@ convert_to_void (tree expr, impl_conv_void implicit, tsubst_flags_t complain)
     case INDIRECT_REF:
       {
 	tree type = TREE_TYPE (expr);
-	int is_reference = TYPE_REF_P (TREE_TYPE (TREE_OPERAND (expr, 0)));
+	int is_reference = TREE_CODE (TREE_TYPE (TREE_OPERAND (expr, 0)))
+			   == REFERENCE_TYPE;
 	int is_volatile = TYPE_VOLATILE (type);
 	int is_complete = COMPLETE_TYPE_P (complete_type (type));
 
@@ -1612,7 +1595,7 @@ convert (tree type, tree expr)
 
   intype = TREE_TYPE (expr);
 
-  if (INDIRECT_TYPE_P (type) && INDIRECT_TYPE_P (intype))
+  if (POINTER_TYPE_P (type) && POINTER_TYPE_P (intype))
     return build_nop (type, expr);
 
   return ocp_convert (type, expr, CONV_BACKEND_CONVERT,
@@ -2022,8 +2005,8 @@ noexcept_conv_p (tree to, tree from)
       t = TYPE_PTRMEMFUNC_FN_TYPE (t);
       f = TYPE_PTRMEMFUNC_FN_TYPE (f);
     }
-  if (TYPE_PTR_P (t)
-      && TYPE_PTR_P (f))
+  if (TREE_CODE (t) == POINTER_TYPE
+      && TREE_CODE (f) == POINTER_TYPE)
     {
       t = TREE_TYPE (t);
       f = TREE_TYPE (f);
@@ -2053,8 +2036,8 @@ fnptr_conv_p (tree to, tree from)
       t = TYPE_PTRMEMFUNC_FN_TYPE (t);
       f = TYPE_PTRMEMFUNC_FN_TYPE (f);
     }
-  if (TYPE_PTR_P (t)
-      && TYPE_PTR_P (f))
+  if (TREE_CODE (t) == POINTER_TYPE
+      && TREE_CODE (f) == POINTER_TYPE)
     {
       t = TREE_TYPE (t);
       f = TREE_TYPE (f);

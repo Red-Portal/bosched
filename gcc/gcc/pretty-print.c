@@ -705,11 +705,10 @@ static void pp_quoted_string (pretty_printer *, const char *, size_t = -1);
    For use e.g. when implementing "+" in client format decoders.  */
 
 void
-text_info::set_location (unsigned int idx, location_t loc,
-			 enum range_display_kind range_display_kind)
+text_info::set_location (unsigned int idx, location_t loc, bool show_caret_p)
 {
   gcc_checking_assert (m_richloc);
-  m_richloc->set_range (idx, loc, range_display_kind);
+  m_richloc->set_range (line_table, idx, loc, show_caret_p);
 }
 
 location_t
@@ -1492,29 +1491,14 @@ pp_clear_output_area (pretty_printer *pp)
   pp_buffer (pp)->line_length = 0;
 }
 
-/* Set PREFIX for PRETTY-PRINTER, taking ownership of PREFIX, which
-   will eventually be free-ed.  */
-
+/* Set PREFIX for PRETTY-PRINTER.  */
 void
-pp_set_prefix (pretty_printer *pp, char *prefix)
+pp_set_prefix (pretty_printer *pp, const char *prefix)
 {
-  free (pp->prefix);
   pp->prefix = prefix;
   pp_set_real_maximum_length (pp);
   pp->emitted_prefix = false;
   pp_indentation (pp) = 0;
-}
-
-/* Take ownership of PP's prefix, setting it to NULL.
-   This allows clients to save, overide, and then restore an existing
-   prefix, without it being free-ed.  */
-
-char *
-pp_take_prefix (pretty_printer *pp)
-{
-  char *result = pp->prefix;
-  pp->prefix = NULL;
-  return result;
 }
 
 /* Free PRETTY-PRINTER's prefix, a previously malloc()'d string.  */
@@ -1523,7 +1507,7 @@ pp_destroy_prefix (pretty_printer *pp)
 {
   if (pp->prefix != NULL)
     {
-      free (pp->prefix);
+      free (CONST_CAST (char *, pp->prefix));
       pp->prefix = NULL;
     }
 }
@@ -1560,9 +1544,10 @@ pp_emit_prefix (pretty_printer *pp)
     }
 }
 
-/* Construct a PRETTY-PRINTER of MAXIMUM_LENGTH characters per line.  */
+/* Construct a PRETTY-PRINTER with PREFIX and of MAXIMUM_LENGTH
+   characters per line.  */
 
-pretty_printer::pretty_printer (int maximum_length)
+pretty_printer::pretty_printer (const char *p, int l)
   : buffer (new (XCNEW (output_buffer)) output_buffer ()),
     prefix (),
     padding (pp_none),
@@ -1576,10 +1561,10 @@ pretty_printer::pretty_printer (int maximum_length)
     translate_identifiers (true),
     show_color ()
 {
-  pp_line_cutoff (this) = maximum_length;
+  pp_line_cutoff (this) = l;
   /* By default, we emit prefixes once per message.  */
   pp_prefixing_rule (this) = DIAGNOSTICS_SHOW_PREFIX_ONCE;
-  pp_set_prefix (this, NULL);
+  pp_set_prefix (this, p);
 }
 
 pretty_printer::~pretty_printer ()
@@ -1588,7 +1573,6 @@ pretty_printer::~pretty_printer ()
     delete m_format_postprocessor;
   buffer->~output_buffer ();
   XDELETE (buffer);
-  free (prefix);
 }
 
 /* Append a string delimited by START and END to the output area of
@@ -2127,7 +2111,10 @@ test_pp_format ()
 {
   /* Avoid introducing locale-specific differences in the results
      by hardcoding open_quote and close_quote.  */
-  auto_fix_quotes fix_quotes;
+  const char *old_open_quote = open_quote;
+  const char *old_close_quote = close_quote;
+  open_quote = "`";
+  close_quote = "'";
 
   /* Verify that plain text is passed through unchanged.  */
   assert_pp_format (SELFTEST_LOCATION, "unformatted", "unformatted");
@@ -2209,6 +2196,10 @@ test_pp_format ()
   assert_pp_format (SELFTEST_LOCATION, "item 3 of 7", "item %i of %i", 3, 7);
   assert_pp_format (SELFTEST_LOCATION, "problem with `bar' at line 10",
 		    "problem with %qs at line %i", "bar", 10);
+
+  /* Restore old values of open_quote and close_quote.  */
+  open_quote = old_open_quote;
+  close_quote = old_close_quote;
 }
 
 /* Run all of the selftests within this file.  */

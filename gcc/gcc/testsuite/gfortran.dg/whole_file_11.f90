@@ -1,4 +1,5 @@
 ! { dg-do compile }
+! { dg-options "-fwhole-file" }
 !
 ! Tests the fix PR40011 comment 16 in which the derived type lists in
 ! different program units were getting mixed up.

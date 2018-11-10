@@ -129,8 +129,7 @@ grep '^PASS' "$before_s" | sed 's/^[^:]*:[ 	]//' | comm -12 $tmp1 - >$tmp2
 
 grep -s . $tmp2 >/dev/null
 if [ $? = 0 ]; then
-	num=`cat $tmp2 | wc -l`
-	echo "Tests that now fail, but worked before ($num tests):"
+	echo "Tests that now fail, but worked before:"
 	echo
 	cat $tmp2
 	echo
@@ -142,8 +141,7 @@ grep '^FAIL' "$before_s" | sed 's/^[^:]*:[ 	]//' | comm -12 $tmp1 - >$tmp2
 
 grep -s . $tmp2 >/dev/null
 if [ $? = 0 ]; then
-	num=`cat $tmp2 | wc -l`
-	echo "Tests that now work, but didn't before ($num tests):"
+	echo "Tests that now work, but didn't before:"
 	echo
 	cat $tmp2
 	[ -n "$strict" ] && echo "Strict test fails" && exit_status=1
@@ -155,8 +153,7 @@ grep '^[PF]A[SI][SL]' "$before_s" | sed 's/^[^:]*:[ 	]//' | comm -23 $tmp1 - >$t
 
 grep -s . $tmp2 >/dev/null
 if [ $? = 0 ]; then
-	num=`cat $tmp2 | wc -l`
-	echo "New tests that FAIL ($num tests):"
+	echo "New tests that FAIL:"
 	echo
 	cat $tmp2
 	echo
@@ -168,8 +165,7 @@ grep '^[PF]A[SI][SL]' "$before_s" | sed 's/^[^:]*:[ 	]//' | comm -23 $tmp1 - >$t
 
 grep -s . $tmp2 >/dev/null
 if [ $? = 0 ]; then
-	num=`cat $tmp2 | wc -l`
-	echo "New tests that PASS ($num tests):"
+	echo "New tests that PASS:"
 	echo
 	cat $tmp2
 	[ -n "$strict" ] && echo "Strict test fails" && exit_status=1
@@ -181,8 +177,7 @@ grep '^PASS' "$before_s" | sed 's/^[^:]*:[ 	]//' | comm -13 $tmp1 - >$tmp2
 
 grep -s . $tmp2 >/dev/null
 if [ $? = 0 ]; then
-	num=`cat $tmp2 | wc -l`
-	echo "Old tests that passed, that have disappeared ($num tests): (Eeek!)"
+	echo "Old tests that passed, that have disappeared: (Eeek!)"
 	echo
 	cat $tmp2
 	[ -n "$strict" ] && echo "Strict test fails" && exit_status=1
@@ -194,8 +189,7 @@ grep '^FAIL' "$before_s" | sed 's/^[^:]*:[ 	]//' | comm -13 $tmp1 - >$tmp2
 
 grep -s . $tmp2 >/dev/null
 if [ $? = 0 ]; then
-	num=`cat $tmp2 | wc -l`
-	echo "Old tests that failed, that have disappeared ($num tests): (Eeek!)"
+	echo "Old tests that failed, that have disappeared: (Eeek!)"
 	echo
 	cat $tmp2
 	[ -n "$strict" ] && echo "Strict test fails" && exit_status=1

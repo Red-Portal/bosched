@@ -397,8 +397,7 @@ find_end_label (rtx kind)
   while (NOTE_P (insn)
 	 || (NONJUMP_INSN_P (insn)
 	     && (GET_CODE (PATTERN (insn)) == USE
-		 || GET_CODE (PATTERN (insn)) == CLOBBER
-		 || GET_CODE (PATTERN (insn)) == CLOBBER_HIGH)))
+		 || GET_CODE (PATTERN (insn)) == CLOBBER)))
     insn = PREV_INSN (insn);
 
   /* When a target threads its epilogue we might already have a
@@ -1298,8 +1297,7 @@ try_merge_delay_insns (rtx_insn *insn, rtx_insn *thread)
 
       /* TRIAL must be a CALL_INSN or INSN.  Skip USE and CLOBBER.  */
       if (NONJUMP_INSN_P (trial)
-	  && (GET_CODE (pat) == USE || GET_CODE (pat) == CLOBBER
-	      || GET_CODE (pat) == CLOBBER_HIGH))
+	  && (GET_CODE (pat) == USE || GET_CODE (pat) == CLOBBER))
 	continue;
 
       if (GET_CODE (next_to_match) == GET_CODE (trial)
@@ -1493,8 +1491,7 @@ redundant_insn (rtx insn, rtx_insn *target, const vec<rtx_insn *> &delay_list)
       --insns_to_search;
 
       pat = PATTERN (trial);
-      if (GET_CODE (pat) == USE || GET_CODE (pat) == CLOBBER
-	  || GET_CODE (pat) == CLOBBER_HIGH)
+      if (GET_CODE (pat) == USE || GET_CODE (pat) == CLOBBER)
 	continue;
 
       if (GET_CODE (trial) == DEBUG_INSN)
@@ -1592,8 +1589,7 @@ redundant_insn (rtx insn, rtx_insn *target, const vec<rtx_insn *> &delay_list)
       --insns_to_search;
 
       pat = PATTERN (trial);
-      if (GET_CODE (pat) == USE || GET_CODE (pat) == CLOBBER
-	  || GET_CODE (pat) == CLOBBER_HIGH)
+      if (GET_CODE (pat) == USE || GET_CODE (pat) == CLOBBER)
 	continue;
 
       if (GET_CODE (trial) == DEBUG_INSN)
@@ -1705,8 +1701,7 @@ own_thread_p (rtx thread, rtx label, int allow_fallthrough)
 	|| LABEL_P (insn)
 	|| (NONJUMP_INSN_P (insn)
 	    && GET_CODE (PATTERN (insn)) != USE
-	    && GET_CODE (PATTERN (insn)) != CLOBBER
-	    && GET_CODE (PATTERN (insn)) != CLOBBER_HIGH))
+	    && GET_CODE (PATTERN (insn)) != CLOBBER))
       return 0;
 
   return 1;
@@ -2029,8 +2024,7 @@ fill_simple_delay_slots (int non_jumps_p)
 	      pat = PATTERN (trial);
 
 	      /* Stand-alone USE and CLOBBER are just for flow.  */
-	      if (GET_CODE (pat) == USE || GET_CODE (pat) == CLOBBER
-		  || GET_CODE (pat) == CLOBBER_HIGH)
+	      if (GET_CODE (pat) == USE || GET_CODE (pat) == CLOBBER)
 		continue;
 
 	      /* And DEBUG_INSNs never go into delay slots.  */
@@ -2156,8 +2150,7 @@ fill_simple_delay_slots (int non_jumps_p)
 	      pat = PATTERN (trial);
 
 	      /* Stand-alone USE and CLOBBER are just for flow.  */
-	      if (GET_CODE (pat) == USE || GET_CODE (pat) == CLOBBER
-		  || GET_CODE (pat) == CLOBBER_HIGH)
+	      if (GET_CODE (pat) == USE || GET_CODE (pat) == CLOBBER)
 		continue;
 
 	      /* And DEBUG_INSNs do not go in delay slots.  */
@@ -2425,8 +2418,7 @@ fill_slots_from_thread (rtx_jump_insn *insn, rtx condition,
 	}
 
       pat = PATTERN (trial);
-      if (GET_CODE (pat) == USE || GET_CODE (pat) == CLOBBER
-	  || GET_CODE (pat) == CLOBBER_HIGH)
+      if (GET_CODE (pat) == USE || GET_CODE (pat) == CLOBBER)
 	continue;
 
       if (GET_CODE (trial) == DEBUG_INSN)
@@ -3638,13 +3630,18 @@ make_return_insns (rtx_insn *first)
 	 insns for its delay slots, if it needs some.  */
       if (ANY_RETURN_P (PATTERN (jump_insn)))
 	{
-	  rtx_insn *after = PREV_INSN (insn);
+	  rtx_insn *prev = PREV_INSN (insn);
 
 	  delete_related_insns (insn);
-	  insn = jump_insn;
-	  for (i = 1; i < pat->len (); i++)
-	    after = emit_copy_of_insn_after (pat->insn (i), after);
-	  add_insn_after (insn, after, NULL);
+	  for (i = 1; i < XVECLEN (pat, 0); i++)
+	    {
+	      rtx_insn *in_seq_insn = as_a<rtx_insn *> (XVECEXP (pat, 0, i));
+	      prev = emit_insn_after_setloc (PATTERN (in_seq_insn), prev,
+					     INSN_LOCATION (in_seq_insn));
+	    }
+
+	  insn = emit_jump_insn_after_setloc (PATTERN (jump_insn), prev,
+					      INSN_LOCATION (jump_insn));
 	  emit_barrier_after (insn);
 
 	  if (slots)
@@ -3821,8 +3818,7 @@ dbr_schedule (rtx_insn *first)
 	  if (! insn->deleted ()
 	      && NONJUMP_INSN_P (insn)
 	      && GET_CODE (PATTERN (insn)) != USE
-	      && GET_CODE (PATTERN (insn)) != CLOBBER
-	      && GET_CODE (PATTERN (insn)) != CLOBBER_HIGH)
+	      && GET_CODE (PATTERN (insn)) != CLOBBER)
 	    {
 	      if (GET_CODE (PATTERN (insn)) == SEQUENCE)
 		{

@@ -56,9 +56,6 @@ namespace __debug
       typedef typename _Base::iterator		_Base_iterator;
       typedef __gnu_debug::_Equal_to<_Base_const_iterator> _Equal;
 
-      template<typename _ItT, typename _SeqT, typename _CatT>
-	friend class ::__gnu_debug::_Safe_iterator;
-
     public:
       // types:
       typedef _Key					key_type;
@@ -118,8 +115,8 @@ namespace __debug
       template<typename _InputIterator>
 	map(_InputIterator __first, _InputIterator __last,
 	    const allocator_type& __a)
-	: _Base(__gnu_debug::__base(
-		  __glibcxx_check_valid_constructor_range(__first, __last)),
+	: _Base(__gnu_debug::__base(__gnu_debug::__check_valid_range(__first,
+								     __last)),
 		__gnu_debug::__base(__last), __a)
 	{ }
 
@@ -137,8 +134,8 @@ namespace __debug
 	map(_InputIterator __first, _InputIterator __last,
 	    const _Compare& __comp = _Compare(),
 	    const _Allocator& __a = _Allocator())
-	: _Base(__gnu_debug::__base(
-		  __glibcxx_check_valid_constructor_range(__first, __last)),
+	: _Base(__gnu_debug::__base(__gnu_debug::__check_valid_range(__first,
+								     __last)),
 		__gnu_debug::__base(__last),
 		__comp, __a) { }
 
@@ -240,7 +237,8 @@ namespace __debug
 	emplace(_Args&&... __args)
 	{
 	  auto __res = _Base::emplace(std::forward<_Args>(__args)...);
-	  return { { __res.first, this }, __res.second };
+	  return std::pair<iterator, bool>(iterator(__res.first, this),
+					   __res.second);
 	}
 
       template<typename... _Args>
@@ -248,11 +246,9 @@ namespace __debug
 	emplace_hint(const_iterator __pos, _Args&&... __args)
 	{
 	  __glibcxx_check_insert(__pos);
-	  return
-	    {
-	      _Base::emplace_hint(__pos.base(), std::forward<_Args>(__args)...),
-	      this
-	    };
+	  return iterator(_Base::emplace_hint(__pos.base(),
+					      std::forward<_Args>(__args)...),
+			  this);
 	}
 #endif
 
@@ -271,7 +267,7 @@ namespace __debug
       insert(value_type&& __x)
       {
 	auto __res = _Base::insert(std::move(__x));
-	return { { __res.first, this }, __res.second };
+	return { iterator(__res.first, this), __res.second };
       }
 
       template<typename _Pair, typename = typename
@@ -280,8 +276,10 @@ namespace __debug
 	std::pair<iterator, bool>
 	insert(_Pair&& __x)
 	{
-	  auto __res = _Base::insert(std::forward<_Pair>(__x));
-	  return { { __res.first, this }, __res.second };
+	  std::pair<_Base_iterator, bool> __res
+	    = _Base::insert(std::forward<_Pair>(__x));
+	  return std::pair<iterator, bool>(iterator(__res.first, this),
+					   __res.second);
 	}
 #endif
 
@@ -319,11 +317,8 @@ namespace __debug
 	insert(const_iterator __position, _Pair&& __x)
 	{
 	  __glibcxx_check_insert(__position);
-	  return
-	    {
-	      _Base::insert(__position.base(), std::forward<_Pair>(__x)),
-	      this
-	    };
+	  return iterator(_Base::insert(__position.base(),
+					std::forward<_Pair>(__x)), this);
 	}
 #endif
 
@@ -349,7 +344,7 @@ namespace __debug
         {
 	  auto __res = _Base::try_emplace(__k,
 					  std::forward<_Args>(__args)...);
-	  return { { __res.first, this }, __res.second };
+	  return { iterator(__res.first, this), __res.second };
 	}
 
       template <typename... _Args>
@@ -358,7 +353,7 @@ namespace __debug
         {
 	  auto __res = _Base::try_emplace(std::move(__k),
 					  std::forward<_Args>(__args)...);
-	  return { { __res.first, this }, __res.second };
+	  return { iterator(__res.first, this), __res.second };
 	}
 
       template <typename... _Args>
@@ -367,12 +362,9 @@ namespace __debug
                     _Args&&... __args)
         {
 	  __glibcxx_check_insert(__hint);
-	  return
-	    {
-	      _Base::try_emplace(__hint.base(), __k,
-				 std::forward<_Args>(__args)...),
-	      this
-	    };
+	  return iterator(_Base::try_emplace(__hint.base(), __k,
+					     std::forward<_Args>(__args)...),
+			  this);
 	}
 
       template <typename... _Args>
@@ -380,12 +372,9 @@ namespace __debug
         try_emplace(const_iterator __hint, key_type&& __k, _Args&&... __args)
         {
 	  __glibcxx_check_insert(__hint);
-	  return
-	    {
-	      _Base::try_emplace(__hint.base(), std::move(__k),
-				 std::forward<_Args>(__args)...),
-	      this
-	    };
+	  return iterator(_Base::try_emplace(__hint.base(), std::move(__k),
+					     std::forward<_Args>(__args)...),
+			  this);
 	}
 
       template <typename _Obj>
@@ -394,7 +383,7 @@ namespace __debug
 	{
 	  auto __res = _Base::insert_or_assign(__k,
 					       std::forward<_Obj>(__obj));
-	  return { { __res.first, this }, __res.second };
+	  return { iterator(__res.first, this), __res.second };
 	}
 
       template <typename _Obj>
@@ -403,7 +392,7 @@ namespace __debug
 	{
 	  auto __res = _Base::insert_or_assign(std::move(__k),
 					       std::forward<_Obj>(__obj));
-	  return { { __res.first, this }, __res.second };
+	  return { iterator(__res.first, this), __res.second };
 	}
 
       template <typename _Obj>
@@ -412,12 +401,9 @@ namespace __debug
                          const key_type& __k, _Obj&& __obj)
 	{
 	  __glibcxx_check_insert(__hint);
-	  return
-	    {
-	      _Base::insert_or_assign(__hint.base(), __k,
-				      std::forward<_Obj>(__obj)),
-	      this
-	    };
+	  return iterator(_Base::insert_or_assign(__hint.base(), __k,
+						  std::forward<_Obj>(__obj)),
+			  this);
 	}
 
       template <typename _Obj>
@@ -425,12 +411,10 @@ namespace __debug
         insert_or_assign(const_iterator __hint, key_type&& __k, _Obj&& __obj)
         {
 	  __glibcxx_check_insert(__hint);
-	  return
-	    {
-	      _Base::insert_or_assign(__hint.base(), std::move(__k),
-				      std::forward<_Obj>(__obj)),
-	      this
-	    };
+	  return iterator(_Base::insert_or_assign(__hint.base(),
+						  std::move(__k),
+						  std::forward<_Obj>(__obj)),
+			  this);
 	}
 #endif // C++17
 
@@ -459,15 +443,15 @@ namespace __debug
       insert(node_type&& __nh)
       {
 	auto __ret = _Base::insert(std::move(__nh));
-	return
-	  { { __ret.position, this }, __ret.inserted, std::move(__ret.node) };
+	iterator __pos = iterator(__ret.position, this);
+	return { __pos, __ret.inserted, std::move(__ret.node) };
       }
 
       iterator
       insert(const_iterator __hint, node_type&& __nh)
       {
 	__glibcxx_check_insert(__hint);
-	return { _Base::insert(__hint.base(), std::move(__nh)), this };
+	return iterator(_Base::insert(__hint.base(), std::move(__nh)), this);
       }
 
       using _Base::merge;
@@ -479,10 +463,9 @@ namespace __debug
       {
 	__glibcxx_check_erase(__position);
 	this->_M_invalidate_if(_Equal(__position.base()));
-	return { _Base::erase(__position.base()), this };
+	return iterator(_Base::erase(__position.base()), this);
       }
 
-      _GLIBCXX_ABI_TAG_CXX11
       iterator
       erase(iterator __position)
       { return erase(const_iterator(__position)); }
@@ -520,14 +503,13 @@ namespace __debug
 	for (_Base_const_iterator __victim = __first.base();
 	     __victim != __last.base(); ++__victim)
 	  {
-	    _GLIBCXX_DEBUG_VERIFY(__victim != _Base::cend(),
+	    _GLIBCXX_DEBUG_VERIFY(__victim != _Base::end(),
 				  _M_message(__gnu_debug::__msg_valid_range)
 				  ._M_iterator(__first, "first")
 				  ._M_iterator(__last, "last"));
 	    this->_M_invalidate_if(_Equal(__victim));
 	  }
-
-	return { _Base::erase(__first.base(), __last.base()), this };
+	return iterator(_Base::erase(__first.base(), __last.base()), this);
       }
 #else
       void

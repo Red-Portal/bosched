@@ -42,8 +42,7 @@ const (
 	itemChar                         // printable ASCII character; grab bag for comma etc.
 	itemCharConstant                 // character constant
 	itemComplex                      // complex constant (1+2i); imaginary is just a number
-	itemAssign                       // equals ('=') introducing an assignment
-	itemDeclare                      // colon-equals (':=') introducing a declaration
+	itemColonEquals                  // colon-equals (':=') introducing a declaration
 	itemEOF
 	itemField      // alphanumeric identifier starting with '.'
 	itemIdentifier // alphanumeric identifier not starting with '.'
@@ -367,13 +366,11 @@ func lexInsideAction(l *lexer) stateFn {
 		return l.errorf("unclosed action")
 	case isSpace(r):
 		return lexSpace
-	case r == '=':
-		l.emit(itemAssign)
 	case r == ':':
 		if l.next() != '=' {
 			return l.errorf("expected :=")
 		}
-		l.emit(itemDeclare)
+		l.emit(itemColonEquals)
 	case r == '|':
 		l.emit(itemPipe)
 	case r == '"':

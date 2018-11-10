@@ -1,6 +1,5 @@
 // PR c++/66832
-// { dg-do compile { target c++17 } }
-// { dg-options "-fconcepts" }
+// { dg-options "-std=c++17 -fconcepts" }
 
 template <class T, class U, unsigned N>
   requires requires (T& t, U &u) { t.foo(); u.foo(); }

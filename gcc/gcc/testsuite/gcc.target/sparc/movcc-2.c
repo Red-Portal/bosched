@@ -1,6 +1,6 @@
 /* { dg-do compile } */
-/* { dg-require-effective-target lp64 } */
 /* { dg-options "-O2" } */
+/* { dg-require-effective-target lp64 } */
 
 long foo1 (long a)
 {

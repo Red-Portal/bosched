@@ -8,7 +8,6 @@ package strings_test
 // Benchmarks omitted since the underlying implementation is identical.
 
 import (
-	"internal/testenv"
 	. "strings"
 	"testing"
 )
@@ -53,21 +52,10 @@ func TestCompareIdenticalString(t *testing.T) {
 }
 
 func TestCompareStrings(t *testing.T) {
-	lengths := make([]int, 0) // lengths to test in ascending order
-	for i := 0; i <= 128; i++ {
-		lengths = append(lengths, i)
-	}
-	lengths = append(lengths, 256, 512, 1024, 1333, 4095, 4096, 4097)
-
-	if !testing.Short() || testenv.Builder() != "" {
-		lengths = append(lengths, 65535, 65536, 65537, 99999)
-	}
-
-	n := lengths[len(lengths)-1]
+	n := 128
 	a := make([]byte, n+1)
 	b := make([]byte, n+1)
-	lastLen := 0
-	for _, len := range lengths {
+	for len := 0; len < 128; len++ {
 		// randomish but deterministic data. No 0 or 255.
 		for i := 0; i < len; i++ {
 			a[i] = byte(1 + 31*i%254)
@@ -79,22 +67,21 @@ func TestCompareStrings(t *testing.T) {
 			b[i] = 9
 		}
 
-		sa, sb := string(a), string(b)
-		cmp := Compare(sa[:len], sb[:len])
+		cmp := Compare(string(a[:len]), string(b[:len]))
 		if cmp != 0 {
 			t.Errorf(`CompareIdentical(%d) = %d`, len, cmp)
 		}
 		if len > 0 {
-			cmp = Compare(sa[:len-1], sb[:len])
+			cmp = Compare(string(a[:len-1]), string(b[:len]))
 			if cmp != -1 {
 				t.Errorf(`CompareAshorter(%d) = %d`, len, cmp)
 			}
-			cmp = Compare(sa[:len], sb[:len-1])
+			cmp = Compare(string(a[:len]), string(b[:len-1]))
 			if cmp != 1 {
 				t.Errorf(`CompareBshorter(%d) = %d`, len, cmp)
 			}
 		}
-		for k := lastLen; k < len; k++ {
+		for k := 0; k < len; k++ {
 			b[k] = a[k] - 1
 			cmp = Compare(string(a[:len]), string(b[:len]))
 			if cmp != 1 {
@@ -107,6 +94,5 @@ func TestCompareStrings(t *testing.T) {
 			}
 			b[k] = a[k]
 		}
-		lastLen = len
 	}
 }

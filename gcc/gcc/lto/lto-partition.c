@@ -115,7 +115,8 @@ add_references_to_partition (ltrans_partition part, symtab_node *node)
        references, too.  */
     else if (is_a <varpool_node *> (ref->referred)
 	     && (dyn_cast <varpool_node *> (ref->referred)
-		 ->ctor_useable_for_folding_p ())
+		 ->ctor_useable_for_folding_p ()
+		 || POINTER_BOUNDS_P (ref->referred->decl))
 	     && !lto_symtab_encoder_in_partition_p (part->encoder, ref->referred))
       {
 	if (!part->initializers_visited)
@@ -160,8 +161,8 @@ add_symbol_to_partition_1 (ltrans_partition part, symtab_node *node)
   if (symbol_partitioned_p (node))
     {
       node->in_other_partition = 1;
-      if (dump_file)
-	fprintf (dump_file,
+      if (symtab->dump_file)
+	fprintf (symtab->dump_file,
 		 "Symbol node %s now used in multiple partitions\n",
 		 node->name ());
     }
@@ -184,6 +185,11 @@ add_symbol_to_partition_1 (ltrans_partition part, symtab_node *node)
       for (e = cnode->callers; e; e = e->next_caller)
 	if (e->caller->thunk.thunk_p && !e->caller->global.inlined_to)
 	  add_symbol_to_partition_1 (part, e->caller);
+
+      /* Instrumented version is actually the same function.
+	 Therefore put it into the same partition.  */
+      if (cnode->instrumented_version)
+	add_symbol_to_partition_1 (part, cnode->instrumented_version);
     }
 
   add_references_to_partition (part, node);
@@ -541,20 +547,13 @@ lto_balanced_map (int n_lto_partitions, int max_partition_size)
   order.qsort (node_cmp);
   noreorder.qsort (node_cmp);
 
-  if (dump_file)
+  if (symtab->dump_file)
     {
       for (unsigned i = 0; i < order.length (); i++)
-<<<<<<< HEAD
-	fprintf (dump_file, "Balanced map symbol order:%s:%u\n",
-		 order[i]->name (), order[i]->tp_first_run);
-      for (unsigned i = 0; i < noreorder.length (); i++)
-	fprintf (dump_file, "Balanced map symbol no_reorder:%s:%u\n",
-=======
 	fprintf (symtab->dump_file, "Balanced map symbol order:%s:%u\n",
 		 order[i]->name (), order[i]->tp_first_run);
       for (unsigned i = 0; i < noreorder.length (); i++)
 	fprintf (symtab->dump_file, "Balanced map symbol no_reorder:%s:%u\n",
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
 		 noreorder[i]->name (), noreorder[i]->tp_first_run);
     }
 
@@ -576,14 +575,9 @@ lto_balanced_map (int n_lto_partitions, int max_partition_size)
     partition_size = PARAM_VALUE (MIN_PARTITION_SIZE);
   npartitions = 1;
   partition = new_partition ("");
-<<<<<<< HEAD
-  if (dump_file)
-    fprintf (dump_file, "Total unit size: %" PRId64 ", partition size: %" PRId64 "\n",
-=======
   if (symtab->dump_file)
     fprintf (symtab->dump_file, "Total unit size: %" PRId64
 	     ", partition size: %" PRId64 "\n",
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
 	     total_size, partition_size);
 
   auto_vec<symtab_node *> next_nodes;
@@ -776,13 +770,8 @@ lto_balanced_map (int n_lto_partitions, int max_partition_size)
 	  best_n_nodes = lto_symtab_encoder_size (partition->encoder);
 	  best_varpool_pos = varpool_pos;
 	}
-<<<<<<< HEAD
-      if (dump_file)
-	fprintf (dump_file, "Step %i: added %s/%i, size %i, "
-=======
       if (symtab->dump_file)
 	fprintf (symtab->dump_file, "Step %i: added %s/%i, size %i, "
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
 		 "cost %" PRId64 "/%" PRId64 " "
 		 "best %" PRId64 "/%" PRId64", step %i\n", i,
 		 order[i]->name (), order[i]->order,
@@ -795,21 +784,16 @@ lto_balanced_map (int n_lto_partitions, int max_partition_size)
 	{
 	  if (best_i != i)
 	    {
-	      if (dump_file)
-		fprintf (dump_file, "Unwinding %i insertions to step %i\n",
+	      if (symtab->dump_file)
+		fprintf (symtab->dump_file, "Unwinding %i insertions to step %i\n",
 			 i - best_i, best_i);
 	      undo_partition (partition, best_n_nodes);
 	      varpool_pos = best_varpool_pos;
 	    }
 	  gcc_assert (best_size == partition->insns);
 	  i = best_i;
-<<<<<<< HEAD
-	  if (dump_file)
-	    fprintf (dump_file,
-=======
 	  if (symtab->dump_file)
 	    fprintf (symtab->dump_file,
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
 		     "Partition insns: %i (want %" PRId64 ")\n",
 		     partition->insns, partition_size);
  	  /* When we are finished, avoid creating empty partition.  */
@@ -822,8 +806,8 @@ lto_balanced_map (int n_lto_partitions, int max_partition_size)
 	  last_visited_node = 0;
 	  cost = 0;
 
-	  if (dump_file)
-	    fprintf (dump_file, "New partition\n");
+	  if (symtab->dump_file)
+	    fprintf (symtab->dump_file, "New partition\n");
 	  best_n_nodes = 0;
 	  best_cost = -1;
 
@@ -835,13 +819,8 @@ lto_balanced_map (int n_lto_partitions, int max_partition_size)
 	    /* Watch for overflow.  */
 	    partition_size = INT_MAX / 16;
 
-<<<<<<< HEAD
-	  if (dump_file)
-	    fprintf (dump_file,
-=======
 	  if (symtab->dump_file)
 	    fprintf (symtab->dump_file,
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
 		     "Total size: %" PRId64 " partition_size: %" PRId64 "\n",
 		     total_size, partition_size);
 	  if (partition_size < PARAM_VALUE (MIN_PARTITION_SIZE))
@@ -868,25 +847,21 @@ lto_balanced_map (int n_lto_partitions, int max_partition_size)
   gcc_assert (next_nodes.length () || npartitions != 1 || !best_cost || best_cost == -1);
   add_sorted_nodes (next_nodes, partition);
 
-<<<<<<< HEAD
-  if (dump_file)
-=======
   if (symtab->dump_file)
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
     {
-      fprintf (dump_file, "\nPartition sizes:\n");
+      fprintf (symtab->dump_file, "\nPartition sizes:\n");
       unsigned partitions = ltrans_partitions.length ();
 
       for (unsigned i = 0; i < partitions ; i++)
 	{
 	  ltrans_partition p = ltrans_partitions[i];
-	  fprintf (dump_file, "partition %d contains %d (%2.2f%%)"
+	  fprintf (symtab->dump_file, "partition %d contains %d (%2.2f%%)"
 		   " symbols and %d (%2.2f%%) insns\n", i, p->symbols,
 		   100.0 * p->symbols / order.length (), p->insns,
 		   100.0 * p->insns / original_total_size);
 	}
 
-      fprintf (dump_file, "\n");
+      fprintf (symtab->dump_file, "\n");
     }
 }
 
@@ -901,8 +876,8 @@ must_not_rename (symtab_node *node, const char *name)
   if (node->lto_file_data
       && lto_get_decl_name_mapping (node->lto_file_data, name) != name)
     {
-      if (dump_file)
-	fprintf (dump_file,
+      if (symtab->dump_file)
+	fprintf (symtab->dump_file,
 		 "Not privatizing symbol name: %s. It privatized already.\n",
 		 name);
       return true;
@@ -913,8 +888,8 @@ must_not_rename (symtab_node *node, const char *name)
      that are not really clones.  */
   if (node->unique_name)
     {
-      if (dump_file)
-	fprintf (dump_file,
+      if (symtab->dump_file)
+	fprintf (symtab->dump_file,
 		 "Not privatizing symbol name: %s. Has unique name.\n",
 		 name);
       return true;
@@ -996,16 +971,16 @@ privatize_symbol_name_1 (symtab_node *node, tree decl)
 
   name = maybe_rewrite_identifier (name);
   symtab->change_decl_assembler_name (decl,
-				      clone_function_name_numbered (
-					  name, "lto_priv"));
+				      clone_function_name_1 (name,
+							     "lto_priv"));
 
   if (node->lto_file_data)
     lto_record_renamed_decl (node->lto_file_data, name,
 			     IDENTIFIER_POINTER
 			     (DECL_ASSEMBLER_NAME (decl)));
 
-  if (dump_file)
-    fprintf (dump_file,
+  if (symtab->dump_file)
+    fprintf (symtab->dump_file,
 	     "Privatizing symbol name: %s -> %s\n",
 	     name, IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (decl)));
 
@@ -1024,6 +999,30 @@ privatize_symbol_name (symtab_node *node)
 {
   if (!privatize_symbol_name_1 (node, node->decl))
     return false;
+
+  /* We could change name which is a target of transparent alias
+     chain of instrumented function name.  Fix alias chain if so  .*/
+  if (cgraph_node *cnode = dyn_cast <cgraph_node *> (node))
+    {
+      tree iname = NULL_TREE;
+      if (cnode->instrumentation_clone)
+	{
+	  /* If we want to privatize instrumentation clone
+	     then we also need to privatize original function.  */
+	  if (cnode->instrumented_version)
+	    privatize_symbol_name (cnode->instrumented_version);
+	  else
+	    privatize_symbol_name_1 (cnode, cnode->orig_decl);
+	  iname = DECL_ASSEMBLER_NAME (cnode->decl);
+	  TREE_CHAIN (iname) = DECL_ASSEMBLER_NAME (cnode->orig_decl);
+	}
+      else if (cnode->instrumented_version
+	       && cnode->instrumented_version->orig_decl == cnode->decl)
+	{
+	  iname = DECL_ASSEMBLER_NAME (cnode->instrumented_version->decl);
+	  TREE_CHAIN (iname) = DECL_ASSEMBLER_NAME (cnode->decl);
+	}
+    }
 
   return true;
 }
@@ -1050,8 +1049,8 @@ promote_symbol (symtab_node *node)
   TREE_PUBLIC (node->decl) = 1;
   DECL_VISIBILITY (node->decl) = VISIBILITY_HIDDEN;
   DECL_VISIBILITY_SPECIFIED (node->decl) = true;
-  if (dump_file)
-    fprintf (dump_file,
+  if (symtab->dump_file)
+    fprintf (symtab->dump_file,
 	     "Promoting as hidden: %s (%s)\n", node->name (),
 	     IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (node->decl)));
 
@@ -1067,8 +1066,8 @@ promote_symbol (symtab_node *node)
 	  TREE_PUBLIC (alias->decl) = 1;
 	  DECL_VISIBILITY (alias->decl) = VISIBILITY_HIDDEN;
 	  DECL_VISIBILITY_SPECIFIED (alias->decl) = true;
-	  if (dump_file)
-	    fprintf (dump_file,
+	  if (symtab->dump_file)
+	    fprintf (symtab->dump_file,
 		     "Promoting alias as hidden: %s\n",
 		     IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (node->decl)));
 	}
@@ -1134,8 +1133,8 @@ rename_statics (lto_symtab_encoder_t encoder, symtab_node *node)
   if (!s)
     return;
 
-  if (dump_file)
-    fprintf (dump_file,
+  if (symtab->dump_file)
+    fprintf (symtab->dump_file,
 	    "Renaming statics with asm name: %s\n", node->name ());
 
   /* Assign every symbol in the set that shares the same ASM name an unique

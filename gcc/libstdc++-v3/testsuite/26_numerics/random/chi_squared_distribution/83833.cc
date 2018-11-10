@@ -17,7 +17,6 @@
 
 // { dg-do run { target c++11 } }
 // { dg-additional-options "-ffloat-store" { target { m68*-*-* || ia32 } } }
-// { dg-require-cstdint "" }
 
 #include <random>
 #include <testsuite_hooks.h>

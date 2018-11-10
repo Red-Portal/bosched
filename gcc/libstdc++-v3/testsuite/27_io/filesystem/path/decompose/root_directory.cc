@@ -47,12 +47,7 @@ test02()
   {
     path rootdir = p.root_directory();
     VERIFY( !rootdir.has_relative_path() );
-    if (!rootdir.empty())
-#if defined(__MINGW32__) || defined(__MINGW64__)
-      VERIFY( rootdir.string() == "/" || rootdir.string() == "\\" );
-#else
-      VERIFY( rootdir.string() == "/" );
-#endif
+    VERIFY( rootdir.empty() || rootdir.native() == "/");
   }
 }
 

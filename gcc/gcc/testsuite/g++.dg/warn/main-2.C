@@ -7,8 +7,8 @@
 
 void f1();  
   
-void  /* { dg-error "1:.\:\:main. must return .int." } */
-main()
+void
+main()  /* { dg-error "must return" } */
 {     
   f1();  
 }  

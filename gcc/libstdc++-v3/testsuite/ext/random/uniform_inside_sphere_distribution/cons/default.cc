@@ -23,7 +23,6 @@
 
 #include <ext/random>
 #include <testsuite_hooks.h>
-#include <testsuite_common_types.h>
 
 void
 test01()
@@ -36,17 +35,9 @@ test01()
   __gnu_cxx::uniform_inside_sphere_distribution<5, float> u5;
 }
 
-void
-test02()
-{
-  __gnu_test::implicitly_default_constructible test;
-  test.operator()<__gnu_cxx::uniform_inside_sphere_distribution<2>>();
-  test.operator()<__gnu_cxx::uniform_inside_sphere_distribution<2>::param_type>();
-}
-
 int
 main()
 {
   test01();
-  test02();
+  return 0;
 }

@@ -64,7 +64,7 @@ spu_macro_to_expand (cpp_reader *pfile, const cpp_token *tok)
       if (ident)
 	{
 	  enum rid rid_code = (enum rid)(ident->rid_code);
-	  if (cpp_macro_p (ident))
+	  if (ident->type == NT_MACRO)
 	    {
 	      (void) cpp_get_token (pfile);
 	      tok = cpp_peek_token (pfile, 0);

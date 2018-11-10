@@ -104,8 +104,6 @@ func baseTypeName(x ast.Expr) (name string, imported bool) {
 			// assume type is imported
 			return t.Sel.Name, true
 		}
-	case *ast.ParenExpr:
-		return baseTypeName(t.X)
 	case *ast.StarExpr:
 		return baseTypeName(t.X)
 	}
@@ -391,32 +389,26 @@ func (r *reader) readFunc(fun *ast.FuncDecl) {
 		return
 	}
 
-	// Associate factory functions with the first visible result type, if that
-	// is the only type returned.
+	// associate factory functions with the first visible result type, if any
 	if fun.Type.Results.NumFields() >= 1 {
-		var typ *namedType // type to associate the function with
-		numResultTypes := 0
-		for _, res := range fun.Type.Results.List {
+		res := fun.Type.Results.List[0]
+		if len(res.Names) <= 1 {
 			// exactly one (named or anonymous) result associated
 			// with the first type in result signature (there may
 			// be more than one result)
 			factoryType := res.Type
-			if t, ok := factoryType.(*ast.ArrayType); ok {
-				// We consider functions that return slices or arrays of type
-				// T (or pointers to T) as factory functions of T.
+			if t, ok := factoryType.(*ast.ArrayType); ok && t.Len == nil {
+				// We consider functions that return slices of type T (or
+				// pointers to T) as factory functions of T.
 				factoryType = t.Elt
 			}
 			if n, imp := baseTypeName(factoryType); !imp && r.isVisible(n) {
-				if t := r.lookupType(n); t != nil {
-					typ = t
-					numResultTypes++
+				if typ := r.lookupType(n); typ != nil {
+					// associate function with typ
+					typ.funcs.set(fun)
+					return
 				}
 			}
-		}
-		// If there is exactly one result type, associate the function with that type.
-		if numResultTypes == 1 {
-			typ.funcs.set(fun)
-			return
 		}
 	}
 

@@ -64,11 +64,7 @@
 #    define SIZE 240
 #  endif
 #elif defined (__riscv)
-#  if defined (__riscv_32e)
-#    define SIZE 252
-#  else
-#    define SIZE 240
-#  endif
+#  define SIZE 240
 #elif defined (__AVR__)
 #if defined (__AVR_3_BYTE_PC__ )
 #  define SIZE 251 /* 256 - 2 bytes for Y - 3 bytes for return address */
@@ -101,8 +97,6 @@
 #define SIZE 252
 #elif defined (__M32R__)
 #define SIZE 252
-#elif defined (__csky__)
-#  define SIZE 252
 #else
 #  define SIZE 256
 #endif

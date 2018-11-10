@@ -30,14 +30,14 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #include <limits.h>
 
 
-#if defined (HAVE_GFC_UINTEGER_4) && defined (HAVE_GFC_INTEGER_8)
+#if defined (HAVE_GFC_INTEGER_4) && defined (HAVE_GFC_INTEGER_8)
 
 #define HAVE_BACK_ARG 1
 
 static inline int
-compare_fcn (const GFC_UINTEGER_4 *a, const GFC_UINTEGER_4 *b, gfc_charlen_type n)
+compare_fcn (const GFC_INTEGER_4 *a, const GFC_INTEGER_4 *b, gfc_charlen_type n)
 {
-  if (sizeof (GFC_UINTEGER_4) == 1)
+  if (sizeof (GFC_INTEGER_4) == 1)
     return memcmp (a, b, n);
   else
     return memcmp_char4 (a, b, n);
@@ -56,10 +56,14 @@ maxloc0_8_s4 (gfc_array_i8 * const restrict retarray,
   index_type extent[GFC_MAX_DIMENSIONS];
   index_type sstride[GFC_MAX_DIMENSIONS];
   index_type dstride;
-  const GFC_UINTEGER_4 *base;
+  const GFC_INTEGER_4 *base;
   GFC_INTEGER_8 * restrict dest;
   index_type rank;
   index_type n;
+
+#ifdef HAVE_BACK_ARG
+  assert (back == 0);
+#endif
 
   rank = GFC_DESCRIPTOR_RANK (array);
   if (rank <= 0)
@@ -102,8 +106,8 @@ maxloc0_8_s4 (gfc_array_i8 * const restrict retarray,
     dest[n * dstride] = 1;
   {
 
-  const GFC_UINTEGER_4 *maxval;
-   maxval = NULL;
+  const GFC_INTEGER_4 *maxval;
+   maxval = base;
 
   while (base)
     {
@@ -111,8 +115,7 @@ maxloc0_8_s4 (gfc_array_i8 * const restrict retarray,
 	{
 	  /* Implementation start.  */
 
-    if (maxval == NULL || (back ? compare_fcn (base, maxval, len) >= 0 :
-     		   	   	   compare_fcn (base, maxval, len) > 0))
+  if (compare_fcn (base, maxval, len) > 0)
     {
       maxval = base;
       for (n = 0; n < rank; n++)
@@ -168,12 +171,15 @@ mmaxloc0_8_s4 (gfc_array_i8 * const restrict retarray,
   index_type mstride[GFC_MAX_DIMENSIONS];
   index_type dstride;
   GFC_INTEGER_8 *dest;
-  const GFC_UINTEGER_4 *base;
+  const GFC_INTEGER_4 *base;
   GFC_LOGICAL_1 *mbase;
   int rank;
   index_type n;
   int mask_kind;
 
+#ifdef HAVE_BACK_ARG
+  assert (back == 0);
+#endif
   rank = GFC_DESCRIPTOR_RANK (array);
   if (rank <= 0)
     runtime_error ("Rank of array needs to be > 0");
@@ -234,7 +240,7 @@ mmaxloc0_8_s4 (gfc_array_i8 * const restrict retarray,
     dest[n * dstride] = 0;
   {
 
-  const GFC_UINTEGER_4 *maxval;
+  const GFC_INTEGER_4 *maxval;
 
   maxval = NULL;
 
@@ -244,9 +250,7 @@ mmaxloc0_8_s4 (gfc_array_i8 * const restrict retarray,
 	{
 	  /* Implementation start.  */
 
-  if (*mbase &&
-        (maxval == NULL || (back ? compare_fcn (base, maxval, len) >= 0:
-		   	   	   compare_fcn (base, maxval, len) > 0)))
+  if (*mbase && (maxval == NULL || compare_fcn (base, maxval, len) > 0))
     {
       maxval = base;
       for (n = 0; n < rank; n++)

@@ -1,4 +1,5 @@
 ! { dg-do run }
+! { dg-options "-fwhole-file" }
 !
 ! PR fortran/19107
 ! -fwhole-file flag added for PR fortran/44945

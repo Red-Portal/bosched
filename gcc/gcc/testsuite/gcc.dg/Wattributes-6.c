@@ -39,13 +39,13 @@ PackedPacked { int i; };
    aligned and packed on a function declaration.  */
 
 void ATTR ((aligned (8), packed))
-faligned8_1 (void);           /* { dg-warning "ignoring attribute .packed. because it conflicts with attribute .aligned." } */
+faligned8_1 (void);           /* { dg-warning ".packed. attribute ignored" } */
 
 void ATTR ((aligned (8)))
-faligned8_2 (void);           /* { dg-message "previous declaration here" } */
+faligned8_2 (void);           /* { dg-message "previous declaration here" "" { xfail *-*-* } } */
 
 void ATTR ((packed))
-faligned8_2 (void);           /* { dg-warning "ignoring attribute .packed. because it conflicts with attribute .aligned." } */
+faligned8_2 (void);           /* { dg-warning ".packed. attribute ignored" } */
 
 /* Exercise the handling of the mutually exclusive attributes
    always_inline and noinline (in that order).  */

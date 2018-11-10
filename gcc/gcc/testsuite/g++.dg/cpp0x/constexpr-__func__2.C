@@ -1,5 +1,5 @@
 // PR c++/70353
-// { dg-do compile { target c++11 } }
+// { dg-do link { target c++11 } }
 
 constexpr const char* ce ()
 {
@@ -8,5 +8,6 @@ constexpr const char* ce ()
 
 const char *c = ce();
 
-#define SA(X) static_assert((X),#X)
-SA(ce()[0] == 'c');
+int main()
+{
+}

@@ -516,4 +516,8 @@ do {                                                            \
 
 #define FUNCTION_MODE SImode
 
+#ifndef NO_IMPLICIT_EXTERN_C
+#define NO_IMPLICIT_EXTERN_C
+#endif
+
 #define STORE_FLAG_VALUE 1

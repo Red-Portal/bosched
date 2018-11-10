@@ -9,7 +9,6 @@
 package gosym
 
 import (
-	"bytes"
 	"encoding/binary"
 	"sync"
 )
@@ -43,7 +42,6 @@ type LineTable struct {
 	filetab  []byte
 	nfiletab uint32
 	fileMap  map[string]uint32
-	strings  map[uint32]string // interned substrings of Data, keyed by offset
 }
 
 // NOTE(rsc): This is wrong for GOARCH=arm, which uses a quantum of 4,
@@ -122,7 +120,7 @@ func (t *LineTable) LineToPC(line int, maxpc uint64) uint64 {
 // Text must be the start address of the
 // corresponding text segment.
 func NewLineTable(data []byte, text uint64) *LineTable {
-	return &LineTable{Data: data, PC: text, Line: 0, strings: make(map[uint32]string)}
+	return &LineTable{Data: data, PC: text, Line: 0}
 }
 
 // Go 1.2 symbol table format.
@@ -268,13 +266,11 @@ func (t *LineTable) readvarint(pp *[]byte) uint32 {
 
 // string returns a Go string found at off.
 func (t *LineTable) string(off uint32) string {
-	if s, ok := t.strings[off]; ok {
-		return s
+	for i := off; ; i++ {
+		if t.Data[i] == 0 {
+			return string(t.Data[off:i])
+		}
 	}
-	i := bytes.IndexByte(t.Data[off:], 0)
-	s := string(t.Data[off : off+uint32(i)])
-	t.strings[off] = s
-	return s
 }
 
 // step advances to the next pc, value pair in the encoded table.

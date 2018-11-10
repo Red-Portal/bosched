@@ -1,9 +1,5 @@
 /* PR tree-optimization/86274 - SEGFAULT when logging std::to_string(NAN)
    { dg-do compile }
-<<<<<<< HEAD
-   { dg-skip-if "not IEEE float layout" { "pdp11-*-*" } }
-=======
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
    { dg-options "-O2 -Wall -fdump-tree-optimized" }  */
 
 typedef __SIZE_TYPE__ size_t;
@@ -90,9 +86,5 @@ void test_warn_sprintf_f (double x)
 
 /* { dg-final { scan-tree-dump-times "call_in_true_branch_not_eliminated_" 0 "optimized" } }
    { dg-final { scan-tree-dump-times "call_made_in_true_branch_" 6 "optimized" } }
-<<<<<<< HEAD
-   { dg-final { scan-tree-dump-times "call_made_in_false_branch_" 6 "optimized" } } */
-=======
    { dg-final { scan-tree-dump-times "call_made_in_false_branch_" 6 "optimized" } }
  */
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf

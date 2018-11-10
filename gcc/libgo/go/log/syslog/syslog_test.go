@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build !windows,!nacl,!plan9,!js
+// +build !windows,!nacl,!plan9
 
 package syslog
 
@@ -214,9 +214,6 @@ func TestNew(t *testing.T) {
 
 	s, err := New(LOG_INFO|LOG_USER, "the_tag")
 	if err != nil {
-		if err.Error() == "Unix syslog delivery error" {
-			t.Skip("skipping: syslogd not running")
-		}
 		t.Fatalf("New() failed: %s", err)
 	}
 	// Don't send any messages.
@@ -229,9 +226,6 @@ func TestNewLogger(t *testing.T) {
 	}
 	f, err := NewLogger(LOG_USER|LOG_INFO, 0)
 	if f == nil {
-		if err.Error() == "Unix syslog delivery error" {
-			t.Skip("skipping: syslogd not running")
-		}
 		t.Error(err)
 	}
 }
@@ -250,9 +244,6 @@ func TestDial(t *testing.T) {
 	}
 	l, err := Dial("", "", LOG_USER|LOG_ERR, "syslog_test")
 	if err != nil {
-		if err.Error() == "Unix syslog delivery error" {
-			t.Skip("skipping: syslogd not running")
-		}
 		t.Fatalf("Dial() failed: %s", err)
 	}
 	l.Close()

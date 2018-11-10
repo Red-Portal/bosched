@@ -5,5 +5,6 @@ namespace A {
 }
 
 namespace B {
-  int j = i;	// { dg-error "'i' was not declared in this scope; did you mean 'A::i'" } 
+  int j = i;	// { dg-error "" } 
+  // { dg-message "suggested alternative" "suggested alternative" { target *-*-* } .-1 }
 }

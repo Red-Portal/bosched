@@ -694,7 +694,6 @@ package body Clean is
             Arg : constant String := Argument (Index);
 
             procedure Bad_Argument;
-            pragma No_Return (Bad_Argument);
             --  Signal bad argument
 
             ------------------

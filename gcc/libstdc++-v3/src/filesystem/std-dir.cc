@@ -37,7 +37,6 @@
 #include "dir-common.h"
 
 namespace fs = std::filesystem;
-namespace posix = std::filesystem::__gnu_posix;
 
 struct fs::_Dir : _Dir_base
 {
@@ -48,7 +47,7 @@ struct fs::_Dir : _Dir_base
       path = p;
   }
 
-  _Dir(posix::DIR* dirp, const path& p) : _Dir_base(dirp), path(p) { }
+  _Dir(DIR* dirp, const path& p) : _Dir_base(dirp), path(p) { }
 
   _Dir(_Dir&&) = default;
 
@@ -181,7 +180,7 @@ recursive_directory_iterator(const path& p, directory_options options,
                              error_code* ecptr)
 : _M_options(options), _M_pending(true)
 {
-  if (posix::DIR* dirp = posix::opendir(p.c_str()))
+  if (DIR* dirp = ::opendir(p.c_str()))
     {
       if (ecptr)
 	ecptr->clear();

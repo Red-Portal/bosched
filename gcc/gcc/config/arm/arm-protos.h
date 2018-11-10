@@ -56,8 +56,6 @@ extern void arm_atomic_assign_expand_fenv (tree *hold, tree *clear, tree *update
 extern rtx arm_simd_vect_par_cnst_half (machine_mode mode, bool high);
 extern bool arm_simd_check_vect_par_cnst_half_p (rtx op, machine_mode mode,
 						 bool high);
-extern void arm_emit_speculation_barrier_function (void);
-
 #ifdef RTX_CODE
 extern void arm_gen_unlikely_cbranch (enum rtx_code, machine_mode cc_mode,
 				      rtx label_ref);
@@ -375,14 +373,14 @@ extern void arm_lang_object_attributes_init (void);
 extern void arm_register_target_pragmas (void);
 extern void arm_cpu_cpp_builtins (struct cpp_reader *);
 
-/* Defined in arm-d.c  */
-extern void arm_d_target_versions (void);
-
 extern bool arm_is_constant_pool_ref (rtx);
 
 /* The bits in this mask specify which instruction scheduling options should
    be used.  */
 extern unsigned int tune_flags;
+
+/* Nonzero if this chip supports the ARM Architecture 3M extensions.  */
+extern int arm_arch3m;
 
 /* Nonzero if this chip supports the ARM Architecture 4 extensions.  */
 extern int arm_arch4;
@@ -390,11 +388,11 @@ extern int arm_arch4;
 /* Nonzero if this chip supports the ARM Architecture 4t extensions.  */
 extern int arm_arch4t;
 
-/* Nonzero if this chip supports the ARM Architecture 5t extensions.  */
-extern int arm_arch5t;
+/* Nonzero if this chip supports the ARM Architecture 5 extensions.  */
+extern int arm_arch5;
 
-/* Nonzero if this chip supports the ARM Architecture 5te extensions.  */
-extern int arm_arch5te;
+/* Nonzero if this chip supports the ARM Architecture 5E extensions.  */
+extern int arm_arch5e;
 
 /* Nonzero if this chip supports the ARM Architecture 6 extensions.  */
 extern int arm_arch6;

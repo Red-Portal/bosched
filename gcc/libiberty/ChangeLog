@@ -1,82 +1,15 @@
-<<<<<<< HEAD
-2018-10-31  Joseph Myers  <joseph@codesourcery.com>
-
-	PR bootstrap/82856
-	Merge from binutils-gdb:
-	2018-06-19  Simon Marchi  <simon.marchi@ericsson.com>
-
-	* configure.ac: Remove AC_PREREQ.
-	* configure: Re-generate.
-	* config.in: Re-generate.
-
-2018-10-01  Nathan Sidwell  <nathan@acm.org>
-
-	* configure.ac (checkfuncs): Add pipe2.
-	* config.in, configure: Rebuilt.
-	* pex-unix.c (pex_unix_exec_child): Comminicate errors from child
-	to parent with a pipe, when possible.
-
-2018-08-23  Nathan Sidwell  <nathan@acm.org>
-	    Martin Liska  <mliska@suse.cz>
-
-	PR driver/87056
-	* pex-unix.c (pex_unix_exec_child): Duplicate bad_fn into local
-	scopes to avoid potential clobber.
-
-2018-08-20  Nathan Sidwell  <nathan@acm.org>
-
-	* pex-unix.c (pex_child_error): Delete.
-	(pex_unix_exec_child): Commonize error paths to single message &
-	exit.
-
-2018-07-30  Tom Tromey  <tom@tromey.com>
-
-	* cplus-dem.c (remember_Btype): Don't call memcpy with LEN==0.
-
-2018-07-26  Martin Liska  <mliska@suse.cz>
-
-	PR lto/86548
-	* make-temp-file.c (TEMP_FILE): Remove leading 'cc'.
-	(make_temp_file): Call make_temp_file_with_prefix with
-	first argument set to NULL.
-	(make_temp_file_with_prefix): Support also prefix.
-=======
 2018-07-26  Release Manager
 
 	* GCC 8.2.0 released.
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
 
 2018-07-19  Eli Zaretskii  <eliz@gnu.org>
 
 	* simple-object-elf.c (ENOTSUP): If not defined by errno.h, redirect
 	to ENOSYS.
 
-<<<<<<< HEAD
-2018-05-30  Jan Hubicka  <hubicka@ucw.cz>
-
-	* simple-object.c (handle_lto_debug_sections): Add rename parameter.
-	(handle_lto_debug_sections_rename): New function.
-	(handle_lto_debug_sections_norename): New function.
-	(simple_object_copy_lto_debug_sections): Add rename parameter.
-
-2018-05-28  Bernd Edlinger  <bernd.edlinger@hotmail.de>
-
-	* splay-tree.c (splay_tree_compare_strings,
-	splay_tree_delete_pointers): New utility functions.
-
-2018-05-10  Martin Liska  <mliska@suse.cz>
-
-	PR bootstrap/64914
-	* md5.c: Use strict alignment with UBSAN_BOOTSTRAP.
-
-2018-04-30  Daniel van Gerpen  <daniel@vangerpen.de>
-
-	* argv.c (expandargv): Fix memory leak for copied argv.
-=======
 2018-05-02  Release Manager
 
 	* GCC 8.1.0 released.
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
 
 2018-04-13  Rainer Orth  <ro@CeBiTec.Uni-Bielefeld.DE>
 
@@ -958,8 +891,8 @@
 	* functions.texi: Regenerate.
 
 2014-12-11  Uros Bizjak  <ubizjak@gmail.com>
-	    Ben Elliston  <bje@au.ibm.com>
-	    Manuel Lopez-Ibanez  <manu@gcc.gnu.org>
+            Ben Elliston  <bje@au.ibm.com>
+            Manuel Lopez-Ibanez  <manu@gcc.gnu.org>
 
 	* xvasprintf.c: New file.
 	* vprintf-support.h: Likewise.

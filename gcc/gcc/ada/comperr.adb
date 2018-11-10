@@ -484,9 +484,7 @@ package body Comperr is
 
          --  No SCIL file generated for generic package declarations
 
-         when N_Generic_Package_Declaration
-            | N_Generic_Package_Renaming_Declaration
-         =>
+         when N_Generic_Package_Declaration =>
             return;
 
          --  Should never happen, but can be ignored in production

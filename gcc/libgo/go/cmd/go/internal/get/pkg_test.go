@@ -33,18 +33,15 @@ func TestFoldDup(t *testing.T) {
 
 var parseMetaGoImportsTests = []struct {
 	in  string
-	mod ModuleMode
 	out []metaImport
 }{
 	{
 		`<meta name="go-import" content="foo/bar git https://github.com/rsc/foo/bar">`,
-		IgnoreMod,
 		[]metaImport{{"foo/bar", "git", "https://github.com/rsc/foo/bar"}},
 	},
 	{
 		`<meta name="go-import" content="foo/bar git https://github.com/rsc/foo/bar">
 		<meta name="go-import" content="baz/quux git http://github.com/rsc/baz/quux">`,
-		IgnoreMod,
 		[]metaImport{
 			{"foo/bar", "git", "https://github.com/rsc/foo/bar"},
 			{"baz/quux", "git", "http://github.com/rsc/baz/quux"},
@@ -53,10 +50,6 @@ var parseMetaGoImportsTests = []struct {
 	{
 		`<meta name="go-import" content="foo/bar git https://github.com/rsc/foo/bar">
 		<meta name="go-import" content="foo/bar mod http://github.com/rsc/baz/quux">`,
-<<<<<<< HEAD
-		IgnoreMod,
-=======
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
 		[]metaImport{
 			{"foo/bar", "git", "https://github.com/rsc/foo/bar"},
 		},
@@ -64,71 +57,35 @@ var parseMetaGoImportsTests = []struct {
 	{
 		`<meta name="go-import" content="foo/bar mod http://github.com/rsc/baz/quux">
 		<meta name="go-import" content="foo/bar git https://github.com/rsc/foo/bar">`,
-<<<<<<< HEAD
-		IgnoreMod,
-=======
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
 		[]metaImport{
 			{"foo/bar", "git", "https://github.com/rsc/foo/bar"},
 		},
 	},
 	{
-<<<<<<< HEAD
-		`<meta name="go-import" content="foo/bar mod http://github.com/rsc/baz/quux">
-		<meta name="go-import" content="foo/bar git https://github.com/rsc/foo/bar">`,
-		PreferMod,
-		[]metaImport{
-			{"foo/bar", "mod", "http://github.com/rsc/baz/quux"},
-		},
-	},
-	{
-=======
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
 		`<head>
 		<meta name="go-import" content="foo/bar git https://github.com/rsc/foo/bar">
 		</head>`,
-		IgnoreMod,
 		[]metaImport{{"foo/bar", "git", "https://github.com/rsc/foo/bar"}},
 	},
 	{
 		`<meta name="go-import" content="foo/bar git https://github.com/rsc/foo/bar">
 		<body>`,
-		IgnoreMod,
 		[]metaImport{{"foo/bar", "git", "https://github.com/rsc/foo/bar"}},
 	},
 	{
 		`<!doctype html><meta name="go-import" content="foo/bar git https://github.com/rsc/foo/bar">`,
-		IgnoreMod,
 		[]metaImport{{"foo/bar", "git", "https://github.com/rsc/foo/bar"}},
 	},
 	{
 		// XML doesn't like <div style=position:relative>.
 		`<!doctype html><title>Page Not Found</title><meta name=go-import content="chitin.io/chitin git https://github.com/chitin-io/chitin"><div style=position:relative>DRAFT</div>`,
-		IgnoreMod,
 		[]metaImport{{"chitin.io/chitin", "git", "https://github.com/chitin-io/chitin"}},
-	},
-	{
-		`<meta name="go-import" content="myitcv.io git https://github.com/myitcv/x">
-	        <meta name="go-import" content="myitcv.io/blah2 mod https://raw.githubusercontent.com/myitcv/pubx/master">
-	        `,
-		IgnoreMod,
-		[]metaImport{{"myitcv.io", "git", "https://github.com/myitcv/x"}},
-	},
-	{
-		`<meta name="go-import" content="myitcv.io git https://github.com/myitcv/x">
-	        <meta name="go-import" content="myitcv.io/blah2 mod https://raw.githubusercontent.com/myitcv/pubx/master">
-	        `,
-		PreferMod,
-		[]metaImport{
-			{"myitcv.io/blah2", "mod", "https://raw.githubusercontent.com/myitcv/pubx/master"},
-			{"myitcv.io", "git", "https://github.com/myitcv/x"},
-		},
 	},
 }
 
 func TestParseMetaGoImports(t *testing.T) {
 	for i, tt := range parseMetaGoImportsTests {
-		out, err := parseMetaGoImports(strings.NewReader(tt.in), tt.mod)
+		out, err := parseMetaGoImports(strings.NewReader(tt.in))
 		if err != nil {
 			t.Errorf("test#%d: %v", i, err)
 			continue

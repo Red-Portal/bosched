@@ -99,7 +99,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "explow.h"
 #include "insn-attr.h"
 #include "rtlhooks-def.h"
-#include "expr.h"
 #include "params.h"
 #include "tree-pass.h"
 #include "valtrack.h"
@@ -571,7 +570,6 @@ find_single_use_1 (rtx dest, rtx *loc)
     case SYMBOL_REF:
     CASE_CONST_ANY:
     case CLOBBER:
-    case CLOBBER_HIGH:
       return 0;
 
     case SET:
@@ -1754,9 +1752,6 @@ set_nonzero_bits_and_sign_copies (rtx x, const_rtx set, void *data)
 	  return;
 	}
 
-      /* Should not happen as we only using pseduo registers.  */
-      gcc_assert (GET_CODE (set) != CLOBBER_HIGH);
-
       /* If this register is being initialized using itself, and the
 	 register is uninitialized in this basic block, and there are
 	 no LOG_LINKS which set the register, then part of the
@@ -1915,7 +1910,6 @@ can_combine_p (rtx_insn *insn, rtx_insn *i3, rtx_insn *pred ATTRIBUTE_UNUSED,
 
 	      /* We can ignore CLOBBERs.  */
 	    case CLOBBER:
-	    case CLOBBER_HIGH:
 	      break;
 
 	    case SET:
@@ -2349,7 +2343,8 @@ cant_combine_insn_p (rtx_insn *insn)
     dest = SUBREG_REG (dest);
   if (REG_P (src) && REG_P (dest)
       && ((HARD_REGISTER_P (src)
-	   && ! TEST_HARD_REG_BIT (fixed_reg_set, REGNO (src)))
+	   && ! TEST_HARD_REG_BIT (fixed_reg_set, REGNO (src))
+	   && targetm.class_likely_spilled_p (REGNO_REG_CLASS (REGNO (src))))
 	  || (HARD_REGISTER_P (dest)
 	      && ! TEST_HARD_REG_BIT (fixed_reg_set, REGNO (dest))
 	      && targetm.class_likely_spilled_p (REGNO_REG_CLASS (REGNO (dest))))))
@@ -2575,17 +2570,10 @@ is_parallel_of_n_reg_sets (rtx pat, int n)
 	|| !REG_P (SET_DEST (XVECEXP (pat, 0, i))))
       return false;
   for ( ; i < len; i++)
-    switch (GET_CODE (XVECEXP (pat, 0, i)))
-      {
-      case CLOBBER:
-	if (XEXP (XVECEXP (pat, 0, i), 0) == const0_rtx)
-	  return false;
-	break;
-      case CLOBBER_HIGH:
-	break;
-      default:
-	return false;
-      }
+    if (GET_CODE (XVECEXP (pat, 0, i)) != CLOBBER
+	|| XEXP (XVECEXP (pat, 0, i), 0) == const0_rtx)
+      return false;
+
   return true;
 }
 
@@ -2614,17 +2602,6 @@ can_split_parallel_of_n_reg_sets (rtx_insn *insn, int n)
     }
 
   return true;
-}
-
-/* Return whether X is just a single set, with the source
-   a general_operand.  */
-static bool
-is_just_move (rtx x)
-{
-  if (INSN_P (x))
-    x = PATTERN (x);
-
-  return (GET_CODE (x) == SET && general_operand (SET_SRC (x), VOIDmode));
 }
 
 /* Try to combine the insns I0, I1 and I2 into I3.
@@ -2691,7 +2668,6 @@ try_combine (rtx_insn *i3, rtx_insn *i2, rtx_insn *i1, rtx_insn *i0,
   int swap_i2i3 = 0;
   int split_i2i3 = 0;
   int changed_i3_dest = 0;
-  bool i2_was_move = false, i3_was_move = false;
 
   int maxreg;
   rtx_insn *temp_insn;
@@ -2872,8 +2848,7 @@ try_combine (rtx_insn *i3, rtx_insn *i2, rtx_insn *i1, rtx_insn *i0,
       for (i = 0; ok && i < XVECLEN (p2, 0); i++)
 	{
 	  if ((GET_CODE (XVECEXP (p2, 0, i)) == SET
-	       || GET_CODE (XVECEXP (p2, 0, i)) == CLOBBER
-	       || GET_CODE (XVECEXP (p2, 0, i)) == CLOBBER_HIGH)
+	       || GET_CODE (XVECEXP (p2, 0, i)) == CLOBBER)
 	      && reg_overlap_mentioned_p (SET_DEST (PATTERN (i3)),
 					  SET_DEST (XVECEXP (p2, 0, i))))
 	    ok = false;
@@ -3083,10 +3058,6 @@ try_combine (rtx_insn *i3, rtx_insn *i2, rtx_insn *i1, rtx_insn *i0,
       undo_all ();
       return 0;
     }
-
-  /* Record whether i2 and i3 are trivial moves.  */
-  i2_was_move = is_just_move (i2);
-  i3_was_move = is_just_move (i3);
 
   /* Record whether I2DEST is used in I2SRC and similarly for the other
      cases.  Knowing this will help in register status updating below.  */
@@ -3310,7 +3281,7 @@ try_combine (rtx_insn *i3, rtx_insn *i2, rtx_insn *i1, rtx_insn *i0,
 		{
 		  /* Replace cc_use_loc with entire new RTX.  */
 		  SUBST (*cc_use_loc,
-			 gen_rtx_fmt_ee (compare_code, GET_MODE (*cc_use_loc),
+			 gen_rtx_fmt_ee (compare_code, compare_mode,
 					 newpat_dest, const0_rtx));
 		  undobuf.other_insn = cc_use_insn;
 		}
@@ -3319,7 +3290,7 @@ try_combine (rtx_insn *i3, rtx_insn *i2, rtx_insn *i1, rtx_insn *i0,
 		  /* Just replace the CC reg with a new mode.  */
 		  SUBST (XEXP (*cc_use_loc, 0), newpat_dest);
 		  undobuf.other_insn = cc_use_insn;
-		}
+		}	      
 	    }
 
 	  /* Now we modify the current newpat:
@@ -4046,10 +4017,8 @@ try_combine (rtx_insn *i3, rtx_insn *i2, rtx_insn *i1, rtx_insn *i0,
 	   && XVECLEN (newpat, 0) == 2
 	   && GET_CODE (XVECEXP (newpat, 0, 0)) == SET
 	   && GET_CODE (XVECEXP (newpat, 0, 1)) == SET
-	   && (i1
-	       || set_noop_p (XVECEXP (newpat, 0, 0))
-	       || set_noop_p (XVECEXP (newpat, 0, 1))
-	       || (!i2_was_move && !i3_was_move))
+	   && (i1 || set_noop_p (XVECEXP (newpat, 0, 0))
+		  || set_noop_p (XVECEXP (newpat, 0, 1)))
 	   && GET_CODE (SET_DEST (XVECEXP (newpat, 0, 0))) != ZERO_EXTRACT
 	   && GET_CODE (SET_DEST (XVECEXP (newpat, 0, 0))) != STRICT_LOW_PART
 	   && GET_CODE (SET_DEST (XVECEXP (newpat, 0, 1))) != ZERO_EXTRACT
@@ -6015,11 +5984,8 @@ combine_simplify_rtx (rtx x, machine_mode op0_mode, int in_dest,
 			      GET_MODE_MASK (mode), 0));
 
       /* We can truncate a constant value and return it.  */
-      {
-	poly_int64 c;
-	if (poly_int_rtx_p (XEXP (x, 0), &c))
-	  return gen_int_mode (c, mode);
-      }
+      if (CONST_INT_P (XEXP (x, 0)))
+	return gen_int_mode (INTVAL (XEXP (x, 0)), mode);
 
       /* Similarly to what we do in simplify-rtx.c, a truncate of a register
 	 whose value is a comparison can be replaced with a subreg if
@@ -8740,7 +8706,6 @@ force_int_to_mode (rtx x, scalar_int_mode mode, scalar_int_mode xmode,
   int next_select = just_select || code == XOR || code == NOT || code == NEG;
   unsigned HOST_WIDE_INT fuller_mask;
   rtx op0, op1, temp;
-  poly_int64 const_op0;
 
   /* When we have an arithmetic operation, or a shift whose count we
      do not know, we need to assume that all bits up to the highest-order
@@ -8864,8 +8829,8 @@ force_int_to_mode (rtx x, scalar_int_mode mode, scalar_int_mode xmode,
     case MINUS:
       /* If X is (minus C Y) where C's least set bit is larger than any bit
 	 in the mask, then we may replace with (neg Y).  */
-      if (poly_int_rtx_p (XEXP (x, 0), &const_op0)
-	  && (unsigned HOST_WIDE_INT) known_alignment (const_op0) > mask)
+      if (CONST_INT_P (XEXP (x, 0))
+	  && least_bit_hwi (UINTVAL (XEXP (x, 0))) > mask)
 	{
 	  x = simplify_gen_unary (NEG, xmode, XEXP (x, 1), xmode);
 	  return force_to_mode (x, mode, mask, next_select);
@@ -10207,8 +10172,7 @@ reg_nonzero_bits_for_combine (const_rtx x, scalar_int_mode xmode,
   rsp = &reg_stat[REGNO (x)];
   if (rsp->last_set_value != 0
       && (rsp->last_set_mode == mode
-	  || (REGNO (x) >= FIRST_PSEUDO_REGISTER
-	      && GET_MODE_CLASS (rsp->last_set_mode) == MODE_INT
+	  || (GET_MODE_CLASS (rsp->last_set_mode) == MODE_INT
 	      && GET_MODE_CLASS (mode) == MODE_INT))
       && ((rsp->last_set_label >= label_tick_ebb_start
 	   && rsp->last_set_label < label_tick)
@@ -13335,15 +13299,6 @@ record_dead_and_set_regs_1 (rtx dest, const_rtx setter, void *data)
 			      ? SET_SRC (setter)
 			      : gen_lowpart (GET_MODE (dest),
 					     SET_SRC (setter)));
-      else if (GET_CODE (setter) == CLOBBER_HIGH)
-	{
-	  reg_stat_type *rsp = &reg_stat[REGNO (dest)];
-	  if (rsp->last_set_value
-	      && reg_is_clobbered_by_clobber_high
-		   (REGNO (dest), GET_MODE (rsp->last_set_value),
-		    XEXP (setter, 0)))
-	    record_value_for_reg (dest, NULL, NULL_RTX);
-	}
       else
 	record_value_for_reg (dest, record_dead_insn, NULL_RTX);
     }
@@ -13764,7 +13719,6 @@ get_last_value (const_rtx x)
 
 static unsigned int reg_dead_regno, reg_dead_endregno;
 static int reg_dead_flag;
-rtx reg_dead_reg;
 
 /* Function called via note_stores from reg_dead_at_p.
 
@@ -13777,10 +13731,6 @@ reg_dead_at_p_1 (rtx dest, const_rtx x, void *data ATTRIBUTE_UNUSED)
   unsigned int regno, endregno;
 
   if (!REG_P (dest))
-    return;
-
-  if (GET_CODE (x) == CLOBBER_HIGH
-      && !reg_is_clobbered_by_clobber_high (reg_dead_reg, XEXP (x, 0)))
     return;
 
   regno = REGNO (dest);
@@ -13806,7 +13756,6 @@ reg_dead_at_p (rtx reg, rtx_insn *insn)
   /* Set variables for reg_dead_at_p_1.  */
   reg_dead_regno = REGNO (reg);
   reg_dead_endregno = END_REGNO (reg);
-  reg_dead_reg = reg;
 
   reg_dead_flag = 0;
 
@@ -14935,50 +14884,11 @@ dump_combine_total_stats (FILE *file)
      total_attempts, total_merges, total_extras, total_successes);
 }
 
-/* Make pseudo-to-pseudo copies after every hard-reg-to-pseudo-copy, because
-   the reg-to-reg copy can usefully combine with later instructions, but we
-   do not want to combine the hard reg into later instructions, for that
-   restricts register allocation.  */
-static void
-make_more_copies (void)
-{
-  basic_block bb;
-
-  FOR_EACH_BB_FN (bb, cfun)
-    {
-      rtx_insn *insn;
-
-      FOR_BB_INSNS (bb, insn)
-        {
-          if (!NONDEBUG_INSN_P (insn))
-            continue;
-
-	  rtx set = single_set (insn);
-	  if (!set)
-	    continue;
-	  rtx dest = SET_DEST (set);
-	  if (dest == pc_rtx)
-	    continue;
-	  rtx src = SET_SRC (set);
-	  if (!(REG_P (src) && HARD_REGISTER_P (src)))
-	    continue;
-	  if (TEST_HARD_REG_BIT (fixed_reg_set, REGNO (src)))
-	    continue;
-
-	  rtx new_reg = gen_reg_rtx (GET_MODE (dest));
-	  rtx_insn *new_insn = gen_move_insn (new_reg, src);
-	  SET_SRC (set) = new_reg;
-	  emit_insn_before (new_insn, insn);
-	  df_insn_rescan (insn);
-	}
-    }
-}
-
 /* Try combining insns through substitution.  */
 static unsigned int
 rest_of_handle_combine (void)
 {
-  make_more_copies ();
+  int rebuild_jump_labels_after_combine;
 
   df_set_flags (DF_LR_RUN_DCE + DF_DEFER_INSN_RESCAN);
   df_note_add_problem ();
@@ -14987,7 +14897,7 @@ rest_of_handle_combine (void)
   regstat_init_n_sets_and_refs ();
   reg_n_sets_max = max_reg_num ();
 
-  int rebuild_jump_labels_after_combine
+  rebuild_jump_labels_after_combine
     = combine_instructions (get_insns (), max_reg_num ());
 
   /* Combining insns may have turned an indirect jump into a

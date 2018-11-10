@@ -138,6 +138,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "dbgcnt.h"
 #include "params.h"
 #include "builtins.h"
+#include "tree-chkp.h"
 #include "cfgloop.h"
 #include "stor-layout.h"
 #include "optabs-query.h"
@@ -807,7 +808,7 @@ surely_varying_stmt_p (gimple *stmt)
       tree fndecl, fntype = gimple_call_fntype (stmt);
       if (!gimple_call_lhs (stmt)
 	  || ((fndecl = gimple_call_fndecl (stmt)) != NULL_TREE
-	      && !fndecl_built_in_p (fndecl)
+	      && !DECL_BUILT_IN (fndecl)
 	      && !lookup_attribute ("assume_aligned",
 				    TYPE_ATTRIBUTES (fntype))
 	      && !lookup_attribute ("alloc_align",
@@ -2079,6 +2080,8 @@ insert_clobber_before_stack_restore (tree saved_val, tree var,
     else if (gimple_assign_ssa_name_copy_p (stmt))
       insert_clobber_before_stack_restore (gimple_assign_lhs (stmt), var,
 					   visited);
+    else if (chkp_gimple_call_builtin_p (stmt, BUILT_IN_CHKP_BNDRET))
+      continue;
     else
       gcc_assert (is_gimple_debug (stmt));
 }
@@ -2560,7 +2563,7 @@ optimize_stack_restore (gimple_stmt_iterator i)
 
       callee = gimple_call_fndecl (stmt);
       if (!callee
-	  || !fndecl_built_in_p (callee, BUILT_IN_NORMAL)
+	  || DECL_BUILT_IN_CLASS (callee) != BUILT_IN_NORMAL
 	  /* All regular builtins are ok, just obviously not alloca.  */
 	  || ALLOCA_FUNCTION_CODE_P (DECL_FUNCTION_CODE (callee)))
 	return NULL_TREE;
@@ -2596,7 +2599,9 @@ optimize_stack_restore (gimple_stmt_iterator i)
       if (is_gimple_call (stack_save))
 	{
 	  callee = gimple_call_fndecl (stack_save);
-	  if (callee && fndecl_built_in_p (callee, BUILT_IN_STACK_SAVE))
+	  if (callee
+	      && DECL_BUILT_IN_CLASS (callee) == BUILT_IN_NORMAL
+	      && DECL_FUNCTION_CODE (callee) == BUILT_IN_STACK_SAVE)
 	    {
 	      gimple_stmt_iterator stack_save_gsi;
 	      tree rhs;
@@ -2931,7 +2936,7 @@ optimize_atomic_bit_test_and (gimple_stmt_iterator *gsip,
   gimple_set_location (g, gimple_location (call));
   gimple_set_vuse (g, gimple_vuse (call));
   gimple_set_vdef (g, gimple_vdef (call));
-  bool throws = stmt_can_throw_internal (cfun, call);
+  bool throws = stmt_can_throw_internal (call);
   gimple_call_set_nothrow (as_a <gcall *> (g),
 			   gimple_call_nothrow_p (as_a <gcall *> (call)));
   SSA_NAME_DEF_STMT (gimple_vdef (call)) = g;
@@ -3193,7 +3198,7 @@ pass_fold_builtins::execute (function *fun)
 	    }
 
 	  callee = gimple_call_fndecl (stmt);
-	  if (!callee || !fndecl_built_in_p (callee, BUILT_IN_NORMAL))
+	  if (!callee || DECL_BUILT_IN_CLASS (callee) != BUILT_IN_NORMAL)
 	    {
 	      gsi_next (&i);
 	      continue;
@@ -3368,7 +3373,8 @@ pass_fold_builtins::execute (function *fun)
 	    }
 	  callee = gimple_call_fndecl (stmt);
 	  if (!callee
-	      || !fndecl_built_in_p (callee, fcode))
+              || DECL_BUILT_IN_CLASS (callee) != BUILT_IN_NORMAL
+	      || DECL_FUNCTION_CODE (callee) == fcode)
 	    gsi_next (&i);
 	}
     }
@@ -3451,10 +3457,9 @@ pass_post_ipa_warn::execute (function *fun)
 			continue;
 
 		      location_t loc = gimple_location (stmt);
-		      auto_diagnostic_group d;
 		      if (warning_at (loc, OPT_Wnonnull,
 				      "%Gargument %u null where non-null "
-				      "expected", stmt, i + 1))
+				      "expected", as_a <gcall *>(stmt), i + 1))
 			{
 			  tree fndecl = gimple_call_fndecl (stmt);
 			  if (fndecl && DECL_IS_BUILTIN (fndecl))

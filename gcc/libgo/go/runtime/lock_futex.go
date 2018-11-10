@@ -236,14 +236,8 @@ func notetsleepg(n *note, ns int64) bool {
 		throw("notetsleepg on g0")
 	}
 
-	entersyscallblock()
+	entersyscallblock(0)
 	ok := notetsleep_internal(n, ns)
-	exitsyscall()
+	exitsyscall(0)
 	return ok
 }
-
-func pauseSchedulerUntilCallback() bool {
-	return false
-}
-
-func checkTimeouts() {}

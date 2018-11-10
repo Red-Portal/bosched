@@ -1,5 +1,5 @@
 // Test for deduction.
-// { dg-do compile { target c++17 } }
+// { dg-options -std=c++17 }
 
 template <class R, class... A>
 void f(R (*)(A...));

@@ -58,6 +58,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-dfa.h"
 #include "profile.h"
 #include "params.h"
+#include "tree-chkp.h"
 #include "context.h"
 #include "gimplify.h"
 #include "stringpool.h"
@@ -120,7 +121,7 @@ static GTY(()) hash_table<function_version_hasher> *cgraph_fnver_htab = NULL;
 hashval_t
 function_version_hasher::hash (cgraph_function_version_info *ptr)
 {
-  int uid = ptr->this_node->get_uid ();
+  int uid = ptr->this_node->uid;
   return (hashval_t)(uid);
 }
 
@@ -129,7 +130,7 @@ bool
 function_version_hasher::equal (cgraph_function_version_info *n1,
 			       	cgraph_function_version_info *n2)
 {
-  return n1->this_node->get_uid () == n2->this_node->get_uid ();
+  return n1->this_node->uid == n2->this_node->uid;
 }
 
 /* Mark as GC root all allocated nodes.  */
@@ -617,7 +618,6 @@ cgraph_node *
 cgraph_node::create_thunk (tree alias, tree, bool this_adjusting,
 			   HOST_WIDE_INT fixed_offset,
 			   HOST_WIDE_INT virtual_value,
-			   HOST_WIDE_INT indirect_offset,
 			   tree virtual_offset,
 			   tree real_alias)
 {
@@ -636,7 +636,6 @@ cgraph_node::create_thunk (tree alias, tree, bool this_adjusting,
 
   node->thunk.fixed_offset = fixed_offset;
   node->thunk.virtual_value = virtual_value;
-  node->thunk.indirect_offset = indirect_offset;
   node->thunk.alias = real_alias;
   node->thunk.this_adjusting = this_adjusting;
   node->thunk.virtual_offset_p = virtual_offset != NULL;
@@ -815,8 +814,9 @@ cgraph_edge::set_call_stmt (gcall *new_stmt, bool update_speculative)
       e = make_direct (new_callee);
     }
 
-  function *fun = DECL_STRUCT_FUNCTION (e->caller->decl);
-  e->can_throw_external = stmt_can_throw_external (fun, new_stmt);
+  push_cfun (DECL_STRUCT_FUNCTION (e->caller->decl));
+  e->can_throw_external = stmt_can_throw_external (new_stmt);
+  pop_cfun ();
   if (e->caller->call_site_hash)
     cgraph_add_edge_to_call_site_hash (e);
 }
@@ -851,12 +851,13 @@ symbol_table::create_edge (cgraph_node *caller, cgraph_node *callee,
       free_edges = NEXT_FREE_EDGE (edge);
     }
   else
-    edge = ggc_alloc<cgraph_edge> ();
+    {
+      edge = ggc_alloc<cgraph_edge> ();
+      edge->uid = edges_max_uid++;
+    }
 
   edges_count++;
 
-  gcc_assert (++edges_max_uid != 0);
-  edge->m_uid = edges_max_uid;
   edge->aux = NULL;
   edge->caller = caller;
   edge->callee = callee;
@@ -869,9 +870,10 @@ symbol_table::create_edge (cgraph_node *caller, cgraph_node *callee,
   edge->count = count;
 
   edge->call_stmt = call_stmt;
+  push_cfun (DECL_STRUCT_FUNCTION (caller->decl));
   edge->can_throw_external
-    = call_stmt ? stmt_can_throw_external (DECL_STRUCT_FUNCTION (caller->decl),
-					   call_stmt) : false;
+    = call_stmt ? stmt_can_throw_external (call_stmt) : false;
+  pop_cfun ();
   if (call_stmt
       && callee && callee->decl
       && !gimple_check_call_matching_types (call_stmt, callee->decl,
@@ -1009,11 +1011,14 @@ cgraph_edge::remove_caller (void)
 void
 symbol_table::free_edge (cgraph_edge *e)
 {
+  int uid = e->uid;
+
   if (e->indirect_info)
     ggc_free (e->indirect_info);
 
   /* Clear out the edge so we do not dangle pointers.  */
   memset (e, 0, sizeof (*e));
+  e->uid = uid;
   NEXT_FREE_EDGE (e) = free_edges;
   free_edges = e;
   edges_count--;
@@ -1270,6 +1275,7 @@ cgraph_edge::redirect_call_stmt_to_callee (void)
   tree decl = gimple_call_fndecl (e->call_stmt);
   gcall *new_stmt;
   gimple_stmt_iterator gsi;
+  bool skip_bounds = false;
 
   if (e->speculative)
     {
@@ -1327,6 +1333,24 @@ cgraph_edge::redirect_call_stmt_to_callee (void)
 	  e->caller->set_call_stmt_including_clones (e->call_stmt, new_stmt,
 						     false);
 	  e->count = gimple_bb (e->call_stmt)->count;
+
+	  /* Fix edges for BUILT_IN_CHKP_BNDRET calls attached to the
+	     processed call stmt.  */
+	  if (gimple_call_with_bounds_p (new_stmt)
+	      && gimple_call_lhs (new_stmt)
+	      && chkp_retbnd_call_by_val (gimple_call_lhs (e2->call_stmt)))
+	    {
+	      tree dresult = gimple_call_lhs (new_stmt);
+	      tree iresult = gimple_call_lhs (e2->call_stmt);
+	      gcall *dbndret = chkp_retbnd_call_by_val (dresult);
+	      gcall *ibndret = chkp_retbnd_call_by_val (iresult);
+	      struct cgraph_edge *iedge
+		= e2->caller->cgraph_node::get_edge (ibndret);
+
+	      if (dbndret)
+		iedge->caller->create_edge (iedge->callee, dbndret, e->count);
+	    }
+
 	  e2->speculative = false;
 	  e2->count = gimple_bb (e2->call_stmt)->count;
 	  ref->speculative = false;
@@ -1340,9 +1364,16 @@ cgraph_edge::redirect_call_stmt_to_callee (void)
 	}
     }
 
+  /* We might propagate instrumented function pointer into
+     not instrumented function and vice versa.  In such a
+     case we need to either fix function declaration or
+     remove bounds from call statement.  */
+  if (flag_check_pointer_bounds && e->callee)
+    skip_bounds = chkp_redirect_edge (e);
 
   if (e->indirect_unknown_callee
-      || decl == e->callee->decl)
+      || (decl == e->callee->decl
+	  && !skip_bounds))
     return e->call_stmt;
 
   if (flag_checking && decl)
@@ -1364,7 +1395,8 @@ cgraph_edge::redirect_call_stmt_to_callee (void)
 	}
     }
 
-  if (e->callee->clone.combined_args_to_skip)
+  if (e->callee->clone.combined_args_to_skip
+      || skip_bounds)
     {
       int lp_nr;
 
@@ -1373,6 +1405,9 @@ cgraph_edge::redirect_call_stmt_to_callee (void)
 	new_stmt
 	  = gimple_call_copy_skip_args (new_stmt,
 					e->callee->clone.combined_args_to_skip);
+      if (skip_bounds)
+	new_stmt = chkp_copy_call_skip_bounds (new_stmt);
+
       tree old_fntype = gimple_call_fntype (e->call_stmt);
       gimple_call_set_fndecl (new_stmt, e->callee->decl);
       cgraph_node *origin = e->callee;
@@ -1559,7 +1594,8 @@ cgraph_update_edges_for_call_stmt_node (cgraph_node *node,
 	{
 	  /* Keep calls marked as dead dead.  */
 	  if (new_stmt && is_gimple_call (new_stmt) && e->callee
-	      && fndecl_built_in_p (e->callee->decl, BUILT_IN_UNREACHABLE))
+	      && DECL_BUILT_IN_CLASS (e->callee->decl) == BUILT_IN_NORMAL
+	      && DECL_FUNCTION_CODE (e->callee->decl) == BUILT_IN_UNREACHABLE)
 	    {
               node->get_edge (old_stmt)->set_call_stmt
 		 (as_a <gcall *> (new_stmt));
@@ -1774,6 +1810,7 @@ void
 cgraph_node::remove (void)
 {
   cgraph_node *n;
+  int uid = this->uid;
 
   if (symtab->ipa_clones_dump_file && symtab->cloned_nodes.contains (this))
     fprintf (symtab->ipa_clones_dump_file,
@@ -1869,7 +1906,13 @@ cgraph_node::remove (void)
       call_site_hash = NULL;
     }
 
-  symtab->release_symbol (this);
+  if (instrumented_version)
+    {
+      instrumented_version->instrumented_version = NULL;
+      instrumented_version = NULL;
+    }
+
+  symtab->release_symbol (this, uid);
 }
 
 /* Likewise indicate that a node is having address taken.  */
@@ -2016,6 +2059,7 @@ cgraph_node::dump (FILE *f)
   if (profile_id)
     fprintf (f, "  Profile id: %i\n",
 	     profile_id);
+  fprintf (f, "  First run: %i\n", tp_first_run);
   cgraph_function_version_info *vi = function_version ();
   if (vi != NULL)
     {
@@ -2039,13 +2083,11 @@ cgraph_node::dump (FILE *f)
   fprintf (f, "  Function flags:");
   if (count.initialized_p ())
     {
-      fprintf (f, " count:");
+      fprintf (f, " count: ");
       count.dump (f);
     }
-  if (tp_first_run > 0)
-    fprintf (f, " first_run:%i", tp_first_run);
   if (origin)
-    fprintf (f, " nested in:%s", origin->asm_name ());
+    fprintf (f, " nested in: %s", origin->asm_name ());
   if (gimple_has_body_p (decl))
     fprintf (f, " body");
   if (process)
@@ -2082,6 +2124,10 @@ cgraph_node::dump (FILE *f)
     fprintf (f, " unlikely_executed");
   if (frequency == NODE_FREQUENCY_EXECUTED_ONCE)
     fprintf (f, " executed_once");
+  if (only_called_at_startup)
+    fprintf (f, " only_called_at_startup");
+  if (only_called_at_exit)
+    fprintf (f, " only_called_at_exit");
   if (opt_for_fn (decl, optimize_size))
     fprintf (f, " optimize_size");
   if (parallelized_function)
@@ -2093,14 +2139,13 @@ cgraph_node::dump (FILE *f)
     {
       fprintf (f, "  Thunk");
       if (thunk.alias)
-	fprintf (f, "  of %s (asm:%s)",
+        fprintf (f, "  of %s (asm: %s)",
 		 lang_hooks.decl_printable_name (thunk.alias, 2),
 		 IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (thunk.alias)));
-      fprintf (f, " fixed offset %i virtual value %i indirect_offset %i "
-		  "has virtual offset %i\n",
+      fprintf (f, " fixed offset %i virtual value %i has "
+	       "virtual offset %i)\n",
 	       (int)thunk.fixed_offset,
 	       (int)thunk.virtual_value,
-	       (int)thunk.indirect_offset,
 	       (int)thunk.virtual_offset_p);
     }
   if (alias && thunk.alias
@@ -2109,7 +2154,7 @@ cgraph_node::dump (FILE *f)
       fprintf (f, "  Alias of %s",
 	       lang_hooks.decl_printable_name (thunk.alias, 2));
       if (DECL_ASSEMBLER_NAME_SET_P (thunk.alias))
-	fprintf (f, " (asm:%s)",
+        fprintf (f, " (asm: %s)",
 		 IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (thunk.alias)));
       fprintf (f, "\n");
     }
@@ -2189,6 +2234,11 @@ cgraph_node::dump (FILE *f)
       if (edge->indirect_info->polymorphic)
 	edge->indirect_info->context.dump (f);
     }
+
+  if (instrumentation_clone)
+    fprintf (f, "  Is instrumented version.\n");
+  else if (instrumented_version)
+    fprintf (f, "  Has instrumented version.\n");
 }
 
 /* Dump call graph node NODE to stderr.  */
@@ -3057,8 +3107,8 @@ cgraph_edge::verify_corresponds_to_fndecl (tree decl)
 
   /* Optimizers can redirect unreachable calls or calls triggering undefined
      behavior to builtin_unreachable.  */
-
-  if (fndecl_built_in_p (callee->decl, BUILT_IN_UNREACHABLE))
+  if (DECL_BUILT_IN_CLASS (callee->decl) == BUILT_IN_NORMAL
+      && DECL_FUNCTION_CODE (callee->decl) == BUILT_IN_UNREACHABLE)
     return false;
 
   if (callee->former_clone_of != node->decl
@@ -3184,7 +3234,8 @@ cgraph_node::verify_node (void)
 	  /* Optimized out calls are redirected to __builtin_unreachable.  */
 	  && (e->count.nonzero_p ()
 	      || ! e->callee->decl
-	      || !fndecl_built_in_p (e->callee->decl, BUILT_IN_UNREACHABLE))
+	      || DECL_BUILT_IN_CLASS (e->callee->decl) != BUILT_IN_NORMAL
+	      || DECL_FUNCTION_CODE (e->callee->decl) != BUILT_IN_UNREACHABLE)
 	  && count
 	      == ENTRY_BLOCK_PTR_FOR_FN (DECL_STRUCT_FUNCTION (decl))->count
 	  && (!e->count.ipa_p ()
@@ -3284,7 +3335,9 @@ cgraph_node::verify_node (void)
           error_found = true;
 	}
       for (i = 0; iterate_reference (i, ref); i++)
-	if (ref->use != IPA_REF_ALIAS)
+	if (ref->use == IPA_REF_CHKP)
+	  ;
+	else if (ref->use != IPA_REF_ALIAS)
 	  {
 	    error ("Alias has non-alias reference");
 	    error_found = true;
@@ -3299,6 +3352,77 @@ cgraph_node::verify_node (void)
       if (!ref_found)
 	{
 	  error ("Analyzed alias has no reference");
+	  error_found = true;
+	}
+    }
+
+  /* Check instrumented version reference.  */
+  if (instrumented_version
+      && instrumented_version->instrumented_version != this)
+    {
+      error ("Instrumentation clone does not reference original node");
+      error_found = true;
+    }
+
+  /* Cannot have orig_decl for not instrumented nodes.  */
+  if (!instrumentation_clone && orig_decl)
+    {
+      error ("Not instrumented node has non-NULL original declaration");
+      error_found = true;
+    }
+
+  /* If original not instrumented node still exists then we may check
+     original declaration is set properly.  */
+  if (instrumented_version
+      && orig_decl
+      && orig_decl != instrumented_version->decl)
+    {
+      error ("Instrumented node has wrong original declaration");
+      error_found = true;
+    }
+
+  /* Check all nodes have chkp reference to their instrumented versions.  */
+  if (analyzed
+      && instrumented_version
+      && !instrumentation_clone)
+    {
+      bool ref_found = false;
+      int i;
+      struct ipa_ref *ref;
+
+      for (i = 0; iterate_reference (i, ref); i++)
+	if (ref->use == IPA_REF_CHKP)
+	  {
+	    if (ref_found)
+	      {
+		error ("Node has more than one chkp reference");
+		error_found = true;
+	      }
+	    if (ref->referred != instrumented_version)
+	      {
+		error ("Wrong node is referenced with chkp reference");
+		error_found = true;
+	      }
+	    ref_found = true;
+	  }
+
+      if (!ref_found)
+	{
+	  error ("Analyzed node has no reference to instrumented version");
+	  error_found = true;
+	}
+    }
+
+  if (instrumentation_clone
+      && DECL_BUILT_IN_CLASS (decl) == NOT_BUILT_IN)
+    {
+      tree name = DECL_ASSEMBLER_NAME (decl);
+      tree orig_name = DECL_ASSEMBLER_NAME (orig_decl);
+
+      if (!IDENTIFIER_TRANSPARENT_ALIAS (name)
+	  || TREE_CHAIN (name) != orig_name)
+	{
+	  error ("Alias chain for instrumented node is broken");
 	  error_found = true;
 	}
     }
@@ -3320,6 +3444,12 @@ cgraph_node::verify_node (void)
 	  error ("Thunk is not supposed to have body");
           error_found = true;
         }
+      if (thunk.add_pointer_bounds_args
+	  && !instrumented_version->semantically_equivalent_p (callees->callee))
+	{
+	  error ("Instrumentation thunk has wrong edge callee");
+          error_found = true;
+	}
     }
   else if (analyzed && gimple_has_body_p (decl)
 	   && !TREE_ASM_WRITTEN (decl)
@@ -3539,8 +3669,6 @@ cgraph_node::get_untransformed_body (void)
 
   gcc_assert (DECL_STRUCT_FUNCTION (decl) == NULL);
 
-  if (!quiet_flag)
-    fprintf (stderr, " in:%s", IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (decl)));
   lto_input_function_body (file_data, this, data);
   lto_stats.num_function_bodies++;
   lto_free_section_data (file_data, LTO_section_function_body, name,
@@ -3578,7 +3706,7 @@ cgraph_node::get_body (void)
       const char *saved_dump_file_name = dump_file_name;
       dump_flags_t saved_dump_flags = dump_flags;
       dump_file_name = NULL;
-      set_dump_file (NULL);
+      dump_file = NULL;
 
       push_cfun (DECL_STRUCT_FUNCTION (decl));
       execute_all_ipa_transforms ();
@@ -3589,7 +3717,7 @@ cgraph_node::get_body (void)
       updated = true;
 
       current_pass = saved_current_pass;
-      set_dump_file (saved_dump_file);
+      dump_file = saved_dump_file;
       dump_file_name = saved_dump_file_name;
       dump_flags = saved_dump_flags;
     }

@@ -406,11 +406,13 @@
   return FP_REGNO_P (r);
 })
 
-;; Return true if this is a register that can has D-form addressing (GPR,
-;; traditional FPR registers, and Altivec registers for scalars).  Unlike
-;; power8 fusion, this fusion does not depend on putting the ADDIS instruction
-;; into the GPR register being loaded.
-(define_predicate "p9_fusion_reg_operand"
+;; Return true if this is a register that can has D-form addressing (GPR and
+;; traditional FPR registers for scalars).  ISA 3.0 (power9) adds D-form
+;; addressing for scalars in Altivec registers.
+;;
+;; If this is a pseudo only allow for GPR fusion in power8.  If we have the
+;; power9 fusion allow the floating point types.
+(define_predicate "toc_fusion_or_p9_reg_operand"
   (match_code "reg,subreg")
 {
   HOST_WIDE_INT r;
@@ -609,7 +611,9 @@
     return 0;
 
   /* Consider all constants with -msoft-float to be easy.  */
-  if (TARGET_SOFT_FLOAT && mode != DImode)
+  if ((TARGET_SOFT_FLOAT
+      || (TARGET_HARD_FLOAT && (TARGET_SINGLE_FLOAT && ! TARGET_DOUBLE_FLOAT)))
+      && mode != DImode)
     return 1;
 
   /* 0.0D is not all zero bits.  */
@@ -686,6 +690,11 @@
 (define_predicate "easy_vector_constant"
   (match_code "const_vector")
 {
+  /* As the paired vectors are actually FPRs it seems that there is
+     no easy way to load a CONST_VECTOR without using memory.  */
+  if (TARGET_PAIRED_FLOAT)
+    return false;
+
   /* Because IEEE 128-bit floating point is considered a vector type
      in order to pass it in VSX registers, it might use this function
      instead of easy_fp_constant.  */
@@ -1662,6 +1671,35 @@
   return GET_CODE (op) == UNSPEC && XINT (op, 1) == UNSPEC_TOCREL;
 })
 
+;; Match the TOC memory operand that can be fused with an addis instruction.
+;; This is used in matching a potential fused address before register
+;; allocation.
+(define_predicate "toc_fusion_mem_raw"
+  (match_code "mem")
+{
+  if (!TARGET_TOC_FUSION_INT || !can_create_pseudo_p ())
+    return false;
+
+  return small_toc_ref (XEXP (op, 0), Pmode);
+})
+
+;; Match the memory operand that has been fused with an addis instruction and
+;; wrapped inside of an (unspec [...] UNSPEC_FUSION_ADDIS) wrapper.
+(define_predicate "toc_fusion_mem_wrapped"
+  (match_code "mem")
+{
+  rtx addr;
+
+  if (!TARGET_TOC_FUSION_INT)
+    return false;
+
+  if (!MEM_P (op))
+    return false;
+
+  addr = XEXP (op, 0);
+  return (GET_CODE (addr) == UNSPEC && XINT (addr, 1) == UNSPEC_FUSION_ADDIS);
+})
+
 ;; Match the first insn (addis) in fusing the combination of addis and loads to
 ;; GPR registers on power8.
 (define_predicate "fusion_gpr_addis"
@@ -1802,7 +1840,7 @@
        DFmode in 32-bit if -msoft-float since it splits into two separate
        instructions.  */
     case E_DFmode:
-      if ((!TARGET_POWERPC64 && !TARGET_HARD_FLOAT) || !TARGET_P9_FUSION)
+      if ((!TARGET_POWERPC64 && !TARGET_DF_FPR) || !TARGET_P9_FUSION)
 	return 0;
       break;
 
@@ -1862,7 +1900,7 @@
        into two separate instructions.  Do allow fusion if we have hardware
        floating point.  */
     case E_DFmode:
-      if (!TARGET_POWERPC64 && !TARGET_HARD_FLOAT)
+      if (!TARGET_POWERPC64 && !TARGET_DF_FPR)
 	return 0;
       break;
 

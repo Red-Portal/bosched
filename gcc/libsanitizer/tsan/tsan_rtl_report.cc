@@ -141,28 +141,30 @@ static ReportStack *SymbolizeStack(StackTrace trace) {
   return stack;
 }
 
-ScopedReportBase::ScopedReportBase(ReportType typ, uptr tag) {
+ScopedReport::ScopedReport(ReportType typ, uptr tag) {
   ctx->thread_registry->CheckLocked();
   void *mem = internal_alloc(MBlockReport, sizeof(ReportDesc));
   rep_ = new(mem) ReportDesc;
   rep_->typ = typ;
   rep_->tag = tag;
   ctx->report_mtx.Lock();
+  CommonSanitizerReportMutex.Lock();
 }
 
-ScopedReportBase::~ScopedReportBase() {
+ScopedReport::~ScopedReport() {
+  CommonSanitizerReportMutex.Unlock();
   ctx->report_mtx.Unlock();
   DestroyAndFree(rep_);
 }
 
-void ScopedReportBase::AddStack(StackTrace stack, bool suppressable) {
+void ScopedReport::AddStack(StackTrace stack, bool suppressable) {
   ReportStack **rs = rep_->stacks.PushBack();
   *rs = SymbolizeStack(stack);
   (*rs)->suppressable = suppressable;
 }
 
-void ScopedReportBase::AddMemoryAccess(uptr addr, uptr external_tag, Shadow s,
-                                       StackTrace stack, const MutexSet *mset) {
+void ScopedReport::AddMemoryAccess(uptr addr, uptr external_tag, Shadow s,
+                                   StackTrace stack, const MutexSet *mset) {
   void *mem = internal_alloc(MBlockReportMop, sizeof(ReportMop));
   ReportMop *mop = new(mem) ReportMop;
   rep_->mops.PushBack(mop);
@@ -183,11 +185,11 @@ void ScopedReportBase::AddMemoryAccess(uptr addr, uptr external_tag, Shadow s,
   }
 }
 
-void ScopedReportBase::AddUniqueTid(int unique_tid) {
+void ScopedReport::AddUniqueTid(int unique_tid) {
   rep_->unique_tids.PushBack(unique_tid);
 }
 
-void ScopedReportBase::AddThread(const ThreadContext *tctx, bool suppressable) {
+void ScopedReport::AddThread(const ThreadContext *tctx, bool suppressable) {
   for (uptr i = 0; i < rep_->threads.Size(); i++) {
     if ((u32)rep_->threads[i]->id == tctx->tid)
       return;
@@ -251,14 +253,14 @@ ThreadContext *IsThreadStackOrTls(uptr addr, bool *is_stack) {
 }
 #endif
 
-void ScopedReportBase::AddThread(int unique_tid, bool suppressable) {
+void ScopedReport::AddThread(int unique_tid, bool suppressable) {
 #if !SANITIZER_GO
   if (const ThreadContext *tctx = FindThreadByUidLocked(unique_tid))
     AddThread(tctx, suppressable);
 #endif
 }
 
-void ScopedReportBase::AddMutex(const SyncVar *s) {
+void ScopedReport::AddMutex(const SyncVar *s) {
   for (uptr i = 0; i < rep_->mutexes.Size(); i++) {
     if (rep_->mutexes[i]->id == s->uid)
       return;
@@ -272,7 +274,7 @@ void ScopedReportBase::AddMutex(const SyncVar *s) {
   rm->stack = SymbolizeStackId(s->creation_stack_id);
 }
 
-u64 ScopedReportBase::AddMutex(u64 id) {
+u64 ScopedReport::AddMutex(u64 id) {
   u64 uid = 0;
   u64 mid = id;
   uptr addr = SyncVar::SplitId(id, &uid);
@@ -291,7 +293,7 @@ u64 ScopedReportBase::AddMutex(u64 id) {
   return mid;
 }
 
-void ScopedReportBase::AddDeadMutex(u64 id) {
+void ScopedReport::AddDeadMutex(u64 id) {
   for (uptr i = 0; i < rep_->mutexes.Size(); i++) {
     if (rep_->mutexes[i]->id == id)
       return;
@@ -305,7 +307,7 @@ void ScopedReportBase::AddDeadMutex(u64 id) {
   rm->stack = 0;
 }
 
-void ScopedReportBase::AddLocation(uptr addr, uptr size) {
+void ScopedReport::AddLocation(uptr addr, uptr size) {
   if (addr == 0)
     return;
 #if !SANITIZER_GO
@@ -360,19 +362,18 @@ void ScopedReportBase::AddLocation(uptr addr, uptr size) {
 }
 
 #if !SANITIZER_GO
-void ScopedReportBase::AddSleep(u32 stack_id) {
+void ScopedReport::AddSleep(u32 stack_id) {
   rep_->sleep = SymbolizeStackId(stack_id);
 }
 #endif
 
-void ScopedReportBase::SetCount(int count) { rep_->count = count; }
+void ScopedReport::SetCount(int count) {
+  rep_->count = count;
+}
 
-const ReportDesc *ScopedReportBase::GetReport() const { return rep_; }
-
-ScopedReport::ScopedReport(ReportType typ, uptr tag)
-    : ScopedReportBase(typ, tag) {}
-
-ScopedReport::~ScopedReport() {}
+const ReportDesc *ScopedReport::GetReport() const {
+  return rep_;
+}
 
 void RestoreStack(int tid, const u64 epoch, VarSizeStackTrace *stk,
                   MutexSet *mset, uptr *tag) {
@@ -391,7 +392,7 @@ void RestoreStack(int tid, const u64 epoch, VarSizeStackTrace *stk,
   const u64 ebegin = RoundDown(eend, kTracePartSize);
   DPrintf("#%d: RestoreStack epoch=%zu ebegin=%zu eend=%zu partidx=%d\n",
           tid, (uptr)epoch, (uptr)ebegin, (uptr)eend, partidx);
-  Vector<uptr> stack;
+  Vector<uptr> stack(MBlockReportStack);
   stack.Resize(hdr->stack0.size + 64);
   for (uptr i = 0; i < hdr->stack0.size; i++) {
     stack[i] = hdr->stack0.trace[i];
@@ -647,8 +648,8 @@ void ReportRace(ThreadState *thr) {
     // callback. Most likely, TraceTopPC will now return a EventTypeFuncExit
     // event. Later we subtract -1 from it (in GetPreviousInstructionPc)
     // and the resulting PC has kExternalPCBit set, so we pass it to
-    // __tsan_symbolize_external_ex. __tsan_symbolize_external_ex is within its
-    // rights to crash since the PC is completely bogus.
+    // __tsan_symbolize_external. __tsan_symbolize_external is within its rights
+    // to crash since the PC is completely bogus.
     // test/tsan/double_race.cc contains a test case for this.
     toppc = 0;
   }
@@ -657,7 +658,7 @@ void ReportRace(ThreadState *thr) {
     return;
 
   // MutexSet is too large to live on stack.
-  Vector<u64> mset_buffer;
+  Vector<u64> mset_buffer(MBlockScopedBuf);
   mset_buffer.Resize(sizeof(MutexSet) / sizeof(u64) + 1);
   MutexSet *mset2 = new(&mset_buffer[0]) MutexSet();
 

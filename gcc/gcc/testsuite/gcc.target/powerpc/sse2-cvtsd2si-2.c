@@ -1,5 +1,6 @@
 /* { dg-do run } */
 /* { dg-options "-O3 -mpower8-vector -Wno-psabi" } */
+/* { dg-require-effective-target lp64 } */
 /* { dg-require-effective-target p8vector_hw } */
 
 #ifndef CHECK_H
@@ -35,12 +36,13 @@ TEST (void)
   e = (long long)(s.a[0] + 0.5);
 
   if (d != e)
-    {
 #if DEBUG
+  {
       printf ("sse2_test_cvtsd2si_2; failed\n");
       printf ("\t [%f,%f] -> [%ld]\n", s.a[0], s.a[1], d);
       printf ("\t expect [%ld]\n", e);
+  }
+#else
+    abort ();
 #endif
-      abort ();
-    }
 }

@@ -66,18 +66,19 @@ namespace __gnu_debug
       void
       _M_invalidate_locals()
       {
-	auto __local_end = _M_cont()._M_base().cend(0);
+	auto __local_end = _M_cont()._M_base().end(0);
 	this->_M_invalidate_local_if(
-		[__local_end](__decltype(__local_end) __it)
+		[__local_end](__decltype(_M_cont()._M_base().cend(0)) __it)
 		{ return __it != __local_end; });
       }
 
       void
       _M_invalidate_all()
       {
-	auto __end = _M_cont()._M_base().cend();
-	this->_M_invalidate_if([__end](__decltype(__end) __it)
-			       { return __it != __end; });
+	auto __end = _M_cont()._M_base().end();
+	this->_M_invalidate_if(
+		[__end](__decltype(_M_cont()._M_base().cend()) __it)
+		{ return __it != __end; });
 	_M_invalidate_locals();
       }
 
@@ -91,7 +92,7 @@ namespace __gnu_debug
 
       /** Invalidates all local iterators @c x that reference this container,
 	  are not singular, and for which @c __pred(x) returns @c
-	  true. @c __pred will be invoked with the normal local iterators
+	  true. @c __pred will be invoked with the normal ilocal iterators
 	  nested in the safe ones. */
       template<typename _Predicate>
 	void

@@ -4,12 +4,11 @@
 
 package runtime
 
-import (
-	"runtime/internal/sys"
-	"unsafe"
-)
+import "unsafe"
 
-type mOS struct{}
+type mOS struct {
+	unused byte
+}
 
 //go:noescape
 //extern umtx_sleep

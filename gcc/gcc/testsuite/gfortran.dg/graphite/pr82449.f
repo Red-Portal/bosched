@@ -1,5 +1,5 @@
 ! { dg-do compile }
-! { dg-options "-O2 -floop-nest-optimize -std=legacy" }
+! { dg-options "-O2 -floop-nest-optimize" }
 
       SUBROUTINE JDFIDX(MKL,KGSH)
       DIMENSION MKL(6,6)

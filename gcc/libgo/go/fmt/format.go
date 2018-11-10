@@ -122,8 +122,8 @@ func (f *fmt) padString(s string) {
 	}
 }
 
-// fmtBoolean formats a boolean.
-func (f *fmt) fmtBoolean(v bool) {
+// fmt_boolean formats a boolean.
+func (f *fmt) fmt_boolean(v bool) {
 	if v {
 		f.padString("true")
 	} else {
@@ -131,8 +131,8 @@ func (f *fmt) fmtBoolean(v bool) {
 	}
 }
 
-// fmtUnicode formats a uint64 as "U+0078" or with f.sharp set as "U+0078 'x'".
-func (f *fmt) fmtUnicode(u uint64) {
+// fmt_unicode formats a uint64 as "U+0078" or with f.sharp set as "U+0078 'x'".
+func (f *fmt) fmt_unicode(u uint64) {
 	buf := f.intbuf[0:]
 
 	// With default precision set the maximum needed buf length is 18
@@ -190,8 +190,8 @@ func (f *fmt) fmtUnicode(u uint64) {
 	f.zero = oldZero
 }
 
-// fmtInteger formats signed and unsigned integers.
-func (f *fmt) fmtInteger(u uint64, base int, isSigned bool, digits string) {
+// fmt_integer formats signed and unsigned integers.
+func (f *fmt) fmt_integer(u uint64, base int, isSigned bool, digits string) {
 	negative := isSigned && int64(u) < 0
 	if negative {
 		u = -u
@@ -322,14 +322,14 @@ func (f *fmt) truncate(s string) string {
 	return s
 }
 
-// fmtS formats a string.
-func (f *fmt) fmtS(s string) {
+// fmt_s formats a string.
+func (f *fmt) fmt_s(s string) {
 	s = f.truncate(s)
 	f.padString(s)
 }
 
-// fmtSbx formats a string or byte slice as a hexadecimal encoding of its bytes.
-func (f *fmt) fmtSbx(s string, b []byte, digits string) {
+// fmt_sbx formats a string or byte slice as a hexadecimal encoding of its bytes.
+func (f *fmt) fmt_sbx(s string, b []byte, digits string) {
 	length := len(b)
 	if b == nil {
 		// No byte slice present. Assume string s should be encoded.
@@ -394,20 +394,20 @@ func (f *fmt) fmtSbx(s string, b []byte, digits string) {
 	}
 }
 
-// fmtSx formats a string as a hexadecimal encoding of its bytes.
-func (f *fmt) fmtSx(s, digits string) {
-	f.fmtSbx(s, nil, digits)
+// fmt_sx formats a string as a hexadecimal encoding of its bytes.
+func (f *fmt) fmt_sx(s, digits string) {
+	f.fmt_sbx(s, nil, digits)
 }
 
-// fmtBx formats a byte slice as a hexadecimal encoding of its bytes.
-func (f *fmt) fmtBx(b []byte, digits string) {
-	f.fmtSbx("", b, digits)
+// fmt_bx formats a byte slice as a hexadecimal encoding of its bytes.
+func (f *fmt) fmt_bx(b []byte, digits string) {
+	f.fmt_sbx("", b, digits)
 }
 
-// fmtQ formats a string as a double-quoted, escaped Go string constant.
+// fmt_q formats a string as a double-quoted, escaped Go string constant.
 // If f.sharp is set a raw (backquoted) string may be returned instead
 // if the string does not contain any control characters other than tab.
-func (f *fmt) fmtQ(s string) {
+func (f *fmt) fmt_q(s string) {
 	s = f.truncate(s)
 	if f.sharp && strconv.CanBackquote(s) {
 		f.padString("`" + s + "`")
@@ -421,9 +421,9 @@ func (f *fmt) fmtQ(s string) {
 	}
 }
 
-// fmtC formats an integer as a Unicode character.
+// fmt_c formats an integer as a Unicode character.
 // If the character is not valid Unicode, it will print '\ufffd'.
-func (f *fmt) fmtC(c uint64) {
+func (f *fmt) fmt_c(c uint64) {
 	r := rune(c)
 	if c > utf8.MaxRune {
 		r = utf8.RuneError
@@ -433,9 +433,9 @@ func (f *fmt) fmtC(c uint64) {
 	f.pad(buf[:w])
 }
 
-// fmtQc formats an integer as a single-quoted, escaped Go character constant.
+// fmt_qc formats an integer as a single-quoted, escaped Go character constant.
 // If the character is not valid Unicode, it will print '\ufffd'.
-func (f *fmt) fmtQc(c uint64) {
+func (f *fmt) fmt_qc(c uint64) {
 	r := rune(c)
 	if c > utf8.MaxRune {
 		r = utf8.RuneError
@@ -448,9 +448,9 @@ func (f *fmt) fmtQc(c uint64) {
 	}
 }
 
-// fmtFloat formats a float64. It assumes that verb is a valid format specifier
+// fmt_float formats a float64. It assumes that verb is a valid format specifier
 // for strconv.AppendFloat and therefore fits into a byte.
-func (f *fmt) fmtFloat(v float64, size int, verb rune, prec int) {
+func (f *fmt) fmt_float(v float64, size int, verb rune, prec int) {
 	// Explicit precision in format specifier overrules default precision.
 	if f.precPresent {
 		prec = f.prec

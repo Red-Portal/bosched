@@ -139,7 +139,7 @@ extern bool ix86_expand_fp_vec_cmp (rtx[]);
 extern void ix86_expand_sse_movcc (rtx, rtx, rtx, rtx);
 extern void ix86_expand_sse_unpack (rtx, rtx, bool, bool);
 extern bool ix86_expand_int_addcc (rtx[]);
-extern rtx_insn *ix86_expand_call (rtx, rtx, rtx, rtx, rtx, bool);
+extern rtx ix86_expand_call (rtx, rtx, rtx, rtx, rtx, bool);
 extern void ix86_split_call_vzeroupper (rtx, rtx);
 extern void x86_initialize_trampoline (rtx, rtx, rtx);
 extern rtx ix86_zero_extend_to_Pmode (rtx);
@@ -232,12 +232,11 @@ extern void ix86_expand_sse2_mulv4si3 (rtx, rtx, rtx);
 extern void ix86_expand_sse2_mulvxdi3 (rtx, rtx, rtx);
 extern void ix86_expand_sse2_abs (rtx, rtx);
 
+extern bool ix86_bnd_prefixed_insn_p (rtx);
+
 /* In i386-c.c  */
 extern void ix86_target_macros (void);
 extern void ix86_register_pragmas (void);
-
-/* In i386-d.c  */
-extern void ix86_d_target_versions (void);
 
 /* In winnt.c  */
 extern void i386_pe_unique_section (tree, int);

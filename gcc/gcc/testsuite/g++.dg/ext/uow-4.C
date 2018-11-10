@@ -3,9 +3,9 @@
 
 extern "C" {
 
-typedef int UOW;  /* { dg-message "declared here" } */
+typedef int UOW;  /* { dg-error "" } */
 struct ABC {
-  UOW UOW; /* { dg-error "changes meaning" } */
+  UOW UOW; /* { dg-error "" } */
 };
 
 }

@@ -23,7 +23,7 @@ namespace __sanitizer {
 template<class BV>
 class BVGraph {
  public:
-  enum SizeEnum : uptr { kSize = BV::kSize };
+  enum SizeEnum { kSize = BV::kSize };
   uptr size() const { return kSize; }
   // No CTOR.
   void clear() {

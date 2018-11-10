@@ -1,5 +1,5 @@
 ! { dg-do compile }
-! { dg-options "-O2 -std=legacy" }
+! { dg-options "-O2" }
       SUBROUTINE UMPSE(AIBJ,NOC,NDIM,NOCA,NVIRA,NOCCA,E2)
       DIMENSION AIBJ(NOC,NDIM,*)
       DO 20 MA=1,NVIRA

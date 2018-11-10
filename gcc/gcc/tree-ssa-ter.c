@@ -683,7 +683,7 @@ find_replaceable_in_bb (temp_expr_table *tab, basic_block bb)
 	 insns instead of a true call.  */
       if (is_gimple_call (stmt)
 	  && !((fndecl = gimple_call_fndecl (stmt))
-	       && fndecl_built_in_p (fndecl)))
+	       && DECL_BUILT_IN (fndecl)))
 	cur_call_cnt++;
 
       /* Increment counter if this statement sets a local

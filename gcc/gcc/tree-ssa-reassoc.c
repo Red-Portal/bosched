@@ -618,7 +618,7 @@ is_reassociable_op (gimple *stmt, enum tree_code code, struct loop *loop)
       && has_single_use (gimple_assign_lhs (stmt)))
     {
       tree rhs1 = gimple_assign_rhs1 (stmt);
-      tree rhs2 = gimple_assign_rhs2 (stmt);
+      tree rhs2 = gimple_assign_rhs1 (stmt);
       if (TREE_CODE (rhs1) == SSA_NAME
 	  && SSA_NAME_OCCURS_IN_ABNORMAL_PHI (rhs1))
 	return false;
@@ -1606,7 +1606,7 @@ undistribute_ops_list (enum tree_code opcode,
     {
       fprintf (dump_file, "searching for un-distribute opportunities ");
       print_generic_expr (dump_file,
-	(*ops)[bitmap_first_set_bit (candidates)]->op, TDF_NONE);
+	(*ops)[bitmap_first_set_bit (candidates)]->op, 0);
       fprintf (dump_file, " %d\n", nr_candidates);
     }
 
@@ -3177,11 +3177,7 @@ optimize_range_tests_var_bound (enum tree_code opcode, int first, int length,
 	 to (unsigned) k_32 < (unsigned) iftmp.0_44, then we would execute
 	 those stmts even for negative k_32 and the value ranges would be no
 	 longer guaranteed and so the optimization would be invalid.  */
-<<<<<<< HEAD
-      while (opcode == ERROR_MARK)
-=======
       if (opcode == ERROR_MARK)
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
 	{
 	  gimple *g = SSA_NAME_DEF_STMT (rhs2);
 	  basic_block bb2 = gimple_bb (g);
@@ -3191,53 +3187,21 @@ optimize_range_tests_var_bound (enum tree_code opcode, int first, int length,
 	    {
 	      /* As an exception, handle a few common cases.  */
 	      if (gimple_assign_cast_p (g)
-<<<<<<< HEAD
-		  && INTEGRAL_TYPE_P (TREE_TYPE (gimple_assign_rhs1 (g))))
-		{
-		  tree op0 = gimple_assign_rhs1 (g);
-		  if (TYPE_UNSIGNED (TREE_TYPE (op0))
-		      && (TYPE_PRECISION (TREE_TYPE (rhs2))
-			  > TYPE_PRECISION (TREE_TYPE (op0))))
-		    /* Zero-extension is always ok.  */
-		    break;
-		  else if (TYPE_PRECISION (TREE_TYPE (rhs2))
-			   == TYPE_PRECISION (TREE_TYPE (op0))
-			   && TREE_CODE (op0) == SSA_NAME)
-		    {
-		      /* Cast from signed to unsigned or vice versa.  Retry
-			 with the op0 as new rhs2.  */
-		      rhs2 = op0;
-		      continue;
-		    }
-		}
-=======
 		  && INTEGRAL_TYPE_P (TREE_TYPE (gimple_assign_rhs1 (g)))
 		  && TYPE_UNSIGNED (TREE_TYPE (gimple_assign_rhs1 (g)))
 		  && (TYPE_PRECISION (TREE_TYPE (rhs2))
 		      > TYPE_PRECISION (TREE_TYPE (gimple_assign_rhs1 (g)))))
 		/* Zero-extension is always ok.  */ ;
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
 	      else if (is_gimple_assign (g)
 		       && gimple_assign_rhs_code (g) == BIT_AND_EXPR
 		       && TREE_CODE (gimple_assign_rhs2 (g)) == INTEGER_CST
 		       && !wi::neg_p (wi::to_wide (gimple_assign_rhs2 (g))))
 		/* Masking with INTEGER_CST with MSB clear is always ok
-<<<<<<< HEAD
-		   too.  */
-		break;
-	      rhs2 = NULL_TREE;
-	    }
-	  break;
-	}
-      if (rhs2 == NULL_TREE)
-	continue;
-=======
 		   too.  */ ;
 	      else
 		continue;
 	    }
 	}
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
 
       wide_int nz = get_nonzero_bits (rhs2);
       if (wi::neg_p (nz))
@@ -3294,13 +3258,10 @@ optimize_range_tests_var_bound (enum tree_code opcode, int first, int length,
       gimple_set_uid (g, uid);
       rhs1 = gimple_assign_lhs (g);
       gsi_insert_before (&gsi, g, GSI_SAME_STMT);
-      if (!useless_type_conversion_p (utype, TREE_TYPE (rhs2)))
-	{
-	  g = gimple_build_assign (make_ssa_name (utype), NOP_EXPR, rhs2);
-	  gimple_set_uid (g, uid);
-	  rhs2 = gimple_assign_lhs (g);
-	  gsi_insert_before (&gsi, g, GSI_SAME_STMT);
-	}
+      g = gimple_build_assign (make_ssa_name (utype), NOP_EXPR, rhs2);
+      gimple_set_uid (g, uid);
+      rhs2 = gimple_assign_lhs (g);
+      gsi_insert_before (&gsi, g, GSI_SAME_STMT);
       if (tree_swap_operands_p (rhs1, rhs2))
 	{
 	  std::swap (rhs1, rhs2);
@@ -3722,7 +3683,7 @@ suitable_cond_bb (basic_block bb, basic_block test_bb, basic_block *other_bb,
       || (gimple_code (stmt) != GIMPLE_COND
 	  && (backward || !final_range_test_p (stmt)))
       || gimple_visited_p (stmt)
-      || stmt_could_throw_p (cfun, stmt)
+      || stmt_could_throw_p (stmt)
       || *other_bb == bb)
     return false;
   is_cond = gimple_code (stmt) == GIMPLE_COND;
@@ -3978,7 +3939,7 @@ maybe_optimize_range_tests (gimple *stmt)
   else
     return cfg_cleanup_needed;
 
-  if (stmt_could_throw_p (cfun, stmt))
+  if (stmt_could_throw_p (stmt))
     return cfg_cleanup_needed;
 
   /* As relative ordering of post-dominator sons isn't fixed,
@@ -5129,14 +5090,14 @@ linearize_expr_tree (vec<operand_entry *> *ops, gimple *stmt,
     {
       binlhsdef = SSA_NAME_DEF_STMT (binlhs);
       binlhsisreassoc = (is_reassociable_op (binlhsdef, rhscode, loop)
-			 && !stmt_could_throw_p (cfun, binlhsdef));
+			 && !stmt_could_throw_p (binlhsdef));
     }
 
   if (TREE_CODE (binrhs) == SSA_NAME)
     {
       binrhsdef = SSA_NAME_DEF_STMT (binrhs);
       binrhsisreassoc = (is_reassociable_op (binrhsdef, rhscode, loop)
-			 && !stmt_could_throw_p (cfun, binrhsdef));
+			 && !stmt_could_throw_p (binrhsdef));
     }
 
   /* If the LHS is not reassociable, but the RHS is, we need to swap
@@ -5871,7 +5832,7 @@ reassociate_bb (basic_block bb)
       stmt = gsi_stmt (gsi);
 
       if (is_gimple_assign (stmt)
-	  && !stmt_could_throw_p (cfun, stmt))
+	  && !stmt_could_throw_p (stmt))
 	{
 	  tree lhs, rhs1, rhs2;
 	  enum tree_code rhs_code = gimple_assign_rhs_code (stmt);

@@ -34,13 +34,11 @@ import (
 	"syscall"
 )
 
-// Error is returned by LookPath when it fails to classify a file as an
-// executable.
+// Error records the name of a binary that failed to be executed
+// and the reason it failed.
 type Error struct {
-	// Name is the file name for which the error occurred.
 	Name string
-	// Err is the underlying error.
-	Err error
+	Err  error
 }
 
 func (e *Error) Error() string {
@@ -113,8 +111,6 @@ type Cmd struct {
 	// ExtraFiles specifies additional open files to be inherited by the
 	// new process. It does not include standard input, standard output, or
 	// standard error. If non-nil, entry i becomes file descriptor 3+i.
-	//
-	// ExtraFiles is not supported on Windows.
 	ExtraFiles []*os.File
 
 	// SysProcAttr holds optional, operating system-specific attributes.

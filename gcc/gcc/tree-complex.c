@@ -703,7 +703,8 @@ update_complex_assignment (gimple_stmt_iterator *gsi, tree r, tree i)
   if (maybe_clean_eh_stmt (stmt))
     gimple_purge_dead_eh_edges (gimple_bb (stmt));
 
-  update_complex_components (gsi, gsi_stmt (*gsi), r, i);
+  if (gimple_in_ssa_p (cfun))
+    update_complex_components (gsi, gsi_stmt (*gsi), r, i);
 }
 
 
@@ -977,21 +978,21 @@ expand_complex_addition (gimple_stmt_iterator *gsi, tree inner_type,
 }
 
 /* Expand a complex multiplication or division to a libcall to the c99
-   compliant routines.  TYPE is the complex type of the operation.
-   If INPLACE_P replace the statement at GSI with
-   the libcall and return NULL_TREE.  Else insert the call, assign its
-   result to an output variable and return that variable.  If INPLACE_P
-   is true then the statement being replaced should be an assignment
-   statement.  */
+   compliant routines.  */
 
-static tree
-expand_complex_libcall (gimple_stmt_iterator *gsi, tree type, tree ar, tree ai,
-			tree br, tree bi, enum tree_code code, bool inplace_p)
+static void
+expand_complex_libcall (gimple_stmt_iterator *gsi, tree ar, tree ai,
+			tree br, tree bi, enum tree_code code)
 {
   machine_mode mode;
   enum built_in_function bcode;
-  tree fn, lhs;
+  tree fn, type, lhs;
+  gimple *old_stmt;
   gcall *stmt;
+
+  old_stmt = gsi_stmt (*gsi);
+  lhs = gimple_assign_lhs (old_stmt);
+  type = TREE_TYPE (lhs);
 
   mode = TYPE_MODE (type);
   gcc_assert (GET_MODE_CLASS (mode) == MODE_COMPLEX_FLOAT);
@@ -1005,74 +1006,23 @@ expand_complex_libcall (gimple_stmt_iterator *gsi, tree type, tree ar, tree ai,
   else
     gcc_unreachable ();
   fn = builtin_decl_explicit (bcode);
+
   stmt = gimple_build_call (fn, 4, ar, ai, br, bi);
-
-  if (inplace_p)
-    {
-      gimple *old_stmt = gsi_stmt (*gsi);
-      gimple_call_set_nothrow (stmt, !stmt_could_throw_p (cfun, old_stmt));
-      lhs = gimple_assign_lhs (old_stmt);
-      gimple_call_set_lhs (stmt, lhs);
-      gsi_replace (gsi, stmt, true);
-
-      type = TREE_TYPE (type);
-      if (stmt_can_throw_internal (cfun, stmt))
-	{
-	  edge_iterator ei;
-	  edge e;
-	  FOR_EACH_EDGE (e, ei, gimple_bb (stmt)->succs)
-	      if (!(e->flags & EDGE_EH))
-		break;
-	  basic_block bb = split_edge (e);
-	  gimple_stmt_iterator gsi2 = gsi_start_bb (bb);
-	  update_complex_components (&gsi2, stmt,
-				     build1 (REALPART_EXPR, type, lhs),
-				     build1 (IMAGPART_EXPR, type, lhs));
-	  return NULL_TREE;
-	}
-      else
-	update_complex_components (gsi, stmt,
-				   build1 (REALPART_EXPR, type, lhs),
-				   build1 (IMAGPART_EXPR, type, lhs));
-      SSA_NAME_DEF_STMT (lhs) = stmt;
-      return NULL_TREE;
-    }
-
-  gimple_call_set_nothrow (stmt, true);
-  lhs = make_ssa_name (type);
   gimple_call_set_lhs (stmt, lhs);
-  gsi_insert_before (gsi, stmt, GSI_SAME_STMT);
+  update_stmt (stmt);
+  gsi_replace (gsi, stmt, false);
 
-  return lhs;
-}
+  if (maybe_clean_or_replace_eh_stmt (old_stmt, stmt))
+    gimple_purge_dead_eh_edges (gsi_bb (*gsi));
 
-/* Perform a complex multiplication on two complex constants A, B represented
-   by AR, AI, BR, BI of type TYPE.
-   The operation we want is: a * b = (ar*br - ai*bi) + i(ar*bi + br*ai).
-   Insert the GIMPLE statements into GSI.  Store the real and imaginary
-   components of the result into RR and RI.  */
-
-static void
-expand_complex_multiplication_components (gimple_stmt_iterator *gsi,
-					     tree type, tree ar, tree ai,
-					     tree br, tree bi,
-					     tree *rr, tree *ri)
-{
-  tree t1, t2, t3, t4;
-
-  t1 = gimplify_build2 (gsi, MULT_EXPR, type, ar, br);
-  t2 = gimplify_build2 (gsi, MULT_EXPR, type, ai, bi);
-  t3 = gimplify_build2 (gsi, MULT_EXPR, type, ar, bi);
-
-  /* Avoid expanding redundant multiplication for the common
-     case of squaring a complex number.  */
-  if (ar == br && ai == bi)
-    t4 = t3;
-  else
-    t4 = gimplify_build2 (gsi, MULT_EXPR, type, ai, br);
-
-  *rr = gimplify_build2 (gsi, MINUS_EXPR, type, t1, t2);
-  *ri = gimplify_build2 (gsi, PLUS_EXPR, type, t3, t4);
+  if (gimple_in_ssa_p (cfun))
+    {
+      type = TREE_TYPE (type);
+      update_complex_components (gsi, stmt,
+				 build1 (REALPART_EXPR, type, lhs),
+				 build1 (IMAGPART_EXPR, type, lhs));
+      SSA_NAME_DEF_STMT (lhs) = stmt;
+    }
 }
 
 /* Expand complex multiplication to scalars:
@@ -1080,12 +1030,11 @@ expand_complex_multiplication_components (gimple_stmt_iterator *gsi,
 */
 
 static void
-expand_complex_multiplication (gimple_stmt_iterator *gsi, tree type,
+expand_complex_multiplication (gimple_stmt_iterator *gsi, tree inner_type,
 			       tree ar, tree ai, tree br, tree bi,
 			       complex_lattice_t al, complex_lattice_t bl)
 {
   tree rr, ri;
-  tree inner_type = TREE_TYPE (type);
 
   if (al < bl)
     {
@@ -1131,77 +1080,27 @@ expand_complex_multiplication (gimple_stmt_iterator *gsi, tree type,
     case PAIR (VARYING, VARYING):
       if (flag_complex_method == 2 && SCALAR_FLOAT_TYPE_P (inner_type))
 	{
-	  /* If optimizing for size or not at all just do a libcall.
-	     Same if there are exception-handling edges or signaling NaNs.  */
-	  if (optimize == 0 || optimize_bb_for_size_p (gsi_bb (*gsi))
-	     || stmt_can_throw_internal (cfun, gsi_stmt (*gsi))
-	     || flag_signaling_nans)
-	    {
-	      expand_complex_libcall (gsi, type, ar, ai, br, bi,
-				      MULT_EXPR, true);
-	      return;
-	    }
-
-	  /* Else, expand x = a * b into
-	     x = (ar*br - ai*bi) + i(ar*bi + br*ai);
-	     if (isunordered (__real__ x, __imag__ x))
-		x = __muldc3 (a, b);  */
-
-	  tree tmpr, tmpi;
-	  expand_complex_multiplication_components (gsi, inner_type, ar, ai,
-						     br, bi, &tmpr, &tmpi);
-
-	  gimple *check
-	    = gimple_build_cond (UNORDERED_EXPR, tmpr, tmpi,
-				 NULL_TREE, NULL_TREE);
-
-	  basic_block orig_bb = gsi_bb (*gsi);
-	  /* We want to keep track of the original complex multiplication
-	     statement as we're going to modify it later in
-	     update_complex_assignment.  Make sure that insert_cond_bb leaves
-	     that statement in the join block.  */
-	  gsi_prev (gsi);
-	  basic_block cond_bb
-	    = insert_cond_bb (gsi_bb (*gsi), gsi_stmt (*gsi), check,
-			      profile_probability::very_unlikely ());
-
-
-	  gimple_stmt_iterator cond_bb_gsi = gsi_last_bb (cond_bb);
-	  gsi_insert_after (&cond_bb_gsi, gimple_build_nop (), GSI_NEW_STMT);
-
-	  tree libcall_res
-	    = expand_complex_libcall (&cond_bb_gsi, type, ar, ai, br,
-				       bi, MULT_EXPR, false);
-	  tree cond_real = gimplify_build1 (&cond_bb_gsi, REALPART_EXPR,
-					    inner_type, libcall_res);
-	  tree cond_imag = gimplify_build1 (&cond_bb_gsi, IMAGPART_EXPR,
-					    inner_type, libcall_res);
-
-	  basic_block join_bb = single_succ_edge (cond_bb)->dest;
-	  *gsi = gsi_start_nondebug_after_labels_bb (join_bb);
-
-	  /* We have a conditional block with some assignments in cond_bb.
-	     Wire up the PHIs to wrap up.  */
-	  rr = make_ssa_name (inner_type);
-	  ri = make_ssa_name (inner_type);
-	  edge cond_to_join = single_succ_edge (cond_bb);
-	  edge orig_to_join = find_edge (orig_bb, join_bb);
-
-	  gphi *real_phi = create_phi_node (rr, gsi_bb (*gsi));
-	  add_phi_arg (real_phi, cond_real, cond_to_join,
-			UNKNOWN_LOCATION);
-	  add_phi_arg (real_phi, tmpr, orig_to_join, UNKNOWN_LOCATION);
-
-	  gphi *imag_phi = create_phi_node (ri, gsi_bb (*gsi));
-	  add_phi_arg (imag_phi, cond_imag, cond_to_join,
-			UNKNOWN_LOCATION);
-	  add_phi_arg (imag_phi, tmpi, orig_to_join, UNKNOWN_LOCATION);
+	  expand_complex_libcall (gsi, ar, ai, br, bi, MULT_EXPR);
+	  return;
 	}
       else
-	/* If we are not worrying about NaNs expand to
-	  (ar*br - ai*bi) + i(ar*bi + br*ai) directly.  */
-	expand_complex_multiplication_components (gsi, inner_type, ar, ai,
-						      br, bi, &rr, &ri);
+	{
+	  tree t1, t2, t3, t4;
+
+	  t1 = gimplify_build2 (gsi, MULT_EXPR, inner_type, ar, br);
+	  t2 = gimplify_build2 (gsi, MULT_EXPR, inner_type, ai, bi);
+	  t3 = gimplify_build2 (gsi, MULT_EXPR, inner_type, ar, bi);
+
+	  /* Avoid expanding redundant multiplication for the common
+	     case of squaring a complex number.  */
+	  if (ar == br && ai == bi)
+	    t4 = t3;
+	  else
+	    t4 = gimplify_build2 (gsi, MULT_EXPR, inner_type, ai, br);
+
+	  rr = gimplify_build2 (gsi, MINUS_EXPR, inner_type, t1, t2);
+	  ri = gimplify_build2 (gsi, PLUS_EXPR, inner_type, t3, t4);
+	}
       break;
 
     default:
@@ -1271,8 +1170,14 @@ expand_complex_div_wide (gimple_stmt_iterator *gsi, tree inner_type,
       gimple *stmt;
       tree cond, tmp;
 
-      tmp = make_ssa_name (boolean_type_node);
+      tmp = create_tmp_var (boolean_type_node);
       stmt = gimple_build_assign (tmp, compare);
+      if (gimple_in_ssa_p (cfun))
+	{
+	  tmp = make_ssa_name (tmp, stmt);
+	  gimple_assign_set_lhs (stmt, tmp);
+	}
+
       gsi_insert_before (gsi, stmt, GSI_SAME_STMT);
 
       cond = fold_build2_loc (gimple_location (stmt),
@@ -1403,14 +1308,13 @@ expand_complex_div_wide (gimple_stmt_iterator *gsi, tree inner_type,
 /* Expand complex division to scalars.  */
 
 static void
-expand_complex_division (gimple_stmt_iterator *gsi, tree type,
+expand_complex_division (gimple_stmt_iterator *gsi, tree inner_type,
 			 tree ar, tree ai, tree br, tree bi,
 			 enum tree_code code,
 			 complex_lattice_t al, complex_lattice_t bl)
 {
   tree rr, ri;
 
-  tree inner_type = TREE_TYPE (type);
   switch (PAIR (al, bl))
     {
     case PAIR (ONLY_REAL, ONLY_REAL):
@@ -1458,7 +1362,7 @@ expand_complex_division (gimple_stmt_iterator *gsi, tree type,
 	case 2:
 	  if (SCALAR_FLOAT_TYPE_P (inner_type))
 	    {
-	      expand_complex_libcall (gsi, type, ar, ai, br, bi, code, true);
+	      expand_complex_libcall (gsi, ar, ai, br, bi, code);
 	      break;
 	    }
 	  /* FALLTHRU */
@@ -1698,20 +1602,25 @@ expand_complex_operations_1 (gimple_stmt_iterator *gsi)
   else
     br = bi = NULL_TREE;
 
-  al = find_lattice_value (ac);
-  if (al == UNINITIALIZED)
-    al = VARYING;
-
-  if (TREE_CODE_CLASS (code) == tcc_unary)
-    bl = UNINITIALIZED;
-  else if (ac == bc)
-    bl = al;
-  else
+  if (gimple_in_ssa_p (cfun))
     {
-      bl = find_lattice_value (bc);
-      if (bl == UNINITIALIZED)
-	bl = VARYING;
+      al = find_lattice_value (ac);
+      if (al == UNINITIALIZED)
+	al = VARYING;
+
+      if (TREE_CODE_CLASS (code) == tcc_unary)
+	bl = UNINITIALIZED;
+      else if (ac == bc)
+	bl = al;
+      else
+	{
+	  bl = find_lattice_value (bc);
+	  if (bl == UNINITIALIZED)
+	    bl = VARYING;
+	}
     }
+  else
+    al = bl = VARYING;
 
   switch (code)
     {
@@ -1721,7 +1630,7 @@ expand_complex_operations_1 (gimple_stmt_iterator *gsi)
       break;
 
     case MULT_EXPR:
-      expand_complex_multiplication (gsi, type, ar, ai, br, bi, al, bl);
+      expand_complex_multiplication (gsi, inner_type, ar, ai, br, bi, al, bl);
       break;
 
     case TRUNC_DIV_EXPR:
@@ -1729,7 +1638,7 @@ expand_complex_operations_1 (gimple_stmt_iterator *gsi)
     case FLOOR_DIV_EXPR:
     case ROUND_DIV_EXPR:
     case RDIV_EXPR:
-      expand_complex_division (gsi, type, ar, ai, br, bi, code, al, bl);
+      expand_complex_division (gsi, inner_type, ar, ai, br, bi, code, al, bl);
       break;
 
     case NEGATE_EXPR:

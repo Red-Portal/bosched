@@ -17,10 +17,12 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"unicode"
 	"unicode/utf8"
 )
@@ -155,18 +157,12 @@ import (
 // an infinite recursion.
 //
 func Marshal(v interface{}) ([]byte, error) {
-	e := newEncodeState()
-
+	e := &encodeState{}
 	err := e.marshal(v, encOpts{escapeHTML: true})
 	if err != nil {
 		return nil, err
 	}
-	buf := append([]byte(nil), e.Bytes()...)
-
-	e.Reset()
-	encodeStatePool.Put(e)
-
-	return buf, nil
+	return e.Bytes(), nil
 }
 
 // MarshalIndent is like Marshal but applies Indent to format the output.
@@ -287,28 +283,24 @@ func newEncodeState() *encodeState {
 	return new(encodeState)
 }
 
-// jsonError is an error wrapper type for internal use only.
-// Panics with errors are wrapped in jsonError so that the top-level recover
-// can distinguish intentional panics from this package.
-type jsonError struct{ error }
-
 func (e *encodeState) marshal(v interface{}, opts encOpts) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			if je, ok := r.(jsonError); ok {
-				err = je.error
-			} else {
+			if _, ok := r.(runtime.Error); ok {
 				panic(r)
 			}
+			if s, ok := r.(string); ok {
+				panic(s)
+			}
+			err = r.(error)
 		}
 	}()
 	e.reflectValue(reflect.ValueOf(v), opts)
 	return nil
 }
 
-// error aborts the encoding by panicking with err wrapped in jsonError.
 func (e *encodeState) error(err error) {
-	panic(jsonError{err})
+	panic(err)
 }
 
 func isEmptyValue(v reflect.Value) bool {
@@ -1237,22 +1229,65 @@ func typeFields(t reflect.Type) []field {
 // will be false: This condition is an error in Go and we skip all
 // the fields.
 func dominantField(fields []field) (field, bool) {
-	// The fields are sorted in increasing index-length order, then by presence of tag.
-	// That means that the first field is the dominant one. We need only check
-	// for error cases: two fields at top level, either both tagged or neither tagged.
-	if len(fields) > 1 && len(fields[0].index) == len(fields[1].index) && fields[0].tag == fields[1].tag {
+	// The fields are sorted in increasing index-length order. The winner
+	// must therefore be one with the shortest index length. Drop all
+	// longer entries, which is easy: just truncate the slice.
+	length := len(fields[0].index)
+	tagged := -1 // Index of first tagged field.
+	for i, f := range fields {
+		if len(f.index) > length {
+			fields = fields[:i]
+			break
+		}
+		if f.tag {
+			if tagged >= 0 {
+				// Multiple tagged fields at the same level: conflict.
+				// Return no field.
+				return field{}, false
+			}
+			tagged = i
+		}
+	}
+	if tagged >= 0 {
+		return fields[tagged], true
+	}
+	// All remaining fields have the same length. If there's more than one,
+	// we have a conflict (two fields named "X" at the same level) and we
+	// return no field.
+	if len(fields) > 1 {
 		return field{}, false
 	}
 	return fields[0], true
 }
 
-var fieldCache sync.Map // map[reflect.Type][]field
+var fieldCache struct {
+	value atomic.Value // map[reflect.Type][]field
+	mu    sync.Mutex   // used only by writers
+}
 
 // cachedTypeFields is like typeFields but uses a cache to avoid repeated work.
 func cachedTypeFields(t reflect.Type) []field {
-	if f, ok := fieldCache.Load(t); ok {
-		return f.([]field)
+	m, _ := fieldCache.value.Load().(map[reflect.Type][]field)
+	f := m[t]
+	if f != nil {
+		return f
 	}
-	f, _ := fieldCache.LoadOrStore(t, typeFields(t))
-	return f.([]field)
+
+	// Compute fields without lock.
+	// Might duplicate effort but won't hold other computations back.
+	f = typeFields(t)
+	if f == nil {
+		f = []field{}
+	}
+
+	fieldCache.mu.Lock()
+	m, _ = fieldCache.value.Load().(map[reflect.Type][]field)
+	newM := make(map[reflect.Type][]field, len(m)+1)
+	for k, v := range m {
+		newM[k] = v
+	}
+	newM[t] = f
+	fieldCache.value.Store(newM)
+	fieldCache.mu.Unlock()
+	return f
 }

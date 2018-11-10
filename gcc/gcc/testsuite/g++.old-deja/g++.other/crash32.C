@@ -5,9 +5,7 @@ struct foo
 {
   enum e
   {
-    not				// { dg-error "" }
-    // We think the next close-brace closes the definition of struct
-    // foo, not enum e.  Things go downhill from there
+    not				// { dg-error "" } 
   }; // { dg-bogus "" } 
   ~foo(); // { dg-bogus "" "" { xfail *-*-* } } 
   void x (foo *&a, bool b = (unsigned char)0);
@@ -26,6 +24,6 @@ namespace N
   typedef baz<bar> c;
 }
 
-{ // { dg-error "expected" }
+{
   int a;
 };

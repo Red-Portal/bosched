@@ -16,12 +16,8 @@
 namespace __sanitizer {
 
 void ReadProcMaps(ProcSelfMapsBuff *proc_maps) {
-  if (!ReadFileToBuffer("/proc/self/maps", &proc_maps->data,
-                        &proc_maps->mmaped_size, &proc_maps->len)) {
-    proc_maps->data = nullptr;
-    proc_maps->mmaped_size = 0;
-    proc_maps->len = 0;
-  }
+  ReadFileToBuffer("/proc/self/maps", &proc_maps->data, &proc_maps->mmaped_size,
+                   &proc_maps->len);
 }
 
 static bool IsOneOf(char c, char c1, char c2) {

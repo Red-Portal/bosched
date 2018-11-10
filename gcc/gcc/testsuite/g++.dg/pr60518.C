@@ -1,5 +1,5 @@
 // { dg-do compile }
-// { dg-options "-Os -fprofile-use -Wno-missing-profile" }
+// { dg-options "-Os -fprofile-use" }
 
 int a;
 int fn1 () { return a == ',' || a == ';'; }

@@ -1,6 +1,5 @@
 // PR c++/66988
-// { dg-do compile { target c++17 } }
-// { dg-options "-fconcepts" }
+// { dg-options "-std=c++17 -fconcepts" }
 
 #include <type_traits>
 

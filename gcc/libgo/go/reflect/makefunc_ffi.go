@@ -33,7 +33,7 @@ func FFICallbackGo(results unsafe.Pointer, params unsafe.Pointer, impl *makeFunc
 	ap := params
 	for _, rt := range ftyp.in {
 		p := unsafe_New(rt)
-		typedmemmove(rt, p, *(*unsafe.Pointer)(ap))
+		memmove(p, *(*unsafe.Pointer)(ap), rt.size)
 		v := Value{rt, p, flag(rt.Kind()) | flagIndir}
 		in = append(in, v)
 		ap = (unsafe.Pointer)(uintptr(ap) + ptrSize)
@@ -59,7 +59,7 @@ func FFICallbackGo(results unsafe.Pointer, params unsafe.Pointer, impl *makeFunc
 		if v.flag&flagIndir == 0 && (v.kind() == Ptr || v.kind() == UnsafePointer) {
 			*(*unsafe.Pointer)(addr) = v.ptr
 		} else {
-			typedmemmove(typ, addr, v.ptr)
+			memmove(addr, v.ptr, typ.size)
 		}
 		off += typ.size
 	}

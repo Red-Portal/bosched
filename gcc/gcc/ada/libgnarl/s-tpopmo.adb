@@ -42,10 +42,11 @@ package body Monotonic is
      (Time       : Duration;
       Mode       : ST.Delay_Modes;
       Check_Time : out Duration;
-      Abs_Time   : out Duration);
+      Abs_Time   : out Duration;
+      Rel_Time   : out Duration);
    --  Helper for Timed_Sleep and Timed_Delay: given a deadline specified by
    --  Time and Mode, compute the current clock reading (Check_Time), and the
-   --  target absolute and relative clock readings (Abs_Time). The
+   --  target absolute and relative clock readings (Abs_Time, Rel_Time). The
    --  epoch for Time depends on Mode; the epoch for Check_Time and Abs_Time
    --  is always that of CLOCK_RT_Ada.
 
@@ -87,7 +88,8 @@ package body Monotonic is
      (Time       : Duration;
       Mode       : ST.Delay_Modes;
       Check_Time : out Duration;
-      Abs_Time   : out Duration)
+      Abs_Time   : out Duration;
+      Rel_Time   : out Duration)
    is
    begin
       Check_Time := Monotonic_Clock;
@@ -96,6 +98,10 @@ package body Monotonic is
 
       if Mode = Relative then
          Abs_Time := Duration'Min (Time, Max_Sensible_Delay) + Check_Time;
+
+         if Relative_Timed_Wait then
+            Rel_Time := Duration'Min (Max_Sensible_Delay, Time);
+         end if;
 
          pragma Warnings (Off);
          --  Comparison "OSC.CLOCK_RT_Ada = OSC.CLOCK_REALTIME" is compile
@@ -108,6 +114,10 @@ package body Monotonic is
       then
          pragma Warnings (On);
          Abs_Time := Duration'Min (Check_Time + Max_Sensible_Delay, Time);
+
+         if Relative_Timed_Wait then
+            Rel_Time := Duration'Min (Max_Sensible_Delay, Time - Check_Time);
+         end if;
 
       --  Absolute deadline specified using the calendar clock, in the
       --  case where it is not the same as the tasking clock: compensate for
@@ -123,6 +133,10 @@ package body Monotonic is
             Abs_Time :=
               Duration'Min (Check_Time + Max_Sensible_Delay, RT_Time);
 
+            if Relative_Timed_Wait then
+               Rel_Time :=
+                 Duration'Min (Max_Sensible_Delay, RT_Time - Check_Time);
+            end if;
          end;
       end if;
    end Compute_Deadline;
@@ -148,11 +162,10 @@ package body Monotonic is
       Base_Time  : Duration;
       Check_Time : Duration;
       Abs_Time   : Duration;
-      P_Abs_Time : Duration;
+      Rel_Time   : Duration;
 
       Request    : aliased timespec;
       Result     : Interfaces.C.int;
-      Exit_Outer : Boolean := False;
 
    begin
       Timedout := True;
@@ -162,63 +175,38 @@ package body Monotonic is
         (Time       => Time,
          Mode       => Mode,
          Check_Time => Check_Time,
-         Abs_Time   => Abs_Time);
+         Abs_Time   => Abs_Time,
+         Rel_Time   => Rel_Time);
       Base_Time := Check_Time;
 
-      --  To keep a sensible Max_Sensible_Delay on a target whose system
-      --  maximum is less than sensible, we split the delay into manageable
-      --  chunks of time less than or equal to the Max_System_Delay.
-
       if Abs_Time > Check_Time then
+         Request :=
+           To_Timespec (if Relative_Timed_Wait then Rel_Time else Abs_Time);
 
-         Outer : loop
+         loop
+            exit when Self_ID.Pending_ATC_Level < Self_ID.ATC_Nesting_Level;
 
-            pragma Warnings (Off, "condition is always *");
-            if Max_System_Delay < Max_Sensible_Delay and then
-               Abs_Time > Check_Time + Max_System_Delay
-            then
-               P_Abs_Time := Check_Time + Max_System_Delay;
-            else
-               P_Abs_Time := Abs_Time;
-               Exit_Outer := True;
+            Result :=
+              pthread_cond_timedwait
+                (cond    => Self_ID.Common.LL.CV'Access,
+                 mutex   => (if Single_Lock
+                             then Single_RTS_Lock'Access
+                             else Self_ID.Common.LL.L'Access),
+                 abstime => Request'Access);
+
+            Check_Time := Monotonic_Clock;
+            exit when Abs_Time <= Check_Time or else Check_Time < Base_Time;
+
+            if Result in 0 | EINTR then
+
+               --  Somebody may have called Wakeup for us
+
+               Timedout := False;
+               exit;
             end if;
-            pragma Warnings (On);
 
-            Request := To_Timespec (P_Abs_Time);
-
-            Inner : loop
-               exit Outer
-                  when Self_ID.Pending_ATC_Level < Self_ID.ATC_Nesting_Level;
-
-               Result :=
-                 pthread_cond_timedwait
-                   (cond    => Self_ID.Common.LL.CV'Access,
-                    mutex   => (if Single_Lock
-                                then Single_RTS_Lock'Access
-                                else Self_ID.Common.LL.L'Access),
-                    abstime => Request'Access);
-
-               case Result is
-                  when 0 | EINTR =>
-                     --  Somebody may have called Wakeup for us
-                     Timedout := False;
-                     exit Outer;
-
-                  when ETIMEDOUT =>
-                     exit Outer when Exit_Outer;
-                     Check_Time := Monotonic_Clock;
-                     exit Inner;
-
-                  when others =>
-                     pragma Assert (False);
-
-               end case;
-
-               exit Outer
-                 when Abs_Time <= Check_Time or else Check_Time < Base_Time;
-
-            end loop Inner;
-         end loop Outer;
+            pragma Assert (Result = ETIMEDOUT);
+         end loop;
       end if;
    end Timed_Sleep;
 
@@ -237,11 +225,11 @@ package body Monotonic is
       Base_Time  : Duration;
       Check_Time : Duration;
       Abs_Time   : Duration;
-      P_Abs_Time : Duration;
+      Rel_Time   : Duration;
       Request    : aliased timespec;
 
-      Result     : Interfaces.C.int;
-      Exit_Outer : Boolean := False;
+      Result : Interfaces.C.int;
+      pragma Warnings (Off, Result);
 
    begin
       if Single_Lock then
@@ -254,61 +242,31 @@ package body Monotonic is
         (Time       => Time,
          Mode       => Mode,
          Check_Time => Check_Time,
-         Abs_Time   => Abs_Time);
+         Abs_Time   => Abs_Time,
+         Rel_Time   => Rel_Time);
       Base_Time := Check_Time;
 
-      --  To keep a sensible Max_Sensible_Delay on a target whose system
-      --  maximum is less than sensible, we split the delay into manageable
-      --  chunks of time less than or equal to the Max_System_Delay.
-
       if Abs_Time > Check_Time then
+         Request :=
+           To_Timespec (if Relative_Timed_Wait then Rel_Time else Abs_Time);
          Self_ID.Common.State := Delay_Sleep;
 
-         Outer : loop
+         loop
+            exit when Self_ID.Pending_ATC_Level < Self_ID.ATC_Nesting_Level;
 
-            pragma Warnings (Off, "condition is always *");
-            if Max_System_Delay < Max_Sensible_Delay and then
-              Abs_Time > Check_Time + Max_System_Delay
-            then
-               P_Abs_Time := Check_Time + Max_System_Delay;
-            else
-               P_Abs_Time := Abs_Time;
-               Exit_Outer := True;
-            end if;
-            pragma Warnings (On);
+            Result :=
+              pthread_cond_timedwait
+                (cond    => Self_ID.Common.LL.CV'Access,
+                 mutex   => (if Single_Lock
+                             then Single_RTS_Lock'Access
+                             else Self_ID.Common.LL.L'Access),
+                 abstime => Request'Access);
 
-            Request := To_Timespec (P_Abs_Time);
+            Check_Time := Monotonic_Clock;
+            exit when Abs_Time <= Check_Time or else Check_Time < Base_Time;
 
-            Inner : loop
-               exit Outer
-                 when Self_ID.Pending_ATC_Level < Self_ID.ATC_Nesting_Level;
-
-               Result :=
-                 pthread_cond_timedwait
-                   (cond    => Self_ID.Common.LL.CV'Access,
-                    mutex   => (if Single_Lock
-                                then Single_RTS_Lock'Access
-                                else Self_ID.Common.LL.L'Access),
-                    abstime => Request'Access);
-
-               case Result is
-                  when ETIMEDOUT =>
-                     exit Outer when Exit_Outer;
-                     Check_Time := Monotonic_Clock;
-                     exit Inner;
-
-                  when 0 | EINTR => null;
-
-                  when others =>
-                     pragma Assert (False);
-
-               end case;
-
-               exit Outer
-                  when Abs_Time <= Check_Time or else Check_Time < Base_Time;
-
-            end loop Inner;
-         end loop Outer;
+            pragma Assert (Result in 0 | ETIMEDOUT | EINTR);
+         end loop;
 
          Self_ID.Common.State := Runnable;
       end if;
@@ -319,7 +277,6 @@ package body Monotonic is
          Unlock_RTS;
       end if;
 
-      pragma Unreferenced (Result);
       Result := sched_yield;
    end Timed_Delay;
 

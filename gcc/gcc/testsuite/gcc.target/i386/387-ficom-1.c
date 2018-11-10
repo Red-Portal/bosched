@@ -37,6 +37,5 @@ int test_ld_i (int x)
   return (long double)i != x;
 }
 
-/* { dg-final { scan-assembler-times "cmpw\[s\t\]" 3 } } */
-/* { dg-final { scan-assembler-times "ficompl" 1 } } */
-/* { dg-final { scan-assembler-times "cmpl" 2 } } */
+/* { dg-final { scan-assembler-times "ficomp\[s\t\]" 3 } } */
+/* { dg-final { scan-assembler-times "ficompl" 3 } } */

@@ -1542,8 +1542,7 @@ canonicalize_loop_ivs (struct loop *loop, tree *nit, bool bump_in_latch)
   precision = GET_MODE_PRECISION (mode);
   type = build_nonstandard_integer_type (precision, unsigned_p);
 
-  if (original_precision != precision
-      || TYPE_UNSIGNED (TREE_TYPE (*nit)) != unsigned_p)
+  if (original_precision != precision)
     {
       *nit = fold_convert (type, *nit);
       *nit = force_gimple_operand (*nit, &stmts, true, NULL_TREE);

@@ -273,7 +273,7 @@ get_tinfo_decl_dynamic (tree exp, tsubst_flags_t complain)
   exp = resolve_nondeduced_context (exp, complain);
 
   /* peel back references, so they match.  */
-  type = non_reference (unlowered_expr_type (exp));
+  type = non_reference (TREE_TYPE (exp));
 
   /* Peel off cv qualifiers.  */
   type = TYPE_MAIN_VARIANT (type);
@@ -317,7 +317,7 @@ typeid_ok_p (void)
   if (!COMPLETE_TYPE_P (const_type_info_type_node))
     {
       gcc_rich_location richloc (input_location);
-      maybe_add_include_fixit (&richloc, "<typeinfo>", false);
+      maybe_add_include_fixit (&richloc, "<typeinfo>");
       error_at (&richloc,
 		"must %<#include <typeinfo>%> before using"
 		" %<typeid%>");
@@ -616,22 +616,22 @@ build_dynamic_cast_1 (tree type, tree expr, tsubst_flags_t complain)
   else
     {
       expr = mark_lvalue_use (expr);
-      exprtype = TREE_TYPE (expr);
+
+      exprtype = build_reference_type (TREE_TYPE (expr));
 
       /* T is a reference type, v shall be an lvalue of a complete class
 	 type, and the result is an lvalue of the type referred to by T.  */
-      if (! MAYBE_CLASS_TYPE_P (exprtype))
+
+      if (! MAYBE_CLASS_TYPE_P (TREE_TYPE (exprtype)))
 	{
 	  errstr = _("source is not of class type");
 	  goto fail;
 	}
-      if (!COMPLETE_TYPE_P (complete_type (exprtype)))
+      if (!COMPLETE_TYPE_P (complete_type (TREE_TYPE (exprtype))))
 	{
 	  errstr = _("source is of incomplete class type");
 	  goto fail;
 	}
-
-      exprtype = cp_build_reference_type (exprtype, !lvalue_p (expr));
     }
 
   /* The dynamic_cast operator shall not cast away constness.  */

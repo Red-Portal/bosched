@@ -148,7 +148,7 @@ class Statement
   make_temporary(Type*, Expression*, Location);
 
   // Make an assignment statement.
-  static Assignment_statement*
+  static Statement*
   make_assignment(Expression*, Expression*, Location);
 
   // Make an assignment operation (+=, etc.).
@@ -562,7 +562,7 @@ class Assignment_statement : public Statement
   Assignment_statement(Expression* lhs, Expression* rhs,
 		       Location location)
     : Statement(STATEMENT_ASSIGNMENT, location),
-      lhs_(lhs), rhs_(rhs), omit_write_barrier_(false)
+      lhs_(lhs), rhs_(rhs)
   { }
 
   Expression*
@@ -572,14 +572,6 @@ class Assignment_statement : public Statement
   Expression*
   rhs() const
   { return this->rhs_; }
-
-  bool
-  omit_write_barrier() const
-  { return this->omit_write_barrier_; }
-
-  void
-  set_omit_write_barrier()
-  { this->omit_write_barrier_ = true; }
 
  protected:
   int
@@ -611,8 +603,6 @@ class Assignment_statement : public Statement
   Expression* lhs_;
   // Right hand side--the rvalue.
   Expression* rhs_;
-  // True if we can omit a write barrier from this assignment.
-  bool omit_write_barrier_;
 };
 
 // A statement which creates and initializes a temporary variable.
@@ -622,8 +612,7 @@ class Temporary_statement : public Statement
  public:
   Temporary_statement(Type* type, Expression* init, Location location)
     : Statement(STATEMENT_TEMPORARY, location),
-      type_(type), init_(init), bvariable_(NULL), is_address_taken_(false),
-      value_escapes_(false)
+      type_(type), init_(init), bvariable_(NULL), is_address_taken_(false)
   { }
 
   // Return the type of the temporary variable.
@@ -640,16 +629,6 @@ class Temporary_statement : public Statement
   void
   set_is_address_taken()
   { this->is_address_taken_ = true; }
-
-  // Whether the value escapes.
-  bool
-  value_escapes() const
-  { return this->value_escapes_; }
-
-  // Record that the value escapes.
-  void
-  set_value_escapes()
-  { this->value_escapes_ = true; }
 
   // Return the temporary variable.  This should not be called until
   // after the statement itself has been converted.
@@ -687,9 +666,6 @@ class Temporary_statement : public Statement
   Bvariable* bvariable_;
   // True if something takes the address of this temporary variable.
   bool is_address_taken_;
-  // True if the value assigned to this temporary variable escapes.
-  // This is used for select statements.
-  bool value_escapes_;
 };
 
 // A variable declaration.  This marks the point in the code where a
@@ -865,7 +841,7 @@ class Send_statement : public Statement
 
   Expression*
   channel()
-  { return this->channel_; }
+  { return this->channel_; }  
 
   Expression*
   val()
@@ -938,8 +914,7 @@ class Select_clauses
 
   // Lower statements.
   void
-  lower(Gogo*, Named_object*, Block*, Temporary_statement*,
-	Temporary_statement*);
+  lower(Gogo*, Named_object*, Block*, Temporary_statement*);
 
   // Determine types.
   void
@@ -956,7 +931,7 @@ class Select_clauses
 
   // Convert to the backend representation.
   Bstatement*
-  get_backend(Translate_context*, Temporary_statement* index,
+  get_backend(Translate_context*, Temporary_statement* sel,
 	      Unnamed_label* break_label, Location);
 
   // Dump AST representation.
@@ -989,8 +964,7 @@ class Select_clauses
 
     // Lower statements.
     void
-    lower(Gogo*, Named_object*, Block*, Temporary_statement*, size_t,
-	  Temporary_statement*);
+    lower(Gogo*, Named_object*, Block*, Temporary_statement*);
 
     // Determine types.
     void
@@ -1043,14 +1017,6 @@ class Select_clauses
     dump_clause(Ast_dump_context*) const;
 
    private:
-    // These values must match the values in libgo/go/runtime/select.go.
-    enum
-    {
-      caseRecv = 1,
-      caseSend = 2,
-      caseDefault = 3,
-    };
-
     void
     lower_default(Block*, Expression*);
 
@@ -1058,11 +1024,7 @@ class Select_clauses
     lower_send(Block*, Expression*, Expression*);
 
     void
-    lower_recv(Gogo*, Named_object*, Block*, Expression*, Expression*,
-	       Temporary_statement*);
-
-    void
-    set_case(Block*, Expression*, Expression*, Expression*, int);
+    lower_recv(Gogo*, Named_object*, Block*, Expression*, Expression*);
 
     // The channel.
     Expression* channel_;
@@ -1100,7 +1062,7 @@ class Select_statement : public Statement
  public:
   Select_statement(Location location)
     : Statement(STATEMENT_SELECT, location),
-      clauses_(NULL), index_(NULL), break_label_(NULL), is_lowered_(false)
+      clauses_(NULL), sel_(NULL), break_label_(NULL), is_lowered_(false)
   { }
 
   // Add the clauses.
@@ -1143,8 +1105,8 @@ class Select_statement : public Statement
  private:
   // The select clauses.
   Select_clauses* clauses_;
-  // A temporary that holds the index value returned by selectgo.
-  Temporary_statement* index_;
+  // A temporary which holds the select structure we build up at runtime.
+  Temporary_statement* sel_;
   // The break label.
   Unnamed_label* break_label_;
   // Whether this statement has been lowered.
@@ -1637,7 +1599,7 @@ class Case_clauses
   // Dump the AST representation to a dump context.
   void
   dump_clauses(Ast_dump_context*) const;
-
+  
  private:
   // For a constant switch we need to keep a record of constants we
   // have already seen.
@@ -1711,7 +1673,7 @@ class Case_clauses
     // Dump the AST representation to a dump context.
     void
     dump_clause(Ast_dump_context*) const;
-
+  
    private:
     // The list of case expressions.
     Expression_list* cases_;

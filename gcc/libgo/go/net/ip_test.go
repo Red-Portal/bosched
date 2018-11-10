@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build !js
-
 package net
 
 import (
@@ -131,7 +129,7 @@ func TestMarshalEmptyIP(t *testing.T) {
 	}
 }
 
-var ipStringTests = []*struct {
+var ipStringTests = []struct {
 	in  IP     // see RFC 791 and RFC 4291
 	str string // see RFC 791, RFC 4291 and RFC 5952
 	byt []byte
@@ -254,21 +252,9 @@ var sink string
 func BenchmarkIPString(b *testing.B) {
 	testHookUninstaller.Do(uninstallTestHooks)
 
-	b.Run("IPv4", func(b *testing.B) {
-		benchmarkIPString(b, IPv4len)
-	})
-
-	b.Run("IPv6", func(b *testing.B) {
-		benchmarkIPString(b, IPv6len)
-	})
-}
-
-func benchmarkIPString(b *testing.B, size int) {
-	b.ReportAllocs()
-	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		for _, tt := range ipStringTests {
-			if tt.in != nil && len(tt.in) == size {
+			if tt.in != nil {
 				sink = tt.in.String()
 			}
 		}

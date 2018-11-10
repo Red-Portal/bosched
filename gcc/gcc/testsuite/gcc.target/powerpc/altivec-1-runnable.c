@@ -31,11 +31,6 @@ int main ()
   vector signed int vec_si_result, vec_si_expected;
   vector signed char vec_sc_arg;
   vector signed char vec_sc_result, vec_sc_expected;
-<<<<<<< HEAD
-  vector pixel vec_pixel_arg;
-  vector unsigned int vec_ui_result, vec_ui_expected;
-
-=======
   vector float vec_float_arg;
   vector double vec_double_result, vec_double_expected;
   vector pixel vec_pixel_arg;
@@ -46,7 +41,6 @@ int main ()
 	  unsigned long long l;
   } conv_exp, conv_val;
 
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
   vec_bs_arg = (vector bool short){ 0, 101, 202, 303,
 				    404, 505, 606, 707 };
   vec_bi_expected = (vector bool int){ 0, 101, 202, 303 };
@@ -215,8 +209,6 @@ int main ()
        abort();
 #endif
   }
-<<<<<<< HEAD
-=======
   
 
   vec_float_arg = (vector float){ 0.0, 1.5, 2.5, 3.5 };
@@ -260,7 +252,6 @@ int main ()
 #endif
       }
   }
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
 
   return 0;
 }

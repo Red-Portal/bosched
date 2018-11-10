@@ -19,8 +19,6 @@
 // @require@ %-*.tst %-*.txt
 // @diff@ %-*.tst %-*.txt
 
-// { dg-require-fileio "" }
-
 #include <istream>
 #include <sstream>
 #include <fstream>

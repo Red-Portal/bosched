@@ -9,7 +9,6 @@ import (
 	"io"
 	"os"
 	"syscall"
-	"time"
 )
 
 // Network file descriptor.
@@ -172,16 +171,4 @@ func setReadBuffer(fd *netFD, bytes int) error {
 
 func setWriteBuffer(fd *netFD, bytes int) error {
 	return syscall.EPLAN9
-}
-
-func (fd *netFD) SetDeadline(t time.Time) error {
-	return fd.pfd.SetDeadline(t)
-}
-
-func (fd *netFD) SetReadDeadline(t time.Time) error {
-	return fd.pfd.SetReadDeadline(t)
-}
-
-func (fd *netFD) SetWriteDeadline(t time.Time) error {
-	return fd.pfd.SetWriteDeadline(t)
 }

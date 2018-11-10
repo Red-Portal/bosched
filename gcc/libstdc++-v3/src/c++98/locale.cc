@@ -77,10 +77,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
   locale::locale(const locale& __other) throw()
   : _M_impl(__other._M_impl)
-  {
-    if (_M_impl != _S_classic)
-      _M_impl->_M_add_reference();
-  }
+  { _M_impl->_M_add_reference(); }
 
   // This is used to initialize global and classic locales, and
   // assumes that the _Impl objects are constructed correctly.
@@ -89,10 +86,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   { }
 
   locale::~locale() throw()
-  {
-    if (_M_impl != _S_classic)
-      _M_impl->_M_remove_reference();
-  }
+  { _M_impl->_M_remove_reference(); }
 
   bool
   locale::operator==(const locale& __rhs) const throw()
@@ -118,10 +112,8 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   const locale&
   locale::operator=(const locale& __other) throw()
   {
-    if (__other._M_impl != _S_classic)
-      __other._M_impl->_M_add_reference();
-    if (_M_impl != _S_classic)
-      _M_impl->_M_remove_reference();
+    __other._M_impl->_M_add_reference();
+    _M_impl->_M_remove_reference();
     _M_impl = __other._M_impl;
     return *this;
   }

@@ -56,7 +56,6 @@ generic
    --  Returns True if Item is found in Set, False otherwise
 
 package GNAT.Array_Split is
-   pragma Preelaborate;
 
    Index_Error : exception;
    --  Raised by all operations below if Index > Field_Count (S)

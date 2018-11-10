@@ -235,19 +235,11 @@ test_neg_double (vector double x)
 
 /* { dg-final { scan-assembler-times "vcmpequd" 1 } } */
 /* { dg-final { scan-assembler-times "vpksdss"  1 } } */
-<<<<<<< HEAD
-/* { dg-final { scan-assembler-times "vpkudus"  2 } } */  
-/* { dg-final { scan-assembler-times "vpkuhus"  2 } } */
-/* { dg-final { scan-assembler-times "vpkshss"  1 } } */  
-/* { dg-final { scan-assembler-times "vpkshus"  1 } } */  
-/* { dg-final { scan-assembler-times "vpksdus"  1 } } */  
-=======
 /* { dg-final { scan-assembler-times "vpkudus"  2 } } */
 /* { dg-final { scan-assembler-times "vpkuhus"  2 } } */
 /* { dg-final { scan-assembler-times "vpkshss"  1 } } */  
 /* { dg-final { scan-assembler-times "vpkshus"  1 } } */  
 /* { dg-final { scan-assembler-times "vpksdus"  1 } } */
->>>>>>> 3e0e7d8b5b9f61b4341a582fa8c3479ba3b5fdcf
 /* { dg-final { scan-assembler-times "vpkuwus"  2 } } */  
 /* { dg-final { scan-assembler-times "vpopcntb" 2 } } */
 /* { dg-final { scan-assembler-times "vpopcnth" 2 } } */

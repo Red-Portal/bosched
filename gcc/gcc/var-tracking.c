@@ -115,7 +115,6 @@
 #include "tree-pretty-print.h"
 #include "rtl-iter.h"
 #include "fibonacci_heap.h"
-#include "print-rtl.h"
 
 typedef fibonacci_heap <long, basic_block_def> bb_heap_t;
 typedef fibonacci_node <long, basic_block_def> bb_heap_node_t;
@@ -918,14 +917,14 @@ static HOST_WIDE_INT cfa_base_offset;
    or hard_frame_pointer_rtx.  */
 
 static inline rtx
-compute_cfa_pointer (poly_int64 adjustment)
+compute_cfa_pointer (HOST_WIDE_INT adjustment)
 {
   return plus_constant (Pmode, cfa_base_rtx, adjustment + cfa_base_offset);
 }
 
 /* Adjustment for hard_frame_pointer_rtx to cfa base reg,
    or -1 if the replacement shouldn't be done.  */
-static poly_int64 hard_frame_pointer_adjustment = -1;
+static HOST_WIDE_INT hard_frame_pointer_adjustment = -1;
 
 /* Data for adjust_mems callback.  */
 
@@ -1049,7 +1048,7 @@ adjust_mems (rtx loc, const_rtx old_rtx, void *data)
 	return compute_cfa_pointer (amd->stack_adjust);
       else if (loc == hard_frame_pointer_rtx
 	       && frame_pointer_needed
-	       && maybe_ne (hard_frame_pointer_adjustment, -1)
+	       && hard_frame_pointer_adjustment != -1
 	       && cfa_base_rtx)
 	return compute_cfa_pointer (hard_frame_pointer_adjustment);
       gcc_checking_assert (loc != virtual_incoming_args_rtx);
@@ -2175,7 +2174,7 @@ get_addr_from_local_cache (dataflow_set *set, rtx const loc)
 static rtx
 vt_canonicalize_addr (dataflow_set *set, rtx oloc)
 {
-  poly_int64 ofst = 0, term;
+  HOST_WIDE_INT ofst = 0;
   machine_mode mode = GET_MODE (oloc);
   rtx loc = oloc;
   rtx x;
@@ -2184,9 +2183,9 @@ vt_canonicalize_addr (dataflow_set *set, rtx oloc)
   while (retry)
     {
       while (GET_CODE (loc) == PLUS
-	     && poly_int_rtx_p (XEXP (loc, 1), &term))
+	     && GET_CODE (XEXP (loc, 1)) == CONST_INT)
 	{
-	  ofst += term;
+	  ofst += INTVAL (XEXP (loc, 1));
 	  loc = XEXP (loc, 0);
 	}
 
@@ -2211,11 +2210,10 @@ vt_canonicalize_addr (dataflow_set *set, rtx oloc)
 	    loc = get_addr_from_global_cache (loc);
 
 	  /* Consolidate plus_constants.  */
-	  while (maybe_ne (ofst, 0)
-		 && GET_CODE (loc) == PLUS
-		 && poly_int_rtx_p (XEXP (loc, 1), &term))
+	  while (ofst && GET_CODE (loc) == PLUS
+		 && GET_CODE (XEXP (loc, 1)) == CONST_INT)
 	    {
-	      ofst += term;
+	      ofst += INTVAL (XEXP (loc, 1));
 	      loc = XEXP (loc, 0);
 	    }
 
@@ -2231,10 +2229,12 @@ vt_canonicalize_addr (dataflow_set *set, rtx oloc)
     }
 
   /* Add OFST back in.  */
-  if (maybe_ne (ofst, 0))
+  if (ofst)
     {
       /* Don't build new RTL if we can help it.  */
-      if (strip_offset (oloc, &term) == loc && known_eq (term, ofst))
+      if (GET_CODE (oloc) == PLUS
+	  && XEXP (oloc, 0) == loc
+	  && INTVAL (XEXP (oloc, 1)) == ofst)
 	return oloc;
 
       loc = plus_constant (mode, loc, ofst);
@@ -6112,7 +6112,7 @@ add_stores (rtx loc, const_rtx expr, void *cuip)
     }
 
   if (loc == stack_pointer_rtx
-      && maybe_ne (hard_frame_pointer_adjustment, -1)
+      && hard_frame_pointer_adjustment != -1
       && preserve)
     cselib_set_value_sp_based (v);
 
@@ -8683,6 +8683,7 @@ emit_note_insn_var_location (variable **varp, emit_note_data *data)
   bool complete;
   enum var_init_status initialized = VAR_INIT_STATUS_UNINITIALIZED;
   HOST_WIDE_INT last_limit;
+  tree type_size_unit;
   HOST_WIDE_INT offsets[MAX_VAR_PARTS];
   rtx loc[MAX_VAR_PARTS];
   tree decl;
@@ -8783,7 +8784,6 @@ emit_note_insn_var_location (variable **varp, emit_note_data *data)
 	  && GET_CODE (loc[n_var_parts]) == GET_CODE (loc2))
 	{
 	  rtx new_loc = NULL;
-	  poly_int64 offset2;
 
 	  if (REG_P (loc[n_var_parts])
 	      && hard_regno_nregs (REGNO (loc[n_var_parts]), mode) * 2
@@ -8808,13 +8808,18 @@ emit_note_insn_var_location (variable **varp, emit_note_data *data)
 	  else if (MEM_P (loc[n_var_parts])
 		   && GET_CODE (XEXP (loc2, 0)) == PLUS
 		   && REG_P (XEXP (XEXP (loc2, 0), 0))
-		   && poly_int_rtx_p (XEXP (XEXP (loc2, 0), 1), &offset2))
+		   && CONST_INT_P (XEXP (XEXP (loc2, 0), 1)))
 	    {
-	      poly_int64 end1 = size;
-	      rtx base1 = strip_offset_and_add (XEXP (loc[n_var_parts], 0),
-						&end1);
-	      if (rtx_equal_p (base1, XEXP (XEXP (loc2, 0), 0))
-		  && known_eq (end1, offset2))
+	      if ((REG_P (XEXP (loc[n_var_parts], 0))
+		   && rtx_equal_p (XEXP (loc[n_var_parts], 0),
+				   XEXP (XEXP (loc2, 0), 0))
+		   && INTVAL (XEXP (XEXP (loc2, 0), 1)) == size)
+		  || (GET_CODE (XEXP (loc[n_var_parts], 0)) == PLUS
+		      && CONST_INT_P (XEXP (XEXP (loc[n_var_parts], 0), 1))
+		      && rtx_equal_p (XEXP (XEXP (loc[n_var_parts], 0), 0),
+				      XEXP (XEXP (loc2, 0), 0))
+		      && INTVAL (XEXP (XEXP (loc[n_var_parts], 0), 1)) + size
+			 == INTVAL (XEXP (XEXP (loc2, 0), 1))))
 		new_loc = adjust_address_nv (loc[n_var_parts],
 					     wider_mode, 0);
 	    }
@@ -8829,9 +8834,8 @@ emit_note_insn_var_location (variable **varp, emit_note_data *data)
 	}
       ++n_var_parts;
     }
-  poly_uint64 type_size_unit
-    = tree_to_poly_uint64 (TYPE_SIZE_UNIT (TREE_TYPE (decl)));
-  if (maybe_lt (poly_uint64 (last_limit), type_size_unit))
+  type_size_unit = TYPE_SIZE_UNIT (TREE_TYPE (decl));
+  if ((unsigned HOST_WIDE_INT) last_limit < TREE_INT_CST_LOW (type_size_unit))
     complete = false;
 
   if (! flag_var_tracking_uninit)
@@ -9684,17 +9688,20 @@ vt_add_function_parameter (tree parm)
      rewrite the incoming location of parameters passed on the stack
      into MEMs based on the argument pointer, so that incoming doesn't
      depend on a pseudo.  */
-  poly_int64 incoming_offset = 0;
   if (MEM_P (incoming)
-      && (strip_offset (XEXP (incoming, 0), &incoming_offset)
-	  == crtl->args.internal_arg_pointer))
+      && (XEXP (incoming, 0) == crtl->args.internal_arg_pointer
+	  || (GET_CODE (XEXP (incoming, 0)) == PLUS
+	      && XEXP (XEXP (incoming, 0), 0)
+		 == crtl->args.internal_arg_pointer
+	      && CONST_INT_P (XEXP (XEXP (incoming, 0), 1)))))
     {
       HOST_WIDE_INT off = -FIRST_PARM_OFFSET (current_function_decl);
+      if (GET_CODE (XEXP (incoming, 0)) == PLUS)
+	off += INTVAL (XEXP (XEXP (incoming, 0), 1));
       incoming
 	= replace_equiv_address_nv (incoming,
 				    plus_constant (Pmode,
-						   arg_pointer_rtx,
-						   off + incoming_offset));
+						   arg_pointer_rtx, off));
     }
 
 #ifdef HAVE_window_save
@@ -9909,7 +9916,8 @@ vt_add_function_parameters (void)
 
   for (parm = DECL_ARGUMENTS (current_function_decl);
        parm; parm = DECL_CHAIN (parm))
-    vt_add_function_parameter (parm);
+    if (!POINTER_BOUNDS_P (parm))
+      vt_add_function_parameter (parm);
 
   if (DECL_HAS_VALUE_EXPR_P (DECL_RESULT (current_function_decl)))
     {
@@ -10001,7 +10009,7 @@ static bool
 vt_initialize (void)
 {
   basic_block bb;
-  poly_int64 fp_cfa_offset = -1;
+  HOST_WIDE_INT fp_cfa_offset = -1;
 
   alloc_aux_for_blocks (sizeof (variable_tracking_info));
 
@@ -10116,7 +10124,7 @@ vt_initialize (void)
 	{
 	  if (GET_CODE (elim) == PLUS)
 	    {
-	      fp_cfa_offset -= rtx_to_poly_int64 (XEXP (elim, 1));
+	      fp_cfa_offset -= INTVAL (XEXP (elim, 1));
 	      elim = XEXP (elim, 0);
 	    }
 	  if (elim != hard_frame_pointer_rtx)
@@ -10209,15 +10217,12 @@ vt_initialize (void)
 			    log_op_type (PATTERN (insn), bb, insn,
 					 MO_ADJUST, dump_file);
 			  VTI (bb)->mos.safe_push (mo);
+			  VTI (bb)->out.stack_adjust += pre;
 			}
 		    }
 
 		  cselib_hook_called = false;
 		  adjust_insn (bb, insn);
-
-		  if (!frame_pointer_needed && pre)
-		    VTI (bb)->out.stack_adjust += pre;
-
 		  if (DEBUG_MARKER_INSN_P (insn))
 		    {
 		      reemit_marker_as_note (insn);
@@ -10231,10 +10236,7 @@ vt_initialize (void)
 		      cselib_process_insn (insn);
 		      if (dump_file && (dump_flags & TDF_DETAILS))
 			{
-			  if (dump_flags & TDF_SLIM)
-			    dump_insn_slim (dump_file, insn);
-			  else
-			    print_rtl_single (dump_file, insn);
+			  print_rtl_single (dump_file, insn);
 			  dump_cselib_table (dump_file);
 			}
 		    }
@@ -10255,8 +10257,8 @@ vt_initialize (void)
 		      VTI (bb)->out.stack_adjust += post;
 		    }
 
-		  if (maybe_ne (fp_cfa_offset, -1)
-		      && known_eq (hard_frame_pointer_adjustment, -1)
+		  if (fp_cfa_offset != -1
+		      && hard_frame_pointer_adjustment == -1
 		      && fp_setter_insn (insn))
 		    {
 		      vt_init_cfa_base ();

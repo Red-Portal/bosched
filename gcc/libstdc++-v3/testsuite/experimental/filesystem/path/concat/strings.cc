@@ -23,7 +23,6 @@
 
 #include <experimental/filesystem>
 #include <testsuite_hooks.h>
-#include <testsuite_iterators.h>
 
 using std::experimental::filesystem::path;
 
@@ -31,30 +30,23 @@ void
 test01()
 {
   path p("/");
-  p += std::string("foo");
-  VERIFY( p.filename().string() == "foo" );
+  p += path::string_type("foo");
+  VERIFY( p.filename() == "foo" );
   p += "bar";
-  VERIFY( p.filename().string() == "foobar" );
+  VERIFY( p.filename() == "foobar" );
   p += '/';
-  VERIFY( p.parent_path().string() == "/foobar" );
-  VERIFY( p.filename().string() == "." );
+  VERIFY( p.parent_path() == "/foobar" && p.filename() == "." );
 #if _GLIBCXX_USE_WCHAR_T
-  VERIFY( p.parent_path().wstring() == L"/foobar" );
-  VERIFY( p.filename().wstring() == L"." );
   p += L"baz.txt";
 #else
   p += "baz.txt";
 #endif
-  VERIFY( p.filename().string() == "baz.txt" );
+  VERIFY( p.filename() == "baz.txt" );
   p.concat("/dir/");
-  // N.B. on Windows p.parent_path() is "/foobar\\baz.txt\\dir"
-  VERIFY( p.parent_path() == path("/foobar/baz.txt/dir") );
-  VERIFY( p.filename().string() == "." );
-  const char file[] = "file";
-  __gnu_test::test_container<const char, __gnu_test::input_iterator_wrapper>
-    input(file, file + 4);
-  p.concat(input.begin(), input.end());
-  VERIFY( p.filename().string() == file );
+  VERIFY( p.parent_path() == "/foobar/baz.txt/dir" && p.filename() == "." );
+  std::string file = "file";
+  p.concat(file.begin(), file.end());
+  VERIFY( p.filename() == "file" );
 }
 
 int

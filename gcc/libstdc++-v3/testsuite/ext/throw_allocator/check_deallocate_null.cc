@@ -17,7 +17,6 @@
 // <http://www.gnu.org/licenses/>.
 
 // { dg-require-time "" }
-// { dg-require-cstdint "" }
 
 #include <ext/throw_allocator.h>
 #include <testsuite_allocator.h>

@@ -42,9 +42,9 @@ set_default_std_flags (void)
 {
   gfc_option.allow_std = GFC_STD_F95_OBS | GFC_STD_F95_DEL
     | GFC_STD_F2003 | GFC_STD_F2008 | GFC_STD_F95 | GFC_STD_F77
-    | GFC_STD_F2008_OBS | GFC_STD_GNU | GFC_STD_LEGACY
+    | GFC_STD_F2008_OBS | GFC_STD_F2008_TS | GFC_STD_GNU | GFC_STD_LEGACY
     | GFC_STD_F2018 | GFC_STD_F2018_DEL | GFC_STD_F2018_OBS;
-  gfc_option.warn_std = GFC_STD_F2018_DEL | GFC_STD_F95_DEL | GFC_STD_LEGACY;
+  gfc_option.warn_std = GFC_STD_F95_DEL | GFC_STD_LEGACY;
 }
 
 
@@ -313,7 +313,6 @@ gfc_post_options (const char **pfilename)
       if (gfc_current_form == FORM_UNKNOWN)
 	{
 	  gfc_current_form = FORM_FREE;
-	  main_input_filename = filename;
 	  gfc_warning_now (0, "Reading file %qs as free form", 
 			   (filename[0] == '\0') ? "<stdin>" : filename);
 	}
@@ -417,7 +416,7 @@ gfc_post_options (const char **pfilename)
      specified it directly.  */
 
   if (flag_frontend_optimize == -1)
-    flag_frontend_optimize = optimize && !optimize_debug;
+    flag_frontend_optimize = optimize;
 
   /* Same for front end loop interchange.  */
 
@@ -565,7 +564,7 @@ gfc_handle_runtime_check_option (const char *arg)
 	      result = 1;
 	      break;
 	    }
-	  else if (optname[n] && pos > 3 && gfc_str_startswith (arg, "no-")
+	  else if (optname[n] && pos > 3 && strncmp ("no-", arg, 3) == 0
 		   && strncmp (optname[n], arg+3, pos-3) == 0)
 	    {
 	      gfc_option.rtcheck &= ~optmask[n];
@@ -585,7 +584,7 @@ gfc_handle_runtime_check_option (const char *arg)
    recognized and handled.  */
 
 bool
-gfc_handle_option (size_t scode, const char *arg, HOST_WIDE_INT value,
+gfc_handle_option (size_t scode, const char *arg, int value,
 		   int kind ATTRIBUTE_UNUSED, location_t loc ATTRIBUTE_UNUSED,
 		   const struct cl_option_handlers *handlers ATTRIBUTE_UNUSED)
 {
@@ -705,7 +704,8 @@ gfc_handle_option (size_t scode, const char *arg, HOST_WIDE_INT value,
       break;
 
     case OPT_std_f95:
-      gfc_option.allow_std = GFC_STD_OPT_F95;
+      gfc_option.allow_std = GFC_STD_F95_OBS | GFC_STD_F95 | GFC_STD_F77
+			     | GFC_STD_F2008_OBS;
       gfc_option.warn_std = GFC_STD_F95_OBS;
       gfc_option.max_continue_fixed = 19;
       gfc_option.max_continue_free = 39;
@@ -715,7 +715,8 @@ gfc_handle_option (size_t scode, const char *arg, HOST_WIDE_INT value,
       break;
 
     case OPT_std_f2003:
-      gfc_option.allow_std = GFC_STD_OPT_F03;
+      gfc_option.allow_std = GFC_STD_F95_OBS | GFC_STD_F77 
+	| GFC_STD_F2003 | GFC_STD_F95 | GFC_STD_F2008_OBS;
       gfc_option.warn_std = GFC_STD_F95_OBS;
       gfc_option.max_identifier_length = 63;
       warn_ampersand = 1;
@@ -723,7 +724,8 @@ gfc_handle_option (size_t scode, const char *arg, HOST_WIDE_INT value,
       break;
 
     case OPT_std_f2008:
-      gfc_option.allow_std = GFC_STD_OPT_F08;
+      gfc_option.allow_std = GFC_STD_F95_OBS | GFC_STD_F77 
+	| GFC_STD_F2003 | GFC_STD_F95 | GFC_STD_F2008 | GFC_STD_F2008_OBS;
       gfc_option.warn_std = GFC_STD_F95_OBS | GFC_STD_F2008_OBS;
       gfc_option.max_identifier_length = 63;
       warn_ampersand = 1;
@@ -731,8 +733,19 @@ gfc_handle_option (size_t scode, const char *arg, HOST_WIDE_INT value,
       break;
 
     case OPT_std_f2008ts:
+      gfc_option.allow_std = GFC_STD_F95_OBS | GFC_STD_F77 
+	| GFC_STD_F2003 | GFC_STD_F95 | GFC_STD_F2008 | GFC_STD_F2008_OBS
+	| GFC_STD_F2008_TS;
+      gfc_option.warn_std = GFC_STD_F95_OBS | GFC_STD_F2008_OBS;
+      gfc_option.max_identifier_length = 63;
+      warn_ampersand = 1;
+      warn_tabs = 1;
+      break;
+
     case OPT_std_f2018:
-      gfc_option.allow_std = GFC_STD_OPT_F18;
+      gfc_option.allow_std = GFC_STD_F95_OBS | GFC_STD_F77
+	| GFC_STD_F2003 | GFC_STD_F95 | GFC_STD_F2008 | GFC_STD_F2008_OBS
+	| GFC_STD_F2008_TS | GFC_STD_F2018 | GFC_STD_F2018_OBS;
       gfc_option.warn_std = GFC_STD_F95_OBS | GFC_STD_F2008_OBS
 	| GFC_STD_F2018_OBS;
       gfc_option.max_identifier_length = 63;

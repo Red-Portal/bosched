@@ -10,6 +10,5 @@ void f()
 void g()
 {
   typedef void (X) ();
-  X x[] = { [x](){} };  // { dg-error "5:declaration of .x. as array of functions" }
-  // { dg-error "not declared" "" { target *-*-* } .-1 }
+  X x[] = { [x](){} };  // { dg-error "array of functions|not declared" }
 }

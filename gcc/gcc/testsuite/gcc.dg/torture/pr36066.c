@@ -1,5 +1,5 @@
 /* { dg-do compile } */
-/* { dg-options "-ftree-vrp" } */
+/* { dg-options "-funsafe-loop-optimizations -ftree-vrp" } */
 
 typedef int FLAC__int32;
 typedef int FLAC__bool;

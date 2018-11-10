@@ -21,18 +21,13 @@
 #include <memory>
 
 // Not swappable, and unique_ptr not swappable via the generic std::swap.
-struct C {
-  void operator()(void*) const { }
-};
+struct C { };
 void swap(C&, C&) = delete;
 
 static_assert( !std::is_swappable_v<std::unique_ptr<int, C>> );
 
 // Not swappable, and unique_ptr not swappable via the generic std::swap.
-struct D {
-  D(D&&) = delete;
-  void operator()(void*) const { }
-};
+struct D { D(D&&) = delete; };
 
 static_assert( !std::is_swappable_v<std::unique_ptr<int, D>> );
 
