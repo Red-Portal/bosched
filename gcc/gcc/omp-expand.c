@@ -556,6 +556,7 @@ expand_parallel_call (struct omp_region *region, basic_block bb,
     int start_ix2;
     location_t clause_loc;
     vec<tree, va_gc> *args;
+    bool add_region_id = false;
 
     clauses = gimple_omp_parallel_clauses (entry_stmt);
 
@@ -571,6 +572,7 @@ expand_parallel_call (struct omp_region *region, basic_block bb,
             switch (region->inner->sched_kind)
             {
             case OMP_CLAUSE_SCHEDULE_RUNTIME:
+                add_region_id = true;
                 start_ix2 = 3;
                 break;
             case OMP_CLAUSE_SCHEDULE_DYNAMIC:
@@ -708,7 +710,7 @@ expand_parallel_call (struct omp_region *region, basic_block bb,
 
     adjust_context_and_scope (gimple_block (entry_stmt), child_fndecl);
 
-    if(region->inner->type == OMP_CLAUSE_SCHEDULE_RUNTIME)
+    if(add_region_id)
     {
         vec_alloc (args, 5 + vec_safe_length (ws_args));
     }
@@ -724,8 +726,7 @@ expand_parallel_call (struct omp_region *region, basic_block bb,
         args->splice (*ws_args);
     args->quick_push (flags);
 
-    if(region->inner->type &&
-       region->inner->types->ched_kind == OMP_CLAUSE_SCHEDULE_RUNTIME)
+    if(add_region_id)
     {
         tree region_id = build_int_cst (long_long_unsigned_type_node,
                                         (region_id_t)region);
