@@ -724,10 +724,11 @@ expand_parallel_call (struct omp_region *region, basic_block bb,
         args->splice (*ws_args);
     args->quick_push (flags);
 
-    if(region->inner->type == OMP_CLAUSE_SCHEDULE_RUNTIME)
+    if(region->inner->type &&
+       region->inner->types->ched_kind == OMP_CLAUSE_SCHEDULE_RUNTIME)
     {
         tree region_id = build_int_cst (long_long_unsigned_type_node,
-                                        static_cast<region_id_t>(region));
+                                        (region_id_t)region);
         args->quick_push (region_id);
     }
 
@@ -2531,6 +2532,8 @@ expand_omp_for_generic (struct omp_region *region,
     tree *counts = NULL;
     int i;
     bool ordered_lastprivate = false;
+    region_id_t region = build_int_cst (long_long_unsigned_type_node,
+                                        static_cast<region_id_t>(region));
 
     gcc_assert (!broken_loop || !in_combined_parallel);
     gcc_assert (fd->iter_type == long_integer_type_node
