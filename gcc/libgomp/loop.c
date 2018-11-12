@@ -40,11 +40,15 @@ static inline void
 gomp_loop_init (struct gomp_work_share *ws, long start, long end, long incr,
                 enum gomp_schedule_type sched, long chunk_size, region_id_t region_id)
 {
+    if(is_parameterized(sched))
+    {
+        double param = bo_schedule_parameter(region_id);
+        ws->param = param; 
+    }
+
     if(is_bo_schedule(sched))
     {
         bo_schedule_begin(region_id);
-        double param = bo_schedule_parameter(region_id);
-        ws->param = param; 
     }
 
     ws->sched = sched;

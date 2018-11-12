@@ -41,23 +41,26 @@ gomp_loop_ull_init (struct gomp_work_share *ws, bool up, gomp_ull start,
                     gomp_ull end, gomp_ull incr, enum gomp_schedule_type sched,
                     gomp_ull chunk_size, region_id_t region_id)
 {
-    struct gomp_task_icv *icv = gomp_icv (false);
-    if(is_bo_schedule(icv->run_sched_var))
+    if(is_parameterized(sched))
     {
-        bo_schedule_begin(region_id);
         double param = bo_schedule_parameter(region_id);
         ws->param = param; 
+    }
+
+    if(is_bo_schedule(sched))
+    {
+        bo_schedule_begin(region_id);
     }
 
     ws->sched = sched;
     ws->chunk_size_ull = chunk_size;
     /* Canonicalize loops that have zero iterations to ->next == ->end.  */
     ws->end_ull = ((up && start > end) || (!up && start < end))
-		? start : end;
-  ws->incr_ull = incr;
-  ws->next_ull = start;
-  ws->mode = 0;
-  if (sched == GFS_DYNAMIC)
+        ? start : end;
+    ws->incr_ull = incr;
+    ws->next_ull = start;
+    ws->mode = 0;
+    if (sched == GFS_DYNAMIC)
     {
       ws->chunk_size_ull *= incr;
 
