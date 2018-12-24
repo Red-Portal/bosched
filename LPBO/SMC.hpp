@@ -8,15 +8,23 @@
 namespace lpbo
 {
 
-    class sequential_monte_carlo
+    class smc_gp
     {
         size_t _n;
         std::vector<gp_model> _particles;
 
+    private:
+        inline void propagate()
+        {
+            
+        }
+
+    public:
+
         inline
-        sequential_monte_carlo(size_t particle_num,
-                               lpbo::vec const& x,
-                               lpbo::vec const& y)
+        smc_gp(size_t particle_num,
+               lpbo::vec const& x,
+               lpbo::vec const& y)
             : _n(particle_num), _particles()
         {
             _particles.reserve(_n);
@@ -25,7 +33,24 @@ namespace lpbo
                 _particles.emplace_back(x, y);
             }
         }
-        
+
+        inline void
+        update(lpbo::vec const& x, lpbo::vec const& y)
+        {
+            
+        }
+
+        inline void
+        update(double x, double y)
+        {
+            
+        }
+
+        inline std::pair<double, double>
+        predict(double x)
+        {
+            
+        }
     };
 }
 

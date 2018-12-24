@@ -1,3 +1,4 @@
+
 #ifndef _LPBO_GP_HPP_
 #define _LPBO_GP_HPP_
 
@@ -5,7 +6,6 @@
 #include <iostream>
 #include <chrono>
 #include <cassert>
-#include <ifstream>
 //#include <blaze/math/lapack/posv.h>
 #include "MCMC.hpp"
 
@@ -18,15 +18,16 @@ namespace lpbo
 
     class gp_model
     {
-        size_t _n;
         double _ker_l; 
         double _ker_g; 
         double _variance;
         double _mean;
+        double _likelihood;
         lpbo::mat _K_inv;
         lpbo::lower _L;
         lpbo::vec _alpha;
         lpbo::vec _data_x;
+        lpbo::vec _data_y_normalized;
 
         inline double
         covariance_kernel(double x,
@@ -119,10 +120,87 @@ namespace lpbo
             return lpbo::lower(buff);
         }
 
+        inline void
+        update_Kinv(double x)
+        {
+            auto K_x = covariance_kernel(x, x, _ker_l, _variance);
+            auto k_x = covariance_kernel(x, _data_x,  _ker_l, _variance);
+            auto Kinv_k_x  = blaze::evaluate(_K_inv * k_x);
+            auto mu = 1 / (K_x - (blaze::trans(k_x) * Kinv_k_x));
+            auto g = -1 * mu * Kinv_k_x;
+
+            auto old_size = _K_inv.rows();
+            _K_inv.resize(old_size + 1, old_size + 1, true);
+            
+            auto matrix_view = blaze::submatrix(_K_inv, 0u, 0u, old_size, old_size);
+            matrix_view += (blaze::outer(g, g) / mu);;
+
+            for(size_t i = 0; i < old_size; ++i)
+            {
+                _K_inv(old_size, i) = g[i]; 
+                _K_inv(i, old_size) = g[i]; 
+            }
+            _K_inv(old_size, old_size) = K_x;
+        }
+
+
+        inline void
+        gp_model_init(lpbo::vec const& x, lpbo::vec const& y,
+                      lpbo::vec&& mcmc_initial,
+                      size_t mcmc_iterations)
+        {
+            _data_x = x;
+            _mean = mean(y);
+            _data_y_normalized = sub(y, _mean);
+            _variance = blaze::dot(_data_y_normalized, _data_y_normalized)
+                / (_data_y_normalized.size() - 1);
+            auto n = x.size();
+
+            auto f = [&](lpbo::vec param){
+                         auto L = compute_inverse(x,
+                                                  param[0],
+                                                  param[1],
+                                                  _variance,
+                                                  n);
+                         auto alpha = _data_y_normalized;
+                         blaze::trsv(lpbo::mat(L), alpha, 'L', 'N', 'N');
+                         blaze::trsv(lpbo::mat(L), alpha, 'L', 'T', 'N');
+                         return loglikelihood(L, alpha, _data_y_normalized);
+                     };
+
+            auto param = metropolis_hastings(f, std::move(mcmc_initial), mcmc_iterations);
+            _ker_l = param[0];
+            _ker_g = param[1];
+
+            std::cout << param << std::endl;
+            _L = compute_inverse(x, _ker_l, _ker_g, _variance, n);
+
+            auto L_inv = _L;
+            blaze::invert(L_inv);
+            _K_inv = blaze::trans(L_inv) * L_inv;
+            _alpha = _K_inv * _data_y_normalized;
+
+            _likelihood = loglikelihood(_L, _alpha, _data_y_normalized);
+        }
+
     public:
         inline
         gp_model() noexcept
         {}
+
+        inline
+        gp_model(lpbo::vec const& x, lpbo::vec const& y) noexcept
+        {
+            gp_model_init(x, y, lpbo::vec{0.1, 0.1}, 1000);
+        }
+
+        inline
+        gp_model(lpbo::vec const& x, lpbo::vec const& y,
+                 lpbo::vec&& mcmc_initial,
+                 size_t mcmc_iterations) noexcept
+        {
+            gp_model_init(x, y, std::move(mcmc_initial), mcmc_iterations);
+        }
 
         inline void
         matrix_deserialize(blaze::Archive<std::ifstream>& archive)
@@ -130,38 +208,29 @@ namespace lpbo
             ;
         }
 
-        inline
-        gp_model(lpbo::vec const& x, lpbo::vec const& y)
+        inline double
+        likelihood()
         {
-            _data_x = x;
-            _mean = mean(y);
-            auto y_norm = sub(y, _mean);
-            _variance = blaze::dot(y_norm, y_norm) / (y_norm.size() - 1);
-            _n = x.size();
+            return _likelihood;           
+        }
 
-            auto f = [&](lpbo::vec param){
-                         auto L = compute_inverse(x,
-                                                  param[0],
-                                                  param[1],
-                                                  _variance,
-                                                  _n);
-                         auto alpha = y_norm;
-                         blaze::trsv(lpbo::mat(L), alpha, 'L', 'N', 'N');
-                         blaze::trsv(lpbo::mat(L), alpha, 'L', 'T', 'N');
-                         return loglikelihood(L, alpha, y_norm);
-                     };
+        inline void
+        update(double x, double y)
+        {
+            auto old_size = _data_x.size();
 
-            auto param = metropolis_hastings(f, lpbo::vec({0.01, 0.01}), 1000);
-            _ker_l = param[0];
-            _ker_g = param[1];
+            update_Kinv(x);
+            
+            _data_x.resize(old_size + 1);
+            _data_x[old_size] = y;
 
-            std::cout << param << std::endl;
-            _L = compute_inverse(x, _ker_l, _ker_g, _variance, _n);
+            _data_y_normalized.resize(old_size + 1);
+            _data_y_normalized[old_size] = y - _mean;
 
-            auto L_inv = _L;
-            blaze::invert(L_inv);
-            _K_inv = blaze::trans(L_inv) * L_inv;
-            _alpha = _K_inv * y_norm;
+            _alpha = _K_inv * _data_y_normalized;
+            _variance = blaze::dot(_data_y_normalized, _data_y_normalized)
+                / (_data_y_normalized.size() - 1);
+            _likelihood = loglikelihood(_L, _alpha, _data_y_normalized);
         }
 
         inline std::pair<double, double>
