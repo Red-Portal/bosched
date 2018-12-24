@@ -11,7 +11,7 @@ extern "C"
 {
     void* test_init(double* x, double* y, int n)
     {
-        auto* model = new lpbo::smc_gp(10, lpbo::vec(n, x), lpbo::vec(n, y)); 
+        auto* model = new lpbo::smc_gp(lpbo::vec(n, x), lpbo::vec(n, y), 10, 0.9); 
         return reinterpret_cast<void*>(model);
     }
 
@@ -21,7 +21,7 @@ extern "C"
         double annealing = 0.5;
         auto* gp_model = reinterpret_cast<lpbo::smc_gp*>(model);
 
-        auto f = [&](double x){
+        auto f = [=](double x){
                      auto [mean, var] = gp_model->predict(x);
                      return lpbo::UCB(mean, var, beta, annealing, iter);
                  };
@@ -44,7 +44,7 @@ extern "C"
         if(iter > 1)
             gp_model->update(x, y);
 
-        auto f = [&](double x){
+        auto f = [=](double x){
                      auto [mean, var] = gp_model->predict(x);
                      return lpbo::UCB(mean, var, beta, annealing, iter);
                  };

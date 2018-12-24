@@ -27,6 +27,7 @@ namespace lpbo
         lpbo::lower _L;
         lpbo::vec _alpha;
         lpbo::vec _data_x;
+        lpbo::vec _data_y;
         lpbo::vec _data_y_normalized;
 
         inline double
@@ -143,13 +144,11 @@ namespace lpbo
             _K_inv(old_size, old_size) = K_x;
         }
 
-
         inline void
         gp_model_init(lpbo::vec const& x, lpbo::vec const& y,
                       lpbo::vec&& mcmc_initial,
                       size_t mcmc_iterations)
         {
-            _data_x = x;
             _mean = mean(y);
             _data_y_normalized = sub(y, _mean);
             _variance = blaze::dot(_data_y_normalized, _data_y_normalized)
@@ -172,7 +171,6 @@ namespace lpbo
             _ker_l = param[0];
             _ker_g = param[1];
 
-            std::cout << param << std::endl;
             _L = compute_inverse(x, _ker_l, _ker_g, _variance, n);
 
             auto L_inv = _L;
@@ -191,6 +189,8 @@ namespace lpbo
         inline
         gp_model(lpbo::vec const& x, lpbo::vec const& y) noexcept
         {
+            _data_x = x;
+            _data_y = y;
             gp_model_init(x, y, lpbo::vec{0.1, 0.1}, 1000);
         }
 
@@ -199,7 +199,25 @@ namespace lpbo
                  lpbo::vec&& mcmc_initial,
                  size_t mcmc_iterations) noexcept
         {
+            _data_x = x;
+            _data_y = y;
             gp_model_init(x, y, std::move(mcmc_initial), mcmc_iterations);
+        }
+
+        inline void
+        rejuvenate(lpbo::vec const& x, lpbo::vec const& y,
+                   lpbo::vec&& mcmc_initial, size_t mcmc_iterations) noexcept
+        {
+            size_t old_n = _data_x.size();
+            size_t add_n = x.size();
+            _data_x.resize(old_n + add_n);
+            blaze::subvector(_data_x, old_n, add_n) = x;
+
+            _data_y.resize(old_n + add_n);
+            blaze::subvector(_data_y, old_n, add_n) = y;
+
+            gp_model_init(_data_x, _data_y,
+                          std::move(mcmc_initial), mcmc_iterations);
         }
 
         inline void
@@ -222,7 +240,10 @@ namespace lpbo
             update_Kinv(x);
             
             _data_x.resize(old_size + 1);
-            _data_x[old_size] = y;
+            _data_x[old_size] = x;
+
+            _data_y.resize(old_size + 1);
+            _data_y[old_size] = y;
 
             _data_y_normalized.resize(old_size + 1);
             _data_y_normalized[old_size] = y - _mean;
@@ -233,12 +254,44 @@ namespace lpbo
             _likelihood = loglikelihood(_L, _alpha, _data_y_normalized);
         }
 
+        inline void
+        update(lpbo::vec const& x, lpbo::vec const& y)
+        {
+            size_t old_n = _data_x.size();
+            size_t add_n = x.size();
+            _data_x.resize(old_n + add_n);
+            blaze::subvector(_data_x, old_n, add_n) = x;
+
+            _data_y.resize(old_n + add_n);
+            blaze::subvector(_data_y, old_n, add_n) = y;
+
+            auto y_normalized = sub(y, _mean);
+            _data_y_normalized.resize(old_n + add_n);
+            blaze::subvector(_data_y_normalized, old_n, add_n) = y_normalized;
+
+            _variance = blaze::dot(_data_y_normalized, _data_y_normalized)
+                / (_data_y_normalized.size() - 1);
+
+            _L = compute_inverse(_data_x, _ker_l, _ker_g, _variance, old_n + add_n);
+
+            auto L_inv = _L;
+            blaze::invert(L_inv);
+            _K_inv = blaze::trans(L_inv) * L_inv;
+            _alpha = _K_inv * _data_y_normalized;
+            _likelihood = loglikelihood(_L, _alpha, _data_y_normalized);
+        }
+
+        inline lpbo::vec
+        parameters() const
+        {
+            return lpbo::vec({_ker_l, _ker_g});
+        }
+
         inline std::pair<double, double>
-        predict(double x)
+        predict(double x) const
         {
             auto k = covariance_kernel(x, _data_x,  _ker_l, _variance);
             auto mu = blaze::dot(k, _alpha) + _mean;
-
             auto sigma2 = covariance_kernel(x, x, _ker_l, _variance)
                 - blaze::trans(k) * (_K_inv * k);
             return {mu, sigma2};
