@@ -1,108 +1,17 @@
 
-#include "LPBO/GP.hpp"
-#include "LPBO/LPBO.hpp"
+#include "utils.hpp"
+#include "loop_state"
+
 #include <blaze/Blaze.h>
 #include <chrono>
 #include <chrono>
 #include <cstdlib>
-#include <ctime>
 #include <fstream>
 #include <iostream>
-#include <nlohmann/json.hpp>
-#include <string>
-#include <string_view>
 #include <unordered_map>
 
-size_t const warm_up_num = 10;
-
-bool is_new_file = false;
-
-struct loop_state_t
-{
-    //lpbo::gp_model gp_model;
-    std::vector<double> obs_x;
-    std::vector<double> obs_y;
-    double param;
-    chrono::steady_clock::time_point start;
-};
-
-struct global_state_t
-{
-    nlohmann::json json_data;
-    size_t iters;
-    size_t num_loops;
-    std::unordered_map<size_t, loop_state_t> loop_states;
-};
-
-global_state_t _global_state;
-
-inline std::string
-format_current_time()
-{
-    time_t rawtime;
-    struct tm * timeinfo;
-    char buffer[80];
-
-    time (&rawtime);
-    timeinfo = localtime(&rawtime);
-
-    strftime(buffer,sizeof(buffer),"%d-%m-%Y %H:%M:%S",timeinfo);
-    return std::string(buffer);
-}
-
-inline void read_loops(nlohmann::json&& data, std::string const& file_name)
-{
-    using namespace std::literals::string_literals;
-
-    _global_state.iters = data["iterations"];
-    _global_state.num_loops = data["num_loop"];
-
-    std::cout << "--------- bayesian optimization ---------"
-              << " modified date   | " << data["date"]
-              << " iterations      | " << _global_state.iters
-              << " number of loops | " << _global_state.num_loops
-              << '\n'
-              << " set environment variable DEBUG for detailed info"
-              << std::endl;
-
-    //std::ifstream matrix_archive(file_name + ".mat.blaze");
-    //std::ifstream vector_archive(file_name + ".mat.blaze");
-
-    for(auto& l : data["loops"])
-    {
-        loop_state_t state;
-        state.id = l.key();
-        state.param = l.value()["param"];
-        if(getenv("DEBUG"))
-        {
-            std::cout << " loop id: " << loop_id
-                      << " number of observations: " << l.value()["obs_x"].size()
-                      << std::endl;
-        }
-        _global_state.loop_states[loop_id] = std::move(state);
-    }
-    _global_state.json_data = std::move(data);
-}
-
-inline nlohmann::json
-write_loops(nlohmann::json&& prev)
-{
-    prev["date"] = format_current_time();
-    ++prev["iterations"];
-
-    for(auto& l : prev["loops"])
-    {
-        size_t loop_id = l.key();
-        auto& loop_state = _global_state.loop_states[loop_id];
-        l.value()["param"] = loop_state.param;
-        l.value()["obs_x"] = std::move(loop_state.obs_x);
-        l.value()["obs_y"] = std::move(loop_state.obs_y);
-
-        l.value()["pred_mean"].push_back(loop_state.pred_mean);
-        l.value()["pred_var"].push_back(loop_state.red_var);
-    }
-    return prev;
-}
+std::unordered_map<size_t, loop_state_t> _loop_states;
+bool _is_new_file;
 
 inline double
 generate_warmup()
@@ -127,8 +36,6 @@ extern "C"
         {
             is_new_file = true;
             nlohmann::json new_file;
-            new_file["iters"] = 1;
-            _global_state.json_data = std::move(new_file);
         }
         else
         {
@@ -136,6 +43,50 @@ extern "C"
             auto data = nlohmann::json();
             stream >> data;
             read_loops(std::move(data), file_name);
+        }
+    }
+
+    double
+    bo_schedule_parameter(unsigned long long region_id)
+    {
+        double param = 0.5;
+        if(is_new_file)
+            _loop_states[region_id].param = param;
+        else
+            param = _loop_states[region_id].param;
+
+        if(getenv("DEBUG"))
+        {
+            std::cout << "-- loop " << region_id
+                      << " requested schedule parameter " << param
+                      << std::endl;
+        }
+        return param;
+    }
+    
+    void bo_schedule_begin(unsigned long long region_id)
+    {
+        if(getenv("DEBUG"))
+        {
+            std::cout << "-- loop " << region_id << " starting execution."
+                      << std::endl;
+        }
+
+        _loop_states[region_id].loop_start();
+    }
+
+    void bo_schedule_end(unsigned long long region_id)
+    {
+        auto& loop_state = _loop_states[region_id];
+        auto duration = loop_state.loop_stop<bosched::microsecond>();
+
+        loop_state.obs_x.push_back(region_id);
+        loop_state.obs_y.push_back(duration.count());
+
+        if(getenv("DEBUG"))
+        {
+            std::cout << "-- loop " << region_id << " ending execution with runtime "
+                      << loop_state.obs_y.back() << "us" << std::endl;
         }
     }
 
@@ -190,55 +141,5 @@ extern "C"
         stream << next; 
     }
 
-    double
-    bo_schedule_parameter(unsigned long long region_id)
-    {
-        double param = 0.5;
-        if(is_new_file)
-        {
-            _global_state.loop_states[region_id].param = param;
-            ++_global_state.num_loops;
-        }
-        else
-        {
-            param = _global_state.loop_states[region_id].param;
-        }
-
-        if(getenv("DEBUG"))
-        {
-            std::cout << "-- loop " << region_id << " requested schedule parameter " << param
-                      << std::endl;
-        }
-        return param;
-    }
-    
-    void bo_schedule_begin(unsigned long long region_id)
-    {
-        if(getenv("DEBUG"))
-        {
-            std::cout << "-- loop " << region_id << " starting execution."
-                      << std::endl;
-        }
-        _global_state.loop_states[region_id].start =
-            std::chrono::steady_clock::now();
-    }
-
-    void bo_schedule_end(unsigned long long region_id)
-    {
-        auto& loop_state = _global_state.loop_states[region_id];
-        auto start_point = loop_state.start;
-        auto duration = std::chrono::steady_clock::now() - start_point;
-
-        loop_state.obs_x.push_back(region_id);
-        loop_state.obs_y.push_back(
-            std::chrono::duration_cast<double, std::micro>(
-                duration).count());
-
-        if(getenv("DEBUG"))
-        {
-            std::cout << "-- loop " << region_id << " ending execution with runtime "
-                      << loop_state.obs_y.back() << "us" << std::endl;
-        }
-    }
 }
 
