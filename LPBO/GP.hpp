@@ -205,6 +205,18 @@ namespace lpbo
             gp_model_init(x, y, std::move(mcmc_initial), mcmc_iterations);
         }
 
+        inline 
+        gp_model(gp_model const& other) = default;
+
+        inline 
+        gp_model(gp_model&& other) = default;
+
+        inline gp_model&
+        operator=(gp_model const& other) = default;
+
+        inline gp_model&
+        operator=(gp_model&& other) = default;
+
         inline void
         rejuvenate(lpbo::vec const& x, lpbo::vec const& y,
                    lpbo::vec&& mcmc_initial, size_t mcmc_iterations) noexcept

@@ -112,6 +112,18 @@ namespace lpbo
             _weights = normalize_weight(std::move(weights));
         }
 
+        inline
+        smc_gp( smc_gp const& other) = default;
+
+        inline
+        smc_gp( smc_gp&& other) noexcept = default;
+
+        inline smc_gp&
+        operator=(smc_gp const& other) = default;
+
+        inline smc_gp&
+        operator=( smc_gp&& other) noexcept = default;
+
         inline void
         update(lpbo::vec const& x, lpbo::vec const& y)
         {
