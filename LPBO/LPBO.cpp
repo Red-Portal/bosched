@@ -1,5 +1,6 @@
 
 #include <cstdio>
+#include <string>
 #include "SMC.hpp"
 #include "acquisition.hpp"
 
@@ -65,4 +66,18 @@ extern "C"
         return result.x;
     }
 
+    void test_serialize(void* model, char* str, int* n)
+    {
+        auto* gp_model = reinterpret_cast<lpbo::smc_gp*>(model);
+        auto serialized = gp_model->serialize();
+        serialized.copy(str, serialized.size());
+        *n = serialized.size();
+    }
+
+    void test_deserialize(void* model, char* str, int n)
+    {
+        auto serialized = std::string(str, n);
+        auto* gp_model = reinterpret_cast<lpbo::smc_gp*>(model);
+        gp_model->deserialize(serialized);
+    }
 }
