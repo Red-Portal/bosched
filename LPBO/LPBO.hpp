@@ -5,13 +5,42 @@
 #include "GP.hpp"
 #include "SMC.hpp"
 
-extern "C"
-{
-    // double next_point(double* x, double* y, int n, int iter, int max_iter,
-    //                   double* out_predmean,  double* out_predvar);
+#include <vector>
 
-    // void render_acquisition(double* x, double* y, int n, int iter,
-    //                         double* x_hat, double* y_hat, int m);
+namespace lpbo
+{
+    inline std::tuple<double, double, double>
+    bayesian_optimiztion(lpbo::smc_gp const& model,
+                         int iter,
+                         int max_iter) noexcept
+    {
+        return {0, 0, 0};
+    }
+
+
+    inline std::vector<double>
+    render_acquisition(lpbo::smc_gp const& model,
+                       size_t resolution) noexcept
+    {
+        return {};
+    }
+
+    using mean_t = double;
+    using var_t = double;
+
+    inline std::pair<std::vector<mean_t>,
+                     std::vector<var_t>>
+    render_gp(lpbo::smc_gp const& model,
+              size_t resolution) noexcept
+    {
+        return {};
+    }
+
+    inline double
+    warmup_sample() noexcept
+    {
+        return 0;
+    }
 }
 
 #endif
