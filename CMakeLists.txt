@@ -28,7 +28,6 @@ set(CMAKE_MODULE_PATH
     ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR}/cmake)
 
 # project source files
-set(LBPO_SOURCE_DIR ${PROJECT_SOURCE_DIR}/LBPO)
 set(SOURCE_DIR ${PROJECT_SOURCE_DIR})
 set(SOURCE_FILES
     ${SOURCE_DIR}/bosched.cpp)
@@ -51,11 +50,22 @@ set_target_properties(${PROJECT_NAME}
     COMPILE_FLAGS "${BUILD_FLAGS}"
     CXX_STANDARD 17)
 
-# Include directories
-target_include_directories(${PROJECT_NAME}
-    PRIVATE
-    ${LPBO_SOURCE_DIR})
-
 ## Thread library dependency
 find_package(BLAZE REQUIRED)
+find_package(dlib REQUIRED)
 
+set(BLA_STATIC)
+find_package(BLAS REQUIRED)
+find_package(LAPACK REQUIRED)
+
+set(LBPO_SOURCE_DIR ${PROJECT_SOURCE_DIR}/LBPO)
+# Include directories
+target_include_directories(${PROJECT_NAME}
+    PUBLIC
+    ${LPBO_SOURCE_DIR}
+    ${BLAZE_INCLUDE_DIR})
+
+target_link_libraries(${PROJECT_NAME}
+    dlib::dlib
+    ${BLAS_LIBRARIES}
+    ${LAPACK_LIBRARIES})
