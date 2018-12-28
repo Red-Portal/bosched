@@ -20,10 +20,15 @@ namespace bosched
             loop_state_t state;
             state.id = l["id"];
             state.param = l["param"];
-            auto obs_x = l["obs_x"];
-            auto obs_y = l["obs_y"];
-            state.obs_x = std::vector<double>(obs_x.cbegin(), obs_x.cend());
-            state.obs_y = std::vector<double>(obs_y.cbegin(), obs_y.cend());
+            try {
+                auto obs_x = l.at("obs_x");
+                auto obs_y = l.at("obs_y");
+                state.obs_x = std::vector<double>(obs_x.cbegin(), obs_x.cend());
+                state.obs_y = std::vector<double>(obs_y.cbegin(), obs_y.cend());
+            }
+            catch(std::exception const& e) {
+                std::cout << e.what() << std::endl;
+            }
 
             loop_states[state.id] = std::move(state);
 
@@ -50,8 +55,12 @@ namespace bosched
             nlohmann::json serialized_state;
             serialized_state["id"] = loop_state.id;
             serialized_state["param"] = loop_state.param;
-            serialized_state["obs_x"] = nlohmann::json(std::move(loop_state.obs_x));
-            serialized_state["obs_y"] = nlohmann::json(std::move(loop_state.obs_y));
+
+            if(loop_state.obs_x.size() > 0)
+            {
+                serialized_state["obs_x"] = nlohmann::json(std::move(loop_state.obs_x));
+                serialized_state["obs_y"] = nlohmann::json(std::move(loop_state.obs_y));
+            }
 
             serialized_states.emplace_back(serialized_state);
 
@@ -76,11 +85,17 @@ namespace bosched
             loop_state_t state;
             state.id = l["id"];
             state.param = l["param"];
-            auto obs_x = l["obs_x"];
-            auto obs_y = l["obs_y"];
-            state.obs_x = std::vector<double>(obs_x.cbegin(), obs_x.cend());
-            state.obs_y = std::vector<double>(obs_y.cbegin(), obs_y.cend());
-            state.gp.emplace(l["gp"]);
+            //auto obs_x = l["obs_x"];
+            //auto obs_y = l["obs_y"];
+            //state.obs_x = std::vector<double>(obs_x.cbegin(), obs_x.cend());
+            //state.obs_y = std::vector<double>(obs_y.cbegin(), obs_y.cend());
+
+            try {
+                state.gp.emplace(l["gp"]);
+            }
+            catch(std::exception const& e) {
+                std::cout << e.what() << std::endl;
+            }
 
             loop_states[state.id] = std::move(state);
 
@@ -107,9 +122,12 @@ namespace bosched
             nlohmann::json serialized_state;
             serialized_state["id"] = loop_state.id;
             serialized_state["param"] = loop_state.param;
-            serialized_state["obs_x"] = nlohmann::json(std::move(loop_state.obs_x));
-            serialized_state["obs_y"] = nlohmann::json(std::move(loop_state.obs_y));
-            serialized_state["gp"] = loop_state->gp.serialize();
+            // serialized_state["obs_x"] = nlohmann::json(std::move(loop_state.obs_x));
+            // serialized_state["obs_y"] = nlohmann::json(std::move(loop_state.obs_y));
+            if(loop_state.gp.has_value())
+            {
+                serialized_state["gp"] = loop_state->gp.serialize();
+            }
 
             serialized_states.emplace_back(serialized_state);
 
