@@ -6,11 +6,12 @@
 #include <cmath>
 #include <random>
 #include <numeric>
+#include <sstream>
+#include <string>
 #include "GP.hpp"
 
 namespace lpbo
 {
-
     class smc_gp
     {
     private:
@@ -20,48 +21,44 @@ namespace lpbo
         std::mt19937 _rng;
 
         template<typename Rng>
-        std::vector<size_t>
-        selection(Rng&& rng, std::vector<double>& weights) const
+        inline std::vector<size_t>
+        selection(Rng&& rng, std::vector<double> weights) const
         {
             size_t num_casualties = static_cast<size_t>(
                 floor(weights.size() * (1 - _survival_rate)));
             auto casualties = std::vector<size_t>(num_casualties);
-            auto anti_weights = std::vector<double>(weights.size());
-            std::transform(weights.begin(), weights.end(), anti_weights.begin(),
+            std::transform(weights.begin(), weights.end(), weights.begin(),
                            [](double x){
                                return 1 - x;
                            });
+
             for(size_t i = 0; i < num_casualties; ++i)
             {
                 auto dist = std::discrete_distribution<size_t>(
-                    anti_weights.begin(), anti_weights.end());
+                    weights.begin(), weights.end());
                 size_t casualty = dist(rng);
                 casualties[i] = casualty;
-                anti_weights[i] = 0;
                 weights[i] = 0;
             }
             return casualties;
         }
 
         template<typename Rng>
-        size_t rejuvenate_select(Rng&& rng, std::vector<double> weights) const
+        inline size_t
+        rejuvenate_select(Rng&& rng, std::vector<double> const& weights) const
         {
             auto dist = std::discrete_distribution<size_t>(
-                weights.begin(), weights.end());
+                weights.cbegin(), weights.cend());
             return dist(rng);
         }
 
-        inline void
-        update_weights()
+        inline std::vector<double>
+        normalize_weight(std::vector<double>&& weights) const noexcept
         {
-            auto weights = std::vector<double>(_particles.size());
-            for(size_t i = 0; i < _particles.size(); ++i)
-                weights[i] = exp(_particles[i].likelihood());
-
             auto sum = std::accumulate(weights.begin(), weights.end(), 0.0);
             std::transform(weights.begin(), weights.end(), weights.begin(),
                            [sum](double x){ return x / sum; });
-            _weights = std::move(weights);
+            return std::move(weights);
         }
         
     public:
@@ -76,42 +73,126 @@ namespace lpbo
         {
             _particles.reserve(particle_num);
             for(size_t i = 0; i < particle_num; ++i)
-            {
                 _particles.emplace_back(x, y);
+
+            auto weights = std::vector<double>(particle_num);
+            for(size_t i = 0; i < particle_num; ++i)
+                weights[i] = exp(_particles[i].likelihood());
+
+            _weights = normalize_weight(std::move(weights));
+        }
+
+        inline
+        smc_gp(std::string const& serialized)
+            : _survival_rate(),
+              _weights(),
+              _rng()
+        {
+            std::stringstream stream;
+            stream << serialized;
+
+            std::string buf;
+            std::getline(stream, buf);
+            size_t particle_num = std::stoull(buf);
+
+            std::getline(stream, buf);
+            _survival_rate = std::stod(buf);
+
+            _particles.reserve(particle_num);
+            for(size_t i = 0; i < particle_num; ++i)
+            {
+                _particles.emplace_back();
+                _particles[i] >> stream;
             }
-            update_weights();
+
+            auto weights = std::vector<double>(particle_num);
+            for(size_t i = 0; i < particle_num; ++i)
+                weights[i] = exp(_particles[i].likelihood());
+
+            _weights = normalize_weight(std::move(weights));
         }
 
         inline void
         update(lpbo::vec const& x, lpbo::vec const& y)
         {
-            auto weights = std::vector<double>(_particles.size());
+            auto unnormalized_weights = std::vector<double>(_particles.size());
             for(size_t i = 0; i < _particles.size(); ++i)
-                weights[i] = exp(_particles[i].likelihood());
+                unnormalized_weights[i] = exp(_particles[i].likelihood());
 
+            auto weights = normalize_weight(std::move(unnormalized_weights));
             auto casualties = selection(_rng, weights);
+
+            std::for_each(casualties.begin(), casualties.end(),
+                          [&](size_t i){
+                              weights[i] = 0;
+                          });
 
             for(auto i : casualties)
             {
                 size_t sel = rejuvenate_select(_rng, weights);
-                _particles[i].rejuvenate(x, y, _particles[sel].parameters(), 10);
+                _particles[i].rejuvenate(x, y, _particles[sel].parameters(), 100);
             }
 
             for(auto& particle : _particles)
             {
                 particle.update(x, y);
+                std::cout << blaze::trans(particle.parameters())
+                          << "\nlike: "  << particle.likelihood()
+                          << '\n'
+                          << std::endl;
             }
-            update_weights();
 
-            double l = 0.0;
-            double g = 0.0;
-            for(size_t i = 0; i < _weights.size(); ++i)
+            for(size_t i = 0; i < _particles.size(); ++i)
+                weights[i] = exp(_particles[i].likelihood());
+
+            _weights = normalize_weight(std::move(weights));
+        }
+
+        inline std::string
+        serialize()
+        {
+            std::stringstream stream;
+            stream << std::to_string(_survival_rate) + '\n';
+            stream << std::to_string(static_cast<unsigned long long>(_particles.size())) + '\n';
+            for(size_t i = 0; i < _particles.size(); ++i)
             {
-                auto param = _particles[i].parameters();
-                l += param[0] * _weights[i];
-                g += param[1] * _weights[i];
+                _particles[i] >> stream ;
             }
-            std::cout << "avg l: " << l << " avg g: " << g << std::endl;
+            return stream.str();
+        }
+
+        inline void
+        deserialize(std::string const& serialized)
+        {
+            if(_particles.size() != 0)
+            {
+                _particles.clear();
+                _weights.clear();
+                _survival_rate = 0;
+            }
+
+            std::stringstream stream;
+            stream << serialized;
+
+            std::string buf;
+            std::getline(stream, buf);
+            _survival_rate = std::stod(buf);
+
+            std::getline(stream, buf);
+            size_t particle_num = std::stoull(buf);
+
+            _particles.reserve(particle_num);
+            for(size_t i = 0; i < particle_num; ++i)
+            {
+                _particles.emplace_back();
+                _particles[i] << stream;
+            }
+
+            auto weights = std::vector<double>(particle_num);
+            for(size_t i = 0; i < particle_num; ++i)
+                weights[i] = exp(_particles[i].likelihood());
+
+            _weights = normalize_weight(std::move(weights));
         }
 
         inline void
@@ -128,8 +209,8 @@ namespace lpbo
             for(size_t i = 0 ; i < _particles.size(); ++i)
             {
                 auto local_prediction = _particles[i].predict(x);
-                mean += (local_prediction.first * _weights[i]) ;
-                var  += (local_prediction.second * _weights[i]);
+                mean += local_prediction.first * _weights[i] ;
+                var  += local_prediction.second * _weights[i];
             }
             return {mean, var};
         }

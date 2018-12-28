@@ -4,6 +4,8 @@
 
 #include <blaze/Blaze.h>
 #include <iostream>
+#include <string>
+#include <sstream>
 #include <chrono>
 #include <cassert>
 //#include <blaze/math/lapack/posv.h>
@@ -24,7 +26,6 @@ namespace lpbo
         double _mean;
         double _likelihood;
         lpbo::mat _K_inv;
-        lpbo::lower _L;
         lpbo::vec _alpha;
         lpbo::vec _data_x;
         lpbo::vec _data_y;
@@ -107,8 +108,8 @@ namespace lpbo
         }
 
         inline lpbo::lower
-        compute_inverse(lpbo::vec const& x,
-                        double l,
+        decompose(lpbo::vec const& x,
+                  double l,
                         double g,
                         double var,
                         size_t n) const noexcept
@@ -156,8 +157,8 @@ namespace lpbo
             auto n = x.size();
 
             auto f = [&](lpbo::vec param){
-                         auto L = compute_inverse(x,
-                                                  param[0],
+                         auto L = decompose(x,
+                                            param[0],
                                                   param[1],
                                                   _variance,
                                                   n);
@@ -171,14 +172,14 @@ namespace lpbo
             _ker_l = param[0];
             _ker_g = param[1];
 
-            _L = compute_inverse(x, _ker_l, _ker_g, _variance, n);
+            auto L = decompose(x, _ker_l, _ker_g, _variance, n);
 
-            auto L_inv = _L;
+            auto L_inv = L;
             blaze::invert(L_inv);
             _K_inv = blaze::trans(L_inv) * L_inv;
             _alpha = _K_inv * _data_y_normalized;
 
-            _likelihood = loglikelihood(_L, _alpha, _data_y_normalized);
+            _likelihood = loglikelihood(L, _alpha, _data_y_normalized);
         }
 
     public:
@@ -220,10 +221,50 @@ namespace lpbo
                           std::move(mcmc_initial), mcmc_iterations);
         }
 
-        inline void
-        matrix_deserialize(blaze::Archive<std::ifstream>& archive)
+        inline std::stringstream&
+        operator>>(std::stringstream& stream) noexcept
         {
-            ;
+            stream << std::to_string(_ker_l) + '\n';
+            stream << std::to_string(_ker_g) + '\n';
+            stream << std::to_string(_variance) + '\n';
+            stream << std::to_string(_mean) + '\n';
+            stream << std::to_string(_likelihood) + '\n';
+
+            auto archive = blaze::Archive<std::stringstream>(stream);
+            archive << _K_inv;
+            archive << _alpha;
+            archive << _data_x;
+            archive << _data_y;
+            archive << _data_y_normalized;
+            return stream;
+        }
+
+        inline std::stringstream&
+        operator<<(std::stringstream& stream) noexcept
+        {
+            std::string buf;
+            std::getline(stream, buf);
+            _ker_l = std::stod(buf);
+
+            std::getline(stream, buf);
+            _ker_g = std::stod(buf);
+
+            std::getline(stream, buf);
+            _variance = std::stod(buf);
+
+            std::getline(stream, buf);
+            _mean = std::stod(buf);
+
+            std::getline(stream, buf);
+            _likelihood = std::stod(buf);
+
+            auto archive = blaze::Archive<std::stringstream>(stream);
+            archive >> _K_inv;
+            archive >> _alpha;
+            archive >> _data_x;
+            archive >> _data_y;
+            archive >> _data_y_normalized;
+            return stream;
         }
 
         inline double
@@ -232,27 +273,27 @@ namespace lpbo
             return _likelihood;           
         }
 
-        inline void
-        update(double x, double y)
-        {
-            auto old_size = _data_x.size();
+        // inline void
+        // update(double x, double y)
+        // {
+        //     auto old_size = _data_x.size();
 
-            update_Kinv(x);
+        //     update_Kinv(x);
             
-            _data_x.resize(old_size + 1);
-            _data_x[old_size] = x;
+        //     _data_x.resize(old_size + 1);
+        //     _data_x[old_size] = x;
 
-            _data_y.resize(old_size + 1);
-            _data_y[old_size] = y;
+        //     _data_y.resize(old_size + 1);
+        //     _data_y[old_size] = y;
 
-            _data_y_normalized.resize(old_size + 1);
-            _data_y_normalized[old_size] = y - _mean;
+        //     _data_y_normalized.resize(old_size + 1);
+        //     _data_y_normalized[old_size] = y - _mean;
 
-            _alpha = _K_inv * _data_y_normalized;
-            _variance = blaze::dot(_data_y_normalized, _data_y_normalized)
-                / (_data_y_normalized.size() - 1);
-            _likelihood = loglikelihood(_L, _alpha, _data_y_normalized);
-        }
+        //     _alpha = _K_inv * _data_y_normalized;
+        //     _variance = blaze::dot(_data_y_normalized, _data_y_normalized)
+        //         / (_data_y_normalized.size() - 1);
+        //     _likelihood = loglikelihood(_L, _alpha, _data_y_normalized);
+        // }
 
         inline void
         update(lpbo::vec const& x, lpbo::vec const& y)
@@ -269,16 +310,17 @@ namespace lpbo
             _data_y_normalized.resize(old_n + add_n);
             blaze::subvector(_data_y_normalized, old_n, add_n) = y_normalized;
 
-            _variance = blaze::dot(_data_y_normalized, _data_y_normalized)
-                / (_data_y_normalized.size() - 1);
+            // _variance = blaze::dot(_data_y_normalized, _data_y_normalized)
+            //     / (_data_y_normalized.size() - 1);
 
-            _L = compute_inverse(_data_x, _ker_l, _ker_g, _variance, old_n + add_n);
+            auto L = decompose(_data_x, _ker_l, _ker_g, _variance, old_n + add_n);
 
-            auto L_inv = _L;
+            auto L_inv = L;
             blaze::invert(L_inv);
             _K_inv = blaze::trans(L_inv) * L_inv;
             _alpha = _K_inv * _data_y_normalized;
-            _likelihood = loglikelihood(_L, _alpha, _data_y_normalized);
+
+            _likelihood = loglikelihood(L, _alpha, _data_y_normalized);
         }
 
         inline lpbo::vec
