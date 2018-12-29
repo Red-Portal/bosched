@@ -21,6 +21,7 @@ namespace bosched
             state.id = l["id"];
             state.param = l["param"];
             state.warming_up = l["warmup"];
+            state.iteration = l["iteration"];
 
             if(state.warming_up)
             {
@@ -60,6 +61,7 @@ namespace bosched
             serialized_state["id"] = loop_state.id;
             serialized_state["param"] = loop_state.param;
             serialized_state["warmup"] = loop_state.warming_up;
+            serialized_state["iteration"] = loop_state.iteration;
 
             if(loop_state.warming_up)
             {

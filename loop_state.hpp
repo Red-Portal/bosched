@@ -20,6 +20,7 @@ namespace bosched
     struct loop_state_t
     {
         size_t id;
+        size_t iteration;
         double param;
         bool warming_up;
         std::optional<lpbo::smc_gp> gp;
