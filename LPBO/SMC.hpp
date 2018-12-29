@@ -83,6 +83,29 @@ namespace lpbo
         }
 
         inline
+        smc_gp(
+            std::vector<double> const& x,
+            std::vector<double> const& y,
+            size_t particle_num,
+            double survival_rate)
+            : _survival_rate(survival_rate), _particles(),
+              _weights(), _rng()
+        {
+            auto x_vec = lpbo::vec(x.size(), x.data());
+            auto y_vec = lpbo::vec(y.size(), y.data());
+
+            _particles.reserve(particle_num);
+            for(size_t i = 0; i < particle_num; ++i)
+                _particles.emplace_back(x_vec, y_vec);
+
+            auto weights = std::vector<double>(particle_num);
+            for(size_t i = 0; i < particle_num; ++i)
+                weights[i] = exp(_particles[i].likelihood());
+
+            _weights = normalize_weight(std::move(weights));
+        }
+
+        inline
         smc_gp(std::string const& serialized)
             : _survival_rate(),
               _weights(),
@@ -148,16 +171,30 @@ namespace lpbo
             for(auto& particle : _particles)
             {
                 particle.update(x, y);
-                std::cout << blaze::trans(particle.parameters())
-                          << "\nlike: "  << particle.likelihood()
-                          << '\n'
-                          << std::endl;
+                // std::cout << blaze::trans(particle.parameters())
+                //           << "\nlike: "  << particle.likelihood()
+                //           << '\n'
+                //           << std::endl;
             }
 
             for(size_t i = 0; i < _particles.size(); ++i)
                 weights[i] = exp(_particles[i].likelihood());
 
             _weights = normalize_weight(std::move(weights));
+        }
+
+        inline void
+        update(double x, double y)
+        {
+            update(lpbo::vec({x}), lpbo::vec({y}));
+        }
+
+        inline void
+        update(std::vector<double> const& x,
+               std::vector<double> const& y)
+        {
+            update(lpbo::vec(x.size(), x.data()),
+                   lpbo::vec(y.size(), y.data()));
         }
 
         inline std::string
@@ -205,12 +242,6 @@ namespace lpbo
                 weights[i] = exp(_particles[i].likelihood());
 
             _weights = normalize_weight(std::move(weights));
-        }
-
-        inline void
-        update(double x, double y)
-        {
-            update(lpbo::vec({x}), lpbo::vec({y}));
         }
 
         inline std::pair<double, double>

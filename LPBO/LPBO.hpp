@@ -17,7 +17,6 @@ namespace lpbo
         return {0, 0, 0};
     }
 
-
     inline std::vector<double>
     render_acquisition(lpbo::smc_gp const& model,
                        size_t resolution) noexcept
@@ -34,12 +33,6 @@ namespace lpbo
               size_t resolution) noexcept
     {
         return {};
-    }
-
-    inline double
-    warmup_sample() noexcept
-    {
-        return 0;
     }
 }
 
