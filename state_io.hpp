@@ -12,7 +12,7 @@
 namespace bosched
 {
     inline std::unordered_map<size_t, loop_state_t>
-    read_warmup_state(nlohmann::json const& loop_data)
+    read_state(nlohmann::json const& loop_data)
     {
         std::unordered_map<size_t, loop_state_t> loop_states;
         for(auto const& l : loop_data)
@@ -20,14 +20,18 @@ namespace bosched
             loop_state_t state;
             state.id = l["id"];
             state.param = l["param"];
-            try {
+            state.warming_up = l["warmup"];
+
+            if(state.warming_up)
+            {
                 auto obs_x = l.at("obs_x");
                 auto obs_y = l.at("obs_y");
                 state.obs_x = std::vector<double>(obs_x.cbegin(), obs_x.cend());
                 state.obs_y = std::vector<double>(obs_y.cbegin(), obs_y.cend());
             }
-            catch(std::exception const& e) {
-                std::cout << e.what() << std::endl;
+            else
+            {
+                state.gp.emplace(l["gp"]);
             }
 
             loop_states[state.id] = std::move(state);
@@ -45,7 +49,7 @@ namespace bosched
     }
 
     inline nlohmann::json
-    write_warmup_state(std::unordered_map<size_t, loop_state_t>&& loop_states)
+    write_state(std::unordered_map<size_t, loop_state_t>&& loop_states)
     {
         nlohmann::json serialized_states;
         for(auto const& l : loop_states)
@@ -55,76 +59,14 @@ namespace bosched
             nlohmann::json serialized_state;
             serialized_state["id"] = loop_state.id;
             serialized_state["param"] = loop_state.param;
+            serialized_state["warmup"] = loop_state.warming_up;
 
-            if(loop_state.obs_x.size() > 0)
+            if(loop_state.warming_up)
             {
                 serialized_state["obs_x"] = nlohmann::json(std::move(loop_state.obs_x));
                 serialized_state["obs_y"] = nlohmann::json(std::move(loop_state.obs_y));
             }
-
-            serialized_states.emplace_back(serialized_state);
-
-            if(getenv("DEBUG"))
-            {
-                std::cout << " [ serialized ]" << '\n'
-                          << " loop id: " << loop_state.id
-                          << " parameter: " << loop_state.param
-                          << " number of observations: " << loop_state.obs_x.size()
-                          << std::endl;
-            }
-        }
-        return serialized_states;
-    }
-
-    inline std::unordered_map<size_t, loop_state_t>
-    read_running_state(nlohmann::json const& loop_data)
-    {
-        std::unordered_map<size_t, loop_state_t> loop_states;
-        for(auto const& l : loop_data)
-        {
-            loop_state_t state;
-            state.id = l["id"];
-            state.param = l["param"];
-            //auto obs_x = l["obs_x"];
-            //auto obs_y = l["obs_y"];
-            //state.obs_x = std::vector<double>(obs_x.cbegin(), obs_x.cend());
-            //state.obs_y = std::vector<double>(obs_y.cbegin(), obs_y.cend());
-
-            try {
-                state.gp.emplace(l["gp"]);
-            }
-            catch(std::exception const& e) {
-                std::cout << e.what() << std::endl;
-            }
-
-            loop_states[state.id] = std::move(state);
-
-            if(getenv("DEBUG"))
-            {
-                std::cout << " [ deserialized ]" << '\n'
-                          << " loop id: " << state.id
-                          << " parameter: " << state.param
-                          << " number of observations: " << state.obs_x.size()
-                          << std::endl;
-            }
-        }
-        return loop_states;
-    }
-
-    inline nlohmann::json
-    write_running_state(std::unordered_map<size_t, loop_state_t>&& loop_states)
-    {
-        nlohmann::json serialized_states;
-        for(auto const& l : loop_states)
-        {
-            auto const& loop_state = l.second;
-
-            nlohmann::json serialized_state;
-            serialized_state["id"] = loop_state.id;
-            serialized_state["param"] = loop_state.param;
-            // serialized_state["obs_x"] = nlohmann::json(std::move(loop_state.obs_x));
-            // serialized_state["obs_y"] = nlohmann::json(std::move(loop_state.obs_y));
-            if(loop_state.gp.has_value())
+            else
             {
                 serialized_state["gp"] = loop_state->gp.serialize();
             }
@@ -148,8 +90,7 @@ namespace bosched
     using parsed_state_t = std::tuple<iteration_t, loop_table_t>;
 
     inline parsed_state_t
-    read_loops(nlohmann::json&& data,
-               std::string const& file_name)
+    read_loops(nlohmann::json&& data)
     {
         using namespace std::literals::string_literals;
         std::unordered_map<size_t, loop_state_t> loop_states;
@@ -165,10 +106,7 @@ namespace bosched
                   << " set environment variable DEBUG for detailed info"
                   << std::endl;
 
-        if(iteration < 10)
-            loop_states = read_warmup_state(data["loops"]);
-        else
-            loop_states = read_running_state(data["loops"]);
+        loop_states = read_state(data["loops"]);
         return {iteration, loop_states};
     }
 
@@ -179,11 +117,7 @@ namespace bosched
         nlohmann::json data;
         data["date"] = format_current_time();
         data["iteration"] = iteration;
-
-        if(iteration < 10)
-            data["loops"] = write_warmup_state(std::move(loop_states));
-        else
-            data["loops"] = write_running_state(std::move(loop_states));
+        data["loops"] = write_state(std::move(loop_states));
         return data;
     }
 }

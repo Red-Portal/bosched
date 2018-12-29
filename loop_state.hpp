@@ -21,6 +21,7 @@ namespace bosched
     {
         size_t id;
         double param;
+        bool warming_up;
         std::optional<lpbo::smc_gp> gp;
         bosched::time_point_t start;
         std::vector<double> obs_x;
