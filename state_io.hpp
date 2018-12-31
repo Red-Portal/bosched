@@ -5,6 +5,7 @@
 #include "loop_state.hpp"
 #include "utils.hpp"
 
+#include <cstddef>
 #include <nlohmann/json.hpp>
 #include <string>
 #include <string_view>
@@ -32,7 +33,10 @@ namespace bosched
             }
             else
             {
-                state.gp.emplace(l["gp"]);
+                auto bytes = l["gp"];
+                auto byte_vec = std::vector<uint8_t>(bytes.begin(), bytes.end());
+                auto str = std::string(byte_vec.begin(), byte_vec.end());
+                state.gp.emplace(str);
             }
 
             if(getenv("DEBUG"))
@@ -63,9 +67,6 @@ namespace bosched
             serialized_state["warmup"] = loop_state.warming_up;
             serialized_state["iteration"] = loop_state.iteration;
 
-            std::cout << "id: " << loop_state.id
-                      << " param: " << loop_state.param << std::endl;
-
             if(loop_state.warming_up)
             {
                 serialized_state["obs_x"] = nlohmann::json(std::move(loop_state.obs_x));
@@ -73,7 +74,9 @@ namespace bosched
             }
             else
             {
-                serialized_state["gp"] = loop_state.gp->serialize();
+                auto str = loop_state.gp->serialize();
+                auto bytes = std::vector<uint8_t>(str.begin(), str.end());
+                serialized_state["gp"] = bytes;
             }
 
             if(getenv("DEBUG"))

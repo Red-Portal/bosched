@@ -22,9 +22,12 @@ namespace bosched
         size_t id;
         size_t iteration;
         double param;
-        bool warming_up;
-        std::optional<lpbo::smc_gp> gp;
         bosched::time_point_t start;
+        bool warming_up;
+        bool is_bo_schedule;
+        double mean;
+        double var;
+        std::optional<lpbo::smc_gp> gp;
         std::vector<double> obs_x;
         std::vector<double> obs_y;
 

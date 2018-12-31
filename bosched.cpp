@@ -6,7 +6,7 @@
 
 #include <blaze/Blaze.h>
 #include <chrono>
-#include <chrono>
+#include <random>
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
@@ -15,7 +15,9 @@
 
 extern char const* __progname;
 
+bool _is_bo_schedule;
 bool _is_new_file;
+std::mt19937 _rng __attribute__((init_priority(101)));
 std::string _progname __attribute__((init_priority(101)));
 std::unordered_map<size_t, bosched::loop_state_t> _loop_states __attribute__((init_priority(101)));
 
@@ -24,7 +26,13 @@ namespace bosched
     inline double
     warmup_next_param()
     {
-        return 0.5;// assert generated parameter is never zero
+        auto dist = std::uniform_real_distribution<double>(0.0, 1.0);
+        double next = 0;
+        do 
+        {
+            next = dist(_rng);
+        } while(next == 0);
+        return next;
     }
 
     inline std::unordered_map<size_t, loop_state_t>
@@ -34,11 +42,6 @@ namespace bosched
         {
             size_t loop_id = l.first;
             auto& loop_state = l.second;
-
-            std::cout << "id: " << loop_id
-                      << " warming up? " << loop_state.warming_up
-                      << " observation: " << loop_state.obs_x.size() 
-                      << std::endl;
 
             if(loop_state.warming_up)
             {
@@ -103,6 +106,9 @@ extern "C"
         using namespace std::literals::string_literals;
         _progname = std::string(__progname);
 
+        auto seed = std::random_device();
+        _rng = std::mt19937(seed());
+
         auto file_name = ".bostate."s + _progname;
         std::ifstream stream(file_name + ".json"s);
 
@@ -123,7 +129,10 @@ extern "C"
     void __attribute__ ((destructor))
     bo_save_data()
     {
-        auto updated_states = update_loop_parameters(std::move(_loop_states));
+        auto updated_states = _is_bo_schedule ?
+            update_loop_parameters(std::move(_loop_states)) 
+            : std::move(_loop_states);
+
         auto next = bosched::write_loops(updated_states);
 
         using namespace std::literals::string_literals;
@@ -134,10 +143,12 @@ extern "C"
     }
 
     double
-    bo_schedule_parameter(unsigned long long region_id)
+    bo_schedule_parameter(unsigned long long region_id,
+                          int is_bo_schedule)
     {
-        double param = 0.0;
+        double param = 0.5;
         auto& loop_state = _loop_states[region_id];
+        _is_bo_schedule = static_cast<bool>(is_bo_schedule);
 
         if(_is_new_file)
         {
@@ -146,7 +157,7 @@ extern "C"
             loop_state.iteration = 0;
         }
         
-        if(loop_state.warming_up)
+        if(loop_state.warming_up && is_bo_schedule)
         {
             param = bosched::warmup_next_param();
             loop_state.param = param;
