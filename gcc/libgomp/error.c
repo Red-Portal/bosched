@@ -76,8 +76,8 @@ gomp_error (const char *fmt, ...)
 void
 gomp_vfatal (const char *fmt, va_list list)
 {
-  gomp_verror (fmt, list);
-  exit (EXIT_FAILURE);
+    gomp_verror (fmt, list);
+    exit (EXIT_FAILURE);
 }
 
 void

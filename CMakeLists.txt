@@ -52,7 +52,7 @@ set_target_properties(${PROJECT_NAME}
 
 ## Thread library dependency
 find_package(BLAZE REQUIRED)
-find_package(dlib REQUIRED)
+#find_package(dlib REQUIRED)
 
 set(BLA_STATIC)
 find_package(BLAS REQUIRED)
@@ -66,6 +66,6 @@ target_include_directories(${PROJECT_NAME}
     ${BLAZE_INCLUDE_DIR})
 
 target_link_libraries(${PROJECT_NAME}
-    dlib::dlib
+    dlib
     ${BLAS_LIBRARIES}
     ${LAPACK_LIBRARIES})

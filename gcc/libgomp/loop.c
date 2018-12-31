@@ -211,7 +211,10 @@ GOMP_loop_runtime_start (long start, long end, long incr,
            driven choice.  */
         return gomp_loop_static_start (start, end, incr, 0, istart, iend);
     default:
-        abort ();
+        //abort ();
+        return gomp_loop_guided_start (start, end, incr,
+                                       icv->run_sched_chunk_size,
+                                       istart, iend);
     }
 }
 
@@ -310,7 +313,9 @@ GOMP_loop_ordered_runtime_start (long start, long end, long incr,
         return gomp_loop_ordered_static_start (start, end, incr,
                                                0, istart, iend);
     default:
-        abort ();
+        //abort ();
+        return gomp_loop_ordered_static_start (start, end, incr,
+                                               0, istart, iend);
     }
 }
 
@@ -415,7 +420,10 @@ GOMP_loop_doacross_runtime_start (unsigned ncounts, long *counts,
         return gomp_loop_doacross_static_start (ncounts, counts,
                                                 0, istart, iend);
     default:
-        abort ();
+        //abort ();
+        return gomp_loop_doacross_guided_start (ncounts, counts,
+                                                icv->run_sched_chunk_size,
+                                                istart, iend);
     }
 }
 
@@ -484,7 +492,8 @@ GOMP_loop_runtime_next (long *istart, long *iend)
     case GFS_GUIDED:
         return gomp_loop_guided_next (istart, iend);
     default:
-        abort ();
+        //abort ();
+        return gomp_loop_guided_next (istart, iend);
     }
 }
 

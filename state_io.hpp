@@ -70,7 +70,7 @@ namespace bosched
             }
             else
             {
-                serialized_state["gp"] = loop_state->gp.serialize();
+                serialized_state["gp"] = loop_state.gp->serialize();
             }
 
             serialized_states.emplace_back(serialized_state);
@@ -87,38 +87,33 @@ namespace bosched
         return serialized_states;
     }
 
-    using iteration_t = size_t;
-    using loop_table_t = std::unordered_map<size_t, loop_state_t>;
-    using parsed_state_t = std::tuple<iteration_t, loop_table_t>;
-
-    inline parsed_state_t
+    inline std::unordered_map<size_t, loop_state_t>
     read_loops(nlohmann::json&& data)
     {
         using namespace std::literals::string_literals;
         std::unordered_map<size_t, loop_state_t> loop_states;
 
-        auto iteration = data["iteration"];
-        auto num_loops = data["num_loop"];
+        auto date      = data["data"];
+        auto num_loops = data["num_loops"];
 
         std::cout << "--------- bayesian optimization ---------" << '\n'
-                  << " modified date   | " << data["date"] << '\n'
-                  << " iterations      | " << iteration << '\n'
+                  << " modified date   | " << date << '\n'
                   << " number of loops | " << num_loops << '\n'
                   << '\n'
                   << " set environment variable DEBUG for detailed info"
                   << std::endl;
 
         loop_states = read_state(data["loops"]);
-        return {iteration, loop_states};
+        return loop_states;
     }
 
     inline nlohmann::json
-    write_loops(size_t iteration,
-                std::unordered_map<size_t, loop_state_t>&& loop_states)
+    write_loops(std::unordered_map<size_t, loop_state_t>&& loop_states)
     {
+        std::cout << "size: " << loop_states.size() << std::endl;
         nlohmann::json data;
         data["date"] = format_current_time();
-        data["iteration"] = iteration;
+        data["num_loops"] = loop_states.size();
         data["loops"] = write_state(std::move(loop_states));
         return data;
     }
