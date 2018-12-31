@@ -41,13 +41,14 @@ gomp_loop_ull_init (struct gomp_work_share *ws, bool up, gomp_ull start,
                     gomp_ull end, gomp_ull incr, enum gomp_schedule_type sched,
                     gomp_ull chunk_size, region_id_t region_id)
 {
+    bool is_bo = is_bo_schedule(sched);
     if(is_parameterized(sched))
     {
-        double param = bo_schedule_parameter(region_id);
+        double param = bo_schedule_parameter(region_id, (int)is_bo);
         ws->param = param; 
     }
 
-    if(is_bo_schedule(sched))
+    if(is_bo)
     {
         bo_schedule_begin(region_id);
     }

@@ -11,7 +11,8 @@ extern void bo_load_data(char const* progname,
 extern void bo_save_data(char const* progname,
                          size_t sched_id);
 
-extern double bo_schedule_parameter(unsigned long long region_id);
+extern double bo_schedule_parameter(unsigned long long region_id,
+                                    int is_bo);
 
 extern void bo_schedule_begin(unsigned long long region_id);
 
