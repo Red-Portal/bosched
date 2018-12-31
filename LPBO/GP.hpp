@@ -234,7 +234,7 @@ namespace lpbo
         }
 
         inline std::stringstream&
-        operator>>(std::stringstream& stream) noexcept
+        operator>>(std::stringstream& stream) const noexcept
         {
             stream << std::to_string(_ker_l) + '\n';
             stream << std::to_string(_ker_g) + '\n';

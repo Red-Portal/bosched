@@ -10,9 +10,9 @@
 namespace lpbo
 {
     inline std::tuple<double, double, double>
-    bayesian_optimiztion(lpbo::smc_gp const& model,
-                         int iter,
-                         int max_iter) noexcept
+    bayesian_optimization(lpbo::smc_gp const& model,
+                          int iter,
+                          int max_iter) noexcept
     {
         return {0, 0, 0};
     }

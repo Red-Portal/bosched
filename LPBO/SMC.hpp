@@ -198,14 +198,14 @@ namespace lpbo
         }
 
         inline std::string
-        serialize()
+        serialize() const
         {
             std::stringstream stream;
             stream << std::to_string(_survival_rate) + '\n';
             stream << std::to_string(static_cast<unsigned long long>(_particles.size())) + '\n';
             for(size_t i = 0; i < _particles.size(); ++i)
             {
-                _particles[i] >> stream ;
+                _particles[i] >> stream;
             }
             return stream.str();
         }
