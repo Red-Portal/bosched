@@ -173,7 +173,7 @@ libgomp_plugin_nvptx_la_LINK = $(LIBTOOL) --tag=CC \
 @PLUGIN_NVPTX_TRUE@	$(toolexeclibdir)
 libgomp_la_LIBADD =
 @USE_FORTRAN_TRUE@am__objects_1 = openacc.lo
-am_libgomp_la_OBJECTS = alloc.lo atomic.lo barrier.lo critical.lo \
+am_libgomp_la_OBJECTS = init_hook.lo alloc.lo atomic.lo barrier.lo critical.lo \
 	env.lo error.lo icv.lo icv-device.lo iter.lo iter_ull.lo \
 	loop.lo loop_ull.lo ordered.lo parallel.lo sections.lo \
 	single.lo task.lo team.lo work.lo lock.lo mutex.lo proc.lo \
