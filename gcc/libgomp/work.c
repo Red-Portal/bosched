@@ -284,14 +284,14 @@ gomp_work_share_end_nowait (region_id_t region_id)
     struct gomp_work_share *ws = thr->ts.work_share;
     unsigned completed;
 
-    struct gomp_task_icv *icv = gomp_icv (false);
+    //struct gomp_task_icv *icv = gomp_icv (false);
     /* Work sharing constructs can be orphaned.  */
     if (team == NULL)
     {
-        if (is_bo_schedule(icv->run_sched_var))
-        {
-            bo_schedule_end(region_id);
-        }
+        // if (is_bo_schedule(icv->run_sched_var))
+        // {
+        //     bo_schedule_end(region_id);
+        // }
         free_work_share (NULL, ws);
         thr->ts.work_share = NULL;
         return;
@@ -307,11 +307,11 @@ gomp_work_share_end_nowait (region_id_t region_id)
 
     if (__builtin_expect (thr->ts.last_work_share == NULL, 0))
     {
-        if (is_bo_schedule(icv->run_sched_var) &&
-            completed == team->nthreads)
-        {
-            bo_schedule_end(region_id);
-        }
+        // if (is_bo_schedule(icv->run_sched_var) &&
+        //     completed == team->nthreads)
+        // {
+        //     bo_schedule_end(region_id);
+        // }
         return;
     }
 
@@ -321,10 +321,10 @@ gomp_work_share_end_nowait (region_id_t region_id)
         team->work_shares_to_free = thr->ts.work_share;
         free_work_share (team, thr->ts.last_work_share);
 
-        if(is_bo_schedule(icv->run_sched_var))
-        {
-            bo_schedule_end(region_id);
-        }
+        // if(is_bo_schedule(icv->run_sched_var))
+        // {
+        //     bo_schedule_end(region_id);
+        // }
     }
     thr->ts.last_work_share = NULL;
 }

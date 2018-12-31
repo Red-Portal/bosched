@@ -26,7 +26,11 @@
 /* This file handles the (bare) PARALLEL construct.  */
 
 #include "libgomp.h"
+#include "bo_scheduling.h"
 #include <limits.h>
+#include <stdio.h>
+
+typedef unsigned long long region_id_t;
 
 
 /* Determine the number of threads to be launched for a PARALLEL construct.
@@ -127,34 +131,39 @@ GOMP_parallel_start (void (*fn) (void *), void *data, unsigned num_threads)
 }
 
 void
-GOMP_parallel_end (void)
+GOMP_parallel_end (region_id_t region_id)
 {
   struct gomp_task_icv *icv = gomp_icv (false);
+  if(region_id != 0 && is_bo_schedule(icv->run_sched_var))
+  {
+      bo_schedule_end(region_id);
+  }
+
   if (__builtin_expect (icv->thread_limit_var != UINT_MAX, 0))
-    {
+  {
       struct gomp_thread *thr = gomp_thread ();
       struct gomp_team *team = thr->ts.team;
       unsigned int nthreads = team ? team->nthreads : 1;
       gomp_team_end ();
       if (nthreads > 1)
-	{
-	  /* If not nested, there is just one thread in the
-	     contention group left, no need for atomicity.  */
-	  if (thr->ts.team == NULL)
-	    thr->thread_pool->threads_busy = 1;
-	  else
-	    {
+      {
+          /* If not nested, there is just one thread in the
+             contention group left, no need for atomicity.  */
+          if (thr->ts.team == NULL)
+              thr->thread_pool->threads_busy = 1;
+          else
+          {
 #ifdef HAVE_SYNC_BUILTINS
-	      __sync_fetch_and_add (&thr->thread_pool->threads_busy,
-				    1UL - nthreads);
+              __sync_fetch_and_add (&thr->thread_pool->threads_busy,
+                                    1UL - nthreads);
 #else
-	      gomp_mutex_lock (&gomp_managed_threads_lock);
-	      thr->thread_pool->threads_busy -= nthreads - 1;
-	      gomp_mutex_unlock (&gomp_managed_threads_lock);
+              gomp_mutex_lock (&gomp_managed_threads_lock);
+              thr->thread_pool->threads_busy -= nthreads - 1;
+              gomp_mutex_unlock (&gomp_managed_threads_lock);
 #endif
-	    }
-	}
-    }
+          }
+      }
+  }
   else
     gomp_team_end ();
 }
@@ -166,7 +175,7 @@ GOMP_parallel (void (*fn) (void *), void *data, unsigned num_threads, unsigned i
   num_threads = gomp_resolve_num_threads (num_threads, 0);
   gomp_team_start (fn, data, num_threads, flags, gomp_new_team (num_threads));
   fn (data);
-  ialias_call (GOMP_parallel_end) ();
+  ialias_call (GOMP_parallel_end) (0);
 }
 
 bool

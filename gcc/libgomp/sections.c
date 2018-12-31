@@ -156,7 +156,7 @@ GOMP_parallel_sections (void (*fn) (void *), void *data,
   gomp_sections_init (&team->work_shares[0], count);
   gomp_team_start (fn, data, num_threads, flags, team);
   fn (data);
-  GOMP_parallel_end ();
+  GOMP_parallel_end (0);
 }
 
 /* The GOMP_section_end* routines are called after the thread is told

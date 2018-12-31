@@ -640,7 +640,7 @@ GOMP_parallel_loop_static (void (*fn) (void *), void *data,
     gomp_parallel_loop_start (fn, data, num_threads, start, end, incr,
                               GFS_STATIC, chunk_size, flags, 0);
     fn (data);
-    GOMP_parallel_end ();
+    GOMP_parallel_end (0);
 }
 
 void
@@ -651,7 +651,7 @@ GOMP_parallel_loop_dynamic (void (*fn) (void *), void *data,
     gomp_parallel_loop_start (fn, data, num_threads, start, end, incr,
                               GFS_DYNAMIC, chunk_size, flags, 0);
     fn (data);
-    GOMP_parallel_end ();
+    GOMP_parallel_end (0);
 }
 
 void
@@ -662,7 +662,7 @@ GOMP_parallel_loop_guided (void (*fn) (void *), void *data,
     gomp_parallel_loop_start (fn, data, num_threads, start, end, incr,
                               GFS_GUIDED, chunk_size, flags, 0);
     fn (data);
-    GOMP_parallel_end ();
+    GOMP_parallel_end (0);
 }
 
 #ifdef HAVE_ATTRIBUTE_ALIAS
@@ -680,7 +680,7 @@ GOMP_parallel_loop_nonmonotonic_dynamic (void (*fn) (void *), void *data,
     gomp_parallel_loop_start (fn, data, num_threads, start, end, incr,
                               GFS_DYNAMIC, chunk_size, flags, 0);
     fn (data);
-    GOMP_parallel_end ();
+    GOMP_parallel_end (0);
 }
 
 void
@@ -692,7 +692,7 @@ GOMP_parallel_loop_nonmonotonic_guided (void (*fn) (void *), void *data,
     gomp_parallel_loop_start (fn, data, num_threads, start, end, incr,
                               GFS_GUIDED, chunk_size, flags, 0);
     fn (data);
-    GOMP_parallel_end ();
+    GOMP_parallel_end (0);
 }
 #endif
 
@@ -707,7 +707,7 @@ GOMP_parallel_loop_runtime (void (*fn) (void *), void *data,
                               incr, icv->run_sched_var,
                               icv->run_sched_chunk_size, flags, id);
     fn (data);
-    GOMP_parallel_end ();
+    GOMP_parallel_end (id);
 }
 
 /* The GOMP_loop_end* routines are called after the thread is told that
