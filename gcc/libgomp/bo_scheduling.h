@@ -2,13 +2,13 @@
 #ifndef BO_SCHEDULING_H
 #define BO_SCHEDULING_H 1
 
+#include <string.h>
 #include "libgomp.h"
 
-extern void* bo_load_data(char const* progname,
-                          size_t sched_id);
+extern void bo_load_data(char const* progname,
+                         size_t sched_id);
 
-extern void bo_save_data(void* context,
-                         char const* progname,
+extern void bo_save_data(char const* progname,
                          size_t sched_id);
 
 extern double bo_schedule_parameter(unsigned long long region_id);
