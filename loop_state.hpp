@@ -40,7 +40,7 @@ namespace bosched
         loop_stop() const noexcept
         {
             return std::chrono::duration_cast<Duration>
-                (start - bosched::clock::now());
+                (bosched::clock::now() - start);
         }
     };
 }
