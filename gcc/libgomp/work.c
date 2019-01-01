@@ -31,6 +31,7 @@
 
 #include <stddef.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 
 typedef unsigned long long region_id_t;
@@ -208,33 +209,33 @@ gomp_work_share_start (bool ordered)
 void
 gomp_work_share_end (region_id_t region_id)
 {
-  struct gomp_thread *thr = gomp_thread ();
-  struct gomp_team *team = thr->ts.team;
-  gomp_barrier_state_t bstate;
+    struct gomp_thread *thr = gomp_thread ();
+    struct gomp_team *team = thr->ts.team;
+    gomp_barrier_state_t bstate;
 
-  /* Work sharing constructs can be orphaned.  */
-  if (team == NULL)
+    struct gomp_task_icv *icv = gomp_icv (false);
+    if(is_bo_schedule(icv->run_sched_var))
     {
-      free_work_share (NULL, thr->ts.work_share);
-      thr->ts.work_share = NULL;
-      return;
+        bo_schedule_end(region_id);
     }
 
-  bstate = gomp_barrier_wait_start (&team->barrier);
-
-  if (gomp_barrier_last_thread (bstate))
+    /* Work sharing constructs can be orphaned.  */
+    if (team == NULL)
     {
-      if (__builtin_expect (thr->ts.last_work_share != NULL, 1))
-	{
-	  team->work_shares_to_free = thr->ts.work_share;
-	  free_work_share (team, thr->ts.last_work_share);
+        free_work_share (NULL, thr->ts.work_share);
+        thr->ts.work_share = NULL;
+        return;
+    }
 
-      struct gomp_task_icv *icv = gomp_icv (false);
-      if(is_bo_schedule(icv->run_sched_var))
-      {
-          bo_schedule_end(region_id);
-      }
-	}
+    bstate = gomp_barrier_wait_start (&team->barrier);
+
+    if (gomp_barrier_last_thread (bstate))
+    {
+        if (__builtin_expect (thr->ts.last_work_share != NULL, 1))
+        {
+            team->work_shares_to_free = thr->ts.work_share;
+            free_work_share (team, thr->ts.last_work_share);
+        }
     }
 
   gomp_team_barrier_wait_end (&team->barrier, bstate);
@@ -284,15 +285,15 @@ gomp_work_share_end_nowait (region_id_t region_id)
     struct gomp_work_share *ws = thr->ts.work_share;
     unsigned completed;
 
-    //struct gomp_task_icv *icv = gomp_icv (false);
+    struct gomp_task_icv *icv = gomp_icv (false);
 
     /* Work sharing constructs can be orphaned.  */
     if (team == NULL)
     {
-        // if (is_bo_schedule(icv->run_sched_var))
-        // {
-        //     bo_schedule_end(region_id);
-        // }
+        if (is_bo_schedule(icv->run_sched_var))
+        {
+            bo_schedule_end(region_id);
+        }
         free_work_share (NULL, ws);
         thr->ts.work_share = NULL;
         return;
@@ -308,6 +309,7 @@ gomp_work_share_end_nowait (region_id_t region_id)
 
     if (__builtin_expect (thr->ts.last_work_share == NULL, 0))
     {
+        // printf("here 2\n");
         // if (is_bo_schedule(icv->run_sched_var) &&
         //     completed == team->nthreads)
         // {
@@ -320,11 +322,10 @@ gomp_work_share_end_nowait (region_id_t region_id)
     {
         team->work_shares_to_free = thr->ts.work_share;
         free_work_share (team, thr->ts.last_work_share);
-
-        // if(is_bo_schedule(icv->run_sched_var))
-        // {
-        //     bo_schedule_end(region_id);
-        // }
+        if(is_bo_schedule(icv->run_sched_var))
+        {
+            bo_schedule_end(region_id);
+        }
     }
     thr->ts.last_work_share = NULL;
 }
