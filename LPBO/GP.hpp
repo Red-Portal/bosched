@@ -280,7 +280,7 @@ namespace lpbo
         }
 
         inline double
-        likelihood()
+        likelihood() const
         {
             return _likelihood;           
         }
@@ -322,11 +322,7 @@ namespace lpbo
             _data_y_normalized.resize(old_n + add_n);
             blaze::subvector(_data_y_normalized, old_n, add_n) = y_normalized;
 
-            // _variance = blaze::dot(_data_y_normalized, _data_y_normalized)
-            //     / (_data_y_normalized.size() - 1);
-
             auto L = decompose(_data_x, _ker_l, _ker_g, _variance, old_n + add_n);
-
             auto L_inv = L;
             blaze::invert(L_inv);
             _K_inv = blaze::trans(L_inv) * L_inv;

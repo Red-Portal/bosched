@@ -116,16 +116,16 @@ namespace lpbo
 
             std::string buf;
             std::getline(stream, buf);
-            size_t particle_num = std::stoull(buf);
+            _survival_rate = std::stod(buf);
 
             std::getline(stream, buf);
-            _survival_rate = std::stod(buf);
+            size_t particle_num = std::stoull(buf);
 
             _particles.reserve(particle_num);
             for(size_t i = 0; i < particle_num; ++i)
             {
                 _particles.emplace_back();
-                _particles[i] >> stream;
+                _particles[i] << stream;
             }
 
             auto weights = std::vector<double>(particle_num);
