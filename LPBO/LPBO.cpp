@@ -1,10 +1,12 @@
 
 #include <cstdio>
+#include <dlib/global_optimization.h>
 #include <string>
+
 #include "SMC.hpp"
+#include "LPBO.hpp"
 #include "acquisition.hpp"
 
-#include <dlib/global_optimization.h>
 
 double const beta = 2;
 
@@ -45,25 +47,18 @@ extern "C"
         if(iter > 1)
             gp_model->update(x, y);
 
-        auto f = [=](double x){
-                     auto [mean, var] = gp_model->predict(x);
-                     return lpbo::UCB(mean, var, beta, annealing, iter);
-                 };
-
-        auto result = dlib::find_min_global(
-            f, {0.0}, {1.0}, dlib::max_function_calls(max_iter), dlib::FOREVER, 1e-3);
-
-        auto [m, v] = gp_model->predict(result.x);
+        auto [n, m, v, cb]
+            = lpbo::bayesian_optimization(*gp_model, 1e-7, iter, max_iter);
 
         if(out_merit != nullptr)
-            *out_merit = lpbo::UCB(m, v, beta, annealing, iter);
+            *out_merit = cb;
 
         if(out_predmean != nullptr)
             *out_predmean = m;
 
         if(out_predvar != nullptr)
             *out_predvar = v;
-        return result.x;
+        return n;
     }
 
     void test_serialize(void* model, char* str, int* n)

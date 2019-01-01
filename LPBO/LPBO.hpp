@@ -4,17 +4,35 @@
 
 #include "GP.hpp"
 #include "SMC.hpp"
+#include "acquisition.hpp"
 
+#include <dlib/global_optimization.h>
 #include <vector>
 
 namespace lpbo
 {
-    inline std::tuple<double, double, double>
+    inline std::tuple<double, double, double, double>
     bayesian_optimization(lpbo::smc_gp const& model,
+                          double epsilon,
                           int iter,
                           int max_iter) noexcept
     {
-        return {0, 0, 0};
+        double const beta = 2;
+        double annealing = 0.5;
+
+        auto f = [&](double x){
+                     auto [mean, var] = model.predict(x);
+                     return lpbo::UCB(mean, var, beta, annealing, iter);
+                 };
+
+        auto result = dlib::find_min_global(
+            f, {epsilon}, {1.0},
+            dlib::max_function_calls(max_iter),
+            dlib::FOREVER, 1e-3);
+
+        auto [m, v] = model.predict(result.x);
+        double cb = lpbo::UCB(m, v, beta, annealing, iter);
+        return {result.x, m, v, cb};
     }
 
     inline std::vector<double>
