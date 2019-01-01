@@ -15,6 +15,8 @@
 
 extern char const* __progname;
 
+double const _epsilon = 1e-7;
+
 bool _is_bo_schedule;
 bool _is_new_file;
 std::mt19937 _rng __attribute__((init_priority(101)));
@@ -26,9 +28,8 @@ namespace bosched
     inline double
     warmup_next_param()
     {
-        auto dist = std::uniform_real_distribution<double>(0.0, 1.0);
-        double next = 0;
-        do { next = dist(_rng);} while(next == 0);
+        auto dist = std::uniform_real_distribution<double>(_epsilon, 1.0);
+        double next = dist(_rng);
         return next;
     }
 
@@ -49,7 +50,7 @@ namespace bosched
 
             auto [next, mean, var, acq] =
                 lpbo::bayesian_optimization(*loop_state.gp,
-                                            1e-7,
+                                            _epsilon,
                                             loop_state.iteration,
                                             200);
             loop_state.mean.push_back(mean);
@@ -172,6 +173,7 @@ extern "C"
             loop_state.id = region_id;
             loop_state.warming_up = true;
             loop_state.iteration = 0;
+            loop_state.param = param;
         }
         
         if(loop_state.warming_up && is_bo_schedule)
@@ -214,7 +216,7 @@ extern "C"
         if(getenv("DEBUG"))
         {
             std::cout << "-- loop " << region_id << " ending execution with runtime "
-                      << loop_state.obs_y.back() << "us" << std::endl;
+                      << loop_state.obs_y.back() << "ms" << std::endl;
         }
     }
 }
