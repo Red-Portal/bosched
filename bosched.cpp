@@ -28,10 +28,7 @@ namespace bosched
     {
         auto dist = std::uniform_real_distribution<double>(0.0, 1.0);
         double next = 0;
-        do 
-        {
-            next = dist(_rng);
-        } while(next == 0);
+        do { next = dist(_rng);} while(next == 0);
         return next;
     }
 
