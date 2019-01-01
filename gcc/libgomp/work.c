@@ -285,6 +285,7 @@ gomp_work_share_end_nowait (region_id_t region_id)
     unsigned completed;
 
     //struct gomp_task_icv *icv = gomp_icv (false);
+
     /* Work sharing constructs can be orphaned.  */
     if (team == NULL)
     {
@@ -314,7 +315,6 @@ gomp_work_share_end_nowait (region_id_t region_id)
         // }
         return;
     }
-
 
     if (completed == team->nthreads)
     {

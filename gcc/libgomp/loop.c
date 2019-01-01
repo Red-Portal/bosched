@@ -30,6 +30,7 @@
 #include <stdio.h>
 #include "libgomp.h"
 #include "bo_scheduling.h"
+#include "schedules.h"
 
 typedef unsigned long long region_id_t;
 
@@ -68,14 +69,16 @@ gomp_loop_init (struct gomp_work_share *ws, long start, long end, long incr,
 
     if(sched == FS_FSS
        || sched == FS_FAC2
-       || sched == OB_FSS)
+       || sched == BO_FSS)
     {
         ws->chunk_size = num_tasks / nthreads;
     }
 
-    if (sched == GFS_DYNAMIC || sched == OB_CSS )
+    if (sched == GFS_DYNAMIC
+        || sched == FS_CSS
+        || sched == BO_CSS )
     {
-        if(sched == FS_CSS)
+        if(sched == FS_CSS || sched == BO_CSS )
         {
             ws->chunk_size = css_chunk_size(ws->param, num_tasks, nthreads);
         }
@@ -208,7 +211,8 @@ gomp_loop_guided_start (long start, long end, long incr, long chunk_size,
 static bool
 bo_loop_css_start (long start, long end, long incr,
                    long *istart, long *iend,
-                   enum gomp_schedule_type sched)
+                   enum gomp_schedule_type sched,
+                   region_id_t region_id  )
 {
     struct gomp_thread *thr = gomp_thread ();
     bool ret;
@@ -216,7 +220,7 @@ bo_loop_css_start (long start, long end, long incr,
     if (gomp_work_share_start (false))
     {
         gomp_loop_init (thr->ts.work_share, start, end, incr,
-                        sched, 0, 0);
+                        sched, 0, region_id);
         gomp_work_share_init_done ();
     }
 
@@ -227,7 +231,8 @@ bo_loop_css_start (long start, long end, long incr,
 static bool
 bo_loop_fss_start (long start, long end, long incr,
                    long *istart, long *iend,
-                   enum gomp_schedule_type sched)
+                   enum gomp_schedule_type sched,
+                   region_id_t region_id  )
 {
     struct gomp_thread *thr = gomp_thread ();
     bool ret;
@@ -235,7 +240,7 @@ bo_loop_fss_start (long start, long end, long incr,
     if (gomp_work_share_start (false))
     {
         gomp_loop_init (thr->ts.work_share, start, end, incr,
-                        sched, 0, 0);
+                        sched, 0, region_id);
         gomp_work_share_init_done ();
     }
     ret = bo_iter_fss_next (istart, iend);
@@ -245,7 +250,8 @@ bo_loop_fss_start (long start, long end, long incr,
 static bool
 bo_loop_qss_start (long start, long end, long incr,
                    long *istart, long *iend,
-                   enum gomp_schedule_type sched)
+                   enum gomp_schedule_type sched,
+                   region_id_t region_id )
 {
     struct gomp_thread *thr = gomp_thread ();
     bool ret;
@@ -253,7 +259,7 @@ bo_loop_qss_start (long start, long end, long incr,
     if (gomp_work_share_start (false))
     {
         gomp_loop_init (thr->ts.work_share, start, end, incr,
-                        sched, 0, 0);
+                        sched, 0, region_id);
         gomp_work_share_init_done ();
     }
     ret = bo_iter_qss_next (istart, iend);
@@ -263,7 +269,8 @@ bo_loop_qss_start (long start, long end, long incr,
 static bool
 bo_loop_tss_start (long start, long end, long incr,
                    long *istart, long *iend,
-                   enum gomp_schedule_type sched)
+                   enum gomp_schedule_type sched,
+                   region_id_t region_id )
 {
     struct gomp_thread *thr = gomp_thread ();
     bool ret;
@@ -271,7 +278,7 @@ bo_loop_tss_start (long start, long end, long incr,
     if (gomp_work_share_start (false))
     {
         gomp_loop_init (thr->ts.work_share, start, end, incr,
-                        sched, 0, 0);
+                        sched, 0, region_id);
         gomp_work_share_init_done ();
     }
     ret = bo_iter_tss_next (istart, iend);
@@ -281,7 +288,8 @@ bo_loop_tss_start (long start, long end, long incr,
 static bool
 bo_loop_fac2_start (long start, long end, long incr,
                     long *istart, long *iend,
-                    enum gomp_schedule_type sched)
+                    enum gomp_schedule_type sched,
+                    region_id_t region_id)
 {
     struct gomp_thread *thr = gomp_thread ();
     bool ret;
@@ -289,7 +297,7 @@ bo_loop_fac2_start (long start, long end, long incr,
     if (gomp_work_share_start (false))
     {
         gomp_loop_init (thr->ts.work_share, start, end, incr,
-                        sched, 0, 0);
+                        sched, 0, region_id);
         gomp_work_share_init_done ();
     }
     ret = bo_iter_fac2_next (istart, iend);
@@ -298,10 +306,10 @@ bo_loop_fac2_start (long start, long end, long incr,
 
 bool
 GOMP_loop_runtime_start (long start, long end, long incr,
-                         long *istart, long *iend, region_id_t id)
+                         long *istart, long *iend,
+                         region_id_t region_id)
 {
     struct gomp_task_icv *icv = gomp_icv (false);
-
     switch (icv->run_sched_var)
     {
     case GFS_STATIC:
@@ -325,24 +333,29 @@ GOMP_loop_runtime_start (long start, long end, long incr,
         abort ();
 
     case FS_FAC2:
-        return bo_loop_fac2_start (up, start, end, incr,
-                                   istart, iend, icv->run_sched_var);
+        return bo_loop_fac2_start (start, end, incr,
+                                   istart, iend, icv->run_sched_var,
+                                   region_id);
     case FS_FSS:
     case BO_FSS:
-        return bo_loop_fss_start (up, start, end, incr,
-                                  istart, iend, icv->run_sched_var);
+        return bo_loop_fss_start (start, end, incr,
+                                  istart, iend, icv->run_sched_var,
+                                  region_id );
     case FS_TSS:
-        return bo_loop_tss_start(up, start, end, incr,
-                                 istart, iend, icv->run_sched_var);
+        return bo_loop_tss_start(start, end, incr,
+                                 istart, iend, icv->run_sched_var,
+                                 region_id );
     case FS_CSS:
     case BO_CSS:
-        return bo_loop_css_start (up, start, end, incr,
-                                  istart, iend, icv->run_sched_var);
+        return bo_loop_css_start (start, end, incr,
+                                  istart, iend, icv->run_sched_var,
+                                  region_id );
 
     case FS_QSS:
     case BO_QSS:
-        return bo_loop_qss_start (up, start, end, incr,
-                                  istart, iend, icv->run_sched_var);
+        return bo_loop_qss_start (start, end, incr,
+                                  istart, iend, icv->run_sched_var,
+                                  region_id );
 
     default:
         abort ();
@@ -607,7 +620,7 @@ gomp_loop_guided_next (long *istart, long *iend)
 }
 
 static bool
-gomp_loop_css_next (gomp_ull *istart, gomp_ull *iend)
+bo_loop_css_next (long *istart, long *iend)
 {
     bool ret;
     ret = gomp_iter_dynamic_next (istart, iend);
@@ -615,7 +628,7 @@ gomp_loop_css_next (gomp_ull *istart, gomp_ull *iend)
 }
 
 static bool
-bo_loop_ull_fac2_next (gomp_ull *istart, gomp_ull *iend)
+bo_loop_fac2_next (long *istart, long *iend)
 {
     bool ret;
     ret = bo_iter_fac2_next (istart, iend);
@@ -623,7 +636,7 @@ bo_loop_ull_fac2_next (gomp_ull *istart, gomp_ull *iend)
 }
 
 static bool
-bo_loop_ull_fss_next (gomp_ull *istart, gomp_ull *iend)
+bo_loop_fss_next (long *istart, long *iend)
 {
     bool ret;
     ret = bo_iter_fss_next (istart, iend);
@@ -631,7 +644,7 @@ bo_loop_ull_fss_next (gomp_ull *istart, gomp_ull *iend)
 }
 
 static bool
-bo_loop_ull_qss_next (gomp_ull *istart, gomp_ull *iend)
+bo_loop_qss_next (long *istart, long *iend)
 {
     bool ret;
     ret = bo_iter_qss_next (istart, iend);
@@ -639,7 +652,7 @@ bo_loop_ull_qss_next (gomp_ull *istart, gomp_ull *iend)
 }
 
 static bool
-bo_loop_ull_tss_next (gomp_ull *istart, gomp_ull *iend)
+bo_loop_tss_next (long *istart, long *iend)
 {
     bool ret;
     ret = bo_iter_tss_next (istart, iend);
@@ -814,7 +827,6 @@ GOMP_parallel_loop_runtime_start (void (*fn) (void *), void *data,
                                   unsigned num_threads, long start, long end,
                                   long incr, region_id_t id)
 {
-    //printf("executing omp region: %llu\n", id);
     struct gomp_task_icv *icv = gomp_icv (false);
     gomp_parallel_loop_start (fn, data, num_threads, start, end, incr,
                               icv->run_sched_var, icv->run_sched_chunk_size, 0, id);
@@ -891,7 +903,6 @@ GOMP_parallel_loop_runtime (void (*fn) (void *), void *data,
                             unsigned num_threads, long start, long end,
                             long incr, unsigned flags, region_id_t id)
 {
-    //printf("executing omp region: %llu\n", id);
     struct gomp_task_icv *icv = gomp_icv (false);
     gomp_parallel_loop_start (fn, data, num_threads, start, end,
                               incr, icv->run_sched_var,

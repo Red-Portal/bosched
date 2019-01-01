@@ -147,7 +147,7 @@ parse_schedule (void)
     else if (strncasecmp (env, "fac2", 4) == 0)
     {
         gomp_global_icv.run_sched_var = FS_FAC2;
-        env += 2;
+        env += 4;
     }
     else if (strncasecmp (env, "fss", 3) == 0)
     {

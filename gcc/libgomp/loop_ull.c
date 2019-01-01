@@ -1,5 +1,4 @@
-/* Copyright (C) 2005-2018 Free Software Foundation, Inc.
-   Contributed by Richard Henderson <rth@redhat.com>.
+/* Copyright (C) 2005-2018 Free Software Foundation, Inc.   Contributed by Richard Henderson <rth@redhat.com>.
 
    This file is part of the GNU Offloading and Multi Processing Library
    (libgomp).
@@ -30,7 +29,7 @@
 #include <stdio.h>
 #include "libgomp.h"
 #include "bo_scheduling.h"
-#incldue "schedules.h"
+#include "schedules.h"
 
 typedef unsigned long long gomp_ull;
 typedef unsigned long long region_id_t;
@@ -71,14 +70,16 @@ gomp_loop_ull_init (struct gomp_work_share *ws, bool up, gomp_ull start,
 
     if(sched == FS_FSS
        || sched == FS_FAC2
-       || sched == OB_FSS)
+       || sched == BO_FSS)
     {
         ws->chunk_size = num_tasks / nthreads;
     }
 
-    if (sched == GFS_DYNAMIC || sched == FS_CSS)
+    if (sched == GFS_DYNAMIC
+        || sched == FS_CSS
+        || sched == BO_CSS)
     {
-        if(sched == FS_CSS)
+        if(sched == FS_CSS || sched == BO_CSS)
         {
             ws->chunk_size_ull = css_chunk_size_ull(ws->param, num_tasks, nthreads);
         }
@@ -201,7 +202,7 @@ gomp_loop_ull_guided_start (bool up, gomp_ull start, gomp_ull end,
 static bool
 bo_loop_ull_fac2_start (bool up, gomp_ull start, gomp_ull end,
                         gomp_ull incr, gomp_ull *istart, gomp_ull *iend,
-                        enum gomp_schedule_type sched )
+                        enum gomp_schedule_type sched, region_id_t region_id )
 {
     struct gomp_thread *thr = gomp_thread ();
     bool ret;
@@ -209,7 +210,7 @@ bo_loop_ull_fac2_start (bool up, gomp_ull start, gomp_ull end,
     if (gomp_work_share_start (false))
     {
         gomp_loop_ull_init (thr->ts.work_share, up,
-                            start, end, incr, sched, 0, 0);
+                            start, end, incr, sched, 0, region_id);
         gomp_work_share_init_done ();
     }
 
@@ -220,7 +221,7 @@ bo_loop_ull_fac2_start (bool up, gomp_ull start, gomp_ull end,
 static bool
 bo_loop_ull_fss_start (bool up, gomp_ull start, gomp_ull end,
                        gomp_ull incr, gomp_ull *istart, gomp_ull *iend,
-                       enum gomp_schedule_type sched )
+                       enum gomp_schedule_type sched, region_id_t region_id )
 {
     struct gomp_thread *thr = gomp_thread ();
     bool ret;
@@ -228,7 +229,7 @@ bo_loop_ull_fss_start (bool up, gomp_ull start, gomp_ull end,
     if (gomp_work_share_start (false))
     {
         gomp_loop_ull_init (thr->ts.work_share, up,
-                            start, end, incr, sched, 0, 0);
+                            start, end, incr, sched, 0, region_id);
         gomp_work_share_init_done ();
     }
 
@@ -239,7 +240,7 @@ bo_loop_ull_fss_start (bool up, gomp_ull start, gomp_ull end,
 static bool
 bo_loop_ull_tss_start (bool up, gomp_ull start, gomp_ull end,
                        gomp_ull incr, gomp_ull *istart, gomp_ull *iend,
-                       enum gomp_schedule_type sched)
+                       enum gomp_schedule_type sched, region_id_t region_id)
 {
     struct gomp_thread *thr = gomp_thread ();
     bool ret;
@@ -247,8 +248,7 @@ bo_loop_ull_tss_start (bool up, gomp_ull start, gomp_ull end,
     if (gomp_work_share_start (false))
     {
         gomp_loop_ull_init (thr->ts.work_share, up,
-                            start, end, incr,
-                            sched, 0, 0);
+                            start, end, incr, sched, 0, region_id);
         gomp_work_share_init_done ();
     }
 
@@ -259,7 +259,7 @@ bo_loop_ull_tss_start (bool up, gomp_ull start, gomp_ull end,
 static bool
 bo_loop_ull_qss_start (bool up, gomp_ull start, gomp_ull end,
                        gomp_ull incr, gomp_ull *istart, gomp_ull *iend,
-                       enum gomp_schedule_type sched )
+                       enum gomp_schedule_type sched, region_id_t region_id)
 {
     struct gomp_thread *thr = gomp_thread ();
     bool ret;
@@ -267,7 +267,7 @@ bo_loop_ull_qss_start (bool up, gomp_ull start, gomp_ull end,
     if (gomp_work_share_start (false))
     {
         gomp_loop_ull_init (thr->ts.work_share, up,
-                            start, end, incr, sched, 0, 0);
+                            start, end, incr, sched, 0, region_id);
         gomp_work_share_init_done ();
     }
 
@@ -278,14 +278,14 @@ bo_loop_ull_qss_start (bool up, gomp_ull start, gomp_ull end,
 static bool
 bo_loop_ull_css_start (bool up, gomp_ull start, gomp_ull end,
                        gomp_ull incr, gomp_ull *istart, gomp_ull *iend,
-                       enum gomp_schedule_type sched )
+                       enum gomp_schedule_type sched, region_id_t region_id)
 {
     struct gomp_thread *thr = gomp_thread ();
     bool ret;
     if (gomp_work_share_start (false))
     {
         gomp_loop_ull_init (thr->ts.work_share, up,
-                            start, end, incr, sched, 0, 0);
+                            start, end, incr, sched, 0, region_id);
         gomp_work_share_init_done ();
     }
     ret = gomp_iter_ull_dynamic_next (istart, iend);
@@ -295,9 +295,8 @@ bo_loop_ull_css_start (bool up, gomp_ull start, gomp_ull end,
 bool
 GOMP_loop_ull_runtime_start (bool up, gomp_ull start, gomp_ull end,
                              gomp_ull incr, gomp_ull *istart, gomp_ull *iend,
-                             region_id_t id)
+                             region_id_t region_id)
 {
-    printf("executing omp region: %llu\n", id);
     struct gomp_task_icv *icv = gomp_icv (false);
     switch (icv->run_sched_var)
     {
@@ -323,24 +322,29 @@ GOMP_loop_ull_runtime_start (bool up, gomp_ull start, gomp_ull end,
         abort ();
 
     case FS_FAC2:
-        return gomp_loop_ull_fac2_start (up, start, end, incr,
-                                         istart, iend, icv->run_sched_var);
+        return bo_loop_ull_fac2_start (up, start, end, incr,
+                                       istart, iend, icv->run_sched_var,
+                                       region_id);
     case FS_FSS:
     case BO_FSS:
-        return gomp_loop_ull_fss_start (up, start, end, incr,
-                                        istart, iend, icv->run_sched_var);
+        return bo_loop_ull_fss_start (up, start, end, incr,
+                                      istart, iend, icv->run_sched_var,
+                                      region_id);
     case FS_TSS:
-        return gomp_loop_ull_tss_start(up, start, end, incr,
-                                       istart, iend, icv->run_sched_var);
+        return bo_loop_ull_tss_start(up, start, end, incr,
+                                     istart, iend, icv->run_sched_var,
+                                     region_id );
     case FS_CSS:
     case BO_CSS:
-        return gomp_loop_ull_css_start (up, start, end, incr,
-                                        istart, iend, icv->run_sched_var);
+        return bo_loop_ull_css_start (up, start, end, incr,
+                                      istart, iend, icv->run_sched_var,
+                                      region_id);
 
     case FS_QSS:
     case BO_QSS:
-        return gomp_loop_ull_qss_start (up, start, end, incr,
-                                        istart, iend, icv->run_sched_var);
+        return bo_loop_ull_qss_start (up, start, end, incr,
+                                      istart, iend, icv->run_sched_var,
+                                      region_id);
 
     default:
         abort ();
@@ -610,7 +614,7 @@ gomp_loop_ull_guided_next (gomp_ull *istart, gomp_ull *iend)
 }
 
 static bool
-gomp_loop_ull_css_next (gomp_ull *istart, gomp_ull *iend)
+bo_loop_ull_css_next (gomp_ull *istart, gomp_ull *iend)
 {
     bool ret;
     ret = gomp_iter_ull_dynamic_next (istart, iend);
@@ -618,34 +622,34 @@ gomp_loop_ull_css_next (gomp_ull *istart, gomp_ull *iend)
 }
 
 static bool
-gomp_loop_ull_fac2_next (gomp_ull *istart, gomp_ull *iend)
+bo_loop_ull_fac2_next (gomp_ull *istart, gomp_ull *iend)
 {
     bool ret;
-    ret = gomp_iter_ull_fac2_next (istart, iend);
+    ret = bo_iter_ull_fac2_next (istart, iend);
     return ret;
 }
 
 static bool
-gomp_loop_ull_fss_next (gomp_ull *istart, gomp_ull *iend)
+bo_loop_ull_fss_next (gomp_ull *istart, gomp_ull *iend)
 {
     bool ret;
-    ret = gomp_iter_ull_fss_next (istart, iend);
+    ret = bo_iter_ull_fss_next (istart, iend);
     return ret;
 }
 
 static bool
-gomp_loop_ull_qss_next (gomp_ull *istart, gomp_ull *iend)
+bo_loop_ull_qss_next (gomp_ull *istart, gomp_ull *iend)
 {
     bool ret;
-    ret = gomp_iter_ull_qss_next (istart, iend);
+    ret = bo_iter_ull_qss_next (istart, iend);
     return ret;
 }
 
 static bool
-gomp_loop_ull_tss_next (gomp_ull *istart, gomp_ull *iend)
+bo_loop_ull_tss_next (gomp_ull *istart, gomp_ull *iend)
 {
     bool ret;
-    ret = gomp_iter_ull_tss_next (istart, iend);
+    ret = bo_iter_ull_tss_next (istart, iend);
     return ret;
 }
 
@@ -668,22 +672,22 @@ GOMP_loop_ull_runtime_next (gomp_ull *istart, gomp_ull *iend)
         abort ();
 
     case FS_FAC2:
-        return gomp_loop_ull_fac2_next (istart, iend);
+        return bo_loop_ull_fac2_next (istart, iend);
 
     case FS_FSS:
     case BO_FSS:
-        return gomp_loop_ull_fss_next (istart, iend);
+        return bo_loop_ull_fss_next (istart, iend);
 
     case FS_TSS:
-        return gomp_loop_ull_tss_next (istart, iend);
+        return bo_loop_ull_tss_next (istart, iend);
 
     case FS_CSS:
     case BO_CSS:
-        return gomp_loop_ull_css_next (istart, iend);
+        return bo_loop_ull_css_next (istart, iend);
 
     case FS_QSS:
     case BO_QSS:
-        return gomp_loop_ull_qss_next (istart, iend);
+        return bo_loop_ull_qss_next (istart, iend);
 
     default:
         abort ();
