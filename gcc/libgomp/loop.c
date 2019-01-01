@@ -60,18 +60,25 @@ gomp_loop_init (struct gomp_work_share *ws, long start, long end, long incr,
     ws->incr = incr;
     ws->next = start;
     ws->barrier = start;
-    if (sched == GFS_DYNAMIC)
-    {
-        struct gomp_thread *thr = gomp_thread ();
-        struct gomp_team *team = thr->ts.team;
-        long nthreads = team ? team->nthreads : 1;
 
+    struct gomp_thread *thr = gomp_thread ();
+    struct gomp_team *team = thr->ts.team;
+    long nthreads = team ? team->nthreads : 1;
+    long num_tasks = (ws->end - start) / incr;
+
+    if(sched == FS_FSS
+       || sched == FS_FAC2
+       || sched == OB_FSS)
+    {
+        ws->chunk_size = num_tasks / nthreads;
+    }
+
+    if (sched == GFS_DYNAMIC || sched == OB_CSS )
+    {
         if(sched == FS_CSS)
         {
-            long num_tasks = (ws->end - start) / incr;
             ws->chunk_size = css_chunk_size(ws->param, num_tasks, nthreads);
         }
-
         ws->chunk_size *= incr;
 
 #ifdef HAVE_SYNC_BUILTINS
@@ -200,7 +207,8 @@ gomp_loop_guided_start (long start, long end, long incr, long chunk_size,
 
 static bool
 bo_loop_css_start (long start, long end, long incr,
-                   long *istart, long *iend)
+                   long *istart, long *iend,
+                   enum gomp_schedule_type sched)
 {
     struct gomp_thread *thr = gomp_thread ();
     bool ret;
@@ -208,7 +216,7 @@ bo_loop_css_start (long start, long end, long incr,
     if (gomp_work_share_start (false))
     {
         gomp_loop_init (thr->ts.work_share, start, end, incr,
-                        FS_CSS, 0, 0);
+                        sched, 0, 0);
         gomp_work_share_init_done ();
     }
 
@@ -218,7 +226,8 @@ bo_loop_css_start (long start, long end, long incr,
 
 static bool
 bo_loop_fss_start (long start, long end, long incr,
-                   long *istart, long *iend)
+                   long *istart, long *iend,
+                   enum gomp_schedule_type sched)
 {
     struct gomp_thread *thr = gomp_thread ();
     bool ret;
@@ -226,7 +235,7 @@ bo_loop_fss_start (long start, long end, long incr,
     if (gomp_work_share_start (false))
     {
         gomp_loop_init (thr->ts.work_share, start, end, incr,
-                        FS_FSS, 0, 0);
+                        sched, 0, 0);
         gomp_work_share_init_done ();
     }
     ret = bo_iter_fss_next (istart, iend);
@@ -235,7 +244,8 @@ bo_loop_fss_start (long start, long end, long incr,
 
 static bool
 bo_loop_qss_start (long start, long end, long incr,
-                   long *istart, long *iend)
+                   long *istart, long *iend,
+                   enum gomp_schedule_type sched)
 {
     struct gomp_thread *thr = gomp_thread ();
     bool ret;
@@ -243,7 +253,7 @@ bo_loop_qss_start (long start, long end, long incr,
     if (gomp_work_share_start (false))
     {
         gomp_loop_init (thr->ts.work_share, start, end, incr,
-                        FS_QSS, 0, 0);
+                        sched, 0, 0);
         gomp_work_share_init_done ();
     }
     ret = bo_iter_qss_next (istart, iend);
@@ -252,7 +262,8 @@ bo_loop_qss_start (long start, long end, long incr,
 
 static bool
 bo_loop_tss_start (long start, long end, long incr,
-                   long *istart, long *iend)
+                   long *istart, long *iend,
+                   enum gomp_schedule_type sched)
 {
     struct gomp_thread *thr = gomp_thread ();
     bool ret;
@@ -260,7 +271,7 @@ bo_loop_tss_start (long start, long end, long incr,
     if (gomp_work_share_start (false))
     {
         gomp_loop_init (thr->ts.work_share, start, end, incr,
-                        FS_TSS, 0, 0);
+                        sched, 0, 0);
         gomp_work_share_init_done ();
     }
     ret = bo_iter_tss_next (istart, iend);
@@ -269,7 +280,8 @@ bo_loop_tss_start (long start, long end, long incr,
 
 static bool
 bo_loop_fac2_start (long start, long end, long incr,
-                    long *istart, long *iend)
+                    long *istart, long *iend,
+                    enum gomp_schedule_type sched)
 {
     struct gomp_thread *thr = gomp_thread ();
     bool ret;
@@ -277,7 +289,7 @@ bo_loop_fac2_start (long start, long end, long incr,
     if (gomp_work_share_start (false))
     {
         gomp_loop_init (thr->ts.work_share, start, end, incr,
-                        FS_FAC2, 0, 0);
+                        sched, 0, 0);
         gomp_work_share_init_done ();
     }
     ret = bo_iter_fac2_next (istart, iend);
@@ -314,23 +326,23 @@ GOMP_loop_runtime_start (long start, long end, long incr,
 
     case FS_FAC2:
         return bo_loop_fac2_start (up, start, end, incr,
-                                   istart, iend);
+                                   istart, iend, icv->run_sched_var);
     case FS_FSS:
     case BO_FSS:
         return bo_loop_fss_start (up, start, end, incr,
-                                  istart, iend);
+                                  istart, iend, icv->run_sched_var);
     case FS_TSS:
         return bo_loop_tss_start(up, start, end, incr,
-                                 istart, iend);
+                                 istart, iend, icv->run_sched_var);
     case FS_CSS:
     case BO_CSS:
         return bo_loop_css_start (up, start, end, incr,
-                                  istart, iend);
+                                  istart, iend, icv->run_sched_var);
 
     case FS_QSS:
     case BO_QSS:
         return bo_loop_qss_start (up, start, end, incr,
-                                  istart, iend);
+                                  istart, iend, icv->run_sched_var);
 
     default:
         abort ();
