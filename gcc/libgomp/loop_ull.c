@@ -191,8 +191,8 @@ gomp_loop_ull_guided_start (bool up, gomp_ull start, gomp_ull end,
 }
 
 static bool
-gomp_loop_ull_fac2_start (bool up, gomp_ull start, gomp_ull end,
-                          gomp_ull incr, gomp_ull *istart, gomp_ull *iend)
+bo_loop_ull_fac2_start (bool up, gomp_ull start, gomp_ull end,
+                        gomp_ull incr, gomp_ull *istart, gomp_ull *iend)
 {
     struct gomp_thread *thr = gomp_thread ();
     bool ret;
@@ -204,13 +204,13 @@ gomp_loop_ull_fac2_start (bool up, gomp_ull start, gomp_ull end,
         gomp_work_share_init_done ();
     }
 
-    ret = gomp_iter_ull_fac2_next (istart, iend);
+    ret = bo_iter_ull_fac2_next (istart, iend);
     return ret;
 }
 
 static bool
-gomp_loop_ull_fss_start (bool up, gomp_ull start, gomp_ull end,
-                         gomp_ull incr, gomp_ull *istart, gomp_ull *iend)
+bo_loop_ull_fss_start (bool up, gomp_ull start, gomp_ull end,
+                       gomp_ull incr, gomp_ull *istart, gomp_ull *iend)
 {
     struct gomp_thread *thr = gomp_thread ();
     bool ret;
@@ -222,13 +222,13 @@ gomp_loop_ull_fss_start (bool up, gomp_ull start, gomp_ull end,
         gomp_work_share_init_done ();
     }
 
-    ret = gomp_iter_ull_fss_next (istart, iend);
+    ret = bo_iter_ull_fss_next (istart, iend);
     return ret;
 }
 
 static bool
-gomp_loop_ull_tss_start (bool up, gomp_ull start, gomp_ull end,
-                         gomp_ull incr, gomp_ull *istart, gomp_ull *iend)
+bo_loop_ull_tss_start (bool up, gomp_ull start, gomp_ull end,
+                       gomp_ull incr, gomp_ull *istart, gomp_ull *iend)
 {
     struct gomp_thread *thr = gomp_thread ();
     bool ret;
@@ -240,13 +240,13 @@ gomp_loop_ull_tss_start (bool up, gomp_ull start, gomp_ull end,
         gomp_work_share_init_done ();
     }
 
-    ret = gomp_iter_ull_tss_next (istart, iend);
+    ret = bo_iter_ull_tss_next (istart, iend);
     return ret;
 }
 
 static bool
-gomp_loop_ull_qss_start (bool up, gomp_ull start, gomp_ull end,
-                         gomp_ull incr, gomp_ull *istart, gomp_ull *iend)
+bo_loop_ull_qss_start (bool up, gomp_ull start, gomp_ull end,
+                       gomp_ull incr, gomp_ull *istart, gomp_ull *iend)
 {
     struct gomp_thread *thr = gomp_thread ();
     bool ret;
@@ -258,13 +258,13 @@ gomp_loop_ull_qss_start (bool up, gomp_ull start, gomp_ull end,
         gomp_work_share_init_done ();
     }
 
-    ret = gomp_iter_ull_tss_next (istart, iend);
+    ret = bo_iter_ull_qss_next (istart, iend);
     return ret;
 }
 
 static bool
-gomp_loop_ull_css_start (bool up, gomp_ull start, gomp_ull end,
-                         gomp_ull incr, gomp_ull *istart, gomp_ull *iend)
+bo_loop_ull_css_start (bool up, gomp_ull start, gomp_ull end,
+                       gomp_ull incr, gomp_ull *istart, gomp_ull *iend)
 {
     struct gomp_thread *thr = gomp_thread ();
     bool ret;
