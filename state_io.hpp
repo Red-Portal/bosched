@@ -26,8 +26,8 @@ namespace bosched
 
             if(state.warming_up)
             {
-                auto obs_x = l.at("obs_x");
-                auto obs_y = l.at("obs_y");
+                auto obs_x = l["obs_x"];
+                auto obs_y = l["obs_y"];
                 state.obs_x = std::vector<double>(obs_x.cbegin(), obs_x.cend());
                 state.obs_y = std::vector<double>(obs_y.cbegin(), obs_y.cend());
             }
@@ -37,6 +37,13 @@ namespace bosched
                 auto byte_vec = std::vector<uint8_t>(bytes.begin(), bytes.end());
                 auto str = std::string(byte_vec.begin(), byte_vec.end());
                 state.gp.emplace(str);
+
+                auto mean = l["mean"];
+                auto var  = l["var"];
+                auto acq  = l["acq"];
+                state.mean = std::vector<double>(mean.cbegin(), mean.cend());
+                state.var  = std::vector<double>(var.cbegin(), var.cend());
+                state.acq  = std::vector<double>(acq.cbegin(), acq.cend());
             }
 
             if(getenv("DEBUG"))
@@ -77,6 +84,10 @@ namespace bosched
                 auto str = loop_state.gp->serialize();
                 auto bytes = std::vector<uint8_t>(str.begin(), str.end());
                 serialized_state["gp"] = bytes;
+
+                serialized_state["mean"] = loop_state.mean;
+                serialized_state["var"] = loop_state.mean;
+                serialized_state["acq"] = loop_state.mean;
             }
 
             if(getenv("DEBUG"))

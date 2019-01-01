@@ -35,60 +35,80 @@ namespace bosched
         return next;
     }
 
+    inline void
+    update_param_warmup(loop_state_t& loop_state)
+    {
+        if(loop_state.obs_x.size() > 10)
+        {
+            size_t particle_num = 10;
+            double survival_rate = 0.8;
+            loop_state.warming_up = false;
+
+            loop_state.gp.emplace(loop_state.obs_x,
+                                  loop_state.obs_y,
+                                  particle_num,
+                                  survival_rate);
+            loop_state.iteration = 1;
+
+            auto [next, mean, var, acq] =
+                lpbo::bayesian_optimization(*loop_state.gp,
+                                            1e-7,
+                                            loop_state.iteration,
+                                            200);
+            loop_state.mean.push_back(mean);
+            loop_state.var.push_back(var);
+            loop_state.acq.push_back(acq);
+            loop_state.param = next;
+        }
+    }
+
+    inline void
+    update_param_non_warmup(loop_state_t& loop_state)
+    {
+        if(loop_state.obs_x.size() > 1)
+        {
+            loop_state.gp->update(loop_state.obs_x,
+                                  loop_state.obs_y);
+        }
+
+        auto [next, mean, var, acq] =
+            lpbo::bayesian_optimization(*loop_state.gp,
+                                        1e-7,
+                                        loop_state.iteration,
+                                        200);
+        ++loop_state.iteration;
+        loop_state.mean.push_back(mean);
+        loop_state.var.push_back(var);
+        loop_state.acq.push_back(acq);
+        loop_state.param = next;
+    }
+
     inline std::unordered_map<size_t, loop_state_t>
     update_loop_parameters(std::unordered_map<size_t, loop_state_t>&& loop_states)
     {
         for(auto& l : loop_states)
         {
-            size_t loop_id = l.first;
             auto& loop_state = l.second;
 
             if(loop_state.warming_up)
             {
-                if(loop_state.obs_x.size() > 10)
-                {
-                    size_t particle_num = 10;
-                    double survival_rate = 0.8;
-                    loop_state.warming_up = false;
-                    loop_state.gp.emplace(loop_state.obs_x,
-                                          loop_state.obs_y,
-                                          particle_num,
-                                          survival_rate);
-                    loop_state.iteration = 1;
+                update_param_warmup(loop_state);
 
-                    auto [next, mean, var] =
-                        lpbo::bayesian_optimization(*loop_state.gp,
-                                                    loop_state.iteration,
-                                                    200);
-                    /* */
-                }
-                else if(getenv("DEBUG"))
+                if(getenv("DEBUG"))
                 {
-                    std::cout << "-- warming up loop " << loop_id
+                    std::cout << "-- warming up loop " << loop_state.id
                               << " current observations: " << loop_state.obs_x.size() 
                               << std::endl;
                 }
             }
             else
             {
-                if(loop_state.obs_x.size() > 1)
-                {
-                    loop_state.gp->update(loop_state.obs_x,
-                                          loop_state.obs_y);
-                }
+                update_param_non_warmup(loop_state);
 
-                auto [next, mean, var] =
-                    lpbo::bayesian_optimization(*loop_state.gp,
-                                                loop_state.iteration,
-                                                200);
-                ++loop_state.iteration;
-
-                /* */
-                
                 if(getenv("DEBUG"))
                 {
-                    std::cout << "-- updating GP of loop " << loop_id
-                              << " next point: " << next
+                    std::cout << "-- updating GP of loop " << loop_state.id
+                              << " next point: " << loop_state.param
                               << std::endl;
                 }
             }
@@ -189,7 +209,7 @@ extern "C"
     void bo_schedule_end(unsigned long long region_id)
     {
         auto& loop_state = _loop_states[region_id];
-        auto duration = loop_state.loop_stop<bosched::microsecond>();
+        auto duration = loop_state.loop_stop<bosched::millisecond>();
 
         loop_state.obs_x.push_back(loop_state.param);
         loop_state.obs_y.push_back(duration.count());

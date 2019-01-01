@@ -25,8 +25,9 @@ namespace bosched
         bosched::time_point_t start;
         bool warming_up;
         bool is_bo_schedule;
-        double mean;
-        double var;
+        std::vector<double> mean;
+        std::vector<double> var;
+        std::vector<double> acq;
         std::optional<lpbo::smc_gp> gp;
         std::vector<double> obs_x;
         std::vector<double> obs_y;
