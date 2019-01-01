@@ -59,8 +59,19 @@ gomp_loop_init (struct gomp_work_share *ws, long start, long end, long incr,
         ? start : end;
     ws->incr = incr;
     ws->next = start;
+    ws->barrier = start;
     if (sched == GFS_DYNAMIC)
     {
+        struct gomp_thread *thr = gomp_thread ();
+        struct gomp_team *team = thr->ts.team;
+        long nthreads = team ? team->nthreads : 1;
+
+        if(sched == FS_CSS)
+        {
+            long num_tasks = (ws->end - start) / incr;
+            ws->chunk_size = css_chunk_size(ws->param, num_tasks, nthreads);
+        }
+
         ws->chunk_size *= incr;
 
 #ifdef HAVE_SYNC_BUILTINS
@@ -187,6 +198,92 @@ gomp_loop_guided_start (long start, long end, long incr, long chunk_size,
     return ret;
 }
 
+static bool
+gomp_loop_css_start (long start, long end, long incr,
+                     long *istart, long *iend)
+{
+    struct gomp_thread *thr = gomp_thread ();
+    bool ret;
+
+    if (gomp_work_share_start (false))
+    {
+        gomp_loop_init (thr->ts.work_share, start, end, incr,
+                        FS_CSS, 0, 0);
+        gomp_work_share_init_done ();
+    }
+
+    ret = gomp_iter_dynamic_next (istart, iend);
+    return ret;
+}
+
+static bool
+gomp_loop_fss_start (long start, long end, long incr,
+                     long *istart, long *iend)
+{
+    struct gomp_thread *thr = gomp_thread ();
+    bool ret;
+
+    if (gomp_work_share_start (false))
+    {
+        gomp_loop_init (thr->ts.work_share, start, end, incr,
+                        FS_FSS, 0, 0);
+        gomp_work_share_init_done ();
+    }
+    ret = gomp_iter_fss_next (istart, iend);
+    return ret;
+}
+
+static bool
+gomp_loop_qss_start (long start, long end, long incr,
+                     long *istart, long *iend)
+{
+    struct gomp_thread *thr = gomp_thread ();
+    bool ret;
+
+    if (gomp_work_share_start (false))
+    {
+        gomp_loop_init (thr->ts.work_share, start, end, incr,
+                        FS_QSS, 0, 0);
+        gomp_work_share_init_done ();
+    }
+    ret = gomp_iter_qss_next (istart, iend);
+    return ret;
+}
+
+static bool
+gomp_loop_tss_start (long start, long end, long incr,
+                     long *istart, long *iend)
+{
+    struct gomp_thread *thr = gomp_thread ();
+    bool ret;
+
+    if (gomp_work_share_start (false))
+    {
+        gomp_loop_init (thr->ts.work_share, start, end, incr,
+                        FS_TSS, 0, 0);
+        gomp_work_share_init_done ();
+    }
+    ret = gomp_iter_tss_next (istart, iend);
+    return ret;
+}
+
+static bool
+gomp_loop_fac2_start (long start, long end, long incr,
+                      long *istart, long *iend)
+{
+    struct gomp_thread *thr = gomp_thread ();
+    bool ret;
+
+    if (gomp_work_share_start (false))
+    {
+        gomp_loop_init (thr->ts.work_share, start, end, incr,
+                        FS_FAC2, 0, 0);
+        gomp_work_share_init_done ();
+    }
+    ret = gomp_iter_fac2_next (istart, iend);
+    return ret;
+}
+
 bool
 GOMP_loop_runtime_start (long start, long end, long incr,
                          long *istart, long *iend, region_id_t id)
@@ -211,11 +308,32 @@ GOMP_loop_runtime_start (long start, long end, long incr,
         /* For now map to schedule(static), later on we could play with feedback
            driven choice.  */
         return gomp_loop_static_start (start, end, incr, 0, istart, iend);
+
+    case FS_AF:
+        abort ();
+
+    case FS_FAC2:
+        return gomp_loop_fac2_start (up, start, end, incr,
+                                     istart, iend);
+    case FS_FSS:
+    case BO_FSS:
+        return gomp_loop_fss_start (up, start, end, incr,
+                                    istart, iend);
+    case FS_TSS:
+        return gomp_loop_tss_start(up, start, end, incr,
+                                   istart, iend);
+    case FS_CSS:
+    case BO_CSS:
+        return gomp_loop_css_start (up, start, end, incr,
+                                    istart, iend);
+
+    case FS_QSS:
+    case BO_QSS:
+        return gomp_loop_qss_start (up, start, end, incr,
+                                    istart, iend);
+
     default:
-        //abort ();
-        return gomp_loop_guided_start (start, end, incr,
-                                       icv->run_sched_chunk_size,
-                                       istart, iend);
+        abort ();
     }
 }
 
@@ -314,9 +432,7 @@ GOMP_loop_ordered_runtime_start (long start, long end, long incr,
         return gomp_loop_ordered_static_start (start, end, incr,
                                                0, istart, iend);
     default:
-        //abort ();
-        return gomp_loop_ordered_static_start (start, end, incr,
-                                               0, istart, iend);
+        abort ();
     }
 }
 
@@ -478,6 +594,46 @@ gomp_loop_guided_next (long *istart, long *iend)
     return ret;
 }
 
+static bool
+gomp_loop_css_next (gomp_ull *istart, gomp_ull *iend)
+{
+    bool ret;
+    ret = gomp_iter_dynamic_next (istart, iend);
+    return ret;
+}
+
+static bool
+gomp_loop_ull_fac2_next (gomp_ull *istart, gomp_ull *iend)
+{
+    bool ret;
+    ret = gomp_iter_fac2_next (istart, iend);
+    return ret;
+}
+
+static bool
+gomp_loop_ull_fss_next (gomp_ull *istart, gomp_ull *iend)
+{
+    bool ret;
+    ret = gomp_iter_fss_next (istart, iend);
+    return ret;
+}
+
+static bool
+gomp_loop_ull_qss_next (gomp_ull *istart, gomp_ull *iend)
+{
+    bool ret;
+    ret = gomp_iter_qss_next (istart, iend);
+    return ret;
+}
+
+static bool
+gomp_loop_ull_tss_next (gomp_ull *istart, gomp_ull *iend)
+{
+    bool ret;
+    ret = gomp_iter_tss_next (istart, iend);
+    return ret;
+}
+
 bool
 GOMP_loop_runtime_next (long *istart, long *iend)
 {
@@ -492,9 +648,30 @@ GOMP_loop_runtime_next (long *istart, long *iend)
         return gomp_loop_dynamic_next (istart, iend);
     case GFS_GUIDED:
         return gomp_loop_guided_next (istart, iend);
+
+    case FS_AF:
+        abort ();
+
+    case FS_FAC2:
+        return gomp_loop_fac2_next (istart, iend);
+
+    case FS_FSS:
+    case BO_FSS:
+        return gomp_loop_fss_next (istart, iend);
+
+    case FS_TSS:
+        return gomp_loop_tss_next (istart, iend);
+
+    case FS_CSS:
+    case BO_CSS:
+        return gomp_loop_dynamic_next (istart, iend);
+
+    case FS_QSS:
+    case BO_QSS:
+        return gomp_loop_qss_next (istart, iend);
+
     default:
-        //abort ();
-        return gomp_loop_guided_next (istart, iend);
+        abort ();
     }
 }
 

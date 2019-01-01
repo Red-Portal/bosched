@@ -200,29 +200,33 @@ struct gomp_work_share
 
     int mode;
 
-  union {
-    struct {
-      /* This is the chunk_size argument to the SCHEDULE clause.  */
-      long chunk_size;
+    union {
+        struct {
+            /* This is the chunk_size argument to the SCHEDULE clause.  */
+            long chunk_size;
 
-      /* This is the iteration end point.  If this is a SECTIONS construct,
-	 this is the number of contained sections.  */
-      long end;
+            /* This is the iteration end point.  If this is a SECTIONS construct,
+               this is the number of contained sections.  */
+            long end;
 
-      /* This is the iteration step.  If this is a SECTIONS construct, this
-	 is always 1.  */
-      long incr;
+            /* This is the iteration step.  If this is a SECTIONS construct, this
+               is always 1.  */
+            long incr;
+
+            long barrier;
+        };
+
+        struct {
+            /* The same as above, but for the unsigned long long loop variants.  */
+            unsigned long long chunk_size_ull;
+            unsigned long long end_ull;
+            unsigned long long incr_ull;
+
+            unsigned long long barrier_ull;
+        };
     };
 
-    struct {
-      /* The same as above, but for the unsigned long long loop variants.  */
-      unsigned long long chunk_size_ull;
-      unsigned long long end_ull;
-      unsigned long long incr_ull;
-    };
-  };
-
-  union {
+    union {
     /* This is a circular queue that details which threads will be allowed
        into the ordered region and in which order.  When a thread allocates
        iterations on which it is going to work, it also registers itself at
