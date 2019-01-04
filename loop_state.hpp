@@ -20,6 +20,7 @@ namespace bosched
     struct loop_state_t
     {
         size_t id;
+        size_t num_tasks;
         size_t iteration;
         double param;
         bosched::time_point_t start;
