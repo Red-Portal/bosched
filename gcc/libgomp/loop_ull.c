@@ -74,6 +74,7 @@ gomp_loop_ull_init (struct gomp_work_share *ws, bool up, gomp_ull start,
     }
     else if(sched == FS_FSS || sched == BO_FSS)
     {
+        double param = fss_transform_range(ws->param);
         double temp = nthreads  * ws->param / 2;
         double b2 = (1 / num_tasks) * temp * temp;
         double x = 1 + b2 + sqrt( b2 * (b2 + 2));

@@ -49,6 +49,12 @@ css_chunk_size(double param, long N, size_t P)
     return clip(chunk_size, 1, N);
 }
 
+inline double
+fss_transform_range(double param)
+{
+    return param;
+}
+
 #ifdef HAVE_SYNC_BUILTINS
 /* Similar, but doesn't require the lock held, and uses compare-and-swap
    instead.  Note that the only memory value that changes is ws->next.  */
@@ -249,7 +255,7 @@ bo_iter_fss_next (long *pstart, long *pend)
     bo_ul R = (end - start) / incr;
     bo_ul nend;
 
-    double param = ws->param;
+    double param = fss_transform_range(ws->param);
 
     while (1)
     {
@@ -337,7 +343,7 @@ bo_iter_ull_fss_next (gomp_ull *pstart, gomp_ull *pend)
     gomp_ull R = (end - start) / incr;
     gomp_ull nend;
 
-    double param = ws->param;
+    double param = fss_transform_range(ws->param);
 
     while (1)
     {
