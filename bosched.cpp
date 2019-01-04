@@ -63,11 +63,13 @@ namespace bosched
     inline void
     update_param_non_warmup(loop_state_t& loop_state)
     {
-        if(loop_state.obs_x.size() > 1)
-        {
-            loop_state.gp->update(loop_state.obs_x,
-                                  loop_state.obs_y);
-        }
+        if(loop_state.obs_y.size() > 0)
+            return;
+
+        auto sum = std::accumulate(loop_state.obs_y.begin(),
+                                   loop_state.obs_y.end(), 0.0);
+        auto y_avg = sum / loop_state.obs_y.size();
+        loop_state.gp->update(loop_state.param, y_avg);
 
         auto [next, mean, var, acq] =
             lpbo::bayesian_optimization(*loop_state.gp,
@@ -195,7 +197,8 @@ extern "C"
         return param;
     }
     
-    void bo_schedule_begin(unsigned long long region_id)
+    void bo_schedule_begin(unsigned long long region_id,
+                           unsigned long long N)
     {
         if(getenv("DEBUG"))
         {
@@ -203,6 +206,7 @@ extern "C"
                       << std::endl;
         }
         _loop_states[region_id].loop_start();
+        _loop_states[region_id].num_tasks = N;
     }
 
     void bo_schedule_end(unsigned long long region_id)
@@ -210,8 +214,18 @@ extern "C"
         auto& loop_state = _loop_states[region_id];
         auto duration = loop_state.loop_stop<bosched::millisecond>();
 
-        loop_state.obs_x.push_back(loop_state.param);
-        loop_state.obs_y.push_back(duration.count());
+        if(_is_bo_schedule)
+        {
+            if( loop_state.warming_up && loop_state.obs_x.size() < 20 )
+            {
+                loop_state.obs_x.push_back(loop_state.param);
+                loop_state.obs_y.push_back(duration.count() / loop_state.num_tasks);
+            }
+            else if(!loop_state.warming_up)
+            {
+                loop_state.obs_y.push_back(duration.count() / loop_state.num_tasks);
+            }
+        }
 
         if(getenv("DEBUG"))
         {
