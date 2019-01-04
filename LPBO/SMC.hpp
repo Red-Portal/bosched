@@ -58,11 +58,13 @@ namespace lpbo
         {
             auto max_ll = *std::max_element(weights.begin(), weights.end());
             auto sum = std::accumulate(weights.begin(), weights.end(), 0.0,
-                                       [=](double sum, double loglikelhod){
-                                           return sum + exp(loglikelhod - max_ll);
+                                       [=](double sum, double loglikelihood){
+                                           return sum + exp(loglikelihood - max_ll);
                                        });
             std::transform(weights.begin(), weights.end(), weights.begin(),
-                           [sum](double x){ return x / sum; });
+                           [sum, max_ll](double loglikelihood){
+                               return exp(loglikelihood - max_ll) / sum;
+                           });
             return std::move(weights);
         }
         

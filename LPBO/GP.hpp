@@ -22,7 +22,7 @@ namespace lpbo
     {
         double _ker_l; 
         double _ker_g; 
-        double _variance;
+        double _stddev;
         double _mean;
         double _likelihood;
         lpbo::mat _K_inv;
@@ -34,17 +34,14 @@ namespace lpbo
         inline double
         covariance_kernel(double x,
                           double y,
-                          double l,
-                          double var) const noexcept
+                          double l) const noexcept
         {
             auto temp = (x - y) / l;
-            return var * exp(-0.5 * temp * temp);
+            return exp(-0.5 * temp * temp);
         }
 
         inline lpbo::mat
-        covariance_kernel(lpbo::vec const& x,
-                          double l,
-                          double var) const noexcept
+        covariance_kernel(lpbo::vec const& x, double l) const noexcept
         {
             size_t N = x.size();
             auto K = blaze::SymmetricMatrix<lpbo::mat>(N);
@@ -60,14 +57,13 @@ namespace lpbo
                     }
                 }
             }
-            return var * K;
+            return K;
         }
 
         inline lpbo::vec
         covariance_kernel(double x,
                           lpbo::vec const& v,
-                          double l,
-                          double var) const noexcept
+                          double l) const noexcept
         {
             size_t N = v.size();
             auto temp = lpbo::vec(N);
@@ -78,7 +74,7 @@ namespace lpbo
             auto k = blaze::map(exponent, [](double elem){
                                               return exp(elem);
                                           });
-            return var * k;
+            return k;
         }
     
         inline decltype(auto)
@@ -111,12 +107,11 @@ namespace lpbo
         decompose(lpbo::vec const& x,
                   double l,
                   double g,
-                  double var,
                   size_t n) const noexcept
         {
-            auto K = covariance_kernel(x, l, var);
-            K += (g + 1e-5) * _variance * lpbo::id_mat(n);
-
+            auto K = covariance_kernel(x, l);
+            //K += (g + 1e-10) * lpbo::id_mat(n);
+            K += g * lpbo::id_mat(n);
 
             auto buff = lpbo::mat(n, n);
             blaze::llh(K, buff);
@@ -126,8 +121,8 @@ namespace lpbo
         inline void
         update_Kinv(double x)
         {
-            auto K_x = covariance_kernel(x, x, _ker_l, _variance);
-            auto k_x = covariance_kernel(x, _data_x,  _ker_l, _variance);
+            auto K_x = covariance_kernel(x, x, _ker_l);
+            auto k_x = covariance_kernel(x, _data_x,  _ker_l);
             auto Kinv_k_x  = blaze::evaluate(_K_inv * k_x);
             auto mu = 1 / (K_x - (blaze::trans(k_x) * Kinv_k_x));
             auto g = -1 * mu * Kinv_k_x;
@@ -153,16 +148,16 @@ namespace lpbo
         {
             _mean = mean(y);
             _data_y_normalized = sub(y, _mean);
-            _variance = blaze::dot(_data_y_normalized, _data_y_normalized)
-                / (_data_y_normalized.size() - 1);
-            auto n = x.size();
+            _stddev = sqrt(blaze::dot(_data_y_normalized, _data_y_normalized)
+                           / (_data_y_normalized.size() - 1));
 
+            std::transform(_data_y_normalized.begin(),
+                           _data_y_normalized.end(),
+                           _data_y_normalized.begin(),
+                           [this](double x){ return x / _stddev; });
+            auto n = x.size();
             auto f = [&](lpbo::vec param){
-                         auto L = decompose(x,
-                                            param[0],
-                                                  param[1],
-                                                  _variance,
-                                                  n);
+                         auto L = decompose(x, param[0], param[1], n);
                          auto alpha = _data_y_normalized;
                          blaze::trsv(lpbo::mat(L), alpha, 'L', 'N', 'N');
                          blaze::trsv(lpbo::mat(L), alpha, 'L', 'T', 'N');
@@ -173,7 +168,7 @@ namespace lpbo
             _ker_l = param[0];
             _ker_g = param[1];
 
-            auto L = decompose(x, _ker_l, _ker_g, _variance, n);
+            auto L = decompose(x, _ker_l, _ker_g, n);
 
             auto L_inv = L;
             blaze::invert(L_inv);
@@ -239,7 +234,7 @@ namespace lpbo
         {
             stream << std::to_string(_ker_l) + '\n';
             stream << std::to_string(_ker_g) + '\n';
-            stream << std::to_string(_variance) + '\n';
+            stream << std::to_string(_stddev) + '\n';
             stream << std::to_string(_mean) + '\n';
             stream << std::to_string(_likelihood) + '\n';
 
@@ -263,7 +258,7 @@ namespace lpbo
             _ker_g = std::stod(buf);
 
             std::getline(stream, buf);
-            _variance = std::stod(buf);
+            _stddev = std::stod(buf);
 
             std::getline(stream, buf);
             _mean = std::stod(buf);
@@ -320,10 +315,14 @@ namespace lpbo
             blaze::subvector(_data_y, old_n, add_n) = y;
 
             auto y_normalized = sub(y, _mean);
+            std::transform(y_normalized.begin(),
+                           y_normalized.end(),
+                           y_normalized.begin(),
+                           [this](double x){ return x / _stddev; });
             _data_y_normalized.resize(old_n + add_n);
             blaze::subvector(_data_y_normalized, old_n, add_n) = y_normalized;
 
-            auto L = decompose(_data_x, _ker_l, _ker_g, _variance, old_n + add_n);
+            auto L = decompose(_data_x, _ker_l, _ker_g, old_n + add_n);
             auto L_inv = L;
             blaze::invert(L_inv);
             _K_inv = blaze::trans(L_inv) * L_inv;
@@ -341,10 +340,10 @@ namespace lpbo
         inline std::pair<double, double>
         predict(double x) const
         {
-            auto k = covariance_kernel(x, _data_x,  _ker_l, _variance);
-            auto mu = blaze::dot(k, _alpha) + _mean;
-            auto sigma2 = covariance_kernel(x, x, _ker_l, _variance)
-                - blaze::trans(k) * (_K_inv * k);
+            auto k = covariance_kernel(x, _data_x,  _ker_l);
+            auto mu = blaze::dot(k, _alpha) * _stddev + _mean;
+            auto sigma2 = (covariance_kernel(x, x, _ker_l)
+                           - blaze::trans(k) * (_K_inv * k)) * _stddev * _stddev ;
             return {mu, sigma2};
         }
     };
