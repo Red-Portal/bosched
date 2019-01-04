@@ -42,6 +42,7 @@ gomp_loop_init (struct gomp_work_share *ws, long start, long end, long incr,
                 enum gomp_schedule_type sched, long chunk_size, region_id_t region_id)
 {
     bool is_bo = is_bo_schedule(sched);
+    long num_tasks = (ws->end - start) / incr;
     if(is_parameterized(sched))
     {
         double param = bo_schedule_parameter(region_id, (int)is_bo);
@@ -50,7 +51,7 @@ gomp_loop_init (struct gomp_work_share *ws, long start, long end, long incr,
 
     if(is_bo)
     {
-        bo_schedule_begin(region_id);
+        bo_schedule_begin(region_id, num_tasks);
     }
 
     ws->sched = sched;
@@ -65,18 +66,26 @@ gomp_loop_init (struct gomp_work_share *ws, long start, long end, long incr,
     struct gomp_thread *thr = gomp_thread ();
     struct gomp_team *team = thr->ts.team;
     long nthreads = team ? team->nthreads : 1;
-    long num_tasks = (ws->end - start) / incr;
 
-    if(sched == FS_FSS
-       || sched == FS_FAC2
-       || sched == BO_FSS)
+    if(sched == FS_FAC2)
     {
         ws->chunk_size = num_tasks / nthreads;
     }
+    else if(sched == FS_FSS || sched == BO_FSS)
+    {
+        double temp = nthreads  * ws->param / 2;
+        double b2 = (1 / num_tasks) * temp * temp;
+        double x = 1 + b2 + sqrt( b2 * (b2 + 2));
+        unsigned long F = (num_tasks / x) / nthreads;
+        unsigned long PF  = F * nthreads;
+        unsigned long nbarrier = ws->barrier + (PF * ws->incr);
 
-    if (sched == GFS_DYNAMIC
-        || sched == FS_CSS
-        || sched == BO_CSS )
+        ws->chunk_size = F;
+        ws->barrier = nbarrier; 
+    }
+    else if (sched == GFS_DYNAMIC
+             || sched == FS_CSS
+             || sched == BO_CSS )
     {
         if(sched == FS_CSS || sched == BO_CSS )
         {
