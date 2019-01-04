@@ -213,11 +213,6 @@ gomp_work_share_end (region_id_t region_id)
     struct gomp_team *team = thr->ts.team;
     gomp_barrier_state_t bstate;
 
-    struct gomp_task_icv *icv = gomp_icv (false);
-    if(is_bo_schedule(icv->run_sched_var))
-    {
-        bo_schedule_end(region_id);
-    }
 
     /* Work sharing constructs can be orphaned.  */
     if (team == NULL)
@@ -235,6 +230,12 @@ gomp_work_share_end (region_id_t region_id)
         {
             team->work_shares_to_free = thr->ts.work_share;
             free_work_share (team, thr->ts.last_work_share);
+        }
+
+        struct gomp_task_icv *icv = gomp_icv (false);
+        if(is_bo_schedule(icv->run_sched_var))
+        {
+            bo_schedule_end(region_id);
         }
     }
 

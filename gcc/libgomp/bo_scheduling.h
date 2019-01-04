@@ -14,7 +14,8 @@ extern void bo_save_data(char const* progname,
 extern double bo_schedule_parameter(unsigned long long region_id,
                                     int is_bo);
 
-extern void bo_schedule_begin(unsigned long long region_id);
+extern void bo_schedule_begin(unsigned long long region_id,
+                              unsigned long long N);
 
 extern void bo_schedule_end(unsigned long long region_id);
 
