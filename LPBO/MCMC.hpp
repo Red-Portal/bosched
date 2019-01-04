@@ -49,11 +49,8 @@ namespace lpbo
         auto propose =
             [](std::mt19937& rand, Param means){
                 auto prop = Param(2);
-                // auto dist = std::normal_distribution<double>(0, randomwalk_variance);   
-                // prop[0] = means[0] + dist(rand);
-                // prop[1] = means[1] + dist(rand);
                 auto dist0 = std::uniform_real_distribution<double>(3 * means[0] / 4, 4 * means[0] / 3);   
-                auto dist1 = std::uniform_real_distribution<double>(3 * means[1] / 4, 4 * means[1] / 3);   
+                auto dist1 = std::uniform_real_distribution<double>(3 * means[1] / 4, 4 * means[1] / 3); 
                 prop[0] = dist0(rand);
                 prop[1] = dist1(rand);
                 return prop;
@@ -83,17 +80,7 @@ namespace lpbo
             double log_prior = log_exp_pdf(proposed, exp_prior_lambda);
 
             double rate = exp((like + log_prior) - (prev_like + prev_prior)) * q_like / prev_q_like;
-            //double rate = exp(like - prev_like);// * q_like / prev_q_like;
             double alpha = std::min(1.0, rate);
-
-            // std::cout << "proposed  : \n" << proposed << '\n'
-            //           << "prev      : \n" << theta << '\n'
-            //           << "alpha     : " << alpha << '\n'
-            //           << "like      : " << like << '\n'
-            //           << "prior     : " << log_prior << '\n'
-            //           << "prev_like : " << prev_like << '\n'
-            //     //<< "prev prior: " << prev_prior << '\n'
-            //           << std::endl;
 
             if(decide(rng, alpha))
             {

@@ -110,12 +110,13 @@ namespace lpbo
         inline lpbo::lower
         decompose(lpbo::vec const& x,
                   double l,
-                        double g,
-                        double var,
-                        size_t n) const noexcept
+                  double g,
+                  double var,
+                  size_t n) const noexcept
         {
             auto K = covariance_kernel(x, l, var);
-            K += g * lpbo::id_mat(n);
+            K += (g + 1e-5) * _variance * lpbo::id_mat(n);
+
 
             auto buff = lpbo::mat(n, n);
             blaze::llh(K, buff);

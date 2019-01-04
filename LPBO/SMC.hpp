@@ -2,12 +2,13 @@
 #ifndef _LPBO_SMC_HPP_
 #define _LPBO_SMC_HPP_
 
-#include <vector>
+#include <algorithm>
 #include <cmath>
-#include <random>
 #include <numeric>
+#include <random>
 #include <sstream>
 #include <string>
+#include <vector>
 #include "GP.hpp"
 
 namespace lpbo
@@ -55,7 +56,11 @@ namespace lpbo
         inline std::vector<double>
         normalize_weight(std::vector<double>&& weights) const noexcept
         {
-            auto sum = std::accumulate(weights.begin(), weights.end(), 0.0);
+            auto max_ll = *std::max_element(weights.begin(), weights.end());
+            auto sum = std::accumulate(weights.begin(), weights.end(), 0.0,
+                                       [=](double sum, double loglikelhod){
+                                           return sum + exp(loglikelhod - max_ll);
+                                       });
             std::transform(weights.begin(), weights.end(), weights.begin(),
                            [sum](double x){ return x / sum; });
             return std::move(weights);
