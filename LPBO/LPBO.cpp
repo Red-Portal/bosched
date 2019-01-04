@@ -18,21 +18,24 @@ extern "C"
         return reinterpret_cast<void*>(model);
     }
 
-    void test_render_acquisition(void* model, double* x, double* y, int n, int iter,
-                                 double* x_hat, double* y_hat, int m)
+    void test_render_acquisition(void* model, int iter,
+                                 int resolution, double* y_hat)
     {
-        double annealing = 0.5;
         auto* gp_model = reinterpret_cast<lpbo::smc_gp*>(model);
-
-        auto f = [=](double x){
-                     auto [mean, var] = gp_model->predict(x);
-                     return lpbo::UCB(mean, var, beta, annealing, iter);
-                 };
-
-        for(size_t i = 0; i < size_t(m); ++i)
+        auto y = lpbo::render_acquisition(*gp_model, iter, resolution);
+        for(size_t i = 0; i < static_cast<size_t>(resolution); ++i)
         {
-            y_hat[i] = f(x_hat[i]);
+            y_hat[i] = y[i];
         }
+    }
+
+    void test_render_gp(void* model, int resolution,
+                        double* means, double* vars)
+    {
+        auto* gp_model = reinterpret_cast<lpbo::smc_gp*>(model);
+        auto [means_hat, vars_hat] = lpbo::render_gp(*gp_model, resolution);
+        std::copy(means_hat.begin(), means_hat.end(), means);
+        std::copy(vars_hat.begin(),  vars_hat.end(),  vars);
     }
 
     double test_next_point(void* model, double x, double y,

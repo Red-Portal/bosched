@@ -37,9 +37,22 @@ namespace lpbo
 
     inline std::vector<double>
     render_acquisition(lpbo::smc_gp const& model,
+                       size_t iter,
                        size_t resolution) noexcept
     {
-        return {};
+        double const beta = 2;
+        double annealing = 0.5;
+        auto f = [&](double x){
+                     auto [mean, var] = model.predict(x);
+                     return lpbo::UCB(mean, var, beta, annealing, iter);
+                 };
+
+        auto y = std::vector<double>(resolution);
+        for(size_t i = 0; i < resolution; ++i)
+        {
+            y[i] = f(static_cast<double>(i) / resolution);
+        }
+        return y;
     }
 
     using mean_t = double;
@@ -47,10 +60,18 @@ namespace lpbo
 
     inline std::pair<std::vector<mean_t>,
                      std::vector<var_t>>
-    render_gp(lpbo::smc_gp const& model,
-              size_t resolution) noexcept
+    render_gp(lpbo::smc_gp const& model, size_t resolution) noexcept
     {
-        return {};
+        auto means = std::vector<double>(resolution);
+        auto vars  = std::vector<double>(resolution);
+        for(size_t i = 0; i < resolution; ++i)
+        {
+            auto [mean, var] = model.predict(
+                static_cast<double>(i) / resolution);
+            means[i] = mean;
+            vars[i] = var;
+        }
+        return {means, vars};
     }
 }
 

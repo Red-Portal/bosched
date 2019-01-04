@@ -1,8 +1,9 @@
 
-using PyCall
-@pyimport matplotlib.pyplot as plt
+using Plots
 
 function main()
+    p = plot()
+
     eps = 2;
     function objective(x)
         return 10 * sin(4.0 * π * x) +  eps * randn();
@@ -19,15 +20,17 @@ function main()
     mean_history = Array{Float64, 1}();
     merit_history = Array{Float64, 1}();
 
-    plt.plot(0.0:0.001:1.0, objective_noiseless.(0.0:0.001:1.0))
-    plt.scatter(x, y)
-    plt.show()
+    plot!(p,  0.0:0.001:1.0, objective_noiseless.(0.0:0.001:1.0))
+    plot!(p, x, y, seriestype=:scatter)
+    display(p)
+    readline(stdin)
 
     #ccall((:build, "./libLPBO.so"), Void, (Ptr{Float64}, Ptr{Float64}, Int32), x, y, size(x)[1])
 
     resolution = 100
-    x_tilda = Array{Float64}(0.0:(1/resolution):1.0)
-    y_tilda = Array{Float64}(undef, resolution + 1)
+    y_tilda = Array{Float64}(undef, resolution)
+    gp_means = Array{Float64}(undef, resolution)
+    gp_vars = Array{Float64}(undef, resolution)
 
     model = ccall((:test_init, "./libLPBO.so"), Ptr{Cvoid}, 
                   (Ptr{Float64}, Ptr{Float64}, Int64),
@@ -47,16 +50,23 @@ function main()
                            model, x_selected, y_selected, i, 200, merit, mean, var)
         y_selected = objective(x_selected)
 
-        ccall((:test_render_acquisition, "./libLPBO.so"), Float64,
-              (Ptr{Cvoid}, Ptr{Float64}, Ptr{Float64},
-               Int64, Int64, Ptr{Float64}, Ptr{Float64}, Int64),
-              model, x, y, samples, i, x_tilda, y_tilda, resolution)
+        ccall((:test_render_acquisition, "./libLPBO.so"), Cvoid,
+              (Ptr{Cvoid}, Int64, Int64, Ptr{Float64}),
+              model, i, resolution, y_tilda)
 
-        # plt.plot(x_tilda, y_tilda)
-        # plt.plot(0.0:0.001:1.0, objective_noiseless.(0.0:0.001:1.0))
-        # plt.scatter(x, y, color="blue")
-        # plt.scatter(x_selected, y_selected, color="red")
-        # plt.show()
+        ccall((:test_render_gp, "./libLPBO.so"), Cvoid,
+              (Ptr{Cvoid}, Int64, Ptr{Float64}, Ptr{Float64}),
+              model, resolution, gp_means, gp_vars)
+        
+        x_range = range(0.0, length=resolution, step=1/resolution)
+        p = plot(x_range, y_tilda, label="acquisition", lw=3)
+        plot!(p, x_range, objective_noiseless.(x_range), label="objective", lw=3)
+        plot!(p, x, y, seriestype=:scatter, color="blue", label="data points")
+        plot!(p, [x_selected], [y_selected], seriestype=:scatter, color="red", label="selected point")
+        plot!(p, x_range, gp_means, ribbon=sqrt.(gp_vars) * 0.96,
+              fillalpha=.5, label="gaussian process", lw=3)
+        display(p)
+        readline(stdin)
 
         push!(x, x_selected)
         push!(y, y_selected)
@@ -89,15 +99,21 @@ function main()
         y_selected = objective(x_selected)
 
         ccall((:test_render_acquisition, "./libLPBO.so"), Float64,
-              (Ptr{Cvoid}, Ptr{Float64}, Ptr{Float64},
-               Int64, Int64, Ptr{Float64}, Ptr{Float64}, Int64),
-              model, x, y, samples, i, x_tilda, y_tilda, resolution)
+              (Ptr{Cvoid}, Int64, Int64, Ptr{Float64}),
+              model, i, resolution, y_tilda)
 
-        plt.plot(x_tilda, y_tilda)
-        plt.plot(0.0:0.001:1.0, objective_noiseless.(0.0:0.001:1.0))
-        plt.scatter(x, y, color="blue")
-        plt.scatter(x_selected, y_selected, color="red")
-        plt.show()
+        ccall((:test_render_gp, "./libLPBO.so"), Cvoid,
+              (Ptr{Cvoid}, Int64, Ptr{Float64}, Ptr{Float64}),
+              model, resolution, gp_means, gp_vars)
+
+        x_range = range(0.0, length=resolution, step=1/resolution)
+        p = plot(x_range, y_tilda, label="acquisition", lw=3)
+        plot!(p, x_range, objective_noiseless.(x_range), label="objective", lw=3)
+        plot!(p, x, y, seriestype=:scatter, color="blue", label="data points")
+        plot!(p, [x_selected], [y_selected], seriestype=:scatter, color="red", label="selected point")
+        plot!(p, x_range, gp_means, ribbon=gp_vars, fillalpha=.5, label="gaussian process", lw=3)
+        display(p)
+        readline(stdin)
 
         push!(x, x_selected)
         push!(y, y_selected)
@@ -109,9 +125,7 @@ function main()
                 " x: ", x_selected, " y: ", y_selected)
     end
 
-    plt.plot(1:30, merit_history)
-    #plt.plot(1:30, var_history)
-    plt.show()
+    plot!(1:30, merit_history)
 end 
 
 main()
