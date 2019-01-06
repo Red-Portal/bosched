@@ -1,8 +1,10 @@
 
-#include "utils.hpp"
-#include "loop_state.hpp"
-#include "state_io.hpp"
 #include "LPBO/LPBO.hpp"
+#include "loop_state.hpp"
+#include "metrics.hpp"
+#include "state_io.hpp"
+#include "tls.hpp"
+#include "utils.hpp"
 
 #include <atomic>
 #include <blaze/Blaze.h>
@@ -19,13 +21,14 @@ extern char const* __progname;
 
 double const _epsilon = 1e-7;
 
-std::atomic<bool> _show_loop_stat;
-std::atomic<bool> _is_debug;
-std::atomic<bool> _is_bo_schedule;
-std::atomic<bool> _is_new_file;
+bool _show_loop_stat = false;
+bool _is_debug       = false;
+bool _is_bo_schedule = false;
+bool _is_new_file    = false;
 std::mt19937 _rng __attribute__((init_priority(101)));
 std::string _progname __attribute__((init_priority(101)));
 std::unordered_map<size_t, bosched::loop_state_t> _loop_states __attribute__((init_priority(101)));
+long _procs;
 
 namespace bosched
 {
@@ -45,7 +48,6 @@ namespace bosched
             size_t particle_num = 10;
             double survival_rate = 0.8;
             loop_state.warming_up = false;
-
             loop_state.gp.emplace(loop_state.obs_x,
                                   loop_state.obs_y,
                                   particle_num,
@@ -176,20 +178,18 @@ extern "C"
         stream.close();
     }
 
-    void bo_next_called_start(size_t num_tasks)
+    void bo_record_iteration_start()
     {
         if(__builtin_expect (_show_loop_stat == false, 1))
             return;
-        
-        auto tid = std::this_thread::get_id();
-        
+        bosched::iteration_start_record();
     }
 
-    void bo_next_called_stop(size_t num_tasks)
+    void bo_record_iteration_stop()
     {
         if(__builtin_expect (_show_loop_stat == false, 1))
             return;
-
+        bosched::iteration_stop_record();
     }
 
     double
@@ -217,7 +217,7 @@ extern "C"
             param = loop_state.param;
         }
 
-        if(__builtin_expect (_is_debug == false, 1))
+        if(__builtin_expect (_is_debug, false))
         {
             std::cout << "-- loop " << region_id
                       << " requested schedule parameter " << param
@@ -227,45 +227,72 @@ extern "C"
     }
     
     void bo_schedule_begin(unsigned long long region_id,
-                           unsigned long long N)
+                           unsigned long long N,
+                           long procs)
     {
-        if(__builtin_expect (_is_debug == false, 1))
+        if(_is_bo_schedule || _show_loop_stat)
         {
-            std::cout << "-- loop " << region_id << " starting execution."
-                      << std::endl;
+            _loop_states[region_id].loop_start();
+            _loop_states[region_id].num_tasks = N;
+            _procs = procs;
         }
 
-        _loop_states[region_id].loop_start();
-        _loop_states[region_id].num_tasks = N;
+        if(__builtin_expect (_show_loop_stat, false))
+        {
+            bosched::init_tls();
+        }
+        if(__builtin_expect (_is_debug, false))
+        {
+            std::cout << "-- loop " << region_id << " starting execution."
+                      << " iterations: " << N
+                      << std::endl;
+        }
     }
 
     void bo_schedule_end(unsigned long long region_id)
     {
-        auto& loop_state = _loop_states[region_id];
-        auto duration = loop_state.loop_stop<bosched::millisecond>();
-
-        if(_is_bo_schedule)
+        if(_is_bo_schedule || _show_loop_stat)
         {
-            if( loop_state.warming_up && loop_state.obs_x.size() < 20 )
+            using time_scale_t = bosched::millisecond;
+
+            auto& loop_state = _loop_states[region_id];
+
+            auto duration = loop_state.loop_stop<time_scale_t>();
+
+            if(_is_bo_schedule)
             {
-                loop_state.obs_x.push_back(loop_state.param);
-                loop_state.obs_y.push_back(duration.count());
+                if( loop_state.warming_up && loop_state.obs_x.size() < 20 )
+                {
+                    loop_state.obs_x.push_back(loop_state.param);
+                    loop_state.obs_y.push_back(duration.count());
+                }
+                else if(!loop_state.warming_up)
+                {
+                    loop_state.obs_y.push_back(duration.count());
+                }
             }
-            else if(!loop_state.warming_up)
+
+            if(__builtin_expect (_show_loop_stat, false))
             {
-                loop_state.obs_y.push_back(duration.count());
+                auto work_time = std::chrono::duration_cast<time_scale_t>(
+                    bosched::fetch_total_runtime());
+
+                auto total_overhead = (duration.count() - (work_time.count() / _procs));
+                auto efficiency = 1 / (1 + (total_overhead / work_time.count()));
+
+                auto log = nlohmann::json();
+                log["num_tasks"] = loop_state.num_tasks;
+                log["work_time"] = work_time.count();
+                log["loop_time"] = duration.count();
+                log["efficiency"] = efficiency;
+                log["task_mean"] = work_time.count() / loop_state.num_tasks;
+                std::cout << log.dump(2) << std::endl;
             }
         }
 
-        if(__builtin_expect (_show_loop_stat == false, 1))
+        if(__builtin_expect (_is_debug, false))
         {
-            
-        }
-
-        if(__builtin_expect (_is_debug == false, 1))
-        {
-            std::cout << "-- loop " << region_id << " ending execution with runtime "
-                      << loop_state.obs_y.back() << "ms" << std::endl;
+            std::cout << "-- loop " << region_id << " ending execution" << std::endl;
         }
     }
 }

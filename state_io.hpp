@@ -18,9 +18,8 @@ namespace bosched
         std::unordered_map<size_t, loop_state_t> loop_states;
         for(auto const& l : loop_data)
         {
-            auto loop_id = l["id"];
-
             loop_state_t state;
+            auto loop_id = l["id"];
             state.param = l["param"];
             state.warming_up = l["warmup"];
             state.iteration = l["iteration"];

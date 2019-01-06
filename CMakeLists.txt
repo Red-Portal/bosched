@@ -30,7 +30,9 @@ set(CMAKE_MODULE_PATH
 # project source files
 set(SOURCE_DIR ${PROJECT_SOURCE_DIR})
 set(SOURCE_FILES
-    ${SOURCE_DIR}/bosched.cpp)
+    ${SOURCE_DIR}/bosched.cpp
+    ${SOURCE_DIR}/tls.cpp
+    )
 
 message("[ Source files for ${PROJECT_NAME} ]")
 foreach(SOURCE_FILE ${SOURCE_FILES})
@@ -41,7 +43,7 @@ add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES})
 
 # Build options
 set(BUILD_FLAGS
-    "${CMAKE_CXX_FLAGS} -O3 -g -fPIC -Wall -Wextra -march=native")
+    "${CMAKE_CXX_FLAGS} -O3 -g -fPIC -Wall -Wextra -march=native -flto")
 
 message("C++ flags = ${BUILD_FLAGS}")
 
@@ -54,18 +56,25 @@ set_target_properties(${PROJECT_NAME}
 find_package(BLAZE REQUIRED)
 #find_package(dlib REQUIRED)
 
-set(BLA_STATIC)
+set(BLA_STATIC ON)
 find_package(BLAS REQUIRED)
 find_package(LAPACK REQUIRED)
+
+set(Boost_USE_STATIC_LIBS ON)
+set(Boost_USE_STATIC_RUNTIME ON)
+find_package(Boost REQUIRED COMPONENTS thread)
 
 set(LBPO_SOURCE_DIR ${PROJECT_SOURCE_DIR}/LBPO)
 # Include directories
 target_include_directories(${PROJECT_NAME}
     PUBLIC
     ${LPBO_SOURCE_DIR}
+    ${Boost_INCLUDE_DIRS}
     ${BLAZE_INCLUDE_DIR})
 
 target_link_libraries(${PROJECT_NAME}
+    PRIVATE
     dlib
     ${BLAS_LIBRARIES}
+    ${Boost_LIBRARIES}
     ${LAPACK_LIBRARIES})
