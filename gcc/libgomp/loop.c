@@ -55,7 +55,6 @@ gomp_loop_init (struct gomp_work_share *ws, long start, long end, long incr,
     ws->next = start;
     ws->barrier = start;
 
-
     bool is_bo = is_bo_schedule(sched);
     long num_tasks = (ws->end - start) / incr;
 
@@ -324,50 +323,59 @@ GOMP_loop_runtime_start (long start, long end, long incr,
     switch (icv->run_sched_var)
     {
     case GFS_STATIC:
-        return gomp_loop_static_start (start, end, incr,
-                                       icv->run_sched_chunk_size,
-                                       istart, iend);
-    case GFS_DYNAMIC:
-        return gomp_loop_dynamic_start (start, end, incr,
+        valid = gomp_loop_static_start (start, end, incr,
                                         icv->run_sched_chunk_size,
                                         istart, iend);
+        break;
+    case GFS_DYNAMIC:
+        valid = gomp_loop_dynamic_start (start, end, incr,
+                                         icv->run_sched_chunk_size,
+                                        istart, iend);
+        break;
     case GFS_GUIDED:
-        return gomp_loop_guided_start (start, end, incr,
-                                       icv->run_sched_chunk_size,
+        valid = gomp_loop_guided_start (start, end, incr,
+                                        icv->run_sched_chunk_size,
                                        istart, iend);
+        break;
     case GFS_AUTO:
         /* For now map to schedule(static), later on we could play with feedback
            driven choice.  */
-        return gomp_loop_static_start (start, end, incr, 0,
-                                       istart, iend);
+        valid = gomp_loop_static_start (start, end, incr, 0,
+                                        istart, iend);
+        break;
 
     case FS_AF:
         abort ();
 
     case FS_FAC2:
-        return bo_loop_fac2_start (start, end, incr,
-                                   istart, iend, icv->run_sched_var,
-                                   region_id);
+        valid = bo_loop_fac2_start (start, end, incr,
+                                    istart, iend, icv->run_sched_var,
+                                    region_id);
+        break;
     case FS_FSS:
     case BO_FSS:
-        return bo_loop_fss_start (start, end, incr,
-                                  istart, iend, icv->run_sched_var,
+        valid = bo_loop_fss_start (start, end, incr,
+                                   istart, iend, icv->run_sched_var,
                                   region_id );
+        break;
     case FS_TSS:
-        return bo_loop_tss_start(start, end, incr,
-                                 istart, iend, icv->run_sched_var,
+        valid = bo_loop_tss_start(start, end, incr,
+                                  istart, iend, icv->run_sched_var,
                                  region_id );
+        break;
     case FS_CSS:
     case BO_CSS:
-        return bo_loop_css_start (start, end, incr,
-                                  istart, iend, icv->run_sched_var,
+        valid = bo_loop_css_start (start, end, incr,
+                                   istart, iend, icv->run_sched_var,
                                   region_id );
+        break;
 
     case FS_QSS:
     case BO_QSS:
-        return bo_loop_qss_start (start, end, incr,
-                                  istart, iend, icv->run_sched_var,
-                                  region_id );
+        valid = bo_loop_qss_start (start, end, incr,
+                                   istart, iend, icv->run_sched_var,
+                                   region_id );
+        break;
 
     default:
         abort ();
