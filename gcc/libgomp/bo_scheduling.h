@@ -5,6 +5,10 @@
 #include <string.h>
 #include "libgomp.h"
 
+extern void bo_record_iteration_start();
+
+extern void bo_record_iteration_stop();
+
 extern void bo_load_data(char const* progname,
                          size_t sched_id);
 
@@ -15,7 +19,8 @@ extern double bo_schedule_parameter(unsigned long long region_id,
                                     int is_bo);
 
 extern void bo_schedule_begin(unsigned long long region_id,
-                              unsigned long long N);
+                              unsigned long long N,
+                              long num_tasks );
 
 extern void bo_schedule_end(unsigned long long region_id);
 

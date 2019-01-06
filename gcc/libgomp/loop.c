@@ -25,6 +25,7 @@
 
 /* This file handles the LOOP (FOR/DO) construct.  */
 
+#include <pthread.h>
 #include <limits.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -41,18 +42,9 @@ static inline void
 gomp_loop_init (struct gomp_work_share *ws, long start, long end, long incr,
                 enum gomp_schedule_type sched, long chunk_size, region_id_t region_id)
 {
-    bool is_bo = is_bo_schedule(sched);
-    long num_tasks = (ws->end - start) / incr;
-    if(is_parameterized(sched))
-    {
-        double param = bo_schedule_parameter(region_id, (int)is_bo);
-        ws->param = param; 
-    }
-
-    if(is_bo)
-    {
-        bo_schedule_begin(region_id, num_tasks);
-    }
+    struct gomp_thread *thr = gomp_thread ();
+    struct gomp_team *team = thr->ts.team;
+    long nthreads = team ? team->nthreads : 1;
 
     ws->sched = sched;
     ws->chunk_size = chunk_size;
@@ -63,9 +55,17 @@ gomp_loop_init (struct gomp_work_share *ws, long start, long end, long incr,
     ws->next = start;
     ws->barrier = start;
 
-    struct gomp_thread *thr = gomp_thread ();
-    struct gomp_team *team = thr->ts.team;
-    long nthreads = team ? team->nthreads : 1;
+
+    bool is_bo = is_bo_schedule(sched);
+    long num_tasks = (ws->end - start) / incr;
+
+    if(is_parameterized(sched))
+    {
+        double param = bo_schedule_parameter(region_id, (int)is_bo);
+        ws->param = param; 
+    }
+
+    bo_schedule_begin(region_id, num_tasks, nthreads);
 
     if(sched == FS_FAC2)
     {
@@ -73,9 +73,9 @@ gomp_loop_init (struct gomp_work_share *ws, long start, long end, long incr,
     }
     else if(sched == FS_FSS || sched == BO_FSS)
     {
-        double param = fss_transform_range(ws->param);
-        double temp = nthreads  * ws->param / 2;
-        double b2 = (1 / num_tasks) * temp * temp;
+        ws->param = fss_transform_range(ws->param);
+        double temp = nthreads / 2.0 * ws->param;
+        double b2 = (1.0 / num_tasks) * temp * temp;
         double x = 1 + b2 + sqrt( b2 * (b2 + 2));
         unsigned long F = (num_tasks / x) / nthreads;
         unsigned long PF  = F * nthreads;
@@ -320,6 +320,7 @@ GOMP_loop_runtime_start (long start, long end, long incr,
                          region_id_t region_id)
 {
     struct gomp_task_icv *icv = gomp_icv (false);
+    bool valid;
     switch (icv->run_sched_var)
     {
     case GFS_STATIC:
@@ -337,7 +338,8 @@ GOMP_loop_runtime_start (long start, long end, long incr,
     case GFS_AUTO:
         /* For now map to schedule(static), later on we could play with feedback
            driven choice.  */
-        return gomp_loop_static_start (start, end, incr, 0, istart, iend);
+        return gomp_loop_static_start (start, end, incr, 0,
+                                       istart, iend);
 
     case FS_AF:
         abort ();
@@ -370,6 +372,9 @@ GOMP_loop_runtime_start (long start, long end, long incr,
     default:
         abort ();
     }
+    if(valid)
+        bo_record_iteration_start();
+    return valid;
 }
 
 /* The *_ordered_*_start routines are similar.  The only difference is that
@@ -669,45 +674,61 @@ bo_loop_tss_next (long *istart, long *iend)
     return ret;
 }
 
+extern pthread_key_t thread_id;
+
 bool
 GOMP_loop_runtime_next (long *istart, long *iend)
 {
+    bo_record_iteration_stop();
     struct gomp_thread *thr = gomp_thread ();
-  
-    switch (thr->ts.work_share->sched)
+    bool valid;  
+    struct gomp_work_share *ws = thr->ts.work_share;
+
+    //size_t tasks = (*iend - *istart) / ws->incr;
+    switch (ws->sched)
     {
     case GFS_STATIC:
     case GFS_AUTO:
-        return gomp_loop_static_next (istart, iend);
+        valid = gomp_loop_static_next (istart, iend);
+        break;
     case GFS_DYNAMIC:
-        return gomp_loop_dynamic_next (istart, iend);
+        valid = gomp_loop_dynamic_next (istart, iend);
+        break;
     case GFS_GUIDED:
-        return gomp_loop_guided_next (istart, iend);
+        valid = gomp_loop_guided_next (istart, iend);
+        break;
 
     case FS_AF:
         abort ();
 
     case FS_FAC2:
-        return bo_loop_fac2_next (istart, iend);
+        valid = bo_loop_fac2_next (istart, iend);
+        break;
 
     case FS_FSS:
     case BO_FSS:
-        return bo_loop_fss_next (istart, iend);
+        valid = bo_loop_fss_next (istart, iend);
+        break;
 
     case FS_TSS:
-        return bo_loop_tss_next (istart, iend);
+        valid = bo_loop_tss_next (istart, iend);
+        break;
 
     case FS_CSS:
     case BO_CSS:
-        return bo_loop_css_next (istart, iend);
+        valid = bo_loop_css_next (istart, iend);
+        break;
 
     case FS_QSS:
     case BO_QSS:
-        return bo_loop_qss_next (istart, iend);
+        valid = bo_loop_qss_next (istart, iend);
+        break;
 
     default:
         abort ();
     }
+    bo_record_iteration_start();
+    return valid;
 }
 
 /* The *_ordered_*_next routines are called when the thread completes
