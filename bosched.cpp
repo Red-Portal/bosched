@@ -4,21 +4,25 @@
 #include "state_io.hpp"
 #include "LPBO/LPBO.hpp"
 
+#include <atomic>
 #include <blaze/Blaze.h>
 #include <chrono>
-#include <random>
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <nlohmann/json.hpp>
+#include <random>
+#include <thread>
 #include <unordered_map>
 
 extern char const* __progname;
 
 double const _epsilon = 1e-7;
 
-bool _is_bo_schedule;
-bool _is_new_file;
+std::atomic<bool> _show_loop_stat;
+std::atomic<bool> _is_debug;
+std::atomic<bool> _is_bo_schedule;
+std::atomic<bool> _is_new_file;
 std::mt19937 _rng __attribute__((init_priority(101)));
 std::string _progname __attribute__((init_priority(101)));
 std::unordered_map<size_t, bosched::loop_state_t> _loop_states __attribute__((init_priority(101)));
@@ -53,10 +57,10 @@ namespace bosched
                                             _epsilon,
                                             loop_state.iteration,
                                             200);
-            loop_state.mean.push_back(mean);
-            loop_state.var.push_back(var);
-            loop_state.acq.push_back(acq);
             loop_state.param = next;
+            loop_state.pred_mean.push_back(mean);
+            loop_state.pred_var.push_back(var);
+            loop_state.pred_acq.push_back(acq);
         }
     }
 
@@ -77,9 +81,9 @@ namespace bosched
                                         loop_state.iteration,
                                         200);
         ++loop_state.iteration;
-        loop_state.mean.push_back(mean);
-        loop_state.var.push_back(var);
-        loop_state.acq.push_back(acq);
+        loop_state.pred_mean.push_back(mean);
+        loop_state.pred_var.push_back(var);
+        loop_state.pred_acq.push_back(acq);
         loop_state.param = next;
     }
 
@@ -88,15 +92,16 @@ namespace bosched
     {
         for(auto& l : loop_states)
         {
+            auto loop_id = l.first;
             auto& loop_state = l.second;
 
             if(loop_state.warming_up)
             {
                 update_param_warmup(loop_state);
 
-                if(getenv("DEBUG"))
+                if(_is_debug)
                 {
-                    std::cout << "-- warming up loop " << loop_state.id
+                    std::cout << "-- warming up loop " << loop_id 
                               << " current observations: " << loop_state.obs_x.size() 
                               << std::endl;
                 }
@@ -105,9 +110,9 @@ namespace bosched
             {
                 update_param_non_warmup(loop_state);
 
-                if(getenv("DEBUG"))
+                if(_is_debug)
                 {
-                    std::cout << "-- updating GP of loop " << loop_state.id
+                    std::cout << "-- updating GP of loop " << loop_id
                               << " next point: " << loop_state.param
                               << std::endl;
                 }
@@ -131,6 +136,15 @@ extern "C"
 
         auto file_name = ".bostate."s + _progname;
         std::ifstream stream(file_name + ".json"s);
+
+        if(getenv("DEBUG"))
+        {
+            _is_debug = true;
+        }
+        if(getenv("LOOPSTAT"))
+        {
+            _show_loop_stat = true;
+        }
 
         if(stream)
         {
@@ -162,6 +176,22 @@ extern "C"
         stream.close();
     }
 
+    void bo_next_called_start(size_t num_tasks)
+    {
+        if(__builtin_expect (_show_loop_stat == false, 1))
+            return;
+        
+        auto tid = std::this_thread::get_id();
+        
+    }
+
+    void bo_next_called_stop(size_t num_tasks)
+    {
+        if(__builtin_expect (_show_loop_stat == false, 1))
+            return;
+
+    }
+
     double
     bo_schedule_parameter(unsigned long long region_id,
                           int is_bo_schedule)
@@ -172,7 +202,6 @@ extern "C"
 
         if(_is_new_file)
         {
-            loop_state.id = region_id;
             loop_state.warming_up = true;
             loop_state.iteration = 0;
             loop_state.param = param;
@@ -188,7 +217,7 @@ extern "C"
             param = loop_state.param;
         }
 
-        if(getenv("DEBUG"))
+        if(__builtin_expect (_is_debug == false, 1))
         {
             std::cout << "-- loop " << region_id
                       << " requested schedule parameter " << param
@@ -200,11 +229,12 @@ extern "C"
     void bo_schedule_begin(unsigned long long region_id,
                            unsigned long long N)
     {
-        if(getenv("DEBUG"))
+        if(__builtin_expect (_is_debug == false, 1))
         {
             std::cout << "-- loop " << region_id << " starting execution."
                       << std::endl;
         }
+
         _loop_states[region_id].loop_start();
         _loop_states[region_id].num_tasks = N;
     }
@@ -219,15 +249,20 @@ extern "C"
             if( loop_state.warming_up && loop_state.obs_x.size() < 20 )
             {
                 loop_state.obs_x.push_back(loop_state.param);
-                loop_state.obs_y.push_back(duration.count() / loop_state.num_tasks);
+                loop_state.obs_y.push_back(duration.count());
             }
             else if(!loop_state.warming_up)
             {
-                loop_state.obs_y.push_back(duration.count() / loop_state.num_tasks);
+                loop_state.obs_y.push_back(duration.count());
             }
         }
 
-        if(getenv("DEBUG"))
+        if(__builtin_expect (_show_loop_stat == false, 1))
+        {
+            
+        }
+
+        if(__builtin_expect (_is_debug == false, 1))
         {
             std::cout << "-- loop " << region_id << " ending execution with runtime "
                       << loop_state.obs_y.back() << "ms" << std::endl;

@@ -18,8 +18,9 @@ namespace bosched
         std::unordered_map<size_t, loop_state_t> loop_states;
         for(auto const& l : loop_data)
         {
+            auto loop_id = l["id"];
+
             loop_state_t state;
-            state.id = l["id"];
             state.param = l["param"];
             state.warming_up = l["warmup"];
             state.iteration = l["iteration"];
@@ -41,21 +42,21 @@ namespace bosched
                 auto mean = l["mean"];
                 auto var  = l["var"];
                 auto acq  = l["acq"];
-                state.mean = std::vector<double>(mean.cbegin(), mean.cend());
-                state.var  = std::vector<double>(var.cbegin(), var.cend());
-                state.acq  = std::vector<double>(acq.cbegin(), acq.cend());
+                state.pred_mean = std::vector<double>(mean.cbegin(), mean.cend());
+                state.pred_var  = std::vector<double>(var.cbegin(), var.cend());
+                state.pred_acq  = std::vector<double>(acq.cbegin(), acq.cend());
             }
 
             if(getenv("DEBUG"))
             {
-                std::cout << "-- deserialized loop " << state.id
+                std::cout << "-- deserialized loop " << loop_id
                           << " warmup: "             << state.warming_up
                           << " parameter: "          << state.param
                           << " observations: "       << state.obs_x.size()
                           << std::endl;
             }
 
-            loop_states[state.id] = std::move(state);
+            loop_states[loop_id] = std::move(state);
         }
         return loop_states;
     }
@@ -66,10 +67,11 @@ namespace bosched
         nlohmann::json serialized_states;
         for(auto const& l : loop_states)
         {
+            auto loop_id = l.first;
             auto const& loop_state = l.second;
 
             nlohmann::json serialized_state;
-            serialized_state["id"] = loop_state.id;
+            serialized_state["id"] = loop_id;
             serialized_state["param"] = loop_state.param;
             serialized_state["warmup"] = loop_state.warming_up;
             serialized_state["iteration"] = loop_state.iteration;
@@ -85,9 +87,9 @@ namespace bosched
                 auto bytes = std::vector<uint8_t>(str.begin(), str.end());
                 serialized_state["gp"] = bytes;
 
-                serialized_state["mean"] = loop_state.mean;
-                serialized_state["var"] = loop_state.mean;
-                serialized_state["acq"] = loop_state.mean;
+                serialized_state["mean"] = loop_state.pred_mean;
+                serialized_state["var"] = loop_state.pred_var;
+                serialized_state["acq"] = loop_state.pred_acq;
             }
 
             if(getenv("DEBUG"))
@@ -115,9 +117,13 @@ namespace bosched
         std::cout << "--------- bayesian optimization ---------" << '\n'
                   << " modified date   | " << date << '\n'
                   << " number of loops | " << num_loops << '\n'
-                  << '\n'
-                  << " set environment variable DEBUG for detailed info"
-                  << std::endl;
+                  << std::endl; 
+
+        if(!getenv("DEBUG") )
+        {
+            std::cout << " set environment variable DEBUG for detailed info"
+                      << std::endl;
+        }
 
         loop_states = read_state(data["loops"]);
         return loop_states;
