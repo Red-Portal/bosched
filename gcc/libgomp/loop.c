@@ -257,10 +257,10 @@ bo_loop_fss_start (long start, long end, long incr,
 }
 
 static bool
-bo_loop_qss_start (long start, long end, long incr,
-                   long *istart, long *iend,
-                   enum gomp_schedule_type sched,
-                   region_id_t region_id )
+bo_loop_taper_start (long start, long end, long incr,
+                     long *istart, long *iend,
+                     enum gomp_schedule_type sched,
+                     region_id_t region_id )
 {
     struct gomp_thread *thr = gomp_thread ();
     bool ret;
@@ -271,7 +271,7 @@ bo_loop_qss_start (long start, long end, long incr,
                         sched, 0, region_id);
         gomp_work_share_init_done ();
     }
-    ret = bo_iter_qss_next (istart, iend);
+    ret = bo_iter_taper_next (istart, iend);
     return ret;
 }
 
@@ -370,11 +370,11 @@ GOMP_loop_runtime_start (long start, long end, long incr,
                                   region_id );
         break;
 
-    case FS_QSS:
-    case BO_QSS:
-        valid = bo_loop_qss_start (start, end, incr,
-                                   istart, iend, icv->run_sched_var,
-                                   region_id );
+    case FS_TAPER:
+    case BO_TAPER:
+        valid = bo_loop_taper_start (start, end, incr,
+                                     istart, iend, icv->run_sched_var,
+                                     region_id );
         break;
 
     default:
@@ -667,10 +667,10 @@ bo_loop_fss_next (long *istart, long *iend)
 }
 
 static bool
-bo_loop_qss_next (long *istart, long *iend)
+bo_loop_trape_next (long *istart, long *iend)
 {
     bool ret;
-    ret = bo_iter_qss_next (istart, iend);
+    ret = bo_iter_trape_next (istart, iend);
     return ret;
 }
 
@@ -727,9 +727,9 @@ GOMP_loop_runtime_next (long *istart, long *iend)
         valid = bo_loop_css_next (istart, iend);
         break;
 
-    case FS_QSS:
-    case BO_QSS:
-        valid = bo_loop_qss_next (istart, iend);
+    case FS_TRAPE:
+    case BO_TRAPE:
+        valid = bo_loop_trape_next (istart, iend);
         break;
 
     default:

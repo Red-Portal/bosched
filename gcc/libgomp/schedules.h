@@ -52,7 +52,7 @@ css_chunk_size(double param, long N, size_t P)
 inline double
 fss_transform_range(double param)
 {
-    return param;
+    return pow(2 * param);
 }
 
 #ifdef HAVE_SYNC_BUILTINS
@@ -436,7 +436,7 @@ bo_iter_ull_tss_next (gomp_ull *pstart, gomp_ull *pend)
 }
 
 inline static bool
-bo_iter_ull_qss_next (gomp_ull *pstart, gomp_ull *pend)
+bo_iter_ull_trape_next (gomp_ull *pstart, gomp_ull *pend)
 {
     return false;
 }
@@ -448,7 +448,7 @@ bo_iter_tss_next (long *pstart, long *pend)
 }
 
 inline static bool
-bo_iter_qss_next (long *pstart, long *pend)
+bo_iter_trape_next (long *pstart, long *pend)
 {
     return false;
 }

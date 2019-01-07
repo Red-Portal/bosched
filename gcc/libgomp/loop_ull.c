@@ -269,8 +269,8 @@ bo_loop_ull_tss_start (bool up, gomp_ull start, gomp_ull end,
 }
 
 static bool
-bo_loop_ull_qss_start (bool up, gomp_ull start, gomp_ull end,
-                       gomp_ull incr, gomp_ull *istart, gomp_ull *iend,
+bo_loop_ull_trape_start (bool up, gomp_ull start, gomp_ull end,
+                         gomp_ull incr, gomp_ull *istart, gomp_ull *iend,
                        enum gomp_schedule_type sched, region_id_t region_id)
 {
     struct gomp_thread *thr = gomp_thread ();
@@ -283,7 +283,7 @@ bo_loop_ull_qss_start (bool up, gomp_ull start, gomp_ull end,
         gomp_work_share_init_done ();
     }
 
-    ret = bo_iter_ull_qss_next (istart, iend);
+    ret = bo_iter_ull_trape_next (istart, iend);
     return ret;
 }
 
@@ -360,10 +360,10 @@ GOMP_loop_ull_runtime_start (bool up, gomp_ull start, gomp_ull end,
                                        istart, iend, icv->run_sched_var,
                                       region_id);
         break;
-    case FS_QSS:
-    case BO_QSS:
-        valid = bo_loop_ull_qss_start (up, start, end, incr,
-                                       istart, iend, icv->run_sched_var,
+    case FS_TRAPE:
+    case BO_TRAPE:
+        valid = bo_loop_ull_trape_start (up, start, end, incr,
+                                         istart, iend, icv->run_sched_var,
                                         region_id);
         break;
     default:
@@ -661,10 +661,10 @@ bo_loop_ull_fss_next (gomp_ull *istart, gomp_ull *iend)
 }
 
 static bool
-bo_loop_ull_qss_next (gomp_ull *istart, gomp_ull *iend)
+bo_loop_ull_trape_next (gomp_ull *istart, gomp_ull *iend)
 {
     bool ret;
-    ret = bo_iter_ull_qss_next (istart, iend);
+    ret = bo_iter_ull_trape_next (istart, iend);
     return ret;
 }
 
@@ -725,9 +725,9 @@ GOMP_loop_ull_runtime_next (gomp_ull *istart, gomp_ull *iend)
         valid = bo_loop_ull_css_next (istart, iend);
         break;
 
-    case FS_QSS:
-    case BO_QSS:
-        valid = bo_loop_ull_qss_next (istart, iend);
+    case FS_TRAPE:
+    case BO_TRAPE:
+        valid = bo_loop_ull_trape_next (istart, iend);
         break;
 
     default:
