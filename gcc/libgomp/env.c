@@ -135,10 +135,10 @@ parse_schedule (void)
     // FS_FSS,
     // FS_TSS,
     // FS_CSS,
-    // FS_TRAPE,
+    // FS_TAPE,
     // BO_FSS,
     // BO_CSS,
-    // BO_TRAPE,
+    // BO_TAPE,
     else if (strncasecmp (env, "af", 2) == 0)
     {
         gomp_global_icv.run_sched_var = FS_AF;
@@ -164,15 +164,15 @@ parse_schedule (void)
         gomp_global_icv.run_sched_var = FS_CSS;
         env += 3;
     }
-    else if (strncasecmp (env, "trape", 3) == 0)
+    else if (strncasecmp (env, "tape", 4) == 0)
     {
-        gomp_global_icv.run_sched_var = FS_TRAPE;
-        env += 3;
+        gomp_global_icv.run_sched_var = FS_TAPE;
+        env += 4;
     }
-    else if (strncasecmp (env, "bo_trape", 6) == 0)
+    else if (strncasecmp (env, "bo_tape", 7) == 0)
     {
-        gomp_global_icv.run_sched_var = BO_TRAPE;
-        env += 6;
+        gomp_global_icv.run_sched_var = BO_TAPE;
+        env += 7;
     }
     else if (strncasecmp (env, "bo_css", 6) == 0)
     {
@@ -182,6 +182,11 @@ parse_schedule (void)
     else if (strncasecmp (env, "bo_fss", 6) == 0)
     {
         gomp_global_icv.run_sched_var = BO_FSS;
+        env += 6;
+    }
+    else if (strncasecmp (env, "bo_tss", 6) == 0)
+    {
+        gomp_global_icv.run_sched_var = BO_TSS;
         env += 6;
     }
     else
@@ -1229,10 +1234,10 @@ handle_omp_display_env (unsigned long stacksize, int wait_policy)
         // FS_FSS,
         // FS_TSS,
         // FS_CSS,
-        // FS_TRAPE,
+        // FS_TAPE,
         // BO_FSS,
         // BO_CSS,
-        // BO_TRAPE,
+        // BO_TAPE,
     case FS_AF:
         fputs ("AF", stderr);
         break;
@@ -1248,11 +1253,14 @@ handle_omp_display_env (unsigned long stacksize, int wait_policy)
     case FS_CSS:
         fputs ("CSS", stderr);
         break;
-    case FS_TRAPE:
-        fputs ("TRAPE", stderr);
+    case FS_TAPE:
+        fputs ("TAPE", stderr);
         break;
-    case BO_TRAPE:
-        fputs ("BO_TRAPE", stderr);
+    case BO_TSS:
+        fputs ("BO_TSS", stderr);
+        break;
+    case BO_TAPE:
+        fputs ("BO_TAPE", stderr);
         break;
     case BO_FSS:
         fputs ("BO_FSS", stderr);

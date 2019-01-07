@@ -145,10 +145,11 @@ enum gomp_schedule_type
   FS_FSS,
   FS_TSS,
   FS_CSS,
-  FS_QSS,
+  FS_TAPE,
   BO_FSS,
   BO_CSS,
-  BO_QSS,
+  BO_TSS,
+  BO_TAPE,
 };
 
 struct gomp_doacross_work_share

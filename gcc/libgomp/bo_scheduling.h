@@ -26,7 +26,10 @@ extern void bo_schedule_end(unsigned long long region_id);
 
 inline static bool is_bo_schedule(enum gomp_schedule_type sched)
 {
-    return sched == BO_FSS || sched == BO_CSS || sched == BO_TRAPE;
+    return sched == BO_FSS
+        || sched == BO_CSS
+        || sched == BO_TAPE
+        || sched == BO_TSS;
 }
 
 inline static bool is_parameterized(enum gomp_schedule_type sched)
@@ -34,7 +37,7 @@ inline static bool is_parameterized(enum gomp_schedule_type sched)
     return is_bo_schedule(sched)
         || sched == FS_CSS
         || sched == FS_FSS
-        || sched == FS_TRAPE;
+        || sched == FS_TAPE;
 }
 
 #endif

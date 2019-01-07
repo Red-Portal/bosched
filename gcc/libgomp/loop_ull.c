@@ -70,6 +70,15 @@ gomp_loop_ull_init (struct gomp_work_share *ws, bool up, gomp_ull start,
     {
         ws->chunk_size_ull = num_tasks / nthreads;
     }
+    else if(sched == FS_TSS ||  sched == BO_TSS)
+    {
+        if(sched == FS_TSS)
+        {
+            double temp = (double)num_tasks / (2 * nthreads + 1);
+            ws->param =  (2 * num_tasks) / (temp * temp);
+        }
+        ws->chunk_size_ull =  sqrt(2.0 * num_tasks / ws->param) - 1;
+    }
     else if(sched == FS_FSS || sched == BO_FSS)
     {
         ws->param = fss_transform_range(ws->param);
@@ -269,8 +278,8 @@ bo_loop_ull_tss_start (bool up, gomp_ull start, gomp_ull end,
 }
 
 static bool
-bo_loop_ull_trape_start (bool up, gomp_ull start, gomp_ull end,
-                         gomp_ull incr, gomp_ull *istart, gomp_ull *iend,
+bo_loop_ull_tape_start (bool up, gomp_ull start, gomp_ull end,
+                        gomp_ull incr, gomp_ull *istart, gomp_ull *iend,
                        enum gomp_schedule_type sched, region_id_t region_id)
 {
     struct gomp_thread *thr = gomp_thread ();
@@ -283,7 +292,7 @@ bo_loop_ull_trape_start (bool up, gomp_ull start, gomp_ull end,
         gomp_work_share_init_done ();
     }
 
-    ret = bo_iter_ull_trape_next (istart, iend);
+    ret = bo_iter_ull_tape_next (istart, iend);
     return ret;
 }
 
@@ -343,27 +352,32 @@ GOMP_loop_ull_runtime_start (bool up, gomp_ull start, gomp_ull end,
                                         istart, iend, icv->run_sched_var,
                                        region_id);
         break;
+
     case FS_FSS:
     case BO_FSS:
         valid = bo_loop_ull_fss_start (up, start, end, incr,
                                        istart, iend, icv->run_sched_var,
                                       region_id);
         break;
-    case FS_TSS:
-        valid = bo_loop_ull_tss_start(up, start, end, incr,
-                                      istart, iend, icv->run_sched_var,
-                                     region_id );
-        break;
+
     case FS_CSS:
     case BO_CSS:
         valid = bo_loop_ull_css_start (up, start, end, incr,
                                        istart, iend, icv->run_sched_var,
                                       region_id);
         break;
-    case FS_TRAPE:
-    case BO_TRAPE:
-        valid = bo_loop_ull_trape_start (up, start, end, incr,
-                                         istart, iend, icv->run_sched_var,
+
+    case FS_TSS:
+    case BO_TSS:
+        valid = bo_loop_ull_tss_start(up, start, end, incr,
+                                      istart, iend, icv->run_sched_var,
+                                      region_id );
+        break;
+
+    case FS_TAPE:
+    case BO_TAPE:
+        valid = bo_loop_ull_tape_start (up, start, end, incr,
+                                        istart, iend, icv->run_sched_var,
                                         region_id);
         break;
     default:
@@ -661,10 +675,10 @@ bo_loop_ull_fss_next (gomp_ull *istart, gomp_ull *iend)
 }
 
 static bool
-bo_loop_ull_trape_next (gomp_ull *istart, gomp_ull *iend)
+bo_loop_ull_tape_next (gomp_ull *istart, gomp_ull *iend)
 {
     bool ret;
-    ret = bo_iter_ull_trape_next (istart, iend);
+    ret = bo_iter_ull_tape_next (istart, iend);
     return ret;
 }
 
@@ -717,6 +731,7 @@ GOMP_loop_ull_runtime_next (gomp_ull *istart, gomp_ull *iend)
         break;
 
     case FS_TSS:
+    case BO_TSS:
         valid = bo_loop_ull_tss_next (istart, iend);
         break;
 
@@ -725,9 +740,9 @@ GOMP_loop_ull_runtime_next (gomp_ull *istart, gomp_ull *iend)
         valid = bo_loop_ull_css_next (istart, iend);
         break;
 
-    case FS_TRAPE:
-    case BO_TRAPE:
-        valid = bo_loop_ull_trape_next (istart, iend);
+    case FS_TAPE:
+    case BO_TAPE:
+        valid = bo_loop_ull_tape_next (istart, iend);
         break;
 
     default:

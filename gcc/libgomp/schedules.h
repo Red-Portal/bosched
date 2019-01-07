@@ -9,9 +9,15 @@
 typedef unsigned long long gomp_ull;
 
 inline gomp_ull
+tape_min_k(long nthreads)
+{
+    return nthreads * 2;
+}
+
+inline gomp_ull
 clip_ull(gomp_ull x,
-     gomp_ull low,
-     gomp_ull hi)
+         gomp_ull low,
+         gomp_ull hi)
 {
     gomp_ull temp = x;
     if(x < low)
@@ -52,7 +58,13 @@ css_chunk_size(double param, long N, size_t P)
 inline double
 fss_transform_range(double param)
 {
-    return pow(2 * param);
+    return exp(10 * param - 8);
+}
+
+inline double
+tape_transform_range(double param)
+{
+    return exp(10 * param - 8);
 }
 
 #ifdef HAVE_SYNC_BUILTINS
@@ -125,7 +137,7 @@ bo_iter_fac2_next (long *pstart, long *pend)
             }
         }
 
-        if(__builtin_expect (chunk_size <= R, 1))
+        if(__builtin_expect (chunk_size < R, 1))
             nend = start + chunk_size * incr;
         else
             nend = end;
@@ -216,7 +228,7 @@ bo_iter_ull_fac2_next (gomp_ull *pstart, gomp_ull *pend)
             }
         }
         
-        if(__builtin_expect (chunk_size <= R, 1))
+        if(__builtin_expect (chunk_size < R, 1))
         {
             if (__builtin_expect (ws->mode, 0) == 0)
                 nend = start + chunk_size * incr;
@@ -309,7 +321,7 @@ bo_iter_fss_next (long *pstart, long *pend)
             }
         }
 
-        if(__builtin_expect (chunk_size <= R, 1))
+        if(__builtin_expect (chunk_size < R, 1))
             nend = start + chunk_size * incr;
         else
             nend = end;
@@ -405,7 +417,7 @@ bo_iter_ull_fss_next (gomp_ull *pstart, gomp_ull *pend)
             }
         }
         
-        if(__builtin_expect (chunk_size <= R, 1))
+        if(__builtin_expect (chunk_size < R, 1))
         {
             if (__builtin_expect (ws->mode, 0) == 0)
                 nend = start + chunk_size * incr;
@@ -432,25 +444,223 @@ bo_iter_ull_fss_next (gomp_ull *pstart, gomp_ull *pend)
 inline static bool
 bo_iter_ull_tss_next (gomp_ull *pstart, gomp_ull *pend)
 {
-    return false;
-}
+    struct gomp_thread *thr = gomp_thread ();
+    struct gomp_work_share *ws = thr->ts.work_share;
+    //struct gomp_team *team = thr->ts.team;
+    gomp_ull delta = 1 / ws->param;
+    gomp_ull end = ws->end_ull;
+    gomp_ull incr = ws->incr_ull;
+    gomp_ull nend;
+    gomp_ull start = __atomic_load_n (&ws->next_ull, MEMMODEL_RELAXED);
+    gomp_ull chunk_size = __atomic_load_n (&ws->chunk_size_ull, MEMMODEL_RELAXED);
+    gomp_ull R;
 
-inline static bool
-bo_iter_ull_trape_next (gomp_ull *pstart, gomp_ull *pend)
-{
-    return false;
+    while (1)
+    {
+        if (start == end)
+            return false;
+
+        if (__builtin_expect (ws->mode, 0) == 0)
+            R = (end - start) / incr;
+        else
+            R = (start - end) / -incr;
+
+        gomp_ull nchunk_size;
+        if(__builtin_expect(chunk_size > delta, 1))
+            nchunk_size = chunk_size - delta;
+        else
+            nchunk_size = 1;
+
+        gomp_ull tmp = __sync_val_compare_and_swap (&ws->chunk_size_ull,
+                                                    chunk_size,
+                                                    nchunk_size);
+        if (tmp != nchunk_size)
+        {
+            chunk_size = tmp;
+            start = __atomic_load_n (&ws->next_ull, MEMMODEL_RELAXED);
+            continue;
+        }
+        else {
+            chunk_size = nchunk_size;
+        }
+
+        if(__builtin_expect (chunk_size < R, 1))
+        {
+            if (__builtin_expect (ws->mode, 0) == 0)
+                nend = start + chunk_size * incr;
+            else
+                nend = start + chunk_size * -incr;
+        }
+        else
+            nend = end;
+
+        tmp = __sync_val_compare_and_swap (&ws->next_ull, start, nend);
+        if (tmp == start)
+            break;
+
+        start = tmp;
+        chunk_size = __atomic_load_n (&ws->chunk_size_ull, MEMMODEL_RELAXED);
+    }
+    printf("chunk: %lld, delta: %lld, R: %lld \n", chunk_size, delta, R);
+
+    *pstart = start;
+    *pend = nend;
+    return true;
 }
 
 inline static bool
 bo_iter_tss_next (long *pstart, long *pend)
 {
-    return false;
+    struct gomp_thread *thr = gomp_thread ();
+    struct gomp_work_share *ws = thr->ts.work_share;
+    //struct gomp_team *team = thr->ts.team;
+    bo_ul delta = 1 / ws->param;
+    long start = __atomic_load_n (&ws->next, MEMMODEL_RELAXED);
+    long end = ws->end;
+    long incr = ws->incr;
+    bo_ul chunk_size = __atomic_load_n (&ws->chunk_size, MEMMODEL_RELAXED);
+    bo_ul R = (end - start) / incr;
+    bo_ul nend;
+
+    while (1)
+    {
+        if (start == end)
+            return false;
+
+        R = (end - start) / incr;
+
+        bo_ul nchunk_size;
+        if(__builtin_expect(chunk_size > delta, 1))
+            nchunk_size = chunk_size - delta;
+        else
+            nchunk_size = 1;
+
+        long tmp = __sync_val_compare_and_swap (&ws->chunk_size,
+                                                chunk_size,
+                                                 nchunk_size);
+        if (tmp != nchunk_size)
+        {
+            chunk_size = tmp;
+            start = __atomic_load_n (&ws->next_ull, MEMMODEL_RELAXED);
+            continue;
+        }
+        else {
+            chunk_size = nchunk_size;
+        }
+
+        if(__builtin_expect (chunk_size < R, 1))
+            nend = start + chunk_size * incr;
+        else
+            nend = end;
+
+        tmp = __sync_val_compare_and_swap (&ws->next, start, nend);
+        if (tmp == start)
+            break;
+
+        start = tmp;
+        chunk_size = __atomic_load_n (&ws->chunk_size, MEMMODEL_RELAXED);
+    }
+
+    *pstart = start;
+    *pend = nend;
+    return true;
 }
 
 inline static bool
-bo_iter_trape_next (long *pstart, long *pend)
+bo_iter_ull_tape_next (gomp_ull *pstart, gomp_ull *pend)
 {
-    return false;
+    struct gomp_thread *thr = gomp_thread ();
+    struct gomp_work_share *ws = thr->ts.work_share;
+    struct gomp_team *team = thr->ts.team;
+    gomp_ull nthreads = team ? team->nthreads : 1;
+    gomp_ull start = __atomic_load_n (&ws->next_ull, MEMMODEL_RELAXED);
+    gomp_ull end = ws->end_ull;
+    gomp_ull incr = ws->incr_ull;
+    gomp_ull chunk_size;
+    gomp_ull nend;
+    gomp_ull R;
+    gomp_ull K_min = tape_min_k(nthreads);
+    double v = tape_transform_range(ws->param);
+
+    while (1)
+    {
+        if (start == end)
+            return false;
+
+        if (__builtin_expect (ws->mode, 0) == 0)
+            R = (end - start) / incr;
+        else
+            R = (start - end) / -incr;
+
+        gomp_ull T = R / nthreads + K_min;
+        gomp_ull K = T + v * v / 2 - v * sqrt(2 * T + v * v / 4); 
+        chunk_size = K < K_min ? K_min : K;
+        
+        if(__builtin_expect (chunk_size < R, 1))
+        {
+            if (__builtin_expect (ws->mode, 0) == 0)
+                nend = start + chunk_size * incr;
+            else
+                nend = start + chunk_size * -incr;
+        }
+        else
+            nend = end;
+
+        gomp_ull tmp = __sync_val_compare_and_swap (&ws->next_ull, start, nend);
+        if (tmp == start)
+            break;
+
+        start = tmp;
+    }
+
+    *pstart = start;
+    *pend = nend;
+    return true;
+}
+
+
+inline static bool
+bo_iter_tape_next (long *pstart, long *pend)
+{
+    struct gomp_thread *thr = gomp_thread ();
+    struct gomp_work_share *ws = thr->ts.work_share;
+    struct gomp_team *team = thr->ts.team;
+    bo_ul nthreads = team ? team->nthreads : 1;
+    long start = __atomic_load_n (&ws->next, MEMMODEL_RELAXED);
+    long end = ws->end;
+    long incr = ws->incr;
+    bo_ul chunk_size;
+    bo_ul R = (end - start) / incr;
+    bo_ul nend;
+    bo_ul K_min = tape_min_k(nthreads);
+    double v = tape_transform_range(ws->param);
+
+    while (1)
+    {
+        if (start == end)
+            return false;
+
+        R = (end - start) / incr;
+
+        bo_ul T = R / nthreads + K_min;
+        bo_ul K = T + v * v / 2 - v * sqrt(2 * T + v * v / 4); 
+        chunk_size = K < K_min ? K_min : K;
+
+        if(__builtin_expect (chunk_size < R, 1))
+            nend = start + chunk_size * incr;
+        else
+            nend = end;
+
+        long tmp = __sync_val_compare_and_swap (&ws->next, start, nend);
+        if (tmp == start)
+            break;
+
+        start = tmp;
+    }
+
+    *pstart = start;
+    *pend = nend;
+    return true;
 }
 
 #endif /* HAVE_SYNC_BUILTINS */

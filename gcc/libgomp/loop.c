@@ -70,6 +70,15 @@ gomp_loop_init (struct gomp_work_share *ws, long start, long end, long incr,
     {
         ws->chunk_size = num_tasks / nthreads;
     }
+    else if(sched == FS_TSS ||  sched == BO_TSS)
+    {
+        if(sched == FS_TSS)
+        {
+            double temp = (double)num_tasks / (2 * nthreads + 1);
+            ws->param = (2 * num_tasks) / (temp * temp);
+        }
+        ws->chunk_size = sqrt(2.0 * num_tasks / ws->param) - 1; // f in the original paper
+    }
     else if(sched == FS_FSS || sched == BO_FSS)
     {
         ws->param = fss_transform_range(ws->param);
@@ -257,8 +266,8 @@ bo_loop_fss_start (long start, long end, long incr,
 }
 
 static bool
-bo_loop_taper_start (long start, long end, long incr,
-                     long *istart, long *iend,
+bo_loop_tape_start (long start, long end, long incr,
+                    long *istart, long *iend,
                      enum gomp_schedule_type sched,
                      region_id_t region_id )
 {
@@ -271,7 +280,7 @@ bo_loop_taper_start (long start, long end, long incr,
                         sched, 0, region_id);
         gomp_work_share_init_done ();
     }
-    ret = bo_iter_taper_next (istart, iend);
+    ret = bo_iter_tape_next (istart, iend);
     return ret;
 }
 
@@ -358,11 +367,14 @@ GOMP_loop_runtime_start (long start, long end, long incr,
                                    istart, iend, icv->run_sched_var,
                                   region_id );
         break;
+
     case FS_TSS:
+    case BO_TSS:
         valid = bo_loop_tss_start(start, end, incr,
                                   istart, iend, icv->run_sched_var,
-                                 region_id );
+                                  region_id );
         break;
+
     case FS_CSS:
     case BO_CSS:
         valid = bo_loop_css_start (start, end, incr,
@@ -370,10 +382,10 @@ GOMP_loop_runtime_start (long start, long end, long incr,
                                   region_id );
         break;
 
-    case FS_TAPER:
-    case BO_TAPER:
-        valid = bo_loop_taper_start (start, end, incr,
-                                     istart, iend, icv->run_sched_var,
+    case FS_TAPE:
+    case BO_TAPE:
+        valid = bo_loop_tape_start (start, end, incr,
+                                    istart, iend, icv->run_sched_var,
                                      region_id );
         break;
 
@@ -667,10 +679,10 @@ bo_loop_fss_next (long *istart, long *iend)
 }
 
 static bool
-bo_loop_trape_next (long *istart, long *iend)
+bo_loop_tape_next (long *istart, long *iend)
 {
     bool ret;
-    ret = bo_iter_trape_next (istart, iend);
+    ret = bo_iter_tape_next (istart, iend);
     return ret;
 }
 
@@ -719,6 +731,7 @@ GOMP_loop_runtime_next (long *istart, long *iend)
         break;
 
     case FS_TSS:
+    case BO_TSS:
         valid = bo_loop_tss_next (istart, iend);
         break;
 
@@ -727,9 +740,9 @@ GOMP_loop_runtime_next (long *istart, long *iend)
         valid = bo_loop_css_next (istart, iend);
         break;
 
-    case FS_TRAPE:
-    case BO_TRAPE:
-        valid = bo_loop_trape_next (istart, iend);
+    case FS_TAPE:
+    case BO_TAPE:
+        valid = bo_loop_tape_next (istart, iend);
         break;
 
     default:
