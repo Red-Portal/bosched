@@ -13,7 +13,10 @@ namespace lpbo
                       double annealing,
                       size_t iteration)
     {
-        return mean - (beta / (annealing * iteration)) * var;
+        (void)(beta);
+        (void)(annealing);
+        //return mean - (beta / (annealing * iteration)) * var;
+        return mean - sqrt(log(iteration * iteration * 3.14 * 3.14 / 0.6)) * var;
     }
 }
 
