@@ -29,6 +29,7 @@ std::mt19937 _rng __attribute__((init_priority(101)));
 std::string _progname __attribute__((init_priority(101)));
 std::unordered_map<size_t, bosched::loop_state_t> _loop_states __attribute__((init_priority(101)));
 long _procs;
+nlohmann::json _stats;
 
 namespace bosched
 {
@@ -58,71 +59,71 @@ namespace bosched
                 lpbo::bayesian_optimization(*loop_state.gp,
                                             _epsilon,
                                             loop_state.iteration,
+                                                200);
+                loop_state.param = next;
+                loop_state.pred_mean.push_back(mean);
+                loop_state.pred_var.push_back(var);
+                loop_state.pred_acq.push_back(acq);
+            }
+        }
+
+        inline void
+        update_param_non_warmup(loop_state_t& loop_state)
+        {
+            if(loop_state.obs_y.size() > 0)
+                return;
+
+            auto sum = std::accumulate(loop_state.obs_y.begin(),
+                                       loop_state.obs_y.end(), 0.0);
+            auto y_avg = sum / loop_state.obs_y.size();
+            loop_state.gp->update(loop_state.param, y_avg);
+
+            auto [next, mean, var, acq] =
+                lpbo::bayesian_optimization(*loop_state.gp,
+                                            1e-7,
+                                            loop_state.iteration,
                                             200);
-            loop_state.param = next;
+            ++loop_state.iteration;
             loop_state.pred_mean.push_back(mean);
             loop_state.pred_var.push_back(var);
             loop_state.pred_acq.push_back(acq);
+            loop_state.param = next;
         }
-    }
 
-    inline void
-    update_param_non_warmup(loop_state_t& loop_state)
-    {
-        if(loop_state.obs_y.size() > 0)
-            return;
-
-        auto sum = std::accumulate(loop_state.obs_y.begin(),
-                                   loop_state.obs_y.end(), 0.0);
-        auto y_avg = sum / loop_state.obs_y.size();
-        loop_state.gp->update(loop_state.param, y_avg);
-
-        auto [next, mean, var, acq] =
-            lpbo::bayesian_optimization(*loop_state.gp,
-                                        1e-7,
-                                        loop_state.iteration,
-                                        200);
-        ++loop_state.iteration;
-        loop_state.pred_mean.push_back(mean);
-        loop_state.pred_var.push_back(var);
-        loop_state.pred_acq.push_back(acq);
-        loop_state.param = next;
-    }
-
-    inline std::unordered_map<size_t, loop_state_t>
-    update_loop_parameters(std::unordered_map<size_t, loop_state_t>&& loop_states)
-    {
-        for(auto& l : loop_states)
+        inline std::unordered_map<size_t, loop_state_t>
+        update_loop_parameters(std::unordered_map<size_t, loop_state_t>&& loop_states)
         {
-            auto loop_id = l.first;
-            auto& loop_state = l.second;
-
-            if(loop_state.warming_up)
+            for(auto& l : loop_states)
             {
-                update_param_warmup(loop_state);
+                auto loop_id = l.first;
+                auto& loop_state = l.second;
 
-                if(_is_debug)
+                if(loop_state.warming_up)
                 {
-                    std::cout << "-- warming up loop " << loop_id 
-                              << " current observations: " << loop_state.obs_x.size() 
-                              << std::endl;
+                    update_param_warmup(loop_state);
+
+                    if(_is_debug)
+                    {
+                        std::cout << "-- warming up loop " << loop_id 
+                                  << " current observations: " << loop_state.obs_x.size() 
+                                  << std::endl;
+                    }
+                }
+                else
+                {
+                    update_param_non_warmup(loop_state);
+
+                    if(_is_debug)
+                    {
+                        std::cout << "-- updating GP of loop " << loop_id
+                                  << " next point: " << loop_state.param
+                                  << std::endl;
+                    }
                 }
             }
-            else
-            {
-                update_param_non_warmup(loop_state);
-
-                if(_is_debug)
-                {
-                    std::cout << "-- updating GP of loop " << loop_id
-                              << " next point: " << loop_state.param
-                              << std::endl;
-                }
-            }
+            return std::move(loop_states);
         }
-        return std::move(loop_states);
     }
-}
 
 
 extern "C"
@@ -172,6 +173,15 @@ extern "C"
         auto next = bosched::write_loops(updated_states);
 
         using namespace std::literals::string_literals;
+        if(_show_loop_stat)
+        {
+            auto date = bosched::format_current_time();
+            auto stat_file_name = ".stat."s + _progname + "."s + date;
+            auto stat_stream = std::ofstream(stat_file_name + ".json"s);
+            stat_stream << _stats.dump(2); 
+            stat_stream.close();
+        }
+
         auto file_name = ".bostate."s + _progname;
         auto stream = std::ofstream(file_name + ".json"s);
         stream << next.dump(2); 
@@ -286,7 +296,12 @@ extern "C"
                 log["loop_time"] = duration.count();
                 log["efficiency"] = efficiency;
                 log["task_mean"] = work_time.count() / loop_state.num_tasks;
-                std::cout << log.dump(2) << std::endl;
+                _stats.push_back(std::move(log));
+                if(_is_debug)
+                {
+                    std::cout << "-- loop " << region_id << " stats \n"
+                              << log.dump(2) << '\n' << std::endl;
+                }
             }
         }
 
