@@ -27,8 +27,6 @@ namespace lpbo
         double _likelihood;
         lpbo::mat _K_inv;
         lpbo::vec _alpha;
-        lpbo::vec _data_x;
-        lpbo::vec _data_y;
         lpbo::vec _data_y_normalized;
 
         inline double
@@ -118,28 +116,28 @@ namespace lpbo
             return lpbo::lower(buff);
         }
 
-        inline void
-        update_Kinv(double x)
-        {
-            auto K_x = covariance_kernel(x, x, _ker_l);
-            auto k_x = covariance_kernel(x, _data_x,  _ker_l);
-            auto Kinv_k_x  = blaze::evaluate(_K_inv * k_x);
-            auto mu = 1 / (K_x - (blaze::trans(k_x) * Kinv_k_x));
-            auto g = -1 * mu * Kinv_k_x;
+        // inline void
+        // update_Kinv(double x)
+        // {
+        //     auto K_x = covariance_kernel(x, x, _ker_l);
+        //     auto k_x = covariance_kernel(x, _data_x,  _ker_l);
+        //     auto Kinv_k_x  = blaze::evaluate(_K_inv * k_x);
+        //     auto mu = 1 / (K_x - (blaze::trans(k_x) * Kinv_k_x));
+        //     auto g = -1 * mu * Kinv_k_x;
 
-            auto old_size = _K_inv.rows();
-            _K_inv.resize(old_size + 1, old_size + 1, true);
+        //     auto old_size = _K_inv.rows();
+        //     _K_inv.resize(old_size + 1, old_size + 1, true);
             
-            auto matrix_view = blaze::submatrix(_K_inv, 0u, 0u, old_size, old_size);
-            matrix_view += (blaze::outer(g, g) / mu);;
+        //     auto matrix_view = blaze::submatrix(_K_inv, 0u, 0u, old_size, old_size);
+        //     matrix_view += (blaze::outer(g, g) / mu);;
 
-            for(size_t i = 0; i < old_size; ++i)
-            {
-                _K_inv(old_size, i) = g[i]; 
-                _K_inv(i, old_size) = g[i]; 
-            }
-            _K_inv(old_size, old_size) = K_x;
-        }
+        //     for(size_t i = 0; i < old_size; ++i)
+        //     {
+        //         _K_inv(old_size, i) = g[i]; 
+        //         _K_inv(i, old_size) = g[i]; 
+        //     }
+        //     _K_inv(old_size, old_size) = K_x;
+        // }
 
         inline void
         gp_model_init(lpbo::vec const& x, lpbo::vec const& y,
@@ -186,8 +184,6 @@ namespace lpbo
         inline
         gp_model(lpbo::vec const& x, lpbo::vec const& y) noexcept
         {
-            _data_x = x;
-            _data_y = y;
             gp_model_init(x, y, lpbo::vec{0.1, 0.1}, 1000);
         }
 
@@ -196,8 +192,6 @@ namespace lpbo
                  lpbo::vec&& mcmc_initial,
                  size_t mcmc_iterations) noexcept
         {
-            _data_x = x;
-            _data_y = y;
             gp_model_init(x, y, std::move(mcmc_initial), mcmc_iterations);
         }
 
@@ -217,16 +211,7 @@ namespace lpbo
         rejuvenate(lpbo::vec const& x, lpbo::vec const& y,
                    lpbo::vec&& mcmc_initial, size_t mcmc_iterations) noexcept
         {
-            size_t old_n = _data_x.size();
-            size_t add_n = x.size();
-            _data_x.resize(old_n + add_n);
-            blaze::subvector(_data_x, old_n, add_n) = x;
-
-            _data_y.resize(old_n + add_n);
-            blaze::subvector(_data_y, old_n, add_n) = y;
-
-            gp_model_init(_data_x, _data_y,
-                          std::move(mcmc_initial), mcmc_iterations);
+            gp_model_init(x, y, std::move(mcmc_initial), mcmc_iterations);
         }
 
         inline std::stringstream&
@@ -241,8 +226,6 @@ namespace lpbo
             auto archive = blaze::Archive<std::stringstream>(stream);
             archive << _K_inv;
             archive << _alpha;
-            archive << _data_x;
-            archive << _data_y;
             archive << _data_y_normalized;
             return stream;
         }
@@ -269,8 +252,6 @@ namespace lpbo
             auto archive = blaze::Archive<std::stringstream>(stream);
             archive >> _K_inv;
             archive >> _alpha;
-            archive >> _data_x;
-            archive >> _data_y;
             archive >> _data_y_normalized;
             return stream;
         }
@@ -304,17 +285,13 @@ namespace lpbo
         // }
 
         inline void
-        update(lpbo::vec const& x, lpbo::vec const& y)
+        update(lpbo::vec const& data_x,
+               lpbo::vec const& update_y)
         {
-            size_t old_n = _data_x.size();
-            size_t add_n = x.size();
-            _data_x.resize(old_n + add_n);
-            blaze::subvector(_data_x, old_n, add_n) = x;
+            size_t old_n = _data_y_normalized.size();
+            size_t add_n = update_y.size();
 
-            _data_y.resize(old_n + add_n);
-            blaze::subvector(_data_y, old_n, add_n) = y;
-
-            auto y_normalized = sub(y, _mean);
+            auto y_normalized = sub(update_y, _mean);
             std::transform(y_normalized.begin(),
                            y_normalized.end(),
                            y_normalized.begin(),
@@ -322,7 +299,7 @@ namespace lpbo
             _data_y_normalized.resize(old_n + add_n);
             blaze::subvector(_data_y_normalized, old_n, add_n) = y_normalized;
 
-            auto L = decompose(_data_x, _ker_l, _ker_g, old_n + add_n);
+            auto L = decompose(data_x, _ker_l, _ker_g, old_n + add_n);
             auto L_inv = L;
             blaze::invert(L_inv);
             _K_inv = blaze::trans(L_inv) * L_inv;
@@ -338,9 +315,9 @@ namespace lpbo
         }
 
         inline std::pair<double, double>
-        predict(double x) const
+        predict(lpbo::vec const& data_x, double x) const
         {
-            auto k = covariance_kernel(x, _data_x,  _ker_l);
+            auto k = covariance_kernel(x, data_x,  _ker_l);
             auto mu = blaze::dot(k, _alpha) * _stddev + _mean;
             auto sigma2 = (covariance_kernel(x, x, _ker_l)
                            - blaze::trans(k) * (_K_inv * k)) * _stddev * _stddev ;

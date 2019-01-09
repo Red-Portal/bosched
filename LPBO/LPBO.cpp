@@ -7,9 +7,6 @@
 #include "LPBO.hpp"
 #include "acquisition.hpp"
 
-
-double const beta = 2;
-
 extern "C"
 {
     void* test_init(double* x, double* y, int n)
@@ -44,8 +41,6 @@ extern "C"
                            double* out_predmean,
                            double* out_predvar)
     {
-        double annealing = 0.5;
-
         auto* gp_model = reinterpret_cast<lpbo::smc_gp*>(model);
         if(iter > 1)
             gp_model->update(x, y);
@@ -62,6 +57,17 @@ extern "C"
         if(out_predvar != nullptr)
             *out_predvar = v;
         return n;
+    }
+
+    void test_get_history(void* model, double* x, double* y,  int* n)
+    {
+        auto* gp_model = reinterpret_cast<lpbo::smc_gp*>(model);
+        auto const& data_x = gp_model->data_x();
+        auto const& data_y = gp_model->data_y();
+        std::copy(data_x.begin(), data_x.end(), x);
+        std::copy(data_y.begin(), data_y.end(), y);
+        *n = gp_model->data_x().size();
+        std::cout << *n << std::endl;
     }
 
     void test_serialize(void* model, char* str, int* n)

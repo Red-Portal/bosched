@@ -20,6 +20,8 @@ namespace lpbo
         std::vector<gp_model> _particles;
         std::vector<double> _weights;
         std::mt19937 _rng;
+        lpbo::vec _data_x;
+        lpbo::vec _data_y;
 
         template<typename Rng>
         inline std::vector<size_t>
@@ -76,7 +78,7 @@ namespace lpbo
             size_t particle_num,
             double survival_rate)
             : _survival_rate(survival_rate), _particles(),
-              _weights(), _rng()
+              _weights(), _rng(), _data_x(x), _data_y(y)
         {
             _particles.reserve(particle_num);
             for(size_t i = 0; i < particle_num; ++i)
@@ -96,14 +98,13 @@ namespace lpbo
             size_t particle_num,
             double survival_rate)
             : _survival_rate(survival_rate), _particles(),
-              _weights(), _rng()
+              _weights(), _rng(),
+              _data_x(x.size(), x.data()),
+              _data_y(y.size(), y.data())
         {
-            auto x_vec = lpbo::vec(x.size(), x.data());
-            auto y_vec = lpbo::vec(y.size(), y.data());
-
             _particles.reserve(particle_num);
             for(size_t i = 0; i < particle_num; ++i)
-                _particles.emplace_back(x_vec, y_vec);
+                _particles.emplace_back(_data_x, _data_y);
 
             auto weights = std::vector<double>(particle_num);
             for(size_t i = 0; i < particle_num; ++i)
@@ -117,29 +118,9 @@ namespace lpbo
             : _survival_rate(),
               _weights(),
               _rng()
+
         {
-            std::stringstream stream;
-            stream << serialized;
-
-            std::string buf;
-            std::getline(stream, buf);
-            _survival_rate = std::stod(buf);
-
-            std::getline(stream, buf);
-            size_t particle_num = std::stoull(buf);
-
-            _particles.reserve(particle_num);
-            for(size_t i = 0; i < particle_num; ++i)
-            {
-                _particles.emplace_back();
-                _particles[i] << stream;
-            }
-
-            auto weights = std::vector<double>(particle_num);
-            for(size_t i = 0; i < particle_num; ++i)
-                weights[i] = exp(_particles[i].likelihood());
-
-            _weights = normalize_weight(std::move(weights));
+            deserialize(serialized);
         }
 
         inline
@@ -172,16 +153,23 @@ namespace lpbo
             for(auto i : casualties)
             {
                 size_t sel = rejuvenate_select(_rng, weights);
-                _particles[i].rejuvenate(x, y, _particles[sel].parameters(), 100);
+                _particles[i].rejuvenate(_data_x,
+                                         _data_y,
+                                         _particles[sel].parameters(),
+                                         100);
             }
+
+            size_t old_n = _data_x.size();
+            size_t add_n = x.size();
+            _data_x.resize(old_n + add_n);
+            blaze::subvector(_data_x, old_n, add_n) = x;
+
+            _data_y.resize(old_n + add_n);
+            blaze::subvector(_data_y, old_n, add_n) = y;
 
             for(auto& particle : _particles)
             {
-                particle.update(x, y);
-                // std::cout << blaze::trans(particle.parameters())
-                //           << "\nlike: "  << particle.likelihood()
-                //           << '\n'
-                //           << std::endl;
+                particle.update(_data_x, y);
             }
 
             for(size_t i = 0; i < _particles.size(); ++i)
@@ -210,6 +198,11 @@ namespace lpbo
             std::stringstream stream;
             stream << std::to_string(_survival_rate) + '\n';
             stream << std::to_string(static_cast<unsigned long long>(_particles.size())) + '\n';
+
+            auto archive = blaze::Archive<std::stringstream>(stream);
+            archive << _data_x;
+            archive << _data_y;
+
             for(size_t i = 0; i < _particles.size(); ++i)
             {
                 _particles[i] >> stream;
@@ -237,6 +230,10 @@ namespace lpbo
             std::getline(stream, buf);
             size_t particle_num = std::stoull(buf);
 
+            auto archive = blaze::Archive<std::stringstream>(stream);
+            archive >> _data_x;
+            archive >> _data_y;
+
             _particles.reserve(particle_num);
             for(size_t i = 0; i < particle_num; ++i)
             {
@@ -251,6 +248,18 @@ namespace lpbo
             _weights = normalize_weight(std::move(weights));
         }
 
+        inline lpbo::vec& 
+        data_x()
+        {
+            return _data_x;
+        }
+
+        inline lpbo::vec&
+        data_y()
+        {
+            return _data_y;
+        }
+
         inline std::pair<double, double>
         predict(double x) const
         {
@@ -258,7 +267,7 @@ namespace lpbo
             double var  = 0.0;
             for(size_t i = 0 ; i < _particles.size(); ++i)
             {
-                auto local_prediction = _particles[i].predict(x);
+                auto local_prediction = _particles[i].predict(_data_x, x);
                 mean += local_prediction.first * _weights[i] ;
                 var  += local_prediction.second * _weights[i];
             }

@@ -17,12 +17,9 @@ namespace lpbo
                           int iter,
                           int max_iter) noexcept
     {
-        double const beta = 2;
-        double annealing = 0.5;
-
         auto f = [&](double x){
                      auto [mean, var] = model.predict(x);
-                     return lpbo::UCB(mean, var, beta, annealing, iter);
+                     return lpbo::UCB(mean, var, iter);
                  };
 
         auto result = dlib::find_min_global(
@@ -31,7 +28,7 @@ namespace lpbo
             dlib::FOREVER, 1e-3);
 
         auto [m, v] = model.predict(result.x);
-        double cb = lpbo::UCB(m, v, beta, annealing, iter);
+        double cb = lpbo::UCB(m, v, iter);
         return {result.x, m, v, cb};
     }
 
@@ -40,11 +37,9 @@ namespace lpbo
                        size_t iter,
                        size_t resolution) noexcept
     {
-        double const beta = 2;
-        double annealing = 0.5;
         auto f = [&](double x){
                      auto [mean, var] = model.predict(x);
-                     return lpbo::UCB(mean, var, beta, annealing, iter);
+                     return lpbo::UCB(mean, var, iter);
                  };
 
         auto y = std::vector<double>(resolution);
