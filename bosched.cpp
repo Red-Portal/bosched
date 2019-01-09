@@ -70,7 +70,7 @@ namespace bosched
         inline void
         update_param_non_warmup(loop_state_t& loop_state)
         {
-            if(loop_state.obs_y.size() > 0)
+            if(loop_state.obs_y.size() < 1)
                 return;
 
             auto sum = std::accumulate(loop_state.obs_y.begin(),
@@ -291,17 +291,17 @@ extern "C"
                 auto efficiency = 1 / (1 + (total_overhead / work_time.count()));
 
                 auto log = nlohmann::json();
-                log["num_tasks"] = loop_state.num_tasks;
-                log["work_time"] = work_time.count();
-                log["loop_time"] = duration.count();
+                log["num_tasks"]  = loop_state.num_tasks;
+                log["work_time"]  = work_time.count();
+                log["loop_time"]  = duration.count();
                 log["efficiency"] = efficiency;
-                log["task_mean"] = work_time.count() / loop_state.num_tasks;
-                _stats.push_back(std::move(log));
+                log["task_mean"]  = work_time.count() / loop_state.num_tasks;
                 if(_is_debug)
                 {
                     std::cout << "-- loop " << region_id << " stats \n"
                               << log.dump(2) << '\n' << std::endl;
                 }
+                _stats.push_back(std::move(log));
             }
         }
 
