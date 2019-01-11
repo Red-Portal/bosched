@@ -1,0 +1,408 @@
+#                                               -*- Autoconf -*-
+# Process this file with autoconf to produce a configure script.
+
+AC_PREREQ([2.69])
+AC_INIT([FULL-PACKAGE-NAME], [VERSION], [BUG-REPORT-ADDRESS])
+AC_CONFIG_SRCDIR([include/filenames.h])
+AC_CONFIG_HEADERS([config.h])
+
+# Checks for programs.
+AC_PROG_CXX
+AC_PROG_AWK
+AC_PROG_YACC
+AC_PROG_CC
+AC_PROG_CPP
+AC_PROG_LEX
+AC_PROG_INSTALL
+AC_PROG_LN_S
+AC_PROG_MAKE_SET
+AC_PROG_OBJC
+AC_PROG_RANLIB
+AC_PROG_GO
+AC_PROG_MKDIR_P
+
+# Checks for libraries.
+# FIXME: Replace `main' with a function in `-ld':
+AC_CHECK_LIB([d], [main])
+# FIXME: Replace `main' with a function in `-ldl':
+AC_CHECK_LIB([dl], [main])
+# FIXME: Replace `main' with a function in `-lgmp':
+AC_CHECK_LIB([gmp], [main])
+# FIXME: Replace `main' with a function in `-lgomp':
+AC_CHECK_LIB([gomp], [main])
+# FIXME: Replace `main' with a function in `-lisl':
+AC_CHECK_LIB([isl], [main])
+# FIXME: Replace `main' with a function in `-litm':
+AC_CHECK_LIB([itm], [main])
+# FIXME: Replace `main' with a function in `-lm':
+AC_CHECK_LIB([m], [main])
+# FIXME: Replace `main' with a function in `-lmpc':
+AC_CHECK_LIB([mpc], [main])
+# FIXME: Replace `main' with a function in `-lmpfr':
+AC_CHECK_LIB([mpfr], [main])
+# FIXME: Replace `main' with a function in `-lncurses':
+AC_CHECK_LIB([ncurses], [main])
+# FIXME: Replace `main' with a function in `-lnsl':
+AC_CHECK_LIB([nsl], [main])
+# FIXME: Replace `main' with a function in `-lposix4':
+AC_CHECK_LIB([posix4], [main])
+# FIXME: Replace `main' with a function in `-lpthread':
+AC_CHECK_LIB([pthread], [main])
+# FIXME: Replace `main' with a function in `-lpthreads':
+AC_CHECK_LIB([pthreads], [main])
+# FIXME: Replace `main' with a function in `-lquadmath':
+AC_CHECK_LIB([quadmath], [main])
+# FIXME: Replace `main' with a function in `-lreadline':
+AC_CHECK_LIB([readline], [main])
+# FIXME: Replace `main' with a function in `-lrt':
+AC_CHECK_LIB([rt], [main])
+# FIXME: Replace `main' with a function in `-lsocket':
+AC_CHECK_LIB([socket], [main])
+# FIXME: Replace `main' with a function in `-lspeed':
+AC_CHECK_LIB([speed], [main])
+# FIXME: Replace `main' with a function in `-lthread':
+AC_CHECK_LIB([thread], [main])
+# FIXME: Replace `main' with a function in `-lutil':
+AC_CHECK_LIB([util], [main])
+# FIXME: Replace `main' with a function in `-lws2_32':
+AC_CHECK_LIB([ws2_32], [main])
+# FIXME: Replace `main' with a function in `-lz':
+AC_CHECK_LIB([z], [main])
+
+# Checks for header files.
+AC_FUNC_ALLOCA
+AC_CHECK_HEADERS([fcntl.h float.h inttypes.h langinfo.h libintl.h limits.h locale.h malloc.h stddef.h stdint.h stdlib.h string.h strings.h sys/file.h sys/ioctl.h sys/param.h sys/time.h unistd.h])
+
+# Checks for typedefs, structures, and compiler characteristics.
+AC_CHECK_HEADER_STDBOOL
+AC_C_INLINE
+AC_TYPE_INT16_T
+AC_TYPE_INT32_T
+AC_TYPE_INT64_T
+AC_TYPE_INT8_T
+AC_FUNC_OBSTACK
+AC_TYPE_OFF_T
+AC_C_RESTRICT
+AC_TYPE_SIZE_T
+AC_TYPE_SSIZE_T
+AC_TYPE_UINT16_T
+AC_TYPE_UINT32_T
+AC_TYPE_UINT64_T
+AC_TYPE_UINT8_T
+AC_CHECK_TYPES([ptrdiff_t])
+
+# Checks for library functions.
+AC_FUNC_ERROR_AT_LINE
+AC_FUNC_MALLOC
+AC_FUNC_MBRTOWC
+AC_FUNC_REALLOC
+AC_FUNC_STRNLEN
+AC_FUNC_STRTOD
+AC_CHECK_FUNCS([atexit getcwd getpagesize gettimeofday memchr memmove memset pow re_comp regcomp setenv setlocale sqrt stpcpy strcasecmp strdup strstr strtol strtoul strtoull strverscmp])
+
+AC_CONFIG_FILES([Makefile
+                 build/Makefile
+                 build/build-x86_64-pc-linux-gnu/fixincludes/Makefile
+                 build/build-x86_64-pc-linux-gnu/libcpp/Makefile
+                 build/build-x86_64-pc-linux-gnu/libiberty/Makefile
+                 build/build-x86_64-pc-linux-gnu/libiberty/testsuite/Makefile
+                 build/fixincludes/Makefile
+                 build/gcc/Makefile
+                 build/gcc/ada/Makefile
+                 build/gcc/ada/gcc-interface/Makefile
+                 build/gmp/Makefile
+                 build/gmp/cxx/Makefile
+                 build/gmp/demos/Makefile
+                 build/gmp/demos/calc/Makefile
+                 build/gmp/demos/expr/Makefile
+                 build/gmp/doc/Makefile
+                 build/gmp/mpf/Makefile
+                 build/gmp/mpn/Makefile
+                 build/gmp/mpq/Makefile
+                 build/gmp/mpz/Makefile
+                 build/gmp/printf/Makefile
+                 build/gmp/rand/Makefile
+                 build/gmp/scanf/Makefile
+                 build/gmp/tests/Makefile
+                 build/gmp/tests/cxx/Makefile
+                 build/gmp/tests/devel/Makefile
+                 build/gmp/tests/misc/Makefile
+                 build/gmp/tests/mpf/Makefile
+                 build/gmp/tests/mpn/Makefile
+                 build/gmp/tests/mpq/Makefile
+                 build/gmp/tests/mpz/Makefile
+                 build/gmp/tests/rand/Makefile
+                 build/gmp/tune/Makefile
+                 build/intl/Makefile
+                 build/isl/Makefile
+                 build/isl/doc/Makefile
+                 build/libbacktrace/Makefile
+                 build/libcc1/Makefile
+                 build/libcpp/Makefile
+                 build/libdecnumber/Makefile
+                 build/libiberty/Makefile
+                 build/libiberty/testsuite/Makefile
+                 build/lto-plugin/Makefile
+                 build/mpc/Makefile
+                 build/mpc/doc/Makefile
+                 build/mpc/src/Makefile
+                 build/mpc/tests/Makefile
+                 build/mpfr/Makefile
+                 build/mpfr/doc/Makefile
+                 build/mpfr/src/Makefile
+                 build/mpfr/tests/Makefile
+                 build/mpfr/tune/Makefile
+                 build/prev-gcc/Makefile
+                 build/prev-gcc/ada/Makefile
+                 build/prev-gcc/ada/gcc-interface/Makefile
+                 build/prev-gmp/Makefile
+                 build/prev-gmp/cxx/Makefile
+                 build/prev-gmp/demos/Makefile
+                 build/prev-gmp/demos/calc/Makefile
+                 build/prev-gmp/demos/expr/Makefile
+                 build/prev-gmp/doc/Makefile
+                 build/prev-gmp/mpf/Makefile
+                 build/prev-gmp/mpn/Makefile
+                 build/prev-gmp/mpq/Makefile
+                 build/prev-gmp/mpz/Makefile
+                 build/prev-gmp/printf/Makefile
+                 build/prev-gmp/rand/Makefile
+                 build/prev-gmp/scanf/Makefile
+                 build/prev-gmp/tests/Makefile
+                 build/prev-gmp/tests/cxx/Makefile
+                 build/prev-gmp/tests/devel/Makefile
+                 build/prev-gmp/tests/misc/Makefile
+                 build/prev-gmp/tests/mpf/Makefile
+                 build/prev-gmp/tests/mpn/Makefile
+                 build/prev-gmp/tests/mpq/Makefile
+                 build/prev-gmp/tests/mpz/Makefile
+                 build/prev-gmp/tests/rand/Makefile
+                 build/prev-gmp/tune/Makefile
+                 build/prev-intl/Makefile
+                 build/prev-isl/Makefile
+                 build/prev-isl/doc/Makefile
+                 build/prev-libbacktrace/Makefile
+                 build/prev-libcpp/Makefile
+                 build/prev-libdecnumber/Makefile
+                 build/prev-libiberty/Makefile
+                 build/prev-libiberty/testsuite/Makefile
+                 build/prev-lto-plugin/Makefile
+                 build/prev-mpc/Makefile
+                 build/prev-mpc/doc/Makefile
+                 build/prev-mpc/src/Makefile
+                 build/prev-mpc/tests/Makefile
+                 build/prev-mpfr/Makefile
+                 build/prev-mpfr/doc/Makefile
+                 build/prev-mpfr/src/Makefile
+                 build/prev-mpfr/tests/Makefile
+                 build/prev-mpfr/tune/Makefile
+                 build/prev-x86_64-pc-linux-gnu/32/libgcc/Makefile
+                 build/prev-x86_64-pc-linux-gnu/32/libgomp/Makefile
+                 build/prev-x86_64-pc-linux-gnu/32/libgomp/testsuite/Makefile
+                 build/prev-x86_64-pc-linux-gnu/32/libstdc++-v3/Makefile
+                 build/prev-x86_64-pc-linux-gnu/32/libstdc++-v3/doc/Makefile
+                 build/prev-x86_64-pc-linux-gnu/32/libstdc++-v3/include/Makefile
+                 build/prev-x86_64-pc-linux-gnu/32/libstdc++-v3/libsupc++/Makefile
+                 build/prev-x86_64-pc-linux-gnu/32/libstdc++-v3/po/Makefile
+                 build/prev-x86_64-pc-linux-gnu/32/libstdc++-v3/python/Makefile
+                 build/prev-x86_64-pc-linux-gnu/32/libstdc++-v3/src/Makefile
+                 build/prev-x86_64-pc-linux-gnu/32/libstdc++-v3/src/c++11/Makefile
+                 build/prev-x86_64-pc-linux-gnu/32/libstdc++-v3/src/c++98/Makefile
+                 build/prev-x86_64-pc-linux-gnu/32/libstdc++-v3/src/filesystem/Makefile
+                 build/prev-x86_64-pc-linux-gnu/32/libstdc++-v3/testsuite/Makefile
+                 build/prev-x86_64-pc-linux-gnu/libgcc/Makefile
+                 build/prev-x86_64-pc-linux-gnu/libgomp/Makefile
+                 build/prev-x86_64-pc-linux-gnu/libgomp/testsuite/Makefile
+                 build/prev-x86_64-pc-linux-gnu/libstdc++-v3/Makefile
+                 build/prev-x86_64-pc-linux-gnu/libstdc++-v3/doc/Makefile
+                 build/prev-x86_64-pc-linux-gnu/libstdc++-v3/include/Makefile
+                 build/prev-x86_64-pc-linux-gnu/libstdc++-v3/libsupc++/Makefile
+                 build/prev-x86_64-pc-linux-gnu/libstdc++-v3/po/Makefile
+                 build/prev-x86_64-pc-linux-gnu/libstdc++-v3/python/Makefile
+                 build/prev-x86_64-pc-linux-gnu/libstdc++-v3/src/Makefile
+                 build/prev-x86_64-pc-linux-gnu/libstdc++-v3/src/c++11/Makefile
+                 build/prev-x86_64-pc-linux-gnu/libstdc++-v3/src/c++98/Makefile
+                 build/prev-x86_64-pc-linux-gnu/libstdc++-v3/src/filesystem/Makefile
+                 build/prev-x86_64-pc-linux-gnu/libstdc++-v3/testsuite/Makefile
+                 build/prev-zlib/Makefile
+                 build/stage1-gcc/Makefile
+                 build/stage1-gcc/ada/Makefile
+                 build/stage1-gcc/ada/gcc-interface/Makefile
+                 build/stage1-gmp/Makefile
+                 build/stage1-gmp/cxx/Makefile
+                 build/stage1-gmp/demos/Makefile
+                 build/stage1-gmp/demos/calc/Makefile
+                 build/stage1-gmp/demos/expr/Makefile
+                 build/stage1-gmp/doc/Makefile
+                 build/stage1-gmp/mpf/Makefile
+                 build/stage1-gmp/mpn/Makefile
+                 build/stage1-gmp/mpq/Makefile
+                 build/stage1-gmp/mpz/Makefile
+                 build/stage1-gmp/printf/Makefile
+                 build/stage1-gmp/rand/Makefile
+                 build/stage1-gmp/scanf/Makefile
+                 build/stage1-gmp/tests/Makefile
+                 build/stage1-gmp/tests/cxx/Makefile
+                 build/stage1-gmp/tests/devel/Makefile
+                 build/stage1-gmp/tests/misc/Makefile
+                 build/stage1-gmp/tests/mpf/Makefile
+                 build/stage1-gmp/tests/mpn/Makefile
+                 build/stage1-gmp/tests/mpq/Makefile
+                 build/stage1-gmp/tests/mpz/Makefile
+                 build/stage1-gmp/tests/rand/Makefile
+                 build/stage1-gmp/tune/Makefile
+                 build/stage1-intl/Makefile
+                 build/stage1-isl/Makefile
+                 build/stage1-isl/doc/Makefile
+                 build/stage1-libbacktrace/Makefile
+                 build/stage1-libcpp/Makefile
+                 build/stage1-libdecnumber/Makefile
+                 build/stage1-libiberty/Makefile
+                 build/stage1-libiberty/testsuite/Makefile
+                 build/stage1-lto-plugin/Makefile
+                 build/stage1-mpc/Makefile
+                 build/stage1-mpc/doc/Makefile
+                 build/stage1-mpc/src/Makefile
+                 build/stage1-mpc/tests/Makefile
+                 build/stage1-mpfr/Makefile
+                 build/stage1-mpfr/doc/Makefile
+                 build/stage1-mpfr/src/Makefile
+                 build/stage1-mpfr/tests/Makefile
+                 build/stage1-mpfr/tune/Makefile
+                 build/stage1-x86_64-pc-linux-gnu/32/libgcc/Makefile
+                 build/stage1-x86_64-pc-linux-gnu/32/libgomp/Makefile
+                 build/stage1-x86_64-pc-linux-gnu/32/libgomp/testsuite/Makefile
+                 build/stage1-x86_64-pc-linux-gnu/32/libstdc++-v3/Makefile
+                 build/stage1-x86_64-pc-linux-gnu/32/libstdc++-v3/doc/Makefile
+                 build/stage1-x86_64-pc-linux-gnu/32/libstdc++-v3/include/Makefile
+                 build/stage1-x86_64-pc-linux-gnu/32/libstdc++-v3/libsupc++/Makefile
+                 build/stage1-x86_64-pc-linux-gnu/32/libstdc++-v3/po/Makefile
+                 build/stage1-x86_64-pc-linux-gnu/32/libstdc++-v3/python/Makefile
+                 build/stage1-x86_64-pc-linux-gnu/32/libstdc++-v3/src/Makefile
+                 build/stage1-x86_64-pc-linux-gnu/32/libstdc++-v3/src/c++11/Makefile
+                 build/stage1-x86_64-pc-linux-gnu/32/libstdc++-v3/src/c++98/Makefile
+                 build/stage1-x86_64-pc-linux-gnu/32/libstdc++-v3/src/filesystem/Makefile
+                 build/stage1-x86_64-pc-linux-gnu/32/libstdc++-v3/testsuite/Makefile
+                 build/stage1-x86_64-pc-linux-gnu/libgcc/Makefile
+                 build/stage1-x86_64-pc-linux-gnu/libgomp/Makefile
+                 build/stage1-x86_64-pc-linux-gnu/libgomp/testsuite/Makefile
+                 build/stage1-x86_64-pc-linux-gnu/libstdc++-v3/Makefile
+                 build/stage1-x86_64-pc-linux-gnu/libstdc++-v3/doc/Makefile
+                 build/stage1-x86_64-pc-linux-gnu/libstdc++-v3/include/Makefile
+                 build/stage1-x86_64-pc-linux-gnu/libstdc++-v3/libsupc++/Makefile
+                 build/stage1-x86_64-pc-linux-gnu/libstdc++-v3/po/Makefile
+                 build/stage1-x86_64-pc-linux-gnu/libstdc++-v3/python/Makefile
+                 build/stage1-x86_64-pc-linux-gnu/libstdc++-v3/src/Makefile
+                 build/stage1-x86_64-pc-linux-gnu/libstdc++-v3/src/c++11/Makefile
+                 build/stage1-x86_64-pc-linux-gnu/libstdc++-v3/src/c++98/Makefile
+                 build/stage1-x86_64-pc-linux-gnu/libstdc++-v3/src/filesystem/Makefile
+                 build/stage1-x86_64-pc-linux-gnu/libstdc++-v3/testsuite/Makefile
+                 build/stage1-zlib/Makefile
+                 build/x86_64-pc-linux-gnu/32/libatomic/Makefile
+                 build/x86_64-pc-linux-gnu/32/libatomic/testsuite/Makefile
+                 build/x86_64-pc-linux-gnu/32/libbacktrace/Makefile
+                 build/x86_64-pc-linux-gnu/32/libgcc/Makefile
+                 build/x86_64-pc-linux-gnu/32/libgfortran/Makefile
+                 build/x86_64-pc-linux-gnu/32/libgomp/Makefile
+                 build/x86_64-pc-linux-gnu/32/libgomp/testsuite/Makefile
+                 build/x86_64-pc-linux-gnu/32/libitm/Makefile
+                 build/x86_64-pc-linux-gnu/32/libitm/testsuite/Makefile
+                 build/x86_64-pc-linux-gnu/32/libmpx/Makefile
+                 build/x86_64-pc-linux-gnu/32/libmpx/mpxrt/Makefile
+                 build/x86_64-pc-linux-gnu/32/libmpx/mpxwrap/Makefile
+                 build/x86_64-pc-linux-gnu/32/libquadmath/Makefile
+                 build/x86_64-pc-linux-gnu/32/libsanitizer/Makefile
+                 build/x86_64-pc-linux-gnu/32/libsanitizer/asan/Makefile
+                 build/x86_64-pc-linux-gnu/32/libsanitizer/interception/Makefile
+                 build/x86_64-pc-linux-gnu/32/libsanitizer/libbacktrace/Makefile
+                 build/x86_64-pc-linux-gnu/32/libsanitizer/lsan/Makefile
+                 build/x86_64-pc-linux-gnu/32/libsanitizer/sanitizer_common/Makefile
+                 build/x86_64-pc-linux-gnu/32/libsanitizer/ubsan/Makefile
+                 build/x86_64-pc-linux-gnu/32/libssp/Makefile
+                 build/x86_64-pc-linux-gnu/32/libstdc++-v3/Makefile
+                 build/x86_64-pc-linux-gnu/32/libstdc++-v3/doc/Makefile
+                 build/x86_64-pc-linux-gnu/32/libstdc++-v3/include/Makefile
+                 build/x86_64-pc-linux-gnu/32/libstdc++-v3/libsupc++/Makefile
+                 build/x86_64-pc-linux-gnu/32/libstdc++-v3/po/Makefile
+                 build/x86_64-pc-linux-gnu/32/libstdc++-v3/python/Makefile
+                 build/x86_64-pc-linux-gnu/32/libstdc++-v3/src/Makefile
+                 build/x86_64-pc-linux-gnu/32/libstdc++-v3/src/c++11/Makefile
+                 build/x86_64-pc-linux-gnu/32/libstdc++-v3/src/c++98/Makefile
+                 build/x86_64-pc-linux-gnu/32/libstdc++-v3/src/filesystem/Makefile
+                 build/x86_64-pc-linux-gnu/32/libstdc++-v3/testsuite/Makefile
+                 build/x86_64-pc-linux-gnu/32/libvtv/Makefile
+                 build/x86_64-pc-linux-gnu/32/libvtv/testsuite/Makefile
+                 build/x86_64-pc-linux-gnu/libatomic/Makefile
+                 build/x86_64-pc-linux-gnu/libatomic/testsuite/Makefile
+                 build/x86_64-pc-linux-gnu/libbacktrace/Makefile
+                 build/x86_64-pc-linux-gnu/libgcc/Makefile
+                 build/x86_64-pc-linux-gnu/libgfortran/Makefile
+                 build/x86_64-pc-linux-gnu/libgomp/Makefile
+                 build/x86_64-pc-linux-gnu/libgomp/testsuite/Makefile
+                 build/x86_64-pc-linux-gnu/libitm/Makefile
+                 build/x86_64-pc-linux-gnu/libitm/testsuite/Makefile
+                 build/x86_64-pc-linux-gnu/libmpx/Makefile
+                 build/x86_64-pc-linux-gnu/libmpx/mpxrt/Makefile
+                 build/x86_64-pc-linux-gnu/libmpx/mpxwrap/Makefile
+                 build/x86_64-pc-linux-gnu/libquadmath/Makefile
+                 build/x86_64-pc-linux-gnu/libsanitizer/Makefile
+                 build/x86_64-pc-linux-gnu/libsanitizer/asan/Makefile
+                 build/x86_64-pc-linux-gnu/libsanitizer/interception/Makefile
+                 build/x86_64-pc-linux-gnu/libsanitizer/libbacktrace/Makefile
+                 build/x86_64-pc-linux-gnu/libsanitizer/lsan/Makefile
+                 build/x86_64-pc-linux-gnu/libsanitizer/sanitizer_common/Makefile
+                 build/x86_64-pc-linux-gnu/libsanitizer/tsan/Makefile
+                 build/x86_64-pc-linux-gnu/libsanitizer/ubsan/Makefile
+                 build/x86_64-pc-linux-gnu/libssp/Makefile
+                 build/x86_64-pc-linux-gnu/libstdc++-v3/Makefile
+                 build/x86_64-pc-linux-gnu/libstdc++-v3/doc/Makefile
+                 build/x86_64-pc-linux-gnu/libstdc++-v3/include/Makefile
+                 build/x86_64-pc-linux-gnu/libstdc++-v3/libsupc++/Makefile
+                 build/x86_64-pc-linux-gnu/libstdc++-v3/po/Makefile
+                 build/x86_64-pc-linux-gnu/libstdc++-v3/python/Makefile
+                 build/x86_64-pc-linux-gnu/libstdc++-v3/src/Makefile
+                 build/x86_64-pc-linux-gnu/libstdc++-v3/src/c++11/Makefile
+                 build/x86_64-pc-linux-gnu/libstdc++-v3/src/c++98/Makefile
+                 build/x86_64-pc-linux-gnu/libstdc++-v3/src/filesystem/Makefile
+                 build/x86_64-pc-linux-gnu/libstdc++-v3/testsuite/Makefile
+                 build/x86_64-pc-linux-gnu/libvtv/Makefile
+                 build/x86_64-pc-linux-gnu/libvtv/testsuite/Makefile
+                 build/zlib/Makefile])
+AC_CONFIG_SUBDIRS([fixincludes
+                   gcc
+                   gmp
+                   gmp-6.1.0
+                   gnattools
+                   gotools
+                   intl
+                   isl
+                   isl-0.18
+                   libada
+                   libatomic
+                   libbacktrace
+                   libcc1
+                   libcpp
+                   libdecnumber
+                   libffi
+                   libgcc
+                   libgfortran
+                   libgo
+                   libgomp
+                   libhsail-rt
+                   libiberty
+                   libitm
+                   libmpx
+                   libobjc
+                   liboffloadmic
+                   libquadmath
+                   libsanitizer
+                   libssp
+                   libstdc++-v3
+                   libvtv
+                   lto-plugin
+                   mpc
+                   mpc-1.0.3
+                   mpfr
+                   mpfr-3.1.4
+                   zlib])
+AC_OUTPUT
