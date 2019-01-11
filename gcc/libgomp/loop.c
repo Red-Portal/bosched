@@ -98,6 +98,7 @@ gomp_loop_init (struct gomp_work_share *ws, long start, long end, long incr,
     {
         if(sched == FS_CSS || sched == BO_CSS )
         {
+            ws->param = css_transform_range(ws->param);
             ws->chunk_size = css_chunk_size(ws->param, num_tasks, nthreads);
         }
         ws->chunk_size *= incr;

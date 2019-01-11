@@ -43,7 +43,7 @@ inline gomp_ull
 css_chunk_size_ull(double param, gomp_ull N, size_t P)
 {
     gomp_ull chunk_size =
-        pow((1.414213562 * N * param) / (P * sqrt(log(P))), 2/3);
+        pow((1.414213562 * N * param) / (P * sqrt(log(P))), 2.0/3);
     return clip_ull(chunk_size, 1, N);
 }
 
@@ -51,8 +51,14 @@ inline long
 css_chunk_size(double param, long N, size_t P)
 {
     long chunk_size =
-        pow((1.414213562 * N * param) / (P * sqrt(log(P))), 2/3);
+        pow((1.414213562 * N * param) / (P * sqrt(log(P))), 2.0/3);
     return clip(chunk_size, 1, N);
+}
+
+inline double
+css_transform_range(double param)
+{
+    return exp(10 * param - 8);
 }
 
 inline double

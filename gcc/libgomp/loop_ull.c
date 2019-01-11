@@ -102,6 +102,7 @@ gomp_loop_ull_init (struct gomp_work_share *ws, bool up, gomp_ull start,
     {
         if(sched == FS_CSS || sched == BO_CSS)
         {
+            ws->param = css_transform_range(ws->param);
             ws->chunk_size_ull = css_chunk_size_ull(ws->param, num_tasks, nthreads);
         }
 
