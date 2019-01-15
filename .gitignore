@@ -73,7 +73,3 @@ CTestTestfile.cmake
 
 # build directory
 build/
-
-# simulation related files
-*sim*
-*isim*

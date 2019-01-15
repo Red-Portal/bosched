@@ -6,8 +6,11 @@
 #include <boost/thread/tss.hpp>
 #include <cmath>
 
+
+#include <optional>
+
 std::atomic<size_t> _total_runtime;
-boost::thread_specific_ptr<bosched::clock::time_point> _start;
+std::optional<boost::thread_specific_ptr<bosched::clock::time_point>> _start;
 
 namespace bosched
 {
@@ -18,10 +21,15 @@ namespace bosched
 
     void iteration_start_record()
     {
-        if(_start.get() == nullptr)
+        if(!_start)
         {
+            _start.emplace();
             _start.reset(new bosched::clock::time_point(bosched::clock::now()));
         }
+        // if(_start.get() == nullptr)
+        // {
+        //     _start.reset(new bosched::clock::time_point(bosched::clock::now()));
+        // }
         *_start = bosched::clock::now();
     }
 
