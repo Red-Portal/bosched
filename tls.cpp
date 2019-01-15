@@ -4,11 +4,10 @@
 
 #include <atomic>
 #include <boost/thread/tss.hpp>
-#include <optional>
 #include <cmath>
 
 std::atomic<size_t> _total_runtime;
-std::optional<boost::thread_specific_ptr<bosched::clock::time_point>> _start;
+boost::thread_specific_ptr<bosched::clock::time_point> _start;
 
 namespace bosched
 {
