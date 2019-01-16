@@ -166,6 +166,9 @@ extern "C"
     void __attribute__ ((destructor))
     bo_save_data()
     {
+        if(getenv("EVAL"))
+            return;
+
         auto updated_states = _is_bo_schedule ?
             update_loop_parameters(std::move(_loop_states)) 
             : std::move(_loop_states);
