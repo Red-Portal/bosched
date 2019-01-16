@@ -44,7 +44,7 @@ namespace bosched
     inline void
     update_param_warmup(loop_state_t& loop_state)
     {
-        if(loop_state.obs_x.size() > 10)
+        if(loop_state.obs_x.size() > 20)
         {
             size_t particle_num = 10;
             double survival_rate = 0.8;
@@ -271,7 +271,7 @@ extern "C"
 
             if(_is_bo_schedule)
             {
-                if( loop_state.warming_up && loop_state.obs_x.size() < 20 )
+                if( loop_state.warming_up && loop_state.obs_x.size() < 30 )
                 {
                     loop_state.obs_x.push_back(loop_state.param);
                     loop_state.obs_y.push_back(duration.count());
