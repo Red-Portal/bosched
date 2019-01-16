@@ -25,7 +25,7 @@ namespace lpbo
         auto result = dlib::find_min_global(
             f, {epsilon}, {1.0},
             dlib::max_function_calls(max_iter),
-            dlib::FOREVER, 1e-3);
+            dlib::FOREVER, 1e-2);
 
         auto [m, v] = model.predict(result.x);
         double cb = lpbo::UCB(m, v, iter);

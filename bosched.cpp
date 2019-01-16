@@ -59,70 +59,70 @@ namespace bosched
                 lpbo::bayesian_optimization(*loop_state.gp,
                                             _epsilon,
                                             loop_state.iteration,
-                                                200);
-                loop_state.param = next;
-                loop_state.pred_mean.push_back(mean);
-                loop_state.pred_var.push_back(var);
-                loop_state.pred_acq.push_back(acq);
-            }
-        }
-
-        inline void
-        update_param_non_warmup(loop_state_t& loop_state)
-        {
-            if(loop_state.obs_y.size() < 1)
-                return;
-
-            auto sum = std::accumulate(loop_state.obs_y.begin(),
-                                       loop_state.obs_y.end(), 0.0);
-            auto y_avg = sum / loop_state.obs_y.size();
-            loop_state.gp->update(loop_state.param, y_avg);
-
-            auto [next, mean, var, acq] =
-                lpbo::bayesian_optimization(*loop_state.gp,
-                                            1e-7,
-                                            loop_state.iteration,
-                                            200);
-            ++loop_state.iteration;
+                                            300);
+            loop_state.param = next;
             loop_state.pred_mean.push_back(mean);
             loop_state.pred_var.push_back(var);
             loop_state.pred_acq.push_back(acq);
-            loop_state.param = next;
         }
+    }
 
-        inline std::unordered_map<size_t, loop_state_t>
-        update_loop_parameters(std::unordered_map<size_t, loop_state_t>&& loop_states)
+    inline void
+    update_param_non_warmup(loop_state_t& loop_state)
+    {
+        if(loop_state.obs_y.size() < 1)
+            return;
+
+        auto sum = std::accumulate(loop_state.obs_y.begin(),
+                                   loop_state.obs_y.end(), 0.0);
+        auto y_avg = sum / loop_state.obs_y.size();
+        loop_state.gp->update(loop_state.param, y_avg);
+
+        auto [next, mean, var, acq] =
+            lpbo::bayesian_optimization(*loop_state.gp,
+                                        1e-7,
+                                        loop_state.iteration,
+                                        300);
+        ++loop_state.iteration;
+        loop_state.pred_mean.push_back(mean);
+        loop_state.pred_var.push_back(var);
+        loop_state.pred_acq.push_back(acq);
+        loop_state.param = next;
+    }
+
+    inline std::unordered_map<size_t, loop_state_t>
+    update_loop_parameters(std::unordered_map<size_t, loop_state_t>&& loop_states)
+    {
+        for(auto& l : loop_states)
         {
-            for(auto& l : loop_states)
+            auto loop_id = l.first;
+            auto& loop_state = l.second;
+
+            if(loop_state.warming_up)
             {
-                auto loop_id = l.first;
-                auto& loop_state = l.second;
+                update_param_warmup(loop_state);
 
-                if(loop_state.warming_up)
+                if(_is_debug)
                 {
-                    update_param_warmup(loop_state);
-
-                    if(_is_debug)
-                    {
-                        std::cout << "-- warming up loop " << loop_id 
-                                  << " current observations: " << loop_state.obs_x.size() 
-                                  << std::endl;
-                    }
-                }
-                else
-                {
-                    update_param_non_warmup(loop_state);
-
-                    if(_is_debug)
-                    {
-                        std::cout << "-- updating GP of loop " << loop_id
-                                  << " next point: " << loop_state.param
-                                  << std::endl;
-                    }
+                    std::cout << "-- warming up loop " << loop_id 
+                              << " current observations: " << loop_state.obs_x.size() 
+                              << std::endl;
                 }
             }
-            return std::move(loop_states);
+            else
+            {
+                update_param_non_warmup(loop_state);
+
+                if(_is_debug)
+                {
+                    std::cout << "-- updating GP of loop " << loop_id
+                              << " next point: " << loop_state.param
+                              << std::endl;
+                }
+            }
         }
+        return std::move(loop_states);
+    }
     }
 
 
