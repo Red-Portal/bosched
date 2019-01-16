@@ -156,7 +156,7 @@ namespace lpbo
                 _particles[i].rejuvenate(_data_x,
                                          _data_y,
                                          _particles[sel].parameters(),
-                                         100);
+                                         200);
             }
 
             size_t old_n = _data_x.size();
