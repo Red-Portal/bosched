@@ -11,7 +11,7 @@ namespace lpbo
                       double var,
                       size_t iteration)
     {
-        double beta = log(iteration * iteration * 3.14 * 3.14 / 0.6);
+        double beta = 2 * log(iteration * iteration * 3.14 * 3.14 / 0.6);
         return mean - sqrt(beta * var);
     }
 }
