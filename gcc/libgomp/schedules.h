@@ -358,8 +358,8 @@ bo_iter_ull_fss_next (gomp_ull *pstart, gomp_ull *pend)
     gomp_ull incr = ws->incr_ull;
     gomp_ull barrier = __atomic_load_n (&ws->barrier_ull, MEMMODEL_RELAXED);
     gomp_ull chunk_size = __atomic_load_n (&ws->chunk_size_ull, MEMMODEL_RELAXED);
-    gomp_ull R = (end - start) / incr;
     gomp_ull nend;
+    gomp_ull R;
 
     double param = fss_transform_range(ws->param);
 
@@ -453,13 +453,16 @@ bo_iter_ull_tss_next (gomp_ull *pstart, gomp_ull *pend)
     struct gomp_thread *thr = gomp_thread ();
     struct gomp_work_share *ws = thr->ts.work_share;
     //struct gomp_team *team = thr->ts.team;
+    gomp_ull count = __atomic_add_fetch (&ws->count_ull, 1, MEMMODEL_SEQ_CST);
     gomp_ull delta = 1 / ws->param;
-    gomp_ull end = ws->end_ull;
-    gomp_ull incr = ws->incr_ull;
-    gomp_ull nend;
+    gomp_ull f     = ws->chunk_size_ull;
+    gomp_ull incr  = ws->incr_ull;
     gomp_ull start = __atomic_load_n (&ws->next_ull, MEMMODEL_RELAXED);
-    gomp_ull chunk_size = __atomic_load_n (&ws->chunk_size_ull, MEMMODEL_RELAXED);
+    gomp_ull end   = ws->end_ull;
+    gomp_ull nend;
     gomp_ull R;
+
+    gomp_ull chunk_size = f - count * delta;
 
     while (1)
     {
@@ -471,25 +474,6 @@ bo_iter_ull_tss_next (gomp_ull *pstart, gomp_ull *pend)
         else
             R = (start - end) / -incr;
 
-        gomp_ull nchunk_size;
-        if(__builtin_expect(chunk_size > delta, 1))
-            nchunk_size = chunk_size - delta;
-        else
-            nchunk_size = 1;
-
-        gomp_ull tmp = __sync_val_compare_and_swap (&ws->chunk_size_ull,
-                                                    chunk_size,
-                                                    nchunk_size);
-        if (tmp != nchunk_size)
-        {
-            chunk_size = tmp;
-            start = __atomic_load_n (&ws->next_ull, MEMMODEL_RELAXED);
-            continue;
-        }
-        else {
-            chunk_size = nchunk_size;
-        }
-
         if(__builtin_expect (chunk_size < R, 1))
         {
             if (__builtin_expect (ws->mode, 0) == 0)
@@ -500,15 +484,12 @@ bo_iter_ull_tss_next (gomp_ull *pstart, gomp_ull *pend)
         else
             nend = end;
 
-        tmp = __sync_val_compare_and_swap (&ws->next_ull, start, nend);
+        gomp_ull tmp = __sync_val_compare_and_swap (&ws->next_ull, start, nend);
         if (tmp == start)
             break;
 
         start = tmp;
-        chunk_size = __atomic_load_n (&ws->chunk_size_ull, MEMMODEL_RELAXED);
     }
-    printf("chunk: %lld, delta: %lld, R: %lld \n", chunk_size, delta, R);
-
     *pstart = start;
     *pend = nend;
     return true;
@@ -520,13 +501,16 @@ bo_iter_tss_next (long *pstart, long *pend)
     struct gomp_thread *thr = gomp_thread ();
     struct gomp_work_share *ws = thr->ts.work_share;
     //struct gomp_team *team = thr->ts.team;
+    bo_ul count = __atomic_add_fetch (&ws->count, 1, MEMMODEL_SEQ_CST);
     bo_ul delta = 1 / ws->param;
-    long start = __atomic_load_n (&ws->next, MEMMODEL_RELAXED);
-    long end = ws->end;
-    long incr = ws->incr;
-    bo_ul chunk_size = __atomic_load_n (&ws->chunk_size, MEMMODEL_RELAXED);
-    bo_ul R = (end - start) / incr;
+    bo_ul f     = ws->chunk_size;
+    long  incr  = ws->incr;
+    long  start = __atomic_load_n (&ws->next, MEMMODEL_RELAXED);
+    long  end   = ws->end;
     bo_ul nend;
+    bo_ul R;
+    
+    bo_ul chunk_size = f - count * delta;
 
     while (1)
     {
@@ -535,38 +519,17 @@ bo_iter_tss_next (long *pstart, long *pend)
 
         R = (end - start) / incr;
 
-        bo_ul nchunk_size;
-        if(__builtin_expect(chunk_size > delta, 1))
-            nchunk_size = chunk_size - delta;
-        else
-            nchunk_size = 1;
-
-        long tmp = __sync_val_compare_and_swap (&ws->chunk_size,
-                                                chunk_size,
-                                                 nchunk_size);
-        if (tmp != nchunk_size)
-        {
-            chunk_size = tmp;
-            start = __atomic_load_n (&ws->next_ull, MEMMODEL_RELAXED);
-            continue;
-        }
-        else {
-            chunk_size = nchunk_size;
-        }
-
         if(__builtin_expect (chunk_size < R, 1))
             nend = start + chunk_size * incr;
         else
             nend = end;
 
-        tmp = __sync_val_compare_and_swap (&ws->next, start, nend);
+        long tmp = __sync_val_compare_and_swap (&ws->next, start, nend);
         if (tmp == start)
             break;
 
         start = tmp;
-        chunk_size = __atomic_load_n (&ws->chunk_size, MEMMODEL_RELAXED);
     }
-
     *pstart = start;
     *pend = nend;
     return true;
@@ -598,7 +561,7 @@ bo_iter_ull_tape_next (gomp_ull *pstart, gomp_ull *pend)
         else
             R = (start - end) / -incr;
 
-        gomp_ull T = R / nthreads + K_min;
+        gomp_ull T = R / nthreads + K_min / 2;
         gomp_ull K = T + v * v / 2 - v * sqrt(2 * T + v * v / 4); 
         chunk_size = K < K_min ? K_min : K;
         
@@ -648,7 +611,7 @@ bo_iter_tape_next (long *pstart, long *pend)
 
         R = (end - start) / incr;
 
-        bo_ul T = R / nthreads + K_min;
+        bo_ul T = R / nthreads + K_min / 2;
         bo_ul K = T + v * v / 2 - v * sqrt(2 * T + v * v / 4); 
         chunk_size = K < K_min ? K_min : K;
 

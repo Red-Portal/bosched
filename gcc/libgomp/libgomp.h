@@ -215,6 +215,7 @@ struct gomp_work_share
             long incr;
 
             long barrier;
+            long count;
         };
 
         struct {
@@ -224,6 +225,7 @@ struct gomp_work_share
             unsigned long long incr_ull;
 
             unsigned long long barrier_ull;
+            unsigned long long count_ull;
         };
     };
 

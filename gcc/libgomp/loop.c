@@ -78,6 +78,7 @@ gomp_loop_init (struct gomp_work_share *ws, long start, long end, long incr,
             ws->param = (2 * num_tasks) / (temp * temp);
         }
         ws->chunk_size = sqrt(2.0 * num_tasks / ws->param) - 1; // f in the original paper
+        ws->count = 0;
     }
     else if(sched == FS_FSS || sched == BO_FSS)
     {

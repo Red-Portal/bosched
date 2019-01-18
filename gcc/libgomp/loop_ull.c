@@ -78,6 +78,7 @@ gomp_loop_ull_init (struct gomp_work_share *ws, bool up, gomp_ull start,
             ws->param =  (2 * num_tasks) / (temp * temp);
         }
         ws->chunk_size_ull =  sqrt(2.0 * num_tasks / ws->param) - 1;
+        ws->count_ull = 0;
     }
     else if(sched == FS_FSS || sched == BO_FSS)
     {
