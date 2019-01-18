@@ -123,7 +123,33 @@ namespace bosched
         }
         return std::move(loop_states);
     }
+
+    inline std::unordered_map<size_t, loop_state_t>
+    eval_loop_parameters(std::unordered_map<size_t, loop_state_t>&& loop_states)
+    {
+        for(auto& l : loop_states)
+        {
+            auto loop_id = l.first;
+            auto& loop_state = l.second;
+
+            if(loop_state.warming_up)
+                continue;
+
+            auto [param, mean, var] = lpbo::find_best_mean(*loop_state.gp, _epsilon, 300);
+            loop_state.param = param;
+
+            if(_is_debug)
+            {
+                std::cout << "-- evaluating mean GP of loop " << loop_id
+                          << " best param: " << loop_state.param
+                          << " mean: " << mean
+                          << " var: " << var
+                          << std::endl;
+            }
+        }
+        return std::move(loop_states);
     }
+}
 
 
 extern "C"
@@ -161,6 +187,12 @@ extern "C"
             _is_new_file = true;
         }
         stream.close();
+
+        if(getenv("EVAL"))
+        {
+
+            return;
+        }
     }
 
     void __attribute__ ((destructor))

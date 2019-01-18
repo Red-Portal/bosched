@@ -32,6 +32,25 @@ namespace lpbo
         return {result.x, m, v, cb};
     }
 
+    inline std::tuple<double, double, double>
+    find_best_mean(lpbo::smc_gp const& model,
+                   double epsilon,
+                   int max_iter) noexcept
+    {
+        auto f = [&](double x){
+                     auto [mean, var] = model.predict(x);
+                     return mean;
+                 };
+
+        auto result = dlib::find_min_global(
+            f, {epsilon}, {1.0},
+            dlib::max_function_calls(max_iter),
+            dlib::FOREVER, 1e-3);
+
+        auto [m, v] = model.predict(result.x);
+        return {result.x, m, v};
+    }
+
     inline std::vector<double>
     render_acquisition(lpbo::smc_gp const& model,
                        size_t iter,
