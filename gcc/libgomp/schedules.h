@@ -70,7 +70,7 @@ fss_transform_range(double param)
 inline double
 tape_transform_range(double param)
 {
-    return exp(10 * param - 8);
+    return exp(15 * param - 10);
 }
 
 #ifdef HAVE_SYNC_BUILTINS
