@@ -199,17 +199,11 @@ extern "C"
         if(getenv("EVAL"))
             return;
 
-        std::cout << "???" << std::endl;
-
         auto updated_states = _is_bo_schedule ?
             update_loop_parameters(std::move(_loop_states)) 
             : std::move(_loop_states);
 
-        std::cout << "???" << std::endl;
-
         auto next = bosched::write_loops(updated_states);
-
-        std::cout << "???" << std::endl;
 
         using namespace std::literals::string_literals;
         if(_show_loop_stat)
@@ -220,8 +214,6 @@ extern "C"
             stat_stream << _stats.dump(2); 
             stat_stream.close();
         }
-
-        std::cout << "???" << std::endl;
 
         auto file_name = ".bostate."s + _progname;
         auto stream = std::ofstream(file_name + ".json"s);
