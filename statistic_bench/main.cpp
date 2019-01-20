@@ -46,12 +46,11 @@ public:
         auto workers = std::vector<std::thread>();
         workers.reserve(threads);
 
+        size_t portion = ceil(static_cast<double>(num_tasks) / threads);
         for(size_t i = 0; i < threads; ++i)
         {
-            size_t portion = ceil(static_cast<double>(num_tasks) / threads);
             size_t begin = portion * i;
             size_t end = std::min(portion * (i + 1), num_tasks);
-            end = std::min(num_tasks, end);
             auto seed = rng();
             auto work =
                 [&]
@@ -138,11 +137,20 @@ void benchmark(Rng& rng,
         measures[it] = std::chrono::duration_cast<duration_t>(
             loop_end - loop_start).count();
     }
+    std::vector<double> hiug(iteration);
+    for(size_t i = 0; i < iteration; ++i)
+    {
+        hiug[i] = tasks[i];
+    }
+    auto what = mean(hiug.begin(), hiug.end(), 0.0);
+    auto wut  = stddev(hiug.begin(), hiug.end(), what);
+    std::cout << "what: " << what << "wut: " << wut << std::endl;
+
     auto mu = mean(measures.begin(), measures.end(), 0.0);
     auto sigma = stddev(measures.begin(), measures.end(), mu);
     std::cout << name << ',' << mu << ',' << sigma << ','
-              << dist_mean << ',' << dist_stddev << std::endl;
-}
+                  << dist_mean << ',' << dist_stddev << std::endl;
+    }
 
 int main()
 {
