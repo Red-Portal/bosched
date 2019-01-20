@@ -147,7 +147,6 @@ namespace bosched
                           << std::endl;
             }
         }
-        return std::move(loop_states);
     }
 }
 
