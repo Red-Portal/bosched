@@ -140,7 +140,7 @@ void benchmark(Rng& rng,
     std::vector<double> hiug(iteration);
     for(size_t i = 0; i < iteration; ++i)
     {
-        hiug[i] = tasks[i];
+        hiug[i] = tasks[i].count();
     }
     auto what = mean(hiug.begin(), hiug.end(), 0.0);
     auto wut  = stddev(hiug.begin(), hiug.end(), what);
