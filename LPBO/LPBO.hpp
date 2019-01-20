@@ -8,7 +8,6 @@
 
 #include <dlib/global_optimization.h>
 #include <vector>
-#include <iostream>
 
 namespace lpbo
 {
@@ -20,7 +19,6 @@ namespace lpbo
     {
         auto f = [&](double x){
                      auto [mean, var] = model.predict(x);
-                     std::cout << mean << std::endl;
                      return lpbo::UCB(mean, var, iter);
                  };
 
