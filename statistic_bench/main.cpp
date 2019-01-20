@@ -119,7 +119,7 @@ void benchmark(Rng& rng,
     auto tasks = generate<Dist, Rng>(num_tasks, 8, dist, rng);
     size_t iteration = 128;
 
-    auto measures = std::vector<double>(num_tasks);
+    auto measures = std::vector<double>(iteration);
     for(size_t it = 0; it < iteration; ++it)
     {
         auto loop_start = clock::now();
