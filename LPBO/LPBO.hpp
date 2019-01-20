@@ -6,8 +6,53 @@
 #include "SMC.hpp"
 #include "acquisition.hpp"
 
-#include <dlib/global_optimization.h>
+#include "cma-es/cmaes.h"
 #include <vector>
+
+namespace cmaes
+{
+    template<typename F>
+    inline double
+    optimize(F f, double min, double max, size_t max_iter)
+    {
+        auto is_feasible = [min, max](double x){
+                               return min < x && x < max;
+                           };
+
+        CMAES<double> evo;
+        double* arFunvals;
+        double* const* pop;
+
+        double xstart = 0.5;
+        double stddev = 1.0;
+
+        Parameters<double> parameters;
+        parameters.init(1, &xstart, &stddev);
+        parameters.stopMaxIter = max_iter;
+        parameters.stopTolFun = 1e-7;
+        parameters.lambda = 512;
+    
+        arFunvals = evo.init(parameters);
+
+        while(!evo.testForTermination())
+        {
+            pop = evo.samplePopulation();
+            for (size_t i = 0; i < evo.get(CMAES<double>::PopSize); ++i)
+            {
+                while (!is_feasible(*pop[i]))
+                    evo.reSampleSingle(i);
+            }
+            for (size_t i = 0; i < evo.get(CMAES<double>::Lambda); ++i)
+                arFunvals[i] = f(*pop[i]);
+            evo.updateDistribution(arFunvals);
+        }
+
+        double* xfinal = evo.getNew(CMAES<double>::XMean);
+        double result = xfinal[0];
+        delete[] xfinal;
+        return result;
+    }
+}
 
 namespace lpbo
 {
@@ -22,14 +67,12 @@ namespace lpbo
                      return lpbo::UCB(mean, var, iter);
                  };
 
-        auto result = dlib::find_min_global(
-            f, {epsilon}, {1.0},
-            dlib::max_function_calls(max_iter),
-            dlib::FOREVER, 1e-2);
+        auto result = cmaes::optimize(
+            f, epsilon, 1.0, max_iter);
 
-        auto [m, v] = model.predict(result.x);
+        auto [m, v] = model.predict(result);
         double cb = lpbo::UCB(m, v, iter);
-        return {result.x, m, v, cb};
+        return {result, m, v, cb};
     }
 
     inline std::tuple<double, double, double>
@@ -42,13 +85,11 @@ namespace lpbo
                      return mean;
                  };
 
-        auto result = dlib::find_min_global(
-            f, {epsilon}, {1.0},
-            dlib::max_function_calls(max_iter),
-            dlib::FOREVER, 1e-3);
+        auto result = cmaes::optimize(
+            f, epsilon, 1.0, max_iter);
 
-        auto [m, v] = model.predict(result.x);
-        return {result.x, m, v};
+        auto [m, v] = model.predict(result);
+        return {result, m, v};
     }
 
     inline std::vector<double>

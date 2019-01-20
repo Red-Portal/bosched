@@ -1,6 +1,6 @@
 
 #include <cstdio>
-#include <dlib/global_optimization.h>
+#include <limits>
 #include <string>
 
 #include "SMC.hpp"
@@ -46,7 +46,9 @@ extern "C"
             gp_model->update(x, y);
 
         auto [n, m, v, cb]
-            = lpbo::bayesian_optimization(*gp_model, 1e-7, iter, max_iter);
+            = lpbo::bayesian_optimization(
+                *gp_model, 1e-10,
+                iter, max_iter);
 
         if(out_merit != nullptr)
             *out_merit = cb;

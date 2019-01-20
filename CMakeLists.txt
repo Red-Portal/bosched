@@ -54,7 +54,6 @@ set_target_properties(${PROJECT_NAME}
 
 ## Thread library dependency
 find_package(BLAZE REQUIRED)
-#find_package(dlib REQUIRED)
 
 set(BLA_STATIC ON)
 find_package(BLAS REQUIRED)
@@ -74,7 +73,6 @@ target_include_directories(${PROJECT_NAME}
 
 target_link_libraries(${PROJECT_NAME}
     PRIVATE
-    dlib
     ${BLAS_LIBRARIES}
     ${Boost_LIBRARIES}
     ${LAPACK_LIBRARIES})

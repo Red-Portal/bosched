@@ -59,7 +59,7 @@ namespace bosched
                 lpbo::bayesian_optimization(*loop_state.gp,
                                             _epsilon,
                                             loop_state.iteration,
-                                            300);
+                                            1000);
             loop_state.param = next;
             loop_state.pred_mean.push_back(mean);
             loop_state.pred_var.push_back(var);
@@ -80,9 +80,9 @@ namespace bosched
 
         auto [next, mean, var, acq] =
             lpbo::bayesian_optimization(*loop_state.gp,
-                                        1e-7,
+                                        _epsilon,
                                         loop_state.iteration,
-                                        300);
+                                        1000);
         ++loop_state.iteration;
         loop_state.pred_mean.push_back(mean);
         loop_state.pred_var.push_back(var);
@@ -135,7 +135,7 @@ namespace bosched
             if(loop_state.warming_up)
                 continue;
 
-            auto [param, mean, var] = lpbo::find_best_mean(*loop_state.gp, _epsilon, 300);
+            auto [param, mean, var] = lpbo::find_best_mean(*loop_state.gp, _epsilon, 2000);
             loop_state.param = param;
 
             if(_is_debug)
