@@ -115,7 +115,7 @@ void benchmark(Rng& rng,
     using duration_t = std::chrono::duration<double, std::milli>;
 
     auto tasks = generate<Dist, Rng>(num_tasks, 8, dist, rng);
-    size_t iteration = 128;
+    size_t iteration = 256;
 
     auto measures = std::vector<double>(iteration);
     for(size_t it = 0; it < iteration; ++it)
