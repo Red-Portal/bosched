@@ -1,7 +1,4 @@
 
-// 
-#include <iostream>
-
 #include "LPBO/LPBO.hpp"
 #include "loop_state.hpp"
 #include "metrics.hpp"
