@@ -1,4 +1,7 @@
 
+// 
+#include <iostream>
+
 #include "LPBO/LPBO.hpp"
 #include "loop_state.hpp"
 #include "metrics.hpp"
@@ -11,7 +14,6 @@
 #include <chrono>
 #include <cstdlib>
 #include <fstream>
-#include <iostream>
 #include <nlohmann/json.hpp>
 #include <random>
 #include <thread>
