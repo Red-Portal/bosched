@@ -155,7 +155,7 @@ namespace bosched
 
 extern "C"
 {
-    void __attribute__ ((constructor(102)))
+    void __attribute__ ((constructor(65,535)))
     bo_load_data()
     {
         using namespace std::literals::string_literals;
