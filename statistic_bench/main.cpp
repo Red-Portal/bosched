@@ -140,7 +140,7 @@ void benchmark(Rng& rng,
             }
             auto loop_end = clock::now();
             measures[it] = std::chrono::duration_cast<duration_t>(
-                loop_end - loop_start).count() / iteration;
+                loop_end - loop_start).count();
         }
         auto mu = mean(measures.begin(), measures.end(), 0.0);
         auto sigma = stddev(measures.begin(), measures.end(), mu);
