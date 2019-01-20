@@ -27,6 +27,7 @@ bool _is_bo_schedule = false;
 bool _is_new_file    = false;
 std::mt19937 _rng __attribute__((init_priority(101)));
 std::string _progname __attribute__((init_priority(101)));
+std::uniform_real_distribution<double> dist(_epsilon, 1.0);
 std::unordered_map<size_t, bosched::loop_state_t> _loop_states __attribute__((init_priority(101)));
 long _procs;
 nlohmann::json _stats;
@@ -36,7 +37,6 @@ namespace bosched
     inline double
     warmup_next_param()
     {
-        auto dist = std::uniform_real_distribution<double>(_epsilon, 1.0);
         double next = dist(_rng);
         return next;
     }
