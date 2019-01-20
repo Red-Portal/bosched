@@ -262,7 +262,6 @@ extern "C"
         {
             param = bosched::warmup_next_param();
             loop_state.param = param;
-            std::cout << "what 2 " << param << std::endl;
         }
         else
         {
@@ -271,7 +270,6 @@ extern "C"
 
         if(__builtin_expect (_is_debug, false))
         {
-            std::cout << "what 4"<< std::endl;
             std::cout << "-- loop " << region_id
                       << " requested schedule parameter " << param
                       << std::endl;
