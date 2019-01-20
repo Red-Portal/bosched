@@ -256,20 +256,25 @@ extern "C"
             loop_state.warming_up = true;
             loop_state.iteration = 0;
             loop_state.param = param;
+
+            std::cout << "what 1"<< std::endl;
         }
         
         if(loop_state.warming_up && is_bo_schedule)
         {
             param = bosched::warmup_next_param();
             loop_state.param = param;
+            std::cout << "what 2"<< std::endl;
         }
         else
         {
+            std::cout << "what 3"<< std::endl;
             param = loop_state.param;
         }
 
         if(__builtin_expect (_is_debug, false))
         {
+            std::cout << "what 4"<< std::endl;
             std::cout << "-- loop " << region_id
                       << " requested schedule parameter " << param
                       << std::endl;
