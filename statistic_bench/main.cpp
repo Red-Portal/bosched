@@ -152,7 +152,7 @@ int main()
 
     {
         auto bern1 =
-            [p, val](std::mt19937_64& rng)
+            [](std::mt19937_64& rng)
             {
                 double const p = 0.5;
                 double const val = 1;
@@ -163,7 +163,7 @@ int main()
 
     {
         auto bern1 =
-            [p, val](std::mt19937_64& rng)
+            [](std::mt19937_64& rng)
             {
                 double const p = 0.5;
                 double const val = 1;
@@ -174,7 +174,7 @@ int main()
 
     {
         auto bern2 =
-            [p, val](std::mt19937_64& rng)
+            [](std::mt19937_64& rng)
             {
                 double const p = 0.2;
                 double const val = 2.5;
