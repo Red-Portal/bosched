@@ -118,7 +118,7 @@ void benchmark(Rng& rng,
 
     auto duration = duration_t();
     auto tasks = generate<Dist, Rng>(num_tasks, 8, dist, rng);
-    size_t iteration = 1024;
+    size_t iteration = 128;
 
     if(getenv("EVAL"))
     {
