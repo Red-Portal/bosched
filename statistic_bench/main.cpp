@@ -27,9 +27,6 @@ inline void do_not_optimize(Tp& value) {
 #endif
 }
 
-std::random_device _seed;
-std::mt19937_64 _rng(_seed());
-
 using duration_t = std::chrono::duration<double, std::micro>;
 
 template<typename Dist, typename Rng>
