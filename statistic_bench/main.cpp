@@ -151,46 +151,44 @@ int main()
     std::cout << "distribution,mean,stddev,dist_mean,dist_stddev"  << std::endl;
 
     {
-        double const p = 0.5;
-        double const val = 1;
         auto bern1 =
             [p, val](std::mt19937_64& rng)
             {
+                double const p = 0.5;
+                double const val = 1;
                 return val * stats::rbern(p, rng);
             };
         benchmark(rng, bern1, 1024 * 1024, "warmup", 0.5, 0.5);
     }
 
     {
-        double const p = 0.5;
-        double const val = 1;
         auto bern1 =
             [p, val](std::mt19937_64& rng)
             {
+                double const p = 0.5;
+                double const val = 1;
                 return val * stats::rbern(p, rng);
             };
         benchmark(rng, bern1, 1024 * 1024, "bern1", 0.5, 0.5);
     }
 
     {
-        double const p = 0.2;
-        double const val = 2.5;
         auto bern2 =
             [p, val](std::mt19937_64& rng)
             {
+                double const p = 0.2;
+                double const val = 2.5;
                 return val * stats::rbern(p, rng);
             };
         benchmark(rng, bern2, 1024 * 1024, "bern2", 0.2, 2.5);
     }
 
     {
-        double const p = 0.8;
-        double const val = 10.0/8.0;
         auto bern3 =
             [](std::mt19937_64& rng)
             {
-                double const val = 1;
-                double const p = 0.5;
+                double const p = 0.8;
+                double const val = 10.0/8.0;
                 return val * stats::rbern(p, rng);
             };
         benchmark(rng, bern3, 1024 * 1024, "bern3", 1.0, 0.5);
