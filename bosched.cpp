@@ -266,7 +266,6 @@ extern "C"
         }
         else
         {
-            std::cout << "what 3"<< std::endl;
             param = loop_state.param;
         }
 
