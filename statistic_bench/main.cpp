@@ -43,30 +43,36 @@ public:
              Rng& rng)
         : _runtimes(num_tasks)
     {
-        auto workers = std::vector<std::thread>();
-        workers.reserve(threads);
+        // auto workers = std::vector<std::thread>();
+        // workers.reserve(threads);
 
-        size_t portion = ceil(static_cast<double>(num_tasks) / threads);
-        for(size_t i = 0; i < threads; ++i)
+        // size_t portion = ceil(static_cast<double>(num_tasks) / threads);
+        // for(size_t i = 0; i < threads; ++i)
+        // {
+        //     size_t begin = portion * i;
+        //     size_t end = std::min(portion * (i + 1), num_tasks);
+        //     auto seed = rng();
+        //     auto work =
+        //         [&]
+        //         {
+        //             auto local_rng = std::mt19937_64(seed);
+        //             for(size_t i = begin; i < end; ++i)
+        //             {
+        //                 auto runtime = dist(local_rng);
+        //                 _runtimes[i] = duration_t(runtime); 
+        //             }
+        //         };
+        //     workers.emplace_back(work);
+        // }
+
+        // for(auto& i : workers)
+        //     i.join();
+
+        for(size_t i = 0; i < num_tasks; ++i)
         {
-            size_t begin = portion * i;
-            size_t end = std::min(portion * (i + 1), num_tasks);
-            auto seed = rng();
-            auto work =
-                [&]
-                {
-                    auto local_rng = std::mt19937_64(seed);
-                    for(size_t i = begin; i < end; ++i)
-                    {
-                        auto runtime = dist(local_rng);
-                        _runtimes[i] = duration_t(runtime); 
-                    }
-                };
-            workers.emplace_back(work);
+            auto runtime = dist(rng);
+            _runtimes[i] = duration_t(runtime); 
         }
-
-        for(auto& i : workers)
-            i.join();
     }
 
     inline duration_t
@@ -99,7 +105,7 @@ stddev(It begin, It end, Type mean)
                                    Type temp = elem - mean;
                                    return sum + temp * temp;
                                });
-    return sqrt(sum) / (end - begin - 1);
+    return sqrt(sum / (end - begin - 1));
 }
 
 
@@ -137,20 +143,12 @@ void benchmark(Rng& rng,
         measures[it] = std::chrono::duration_cast<duration_t>(
             loop_end - loop_start).count();
     }
-    std::vector<double> hiug(iteration);
-    for(size_t i = 0; i < iteration; ++i)
-    {
-        hiug[i] = tasks[i].count();
-    }
-    auto what = mean(hiug.begin(), hiug.end(), 0.0);
-    auto wut  = stddev(hiug.begin(), hiug.end(), what);
-    std::cout << "what: " << what << "wut: " << wut << std::endl;
 
     auto mu = mean(measures.begin(), measures.end(), 0.0);
     auto sigma = stddev(measures.begin(), measures.end(), mu);
     std::cout << name << ',' << mu << ',' << sigma << ','
-                  << dist_mean << ',' << dist_stddev << std::endl;
-    }
+              << dist_mean << ',' << dist_stddev << std::endl;
+}
 
 int main()
 {
