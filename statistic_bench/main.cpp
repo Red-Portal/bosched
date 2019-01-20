@@ -1,4 +1,6 @@
 
+#include <iostream>
+
 #define STATS_DONT_USE_OPENMP
 #define STATS_USE_BLAZE
 
@@ -6,7 +8,6 @@
 
 #include <algorithm>
 #include <chrono>
-#include <iostream>
 #include <numeric>
 #include <random>
 #include <string_view>
