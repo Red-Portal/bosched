@@ -187,10 +187,11 @@ extern "C"
         }
         stream.close();
 
+        std::cout << "???" << std::endl;
+
         if(getenv("EVAL"))
         {
             bosched::eval_loop_parameters(_loop_states);
-            return;
         }
     }
 
