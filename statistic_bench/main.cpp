@@ -150,6 +150,8 @@ int main()
     auto seed = std::random_device();
     auto rng = std::mt19937_64(seed());
 
+    std::cout << "distribution,mean,stddev,dist_mean,dist_stddev"  << std::endl;
+
     {
         double const p = 0.5;
         double const val = 1;
