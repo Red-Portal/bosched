@@ -1,4 +1,6 @@
 
+#include <iostream>
+
 #include "LPBO/LPBO.hpp"
 #include "loop_state.hpp"
 #include "metrics.hpp"
@@ -155,6 +157,8 @@ extern "C"
     void __attribute__ ((constructor(65535)))
     bo_load_data()
     {
+        std::ios_base::Init();
+
         using namespace std::literals::string_literals;
         _progname = std::string(__progname);
 
