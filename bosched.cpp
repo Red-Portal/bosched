@@ -124,8 +124,8 @@ namespace bosched
         return std::move(loop_states);
     }
 
-    inline std::unordered_map<size_t, loop_state_t>
-    eval_loop_parameters(std::unordered_map<size_t, loop_state_t>&& loop_states)
+    inline void
+    eval_loop_parameters(std::unordered_map<size_t, loop_state_t>& loop_states)
     {
         for(auto& l : loop_states)
         {
@@ -190,7 +190,7 @@ extern "C"
 
         if(getenv("EVAL"))
         {
-
+            bosched::eval_loop_parameters(_loop_states);
             return;
         }
     }
