@@ -296,7 +296,7 @@ extern "C"
     {
         if(_is_bo_schedule || _show_loop_stat)
         {
-            using time_scale_t = bosched::millisecond;
+            using time_scale_t = bosched::microseconds;
 
             auto& loop_state = _loop_states[region_id];
 
