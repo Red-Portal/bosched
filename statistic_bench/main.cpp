@@ -116,38 +116,11 @@ void benchmark(Rng& rng,
     using clock = std::chrono::steady_clock;
     using duration_t = std::chrono::duration<double, std::milli>;
 
-    auto duration = duration_t();
     auto tasks = generate<Dist, Rng>(num_tasks, 8, dist, rng);
     size_t iteration = 128;
 
-    if(getenv("EVAL"))
-    {
-        auto measures = std::vector<double>(num_tasks);
-        for(size_t it = 0; it < iteration; ++it)
-        {
-            auto loop_start = clock::now();
-#pragma omp parallel for schedule(runtime)
-            for(size_t i = 0; i < num_tasks; ++i)
-            {
-                auto start = clock::now();
-                auto runtime = tasks[i];
-                auto now = clock::now();
-                while(now - start < runtime)
-                {
-                    now = clock::now();
-                    do_not_optimize(now);
-                }
-            }
-            auto loop_end = clock::now();
-            measures[it] = std::chrono::duration_cast<duration_t>(
-                loop_end - loop_start).count();
-        }
-        auto mu = mean(measures.begin(), measures.end(), 0.0);
-        auto sigma = stddev(measures.begin(), measures.end(), mu);
-        std::cout << name << ',' << mu << ',' << sigma << ','
-                  << dist_mean << ',' << dist_stddev << std::endl;
-    }
-    else
+    auto measures = std::vector<double>(num_tasks);
+    for(size_t it = 0; it < iteration; ++it)
     {
         auto loop_start = clock::now();
 #pragma omp parallel for schedule(runtime)
@@ -163,11 +136,13 @@ void benchmark(Rng& rng,
             }
         }
         auto loop_end = clock::now();
-        duration = std::chrono::duration_cast<duration_t>(
-            loop_end - loop_start);
-        std::cout << name << ',' << duration.count() << ','
-                  << dist_mean << ',' << dist_stddev << std::endl;
+        measures[it] = std::chrono::duration_cast<duration_t>(
+            loop_end - loop_start).count();
     }
+    auto mu = mean(measures.begin(), measures.end(), 0.0);
+    auto sigma = stddev(measures.begin(), measures.end(), mu);
+    std::cout << name << ',' << mu << ',' << sigma << ','
+              << dist_mean << ',' << dist_stddev << std::endl;
 }
 
 int main()
