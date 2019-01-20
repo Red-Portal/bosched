@@ -158,6 +158,17 @@ int main()
             {
                 return val * stats::rbern(p, rng);
             };
+        benchmark(rng, bern1, 1024 * 1024, "warmup", 0.5, 0.5);
+    }
+
+    {
+        double const p = 0.5;
+        double const val = 1;
+        auto bern1 =
+            [p, val](std::mt19937_64& rng)
+            {
+                return val * stats::rbern(p, rng);
+            };
         benchmark(rng, bern1, 1024 * 1024, "bern1", 0.5, 0.5);
     }
 
