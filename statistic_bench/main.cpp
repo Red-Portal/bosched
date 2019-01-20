@@ -48,8 +48,9 @@ public:
 
         for(size_t i = 0; i < threads; ++i)
         {
-            size_t begin = (num_tasks / threads) * i;
-            size_t end = (num_tasks / threads) * (i + 1);
+            size_t portion = ceil(static_cast<double>(num_tasks) / threads);
+            size_t begin = portion * i;
+            size_t end = std::min(portion * (i + 1), num_tasks);
             end = std::min(num_tasks, end);
             auto seed = rng();
             auto work =
