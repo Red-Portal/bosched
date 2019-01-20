@@ -191,6 +191,7 @@ extern "C"
 
         if(getenv("EVAL"))
         {
+            std::cout << "???" << std::endl;
             bosched::eval_loop_parameters(_loop_states);
         }
     }
