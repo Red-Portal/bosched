@@ -105,7 +105,7 @@ namespace lpbo
         decompose(lpbo::vec const& x,
                   double l,
                   double g,
-                  size_t n) const noexcept
+                  size_t n) const
         {
             auto K = covariance_kernel(x, l);
             //K += (g + 1e-10) * lpbo::id_mat(n);
@@ -182,7 +182,7 @@ namespace lpbo
         {}
 
         inline
-        gp_model(lpbo::vec const& x, lpbo::vec const& y) noexcept
+        gp_model(lpbo::vec const& x, lpbo::vec const& y)
         {
             gp_model_init(x, y, lpbo::vec{0.1, 0.1}, 1000);
         }
@@ -190,7 +190,7 @@ namespace lpbo
         inline
         gp_model(lpbo::vec const& x, lpbo::vec const& y,
                  lpbo::vec&& mcmc_initial,
-                 size_t mcmc_iterations) noexcept
+                 size_t mcmc_iterations)
         {
             gp_model_init(x, y, std::move(mcmc_initial), mcmc_iterations);
         }
@@ -209,7 +209,7 @@ namespace lpbo
 
         inline void
         rejuvenate(lpbo::vec const& x, lpbo::vec const& y,
-                   lpbo::vec&& mcmc_initial, size_t mcmc_iterations) noexcept
+                   lpbo::vec&& mcmc_initial, size_t mcmc_iterations)
         {
             gp_model_init(x, y, std::move(mcmc_initial), mcmc_iterations);
         }
