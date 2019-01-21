@@ -57,7 +57,7 @@ namespace bosched
                                       particle_num,
                                       survival_rate);
             }
-            catch(std::runtime_error const& err)
+            catch(...)
             {
                 std::cout << "-- covariance matrix singularity detected.. skipping"
                           << std::endl;
@@ -90,7 +90,7 @@ namespace bosched
         auto y_avg = sum / loop_state.obs_y.size();
         try
         { loop_state.gp->update(loop_state.param, y_avg); }
-        catch(std::runtime_error const& err)
+        catch(...)
         {
             std::cout << "-- covariance matrix singularity detected.. skipping"
                       << std::endl;
