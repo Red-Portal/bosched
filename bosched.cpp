@@ -167,7 +167,7 @@ namespace bosched
                 auto [hist_mean, hist_var] = loop_state.gp->predict(best_x);
 
                 std::cout << "-- evaluating mean GP of loop " << loop_id
-                          << " opt best param: " << loop_state.param
+                          << " opt best param: " << param
                           << " mean: " << mean
                           << " var: " << var
                           << " hist best param: " << best_x
