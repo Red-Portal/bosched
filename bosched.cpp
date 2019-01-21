@@ -81,7 +81,7 @@ namespace bosched
         { loop_state.gp->update(loop_state.param, y_avg); }
         catch(std::exception const& err)
         {
-            continue;
+            return;
         }
 
         auto [next, mean, var, acq] =
