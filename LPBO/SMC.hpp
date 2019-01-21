@@ -173,7 +173,7 @@ namespace lpbo
                 {
                     particle.update(_data_x, y);
                 }
-                catch(std::exception const& )
+                catch(std::runtime_error const& err)
                 {
                     size_t sel = rejuvenate_select(_rng, weights);
                     particle.rejuvenate(_data_x,
