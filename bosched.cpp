@@ -154,15 +154,25 @@ namespace bosched
             if(loop_state.warming_up)
                 continue;
 
-            auto [param, mean, var] = lpbo::find_best_mean(*loop_state.gp, _epsilon, 2000);
-            loop_state.param = param;
+            auto y = loop_state.gp->data_y();
+            auto best_y = std::min_element(y.begin(), y.end());
+            auto best_idx = std::distance(y.begin(), best_y);
+            auto best_x = loop_state.gp->data_y()[best_idx];
+
+            loop_state.param = best_x;
 
             if(_is_debug)
             {
+                auto [param, mean, var] = lpbo::find_best_mean(*loop_state.gp, _epsilon, 2000);
+                auto [hist_mean, hist_var] = loop_state.gp->predict(best_x);
+
                 std::cout << "-- evaluating mean GP of loop " << loop_id
-                          << " best param: " << loop_state.param
+                          << " opt best param: " << loop_state.param
                           << " mean: " << mean
                           << " var: " << var
+                          << " hist best param: " << best_x
+                          << " mean: " << hist_mean
+                          << " var: " << hist_var
                           << std::endl;
             }
         }
