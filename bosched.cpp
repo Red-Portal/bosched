@@ -49,12 +49,21 @@ namespace bosched
         {
             size_t particle_num = 10;
             double survival_rate = 0.8;
-            loop_state.warming_up = false;
-            loop_state.gp.emplace(loop_state.obs_x,
-                                  loop_state.obs_y,
-                                  particle_num,
-                                  survival_rate);
+
+            try
+            {
+                loop_state.gp.emplace(loop_state.obs_x,
+                                      loop_state.obs_y,
+                                      particle_num,
+                                      survival_rate);
+            }
+            catch(std::runtime_error const& err)
+            {
+                return;
+            }
+
             loop_state.iteration = 1;
+            loop_state.warming_up = false;
 
             auto [next, mean, var, acq] =
                 lpbo::bayesian_optimization(*loop_state.gp,
@@ -79,7 +88,7 @@ namespace bosched
         auto y_avg = sum / loop_state.obs_y.size();
         try
         { loop_state.gp->update(loop_state.param, y_avg); }
-        catch(std::exception const& err)
+        catch(std::runtime_error const& err)
         {
             std::cout << "-- covariance matrix singularity detected.. skipping"
                       << std::endl;
