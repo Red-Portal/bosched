@@ -59,6 +59,8 @@ namespace bosched
             }
             catch(std::runtime_error const& err)
             {
+                std::cout << "-- covariance matrix singularity detected.. skipping"
+                          << std::endl;
                 return;
             }
 
