@@ -169,7 +169,18 @@ namespace lpbo
 
             for(auto& particle : _particles)
             {
-                particle.update(_data_x, y);
+                try
+                {
+                    particle.update(_data_x, y);
+                }
+                catch(std::exception const& )
+                {
+                    size_t sel = rejuvenate_select(_rng, weights);
+                    particle.rejuvenate(_data_x,
+                                        _data_y,
+                                        _particles[sel].parameters(),
+                                        200);
+                }
             }
 
             for(size_t i = 0; i < _particles.size(); ++i)

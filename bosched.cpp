@@ -81,6 +81,8 @@ namespace bosched
         { loop_state.gp->update(loop_state.param, y_avg); }
         catch(std::exception const& err)
         {
+            std::cout << "-- covariance matrix singularity detected.. skipping"
+                      << std::endl;
             return;
         }
 
