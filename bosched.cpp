@@ -325,7 +325,7 @@ extern "C"
 
             if(_is_bo_schedule)
             {
-                if( loop_state.warming_up && loop_state.obs_x.size() < 30 )
+                if( loop_state.warming_up && loop_state.obs_x.size() < 50 )
                 {
                     loop_state.obs_x.push_back(loop_state.param);
                     loop_state.obs_y.push_back(duration.count());
