@@ -146,6 +146,7 @@ namespace bosched
     inline void
     eval_loop_parameters(std::unordered_map<size_t, loop_state_t>& loop_states)
     {
+        bool use_opt = getenv("USE_OPT") ? true : false;
         for(auto& l : loop_states)
         {
             auto loop_id = l.first;
@@ -154,16 +155,17 @@ namespace bosched
             if(loop_state.warming_up)
                 continue;
 
+            auto [param, mean, var] = lpbo::find_best_mean(*loop_state.gp, _epsilon, 2000);
+
             auto y = loop_state.gp->data_y();
             auto best_y = std::min_element(y.begin(), y.end());
             auto best_idx = std::distance(y.begin(), best_y);
             auto best_x = loop_state.gp->data_x()[best_idx];
 
-            loop_state.param = best_x;
-
+            loop_state.param = param ? use_opt : best_x;
+                
             if(_is_debug)
             {
-                auto [param, mean, var] = lpbo::find_best_mean(*loop_state.gp, _epsilon, 2000);
                 auto [hist_mean, hist_var] = loop_state.gp->predict(best_x);
 
                 std::cout << "-- evaluating mean GP of loop " << loop_id
