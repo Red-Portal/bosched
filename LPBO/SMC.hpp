@@ -25,7 +25,7 @@ namespace lpbo
 
         template<typename Rng>
         inline std::vector<size_t>
-        selection(Rng&& rng, std::vector<double> weights) const
+        selection(Rng&& rng, std::vector<double> weights) const noexcept
         {
             size_t num_casualties = static_cast<size_t>(
                 floor(weights.size() * (1 - _survival_rate)));
@@ -48,7 +48,7 @@ namespace lpbo
 
         template<typename Rng>
         inline size_t
-        rejuvenate_select(Rng&& rng, std::vector<double> const& weights) const
+        rejuvenate_select(Rng&& rng, std::vector<double> const& weights) const noexcept
         {
             auto dist = std::discrete_distribution<size_t>(
                 weights.cbegin(), weights.cend());
@@ -114,7 +114,7 @@ namespace lpbo
         }
 
         inline
-        smc_gp(std::string const& serialized)
+        smc_gp(std::string const& serialized) noexcept
             : _survival_rate(),
               _weights(),
               _rng()
@@ -204,7 +204,7 @@ namespace lpbo
         }
 
         inline std::string
-        serialize() const
+        serialize() const noexcept
         {
             std::stringstream stream;
             stream << std::to_string(_survival_rate) + '\n';
@@ -222,7 +222,7 @@ namespace lpbo
         }
 
         inline void
-        deserialize(std::string const& serialized)
+        deserialize(std::string const& serialized) noexcept
         {
             if(_particles.size() != 0)
             {
@@ -260,19 +260,19 @@ namespace lpbo
         }
 
         inline lpbo::vec& 
-        data_x()
+        data_x() noexcept
         {
             return _data_x;
         }
 
         inline lpbo::vec&
-        data_y()
+        data_y() noexcept
         {
             return _data_y;
         }
 
         inline std::pair<double, double>
-        predict(double x) const
+        predict(double x) const noexcept
         {
             double mean = 0.0;
             double var  = 0.0;
