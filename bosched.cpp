@@ -157,7 +157,7 @@ namespace bosched
             auto y = loop_state.gp->data_y();
             auto best_y = std::min_element(y.begin(), y.end());
             auto best_idx = std::distance(y.begin(), best_y);
-            auto best_x = loop_state.gp->data_y()[best_idx];
+            auto best_x = loop_state.gp->data_x()[best_idx];
 
             loop_state.param = best_x;
 
