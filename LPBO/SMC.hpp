@@ -180,7 +180,6 @@ namespace lpbo
                                         _data_y,
                                         _particles[sel].parameters(),
                                         200);
-                    particle.update(_data_x, y);
                 }
             }
 
