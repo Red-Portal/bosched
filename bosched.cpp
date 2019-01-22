@@ -162,13 +162,14 @@ namespace bosched
             auto best_idx = std::distance(y.begin(), best_y);
             auto best_x = loop_state.gp->data_x()[best_idx];
 
-            loop_state.param = param ? use_opt : best_x;
+            loop_state.param = use_opt ? param : best_x;
                 
             if(_is_debug)
             {
                 auto [hist_mean, hist_var] = loop_state.gp->predict(best_x);
 
                 std::cout << "-- evaluating mean GP of loop " << loop_id
+                          << " best param: " << param
                           << " opt best param: " << param
                           << " mean: " << mean
                           << " var: " << var
