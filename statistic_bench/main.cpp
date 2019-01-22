@@ -125,7 +125,7 @@ void benchmark(Rng& rng,
 
     if(getenv("EVAL"))
     {
-        iteration = 1024;
+        iteration = 256;
     }
 
     auto measures = std::vector<double>(iteration);
