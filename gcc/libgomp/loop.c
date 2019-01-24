@@ -70,6 +70,10 @@ gomp_loop_init (struct gomp_work_share *ws, long start, long end, long incr,
     {
         ws->chunk_size = num_tasks / nthreads;
     }
+    else if(sched == FS_TAPE)
+    {
+        ws->param = 3.0;
+    }
     else if(sched == FS_TSS ||  sched == BO_TSS)
     {
         if(sched == FS_TSS)

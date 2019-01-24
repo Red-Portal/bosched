@@ -70,6 +70,10 @@ gomp_loop_ull_init (struct gomp_work_share *ws, bool up, gomp_ull start,
     {
         ws->chunk_size_ull = num_tasks / nthreads;
     }
+    else if(sched == FS_TAPE)
+    {
+        ws->param = 3.0;
+    }
     else if(sched == FS_TSS ||  sched == BO_TSS)
     {
         if(sched == FS_TSS)
