@@ -463,6 +463,7 @@ bo_iter_ull_tss_next (gomp_ull *pstart, gomp_ull *pend)
     gomp_ull R;
 
     gomp_ull chunk_size = f - count * delta;
+    chunk_size = chunk_size < 1 ? 1 : chunk_size;
 
     while (1)
     {
@@ -511,6 +512,7 @@ bo_iter_tss_next (long *pstart, long *pend)
     bo_ul R;
     
     bo_ul chunk_size = f - count * delta;
+    chunk_size = chunk_size < 1 ? 1 : chunk_size;
 
     while (1)
     {
