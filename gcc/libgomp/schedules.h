@@ -453,7 +453,7 @@ bo_iter_ull_tss_next (gomp_ull *pstart, gomp_ull *pend)
     struct gomp_thread *thr = gomp_thread ();
     struct gomp_work_share *ws = thr->ts.work_share;
     //struct gomp_team *team = thr->ts.team;
-    gomp_ull count = __atomic_add_fetch (&ws->count_ull, 1, MEMMODEL_SEQ_CST);
+    gomp_ull count = __atomic_fetch_add (&ws->count_ull, 1, MEMMODEL_SEQ_CST);
     gomp_ull delta = 1 / ws->param;
     gomp_ull f     = ws->chunk_size_ull;
     gomp_ull incr  = ws->incr_ull;
@@ -501,8 +501,8 @@ bo_iter_tss_next (long *pstart, long *pend)
     struct gomp_thread *thr = gomp_thread ();
     struct gomp_work_share *ws = thr->ts.work_share;
     //struct gomp_team *team = thr->ts.team;
-    bo_ul count = __atomic_add_fetch (&ws->count, 1, MEMMODEL_SEQ_CST);
-    bo_ul delta = 1 / ws->param;
+    bo_ul count = __atomic_fetch_add(&ws->count, 1, MEMMODEL_SEQ_CST);
+    bo_ul delta = 1.0 / ws->param;
     bo_ul f     = ws->chunk_size;
     long  incr  = ws->incr;
     long  start = __atomic_load_n (&ws->next, MEMMODEL_RELAXED);
@@ -532,7 +532,6 @@ bo_iter_tss_next (long *pstart, long *pend)
     }
     *pstart = start;
     *pend = nend;
-    printf("R: %ld C: %ld delta: %ld\n", R, chunk_size, delta);
     return true;
 }
 
