@@ -532,8 +532,8 @@ bo_iter_tss_next (long *pstart, long *pend)
     }
     *pstart = start;
     *pend = nend;
-    return true;
     printf("R: %ld C: %ld delta: %ld\n", R, chunk_size, delta);
+    return true;
 }
 
 inline static bool
