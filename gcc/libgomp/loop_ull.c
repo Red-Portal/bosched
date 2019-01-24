@@ -72,7 +72,10 @@ gomp_loop_ull_init (struct gomp_work_share *ws, bool up, gomp_ull start,
     }
     else if(sched == FS_TAPE)
     {
-        ws->param = 3.0;
+        if(sched == BO_TAPE)
+            ws->param = tape_transform_range(ws->param);
+        else
+            ws->param = 3.0;
     }
     else if(sched == FS_TSS ||  sched == BO_TSS)
     {
@@ -146,7 +149,7 @@ gomp_loop_ull_init (struct gomp_work_share *ws, bool up, gomp_ull start,
    will see the construct exists and allocate work from it.
 
    START, END, INCR are the bounds of the loop; due to the restrictions of
-   OpenMP, these values must be the same in every thread.  This is not
+   OpTSSTSSenMP, these values must be the same in every thread.  This is not
    verified (nor is it entirely verifiable, since START is not necessarily
    retained intact in the work-share data structure).  CHUNK_SIZE is the
    scheduling parameter; again this must be identical in all threads.

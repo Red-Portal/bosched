@@ -551,7 +551,7 @@ bo_iter_ull_tape_next (gomp_ull *pstart, gomp_ull *pend)
     gomp_ull nend;
     gomp_ull R;
     gomp_ull K_min = tape_min_k(nthreads);
-    double v = tape_transform_range(ws->param);
+    double v = ws->param;
 
     while (1)
     {
@@ -604,7 +604,7 @@ bo_iter_tape_next (long *pstart, long *pend)
     bo_ul R = (end - start) / incr;
     bo_ul nend;
     bo_ul K_min = tape_min_k(nthreads);
-    double v = tape_transform_range(ws->param);
+    double v = ws->param;
 
     while (1)
     {
