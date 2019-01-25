@@ -11,7 +11,7 @@ typedef unsigned long long gomp_ull;
 inline gomp_ull
 tape_min_k(long nthreads)
 {
-    return nthreads * 2;
+    return 1;//nthreads * 2;
 }
 
 inline gomp_ull
@@ -563,7 +563,7 @@ bo_iter_ull_tape_next (gomp_ull *pstart, gomp_ull *pend)
         else
             R = (start - end) / -incr;
 
-        gomp_ull T = R / nthreads + K_min / 2;
+        gomp_ull T = (double)R / nthreads + (double)K_min / 2;
         gomp_ull K = T + v * v / 2 - v * sqrt(2 * T + v * v / 4); 
         chunk_size = K < K_min ? K_min : K;
         
@@ -613,7 +613,7 @@ bo_iter_tape_next (long *pstart, long *pend)
 
         R = (end - start) / incr;
 
-        bo_ul T = R / nthreads + K_min / 2;
+        bo_ul T = (double)R / nthreads + (double)K_min / 2;
         bo_ul K = T + v * v / 2 - v * sqrt(2 * T + v * v / 4); 
         chunk_size = K < K_min ? K_min : K;
 
