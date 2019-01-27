@@ -230,6 +230,15 @@ extern "C"
     void __attribute__ ((destructor))
     bo_save_data()
     {
+        if(_show_loop_stat)
+        {
+            //auto date = bosched::format_current_time();
+            auto stat_file_name = ".stat."s + _progname + "."s;
+            auto stat_stream = std::ofstream(stat_file_name + ".json"s);
+            stat_stream << _stats.dump(2); 
+            stat_stream.close();
+        }
+
         if(getenv("EVAL"))
             return;
 
@@ -240,14 +249,6 @@ extern "C"
         auto next = bosched::write_loops(updated_states);
 
         using namespace std::literals::string_literals;
-        if(_show_loop_stat)
-        {
-            //auto date = bosched::format_current_time();
-            auto stat_file_name = ".stat."s + _progname + "."s;
-            auto stat_stream = std::ofstream(stat_file_name + ".json"s);
-            stat_stream << _stats.dump(2); 
-            stat_stream.close();
-        }
 
         auto file_name = ".bostate."s + _progname;
         auto stream = std::ofstream(file_name + ".json"s);
