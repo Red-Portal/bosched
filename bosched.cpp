@@ -242,8 +242,8 @@ extern "C"
         using namespace std::literals::string_literals;
         if(_show_loop_stat)
         {
-            auto date = bosched::format_current_time();
-            auto stat_file_name = ".stat."s + _progname + "."s + date;
+            //auto date = bosched::format_current_time();
+            auto stat_file_name = ".stat."s + _progname + "."s;
             auto stat_stream = std::ofstream(stat_file_name + ".json"s);
             stat_stream << _stats.dump(2); 
             stat_stream.close();
