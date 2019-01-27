@@ -2,6 +2,7 @@
 #include "tls.hpp"
 #include "metrics.hpp"
 
+#include <iostream>
 #include <atomic>
 #include <boost/thread/tss.hpp>
 #include <cmath>
@@ -25,6 +26,7 @@ namespace bosched
         {
             _start.emplace();
             _start->reset(new bosched::clock::time_point(bosched::clock::now()));
+            std::cout << "what" << std::endl;
         }
         // if(_start.get() == nullptr)
         // {
