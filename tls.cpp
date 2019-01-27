@@ -22,18 +22,16 @@ namespace bosched
 
     void iteration_start_record()
     {
-        std::cout << "what" << std::endl;
         if(!_start)
         {
-            std::cout << "what" << std::endl;
             _start.emplace();
+        }
+
+        if(_start.get() == nullptr)
+        {
             _start->reset(new bosched::clock::time_point(bosched::clock::now()));
         }
-        // if(_start.get() == nullptr)
-            // {
-            //     _start.reset(new bosched::clock::time_point(bosched::clock::now()));
-            // }
-            **_start = bosched::clock::now();
+        **_start = bosched::clock::now();
     }
 
     void iteration_stop_record()
