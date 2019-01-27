@@ -31,7 +31,10 @@ namespace bosched
         {
             _start->reset(new bosched::clock::time_point(bosched::clock::now()));
         }
-        **_start = bosched::clock::now();
+        else
+        {
+            **_start = bosched::clock::now();
+        }
     }
 
     void iteration_stop_record()
