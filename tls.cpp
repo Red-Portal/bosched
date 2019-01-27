@@ -27,7 +27,7 @@ namespace bosched
             _start.emplace();
         }
 
-        if(!*_start)
+        if(!_start->get())
         {
             _start->reset(new bosched::clock::time_point(bosched::clock::now()));
         }
