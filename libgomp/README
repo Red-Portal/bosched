@@ -1,0 +1,23 @@
+                              LaPeSD LibGOMP
+
+ABOUT
+
+	This repository contains an enhanced implementation of LibGOMP,
+	which features the following extras:
+	
+		* The Smart Round-Robin (SRR) loop scheduler
+
+		* The Bin Packing LPT (BinLPT) loop scheduler
+
+BUILDING
+
+	To build LaPeSD LibGOMP execute the following commands in the root
+	directory of the project:
+	
+		$ make
+
+LICENSE AND MAINTAINERS
+
+	This is an open source software that is under GPLv3 license and is
+	maintained by Pedro H. Penna. Any questions or suggestions send him
+	an email: <pedrohenriquepenna@gmail.com>.

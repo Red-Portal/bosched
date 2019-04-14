@@ -27,10 +27,9 @@ bool _is_debug       = false;
 bool _is_bo_schedule = false;
 bool _is_new_file    = false;
 std::mt19937 _rng __attribute__((init_priority(101)));
-std::string _progname __attribute__((init_priority(101)));
 std::unordered_map<size_t, bosched::loop_state_t> _loop_states __attribute__((init_priority(101)));
+nlohmann::json _stats __attribute__((init_priority(101)));
 long _procs;
-nlohmann::json _stats;
 
 namespace bosched
 {
@@ -191,12 +190,12 @@ extern "C"
         std::ios_base::Init();
 
         using namespace std::literals::string_literals;
-        _progname = std::string(__progname);
+        auto progname = std::string(__progname);
 
-        auto seed = std::random_device();
+        std::random_device seed;
         _rng = std::mt19937(seed());
 
-        auto file_name = ".bostate."s + _progname;
+        auto file_name = ".bostate."s + progname;
         std::ifstream stream(file_name + ".json"s);
 
         if(getenv("DEBUG"))
@@ -221,6 +220,15 @@ extern "C"
         }
         stream.close();
 
+        if(_show_loop_stat)
+        {
+            auto stat_file_name = ".stat."s + progname;
+            auto stat_stream = std::ifstream(stat_file_name + ".json"s);
+            if(stat_stream)
+                stat_stream >> _stats; 
+            stat_stream.close();
+        }
+
         if(getenv("EVAL"))
         {
             bosched::eval_loop_parameters(_loop_states);
@@ -232,10 +240,10 @@ extern "C"
     {
         using namespace std::literals::string_literals;
 
+        auto progname = std::string(__progname);
         if(_show_loop_stat)
         {
-            //auto date = bosched::format_current_time();
-            auto stat_file_name = ".stat."s + _progname + "."s;
+            auto stat_file_name = ".stat."s + progname;
             auto stat_stream = std::ofstream(stat_file_name + ".json"s);
             stat_stream << _stats.dump(2); 
             stat_stream.close();
@@ -250,7 +258,7 @@ extern "C"
 
         auto next = bosched::write_loops(updated_states);
 
-        auto file_name = ".bostate."s + _progname;
+        auto file_name = ".bostate."s + progname;
         auto stream = std::ofstream(file_name + ".json"s);
         stream << next.dump(2); 
         stream.close();
@@ -332,11 +340,8 @@ extern "C"
         if(_is_bo_schedule || _show_loop_stat)
         {
             using time_scale_t = bosched::microsecond;
-
             auto& loop_state = _loop_states[region_id];
-
             auto duration = loop_state.loop_stop<time_scale_t>();
-
             if(_is_bo_schedule)
             {
                 if( loop_state.warming_up && loop_state.obs_x.size() < 30 )
@@ -359,19 +364,19 @@ extern "C"
                 auto efficiency = 1 / (1 + (total_overhead / work_time.count()));
                 auto cov  = bosched::coeff_of_variation();
 
-                auto log = nlohmann::json();
-                log["num_tasks"]  = loop_state.num_tasks;
-                log["work_time"]  = work_time.count();
-                log["loop_time"]  = duration.count();
-                log["efficiency"] = efficiency;
-                log["task_mean"]  = work_time.count() / loop_state.num_tasks;
-                log["cov"]        = cov;
+                auto& log = _stats[std::to_string(region_id)];
+                log["num_tasks"].push_back(loop_state.num_tasks);
+                log["work_time"].push_back(work_time.count());
+                log["loop_time"].push_back(duration.count());
+                log["efficiency"].push_back(efficiency);
+                log["task_mean"].push_back(work_time.count() / loop_state.num_tasks);
+                log["cov"].push_back(cov);
                 if(_is_debug)
                 {
                     std::cout << "-- loop " << region_id << " stats \n"
                               << log.dump(2) << '\n' << std::endl;
                 }
-                _stats.push_back(std::move(log));
+                //_stats.push_back(std::move(log));
             }
         }
 
