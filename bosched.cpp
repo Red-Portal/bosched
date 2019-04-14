@@ -357,6 +357,7 @@ extern "C"
 
                 auto total_overhead = (duration.count() - (work_time.count() / _procs));
                 auto efficiency = 1 / (1 + (total_overhead / work_time.count()));
+                auto cov  = bosched::coeff_of_variation();
 
                 auto log = nlohmann::json();
                 log["num_tasks"]  = loop_state.num_tasks;
@@ -364,6 +365,7 @@ extern "C"
                 log["loop_time"]  = duration.count();
                 log["efficiency"] = efficiency;
                 log["task_mean"]  = work_time.count() / loop_state.num_tasks;
+                log["cov"]        = cov;
                 if(_is_debug)
                 {
                     std::cout << "-- loop " << region_id << " stats \n"

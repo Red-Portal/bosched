@@ -14,6 +14,8 @@ namespace bosched
 
     void iteration_stop_record();
 
+    double coeff_of_variation();
+
     bosched::millisecond fetch_total_runtime();
 }
 
