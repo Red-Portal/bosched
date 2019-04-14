@@ -162,7 +162,7 @@ gomp_loop_ull_init (struct gomp_work_share *ws, bool up, gomp_ull start,
 static bool
 gomp_loop_ull_static_start (bool up, gomp_ull start, gomp_ull end,
                             gomp_ull incr, gomp_ull chunk_size,
-                            gomp_ull *istart, gomp_ull *iend)
+                            gomp_ull *istart, gomp_ull *iend, region_id_t region_id)
 {
     struct gomp_thread *thr = gomp_thread ();
 
@@ -170,7 +170,7 @@ gomp_loop_ull_static_start (bool up, gomp_ull start, gomp_ull end,
     if (gomp_work_share_start (false))
     {
         gomp_loop_ull_init (thr->ts.work_share, up, start, end, incr,
-                            GFS_STATIC, chunk_size, 0);
+                            GFS_STATIC, chunk_size, region_id);
         gomp_work_share_init_done ();
     }
 
@@ -180,7 +180,7 @@ gomp_loop_ull_static_start (bool up, gomp_ull start, gomp_ull end,
 static bool
 gomp_loop_ull_dynamic_start (bool up, gomp_ull start, gomp_ull end,
                              gomp_ull incr, gomp_ull chunk_size,
-                             gomp_ull *istart, gomp_ull *iend)
+                             gomp_ull *istart, gomp_ull *iend, region_id_t region_id)
 {
     struct gomp_thread *thr = gomp_thread ();
     bool ret;
@@ -188,7 +188,7 @@ gomp_loop_ull_dynamic_start (bool up, gomp_ull start, gomp_ull end,
     if (gomp_work_share_start (false))
     {
         gomp_loop_ull_init (thr->ts.work_share, up, start, end, incr,
-                            GFS_DYNAMIC, chunk_size, 0);
+                            GFS_DYNAMIC, chunk_size, region_id);
         gomp_work_share_init_done ();
     }
 
@@ -206,7 +206,7 @@ gomp_loop_ull_dynamic_start (bool up, gomp_ull start, gomp_ull end,
 static bool
 gomp_loop_ull_guided_start (bool up, gomp_ull start, gomp_ull end,
                             gomp_ull incr, gomp_ull chunk_size,
-                            gomp_ull *istart, gomp_ull *iend)
+                            gomp_ull *istart, gomp_ull *iend, region_id_t region_id)
 {
     struct gomp_thread *thr = gomp_thread ();
     bool ret;
@@ -214,7 +214,7 @@ gomp_loop_ull_guided_start (bool up, gomp_ull start, gomp_ull end,
     if (gomp_work_share_start (false))
     {
         gomp_loop_ull_init (thr->ts.work_share, up, start, end, incr,
-                            GFS_GUIDED, chunk_size, 0);
+                            GFS_GUIDED, chunk_size, region_id);
         gomp_work_share_init_done ();
     }
 
@@ -334,23 +334,23 @@ GOMP_loop_ull_runtime_start (bool up, gomp_ull start, gomp_ull end,
     case GFS_STATIC:
         valid = gomp_loop_ull_static_start (up, start, end, incr,
                                             icv->run_sched_chunk_size,
-                                            istart, iend);
+                                            istart, iend, region_id );
         break;
     case GFS_DYNAMIC:
         valid = gomp_loop_ull_dynamic_start (up, start, end, incr,
                                              icv->run_sched_chunk_size,
-                                                istart, iend);
+											 istart, iend, region_id );
         break;
     case GFS_GUIDED:
-        valid = gomp_loop_ull_guided_start (up, start, end, incr,
+	  valid = gomp_loop_ull_guided_start (up, start, end, incr,
                                             icv->run_sched_chunk_size,
-                                            istart, iend);
+                                            istart, iend, region_id );
         break;
     case GFS_AUTO:
         /* For now map to schedule(static), later on we could play with feedback
            driven choice.  */
         valid = gomp_loop_ull_static_start (up, start, end, incr,
-                                            0, istart, iend);
+                                            0, istart, iend, region_id );
         break;
 
     case FS_AF:

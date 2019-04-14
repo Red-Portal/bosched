@@ -160,7 +160,7 @@ gomp_loop_init (struct gomp_work_share *ws, long start, long end, long incr,
 
 static bool
 gomp_loop_static_start (long start, long end, long incr, long chunk_size,
-                        long *istart, long *iend)
+                        long *istart, long *iend, region_id_t region_id )
 {
     struct gomp_thread *thr = gomp_thread ();
 
@@ -170,7 +170,7 @@ gomp_loop_static_start (long start, long end, long incr, long chunk_size,
 
         //printf("starting omp runtime region!\n");
         gomp_loop_init (thr->ts.work_share, start, end, incr,
-                        GFS_STATIC, chunk_size, 0);
+                        GFS_STATIC, chunk_size, region_id );
         gomp_work_share_init_done ();
     }
 
@@ -184,7 +184,7 @@ gomp_loop_static_start (long start, long end, long incr, long chunk_size,
 
 static bool
 gomp_loop_dynamic_start (long start, long end, long incr, long chunk_size,
-                         long *istart, long *iend)
+                         long *istart, long *iend, region_id_t region_id )
 {
     struct gomp_thread *thr = gomp_thread ();
     bool ret;
@@ -192,7 +192,7 @@ gomp_loop_dynamic_start (long start, long end, long incr, long chunk_size,
     if (gomp_work_share_start (false))
     {
         gomp_loop_init (thr->ts.work_share, start, end, incr,
-                        GFS_DYNAMIC, chunk_size, 0);
+                        GFS_DYNAMIC, chunk_size, region_id );
         gomp_work_share_init_done ();
     }
 
@@ -212,7 +212,7 @@ gomp_loop_dynamic_start (long start, long end, long incr, long chunk_size,
 
 static bool
 gomp_loop_guided_start (long start, long end, long incr, long chunk_size,
-                        long *istart, long *iend)
+                        long *istart, long *iend, region_id_t region_id )
 {
     struct gomp_thread *thr = gomp_thread ();
     bool ret;
@@ -220,7 +220,7 @@ gomp_loop_guided_start (long start, long end, long incr, long chunk_size,
     if (gomp_work_share_start (false))
     {
         gomp_loop_init (thr->ts.work_share, start, end, incr,
-                        GFS_GUIDED, chunk_size, 0);
+                        GFS_GUIDED, chunk_size, region_id );
         gomp_work_share_init_done ();
     }
 
@@ -343,23 +343,23 @@ GOMP_loop_runtime_start (long start, long end, long incr,
     case GFS_STATIC:
         valid = gomp_loop_static_start (start, end, incr,
                                         icv->run_sched_chunk_size,
-                                        istart, iend);
+                                        istart, iend, region_id);
         break;
     case GFS_DYNAMIC:
         valid = gomp_loop_dynamic_start (start, end, incr,
                                          icv->run_sched_chunk_size,
-                                        istart, iend);
+										 istart, iend, region_id);
         break;
     case GFS_GUIDED:
-        valid = gomp_loop_guided_start (start, end, incr,
+	  valid = gomp_loop_guided_start (start, end, incr,
                                         icv->run_sched_chunk_size,
-                                       istart, iend);
+										istart, iend, region_id);
         break;
     case GFS_AUTO:
-        /* For now map to schedule(static), later on we could play with feedback
+	  /* For now map to schedule(static), later on we could play with feedback
            driven choice.  */
         valid = gomp_loop_static_start (start, end, incr, 0,
-                                        istart, iend);
+                                        istart, iend, region_id);
         break;
 
     case FS_AF:
