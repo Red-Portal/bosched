@@ -154,7 +154,7 @@ namespace bosched
             if(loop_state.warming_up)
                 continue;
 
-            auto [param, mean, var] = lpbo::find_best_mean(*loop_state.gp, _epsilon, 2000);
+            auto [param, mean, var] = lpbo::find_best_mean(*loop_state.gp, _epsilon, 5000);
 
             auto y = loop_state.gp->data_y();
             auto best_y = std::min_element(y.begin(), y.end());
