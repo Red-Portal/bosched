@@ -66,80 +66,95 @@ gomp_loop_init (struct gomp_work_share *ws, long start, long end, long incr,
 
     bo_schedule_begin(region_id, num_tasks, nthreads);
 
-    if(sched == FS_FAC2)
-    {
-        ws->chunk_size = num_tasks / nthreads;
-    }
-    else if(sched == FS_TAPE || sched == BO_TAPE)
-    {
-        if(sched == BO_TAPE)
-            ws->param = tape_transform_range(ws->param);
-        else
-            ws->param = 3.0;
-    }
-    else if(sched == FS_TSS ||  sched == BO_TSS)
-    {
-        if(sched == FS_TSS)
-        {
-            double temp = (double)num_tasks / (2 * nthreads + 1);
-            ws->param = (2 * num_tasks) / (temp * temp);
-        }
-        ws->chunk_size = sqrt(2.0 * num_tasks / ws->param) - 1; // f in the original paper
-        ws->count = 0;
-    }
-    else if(sched == FS_FSS || sched == BO_FSS)
-    {
-        ws->param = fss_transform_range(ws->param);
-        double temp = nthreads / 2.0 * ws->param;
-        double b2 = (1.0 / num_tasks) * temp * temp;
-        double x = 1 + b2 + sqrt( b2 * (b2 + 2));
-        unsigned long F = (num_tasks / x) / nthreads;
-        unsigned long PF  = F * nthreads;
-        unsigned long nbarrier = ws->barrier + (PF * ws->incr);
+	switch(sched) {
+	case FS_FAC2:
+	  {
+		ws->chunk_size = num_tasks / nthreads;
+		break;
+	  }
+	case FS_TAPE:
+	case BO_TAPE:
+	  {
+		if(sched == BO_TAPE)
+		  ws->param = tape_transform_range(ws->param);
+		else
+		  ws->param = 3.0;
+		break;
+	  }
 
-        ws->chunk_size = F;
-        ws->barrier = nbarrier; 
-    }
-    else if (sched == GFS_DYNAMIC
-             || sched == FS_CSS
-             || sched == BO_CSS )
-    {
-        if(sched == FS_CSS || sched == BO_CSS )
-        {
-            ws->param = css_transform_range(ws->param);
-            ws->chunk_size = css_chunk_size(ws->param, num_tasks, nthreads);
-        }
-        ws->chunk_size *= incr;
+	case FS_TSS:
+	case BO_TSS:
+	  {
+		if(sched == FS_TSS)
+		  {
+			double temp = (double)num_tasks / (2 * nthreads + 1);
+			ws->param = (2 * num_tasks) / (temp * temp);
+		  }
+		ws->chunk_size = sqrt(2.0 * num_tasks / ws->param) - 1; // f in the original paper
+		ws->count = 0;
+		break;
+	  }
+
+	case FS_FSS:
+	case BO_FSS:
+	  {
+		ws->param = fss_transform_range(ws->param);
+		double temp = nthreads / 2.0 * ws->param;
+		double b2 = (1.0 / num_tasks) * temp * temp;
+		double x = 1 + b2 + sqrt( b2 * (b2 + 2));
+		unsigned long F = (num_tasks / x) / nthreads;
+		unsigned long PF  = F * nthreads;
+		unsigned long nbarrier = ws->barrier + (PF * ws->incr);
+
+		ws->chunk_size = F;
+		ws->barrier = nbarrier; 
+		break;
+	  }
+
+	case GFS_DYNAMIC:
+	case FS_CSS:
+	case BO_CSS:
+	  {
+		if(sched == FS_CSS || sched == BO_CSS )
+		  {
+			ws->param = css_transform_range(ws->param);
+			ws->chunk_size = css_chunk_size(ws->param, num_tasks, nthreads);
+		  }
+		ws->chunk_size *= incr;
 
 #ifdef HAVE_SYNC_BUILTINS
-        {
-            /* For dynamic scheduling prepare things to make each iteration
-               faster.  */
-            struct gomp_thread *thr = gomp_thread ();
-            struct gomp_team *team = thr->ts.team;
-            long nthreads = team ? team->nthreads : 1;
+		{
+		  /* For dynamic scheduling prepare things to make each iteration
+			 faster.  */
+		  struct gomp_thread *thr = gomp_thread ();
+		  struct gomp_team *team = thr->ts.team;
+		  long nthreads = team ? team->nthreads : 1;
 
-            if (__builtin_expect (incr > 0, 1))
-            {
-                /* Cheap overflow protection.  */
-                if (__builtin_expect ((nthreads | ws->chunk_size)
-                                      >= 1UL << (sizeof (long)
-                                                 * __CHAR_BIT__ / 2 - 1), 0))
-                    ws->mode = 0;
-                else
-                    ws->mode = ws->end < (LONG_MAX
-                                          - (nthreads + 1) * ws->chunk_size);
-            }
-            /* Cheap overflow protection.  */
-            else if (__builtin_expect ((nthreads | -ws->chunk_size)
-                                       >= 1UL << (sizeof (long)
-                                                  * __CHAR_BIT__ / 2 - 1), 0))
-                ws->mode = 0;
-            else
-                ws->mode = ws->end > (nthreads + 1) * -ws->chunk_size - LONG_MAX;
-        }
+		  if (__builtin_expect (incr > 0, 1))
+			{
+			  /* Cheap overflow protection.  */
+			  if (__builtin_expect ((nthreads | ws->chunk_size)
+									>= 1UL << (sizeof (long)
+											   * __CHAR_BIT__ / 2 - 1), 0))
+				ws->mode = 0;
+			  else
+				ws->mode = ws->end < (LONG_MAX
+									  - (nthreads + 1) * ws->chunk_size);
+			}
+		  /* Cheap overflow protection.  */
+		  else if (__builtin_expect ((nthreads | -ws->chunk_size)
+									 >= 1UL << (sizeof (long)
+												* __CHAR_BIT__ / 2 - 1), 0))
+			ws->mode = 0;
+		  else
+			ws->mode = ws->end > (nthreads + 1) * -ws->chunk_size - LONG_MAX;
+		}
 #endif
-    }
+		break;
+	  }
+	default:
+	  break;
+	}
 }
 
 /* The *_start routines are called when first encountering a loop construct
