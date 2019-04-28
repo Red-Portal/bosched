@@ -26,8 +26,10 @@ namespace bosched
     {
         _total_runtime.store(size_t(0));
         _startstamp = bosched::clock::now();
-        _timestamp  = std::vector<bosched::clock::time_point>(omp_get_max_threads());
-        _tailstamp  = std::vector<bosched::clock::time_point>(omp_get_max_threads());
+        _timestamp  = std::vector<bosched::clock::time_point>(
+            omp_get_max_threads(), _startstamp);
+        _tailstamp  = std::vector<bosched::clock::time_point>(
+            omp_get_max_threads(), _startstamp);
     }
 
     void iteration_start_record()

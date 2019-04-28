@@ -7,6 +7,7 @@
 #include "state_io.hpp"
 #include "tls.hpp"
 #include "utils.hpp"
+#include "performance.hpp"
 
 #include <atomic>
 #include <blaze/Blaze.h>
@@ -358,25 +359,32 @@ extern "C"
             if(__builtin_expect (_show_loop_stat, false))
             {
                 auto work_time = std::chrono::duration_cast<time_scale_t>(
-                    bosched::fetch_total_runtime());
+                    bosched::total_work()).count();
 
-                auto total_overhead = (duration.count() - (work_time.count() / _procs));
-                auto efficiency = 1 / (1 + (total_overhead / work_time.count()));
-                auto cov  = bosched::coeff_of_variation();
+                auto parallel_time = duration.count();
+
+                auto work_per_processor = bosched::work_per_processor();
+                auto performance        =  work_time / parallel_time;
+                auto cost               = parallel_time * _procs;
+                auto effectiveness      =  performance / cost;
+                auto cov                = bosched::coeff_of_variation(work_per_processor);
+                auto slowdown           = bosched::slowdown(work_per_processor);
 
                 auto& log = _stats[std::to_string(region_id)];
                 log["num_tasks"].push_back(loop_state.num_tasks);
-                log["work_time"].push_back(work_time.count());
-                log["loop_time"].push_back(duration.count());
-                log["efficiency"].push_back(efficiency);
-                log["task_mean"].push_back(work_time.count() / loop_state.num_tasks);
+                log["work_time"].push_back(work_time);
+                log["parallel_time"].push_back(parallel_time);
+                log["effectiveness"].push_back(effectiveness);
+                log["performance"].push_back(performance);
+                log["task_mean"].push_back(work_time / loop_state.num_tasks);
+                log["slowdown"].push_back(slowdown);
                 log["cov"].push_back(cov);
+                log["cost"].push_back(cost);
                 if(_is_debug)
                 {
                     std::cout << "-- loop " << region_id << " stats \n"
                               << log.dump(2) << '\n' << std::endl;
                 }
-                //_stats.push_back(std::move(log));
             }
         }
 
