@@ -416,8 +416,6 @@ GOMP_loop_runtime_start (long start, long end, long incr,
     default:
         abort ();
     }
-    if(valid)
-        bo_record_iteration_start();
     return valid;
 }
 
@@ -772,7 +770,8 @@ GOMP_loop_runtime_next (long *istart, long *iend)
     default:
         abort ();
     }
-    bo_record_iteration_start();
+	if(valid)
+	  bo_record_iteration_start();
     return valid;
 }
 

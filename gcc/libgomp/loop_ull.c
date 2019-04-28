@@ -66,13 +66,14 @@ gomp_loop_ull_init (struct gomp_work_share *ws, bool up, gomp_ull start,
 
     bo_schedule_begin(region_id, num_tasks, nthreads);
 
-	switch() {
+	switch(sched) {
 	case FS_FAC2:
 	  {
 		ws->chunk_size_ull = num_tasks / nthreads;
 		break;
 	  }
 	case FS_TAPE:
+	case BO_TAPE:
 	  {
 		if(sched == BO_TAPE)
 		  ws->param = tape_transform_range(ws->param);
@@ -93,8 +94,8 @@ gomp_loop_ull_init (struct gomp_work_share *ws, bool up, gomp_ull start,
 		break;
 	  }
 	  
-	case FS_TAPE:
-	case BO_TAPE:
+	case FS_FSS:
+	case BO_FSS:
 	  {
 		ws->param = fss_transform_range(ws->param);
 		double temp = nthreads / 2.0 * ws->param ;
@@ -250,14 +251,14 @@ bo_loop_ull_fac2_start (bool up, gomp_ull start, gomp_ull end,
     struct gomp_thread *thr = gomp_thread ();
     bool ret;
 
-    if (gomp_work_share_start (false))
-    {
-        gomp_loop_ull_init (thr->ts.work_share, up,
-                            start, end, incr, sched, 0, region_id);
-        gomp_work_share_init_done ();
-    }
+	if (gomp_work_share_start (false))
+	  {
+		gomp_loop_ull_init (thr->ts.work_share, up,
+							start, end, incr, sched, 0, region_id);
+		gomp_work_share_init_done ();
+	  }
 
-    ret = bo_iter_ull_fac2_next (istart, iend);
+	ret = bo_iter_ull_fac2_next (istart, iend);
     return ret;
 }
 
@@ -405,8 +406,6 @@ GOMP_loop_ull_runtime_start (bool up, gomp_ull start, gomp_ull end,
     default:
         abort ();
     }
-    if(valid)
-        bo_record_iteration_start();
     return valid;
 }
 
@@ -721,57 +720,51 @@ GOMP_loop_ull_runtime_next (gomp_ull *istart, gomp_ull *iend)
     bool valid;  
     struct gomp_work_share *ws = thr->ts.work_share;
 
-    // gomp_ull tasks;
-    // if (__builtin_expect (ws->mode, 0) == 0)
-    //     tasks = (*iend - *istart) / ws->incr_ull;
-    // else
-    //     tasks = (*iend - *istart) / (-1) * ws->incr_ull;
+    switch (ws->sched) {
+	case GFS_STATIC:
+	case GFS_AUTO:
+	  valid = gomp_loop_ull_static_next (istart, iend);
+	  break;
+	case GFS_DYNAMIC:
+	  valid = gomp_loop_ull_dynamic_next (istart, iend);
+	  break;
+	case GFS_GUIDED:
+	  valid = gomp_loop_ull_guided_next (istart, iend);
+	  break;
 
-    switch (ws->sched)
-    {
-    case GFS_STATIC:
-    case GFS_AUTO:
-        valid = gomp_loop_ull_static_next (istart, iend);
-        break;
-    case GFS_DYNAMIC:
-        valid = gomp_loop_ull_dynamic_next (istart, iend);
-        break;
-    case GFS_GUIDED:
-        valid = gomp_loop_ull_guided_next (istart, iend);
-        break;
+	case FS_AF:
+	  abort ();
 
-    case FS_AF:
-        abort ();
+	case FS_FAC2:
+	  valid = bo_loop_ull_fac2_next (istart, iend);
+	  break;
 
-    case FS_FAC2:
-        valid = bo_loop_ull_fac2_next (istart, iend);
-        break;
+	case FS_FSS:
+	case BO_FSS:
+	  valid = bo_loop_ull_fss_next (istart, iend);
+	  break;
 
-    case FS_FSS:
-    case BO_FSS:
-        valid = bo_loop_ull_fss_next (istart, iend);
-        break;
+	case FS_TSS:
+	case BO_TSS:
+	  valid = bo_loop_ull_tss_next (istart, iend);
+	  break;
 
-    case FS_TSS:
-    case BO_TSS:
-        valid = bo_loop_ull_tss_next (istart, iend);
-        break;
+	case FS_CSS:
+	case BO_CSS:
+	  valid = bo_loop_ull_css_next (istart, iend);
+	  break;
 
-    case FS_CSS:
-    case BO_CSS:
-        valid = bo_loop_ull_css_next (istart, iend);
-        break;
+	case FS_TAPE:
+	case BO_TAPE:
+	  valid = bo_loop_ull_tape_next (istart, iend);
+	  break;
 
-    case FS_TAPE:
-    case BO_TAPE:
-        valid = bo_loop_ull_tape_next (istart, iend);
-        break;
-
-    default:
-        abort ();
-    }
-    bo_record_iteration_start();
-    return valid;
+	default:
+	  abort ();
+	}
+	if(valid)
+	  bo_record_iteration_start();
+	return valid;
 }
 
 /* The *_ordered_*_next routines are called when the thread completes

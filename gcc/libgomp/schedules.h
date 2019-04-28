@@ -38,7 +38,6 @@ clip(long x, long low, long hi)
     return temp;
 }
 
-
 inline gomp_ull
 css_chunk_size_ull(double param, gomp_ull N, size_t P)
 {
