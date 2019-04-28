@@ -3,6 +3,7 @@
 #define _BOSCHED_TLS_HPP_
 
 #include <boost/thread/tss.hpp>
+#include <vector>
 
 #include "metrics.hpp"
 
@@ -14,9 +15,9 @@ namespace bosched
 
     void iteration_stop_record();
 
-    double coeff_of_variation();
+    std::vector<double> work_per_processor();
 
-    bosched::millisecond fetch_total_runtime();
+    bosched::millisecond total_work();
 }
 
 #endif
