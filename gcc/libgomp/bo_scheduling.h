@@ -12,6 +12,10 @@ extern void bo_record_iteration_stop();
 extern void bo_load_data(char const* progname,
                          size_t sched_id);
 
+extern void bo_binlpt_load_loop(unsigned long long region_id,
+								int* out_override,
+								unsigned* inout_task_map);
+
 extern void bo_save_data(char const* progname,
                          size_t sched_id);
 

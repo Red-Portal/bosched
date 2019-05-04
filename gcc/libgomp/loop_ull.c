@@ -93,7 +93,7 @@ gomp_loop_ull_init (struct gomp_work_share *ws, bool up, gomp_ull start,
 		ws->count_ull = 0;
 		break;
 	  }
-	  
+
 	case FS_FSS:
 	case BO_FSS:
 	  {
@@ -113,6 +113,20 @@ gomp_loop_ull_init (struct gomp_work_share *ws, bool up, gomp_ull start,
 		ws->barrier_ull = nbarrier; 
 		break;
 	  }
+
+	/* case FS_AFAC: */
+	/*   { */
+	/* 	gomp_ull F = num_tasks / (nthreads * 2); */
+	/* 	ws->chunk_size_ull = F; */
+	/* 	ws->barrier_ull    = start; */
+	/* 	ws->next           = start + ((num_tasks / 2) * ws->incr_ull); */
+	/* 	ws->cnt_ull        = malloc(nthreads * sizeof(gomp_ull)); */
+	/* 	ws->load_ull       = malloc(F * sizeof(gomp_ull)); */
+	/* 	memset(ws->cnt_ull, 0, nthreads * sizeof(gomp_ull)); */
+	/* 	memset(ws->load_ull, 0, F * sizeof(gomp_ull)); */
+	/* 	break; */
+	/*   } */
+	  
 	case GFS_DYNAMIC:
 	case FS_CSS:
 	case BO_CSS:
@@ -281,6 +295,25 @@ bo_loop_ull_fss_start (bool up, gomp_ull start, gomp_ull end,
     return ret;
 }
 
+/* static bool */
+/* bo_loop_ull_afac_start (bool up, gomp_ull start, gomp_ull end, */
+/* 						gomp_ull incr, gomp_ull *istart, gomp_ull *iend, */
+/* 						enum gomp_schedule_type sched, region_id_t region_id ) */
+/* { */
+/*   struct gomp_thread *thr = gomp_thread (); */
+/*   bool ret; */
+
+/*   if (gomp_work_share_start (false)) */
+/*     { */
+/* 	  gomp_loop_ull_init (thr->ts.work_share, up, */
+/* 						  start, end, incr, sched, 0, region_id); */
+/* 	  gomp_work_share_init_done (); */
+/*     } */
+
+/*   ret = bo_iter_ull_afac_next (istart, iend); */
+/*   return ret; */
+/* } */
+
 static bool
 bo_loop_ull_tss_start (bool up, gomp_ull start, gomp_ull end,
                        gomp_ull incr, gomp_ull *istart, gomp_ull *iend,
@@ -339,74 +372,77 @@ bo_loop_ull_css_start (bool up, gomp_ull start, gomp_ull end,
 bool
 GOMP_loop_ull_runtime_start (bool up, gomp_ull start, gomp_ull end,
                              gomp_ull incr, gomp_ull *istart, gomp_ull *iend,
-                             region_id_t region_id)
+							 region_id_t region_id)
 {
-    struct gomp_task_icv *icv = gomp_icv (false);
-    bool valid;
-    switch (icv->run_sched_var)
-    {
-    case GFS_STATIC:
-        valid = gomp_loop_ull_static_start (up, start, end, incr,
-                                            icv->run_sched_chunk_size,
-                                            istart, iend, region_id );
-        break;
-    case GFS_DYNAMIC:
-        valid = gomp_loop_ull_dynamic_start (up, start, end, incr,
-                                             icv->run_sched_chunk_size,
-											 istart, iend, region_id );
-        break;
-    case GFS_GUIDED:
+  struct gomp_task_icv *icv = gomp_icv (false);
+  bool valid;
+  switch (icv->run_sched_var)
+	{
+	case GFS_STATIC:
+	  valid = gomp_loop_ull_static_start (up, start, end, incr,
+										  icv->run_sched_chunk_size,
+										  istart, iend, region_id );
+	  break;
+	case GFS_DYNAMIC:
+	  valid = gomp_loop_ull_dynamic_start (up, start, end, incr,
+										   icv->run_sched_chunk_size,
+										   istart, iend, region_id );
+	  break;
+	case GFS_GUIDED:
 	  valid = gomp_loop_ull_guided_start (up, start, end, incr,
-                                            icv->run_sched_chunk_size,
-                                            istart, iend, region_id );
-        break;
-    case GFS_AUTO:
-        /* For now map to schedule(static), later on we could play with feedback
-           driven choice.  */
-        valid = gomp_loop_ull_static_start (up, start, end, incr,
-                                            0, istart, iend, region_id );
-        break;
+										  icv->run_sched_chunk_size,
+										  istart, iend, region_id );
+	  break;
+	case GFS_AUTO:
+	  /* For now map to schedule(static), later on we could play with feedback
+		 driven choice.  */
+	  valid = gomp_loop_ull_static_start (up, start, end, incr,
+										  0, istart, iend, region_id );
+	  break;
 
-    case FS_AF:
-        abort ();
+	/* case FS_AFAC: */
+	/*   valid = bo_loop_ull_afac_start (up, start, end, incr, */
+	/* 								  istart, iend, icv->run_sched_var, */
+	/* 								  region_id); */
+	/*   break; */
 
-    case FS_FAC2:
-        valid = bo_loop_ull_fac2_start (up, start, end, incr,
-                                        istart, iend, icv->run_sched_var,
-                                       region_id);
-        break;
+	case FS_FAC2:
+	  valid = bo_loop_ull_fac2_start (up, start, end, incr,
+									  istart, iend, icv->run_sched_var,
+									  region_id);
+	  break;
 
-    case FS_FSS:
-    case BO_FSS:
-        valid = bo_loop_ull_fss_start (up, start, end, incr,
-                                       istart, iend, icv->run_sched_var,
-                                      region_id);
-        break;
+	case FS_FSS:
+	case BO_FSS:
+	  valid = bo_loop_ull_fss_start (up, start, end, incr,
+									 istart, iend, icv->run_sched_var,
+									 region_id);
+	  break;
 
-    case FS_CSS:
-    case BO_CSS:
-        valid = bo_loop_ull_css_start (up, start, end, incr,
-                                       istart, iend, icv->run_sched_var,
-                                      region_id);
-        break;
+	case FS_CSS:
+	case BO_CSS:
+	  valid = bo_loop_ull_css_start (up, start, end, incr,
+									 istart, iend, icv->run_sched_var,
+									 region_id);
+	  break;
 
-    case FS_TSS:
-    case BO_TSS:
-        valid = bo_loop_ull_tss_start(up, start, end, incr,
-                                      istart, iend, icv->run_sched_var,
-                                      region_id );
-        break;
+	case FS_TSS:
+	case BO_TSS:
+	  valid = bo_loop_ull_tss_start(up, start, end, incr,
+									istart, iend, icv->run_sched_var,
+									region_id );
+	  break;
 
-    case FS_TAPE:
-    case BO_TAPE:
-        valid = bo_loop_ull_tape_start (up, start, end, incr,
-                                        istart, iend, icv->run_sched_var,
-                                        region_id);
-        break;
-    default:
-        abort ();
-    }
-    return valid;
+	case FS_TAPE:
+	case BO_TAPE:
+	  valid = bo_loop_ull_tape_start (up, start, end, incr,
+									  istart, iend, icv->run_sched_var,
+									  region_id);
+	  break;
+	default:
+	  abort ();
+	}
+  return valid;
 }
 
 /* The *_ordered_*_start routines are similar.  The only difference is that
@@ -414,103 +450,103 @@ GOMP_loop_ull_runtime_start (bool up, gomp_ull start, gomp_ull end,
 
 static bool
 gomp_loop_ull_ordered_static_start (bool up, gomp_ull start, gomp_ull end,
-                                    gomp_ull incr, gomp_ull chunk_size,
-                                    gomp_ull *istart, gomp_ull *iend)
+									gomp_ull incr, gomp_ull chunk_size,
+									gomp_ull *istart, gomp_ull *iend)
 {
-    struct gomp_thread *thr = gomp_thread ();
+  struct gomp_thread *thr = gomp_thread ();
 
-    thr->ts.static_trip = 0;
-    if (gomp_work_share_start (true))
-    {
-        gomp_loop_ull_init (thr->ts.work_share, up, start, end, incr,
-                            GFS_STATIC, chunk_size, 0);
-        gomp_ordered_static_init ();
-        gomp_work_share_init_done ();
-    }
+  thr->ts.static_trip = 0;
+  if (gomp_work_share_start (true))
+	{
+	  gomp_loop_ull_init (thr->ts.work_share, up, start, end, incr,
+						  GFS_STATIC, chunk_size, 0);
+	  gomp_ordered_static_init ();
+	  gomp_work_share_init_done ();
+	}
 
-    return !gomp_iter_ull_static_next (istart, iend);
+  return !gomp_iter_ull_static_next (istart, iend);
 }
 
 static bool
 gomp_loop_ull_ordered_dynamic_start (bool up, gomp_ull start, gomp_ull end,
-                                     gomp_ull incr, gomp_ull chunk_size,
-                                     gomp_ull *istart, gomp_ull *iend)
+									 gomp_ull incr, gomp_ull chunk_size,
+									 gomp_ull *istart, gomp_ull *iend)
 {
-    struct gomp_thread *thr = gomp_thread ();
-    bool ret;
+  struct gomp_thread *thr = gomp_thread ();
+  bool ret;
 
-    if (gomp_work_share_start (true))
-    {
-        gomp_loop_ull_init (thr->ts.work_share, up, start, end, incr,
-                            GFS_DYNAMIC, chunk_size, 0);
-        gomp_mutex_lock (&thr->ts.work_share->lock);
-        gomp_work_share_init_done ();
-    }
-    else
-        gomp_mutex_lock (&thr->ts.work_share->lock);
+  if (gomp_work_share_start (true))
+	{
+	  gomp_loop_ull_init (thr->ts.work_share, up, start, end, incr,
+						  GFS_DYNAMIC, chunk_size, 0);
+	  gomp_mutex_lock (&thr->ts.work_share->lock);
+	  gomp_work_share_init_done ();
+	}
+  else
+	gomp_mutex_lock (&thr->ts.work_share->lock);
 
-    ret = gomp_iter_ull_dynamic_next_locked (istart, iend);
-    if (ret)
-        gomp_ordered_first ();
-    gomp_mutex_unlock (&thr->ts.work_share->lock);
+  ret = gomp_iter_ull_dynamic_next_locked (istart, iend);
+  if (ret)
+	gomp_ordered_first ();
+  gomp_mutex_unlock (&thr->ts.work_share->lock);
 
-    return ret;
+  return ret;
 }
 
 static bool
 gomp_loop_ull_ordered_guided_start (bool up, gomp_ull start, gomp_ull end,
-                                    gomp_ull incr, gomp_ull chunk_size,
-                                    gomp_ull *istart, gomp_ull *iend)
+									gomp_ull incr, gomp_ull chunk_size,
+									gomp_ull *istart, gomp_ull *iend)
 {
-    struct gomp_thread *thr = gomp_thread ();
-    bool ret;
+  struct gomp_thread *thr = gomp_thread ();
+  bool ret;
 
-    if (gomp_work_share_start (true))
-    {
-        gomp_loop_ull_init (thr->ts.work_share, up, start, end, incr,
-                            GFS_GUIDED, chunk_size, 0);
-        gomp_mutex_lock (&thr->ts.work_share->lock);
-        gomp_work_share_init_done ();
-    }
-    else
-        gomp_mutex_lock (&thr->ts.work_share->lock);
+  if (gomp_work_share_start (true))
+	{
+	  gomp_loop_ull_init (thr->ts.work_share, up, start, end, incr,
+						  GFS_GUIDED, chunk_size, 0);
+	  gomp_mutex_lock (&thr->ts.work_share->lock);
+	  gomp_work_share_init_done ();
+	}
+  else
+	gomp_mutex_lock (&thr->ts.work_share->lock);
 
-    ret = gomp_iter_ull_guided_next_locked (istart, iend);
-    if (ret)
-        gomp_ordered_first ();
-    gomp_mutex_unlock (&thr->ts.work_share->lock);
+  ret = gomp_iter_ull_guided_next_locked (istart, iend);
+  if (ret)
+	gomp_ordered_first ();
+  gomp_mutex_unlock (&thr->ts.work_share->lock);
 
-    return ret;
+  return ret;
 }
 
 bool
 GOMP_loop_ull_ordered_runtime_start (bool up, gomp_ull start, gomp_ull end,
-                                     gomp_ull incr, gomp_ull *istart,
-                                     gomp_ull *iend)
+									 gomp_ull incr, gomp_ull *istart,
+									 gomp_ull *iend)
 {
-    struct gomp_task_icv *icv = gomp_icv (false);
-    switch (icv->run_sched_var)
-    {
-    case GFS_STATIC:
-        return gomp_loop_ull_ordered_static_start (up, start, end, incr,
-                                                   icv->run_sched_chunk_size,
-                                                   istart, iend);
-    case GFS_DYNAMIC:
-        return gomp_loop_ull_ordered_dynamic_start (up, start, end, incr,
-                                                    icv->run_sched_chunk_size,
-                                                    istart, iend);
-    case GFS_GUIDED:
-        return gomp_loop_ull_ordered_guided_start (up, start, end, incr,
-                                                   icv->run_sched_chunk_size,
-                                                   istart, iend);
-    case GFS_AUTO:
-        /* For now map to schedule(static), later on we could play with feedback
-           driven choice.  */
-        return gomp_loop_ull_ordered_static_start (up, start, end, incr,
-                                                   0, istart, iend);
-    default:
-        abort ();
-    }
+  struct gomp_task_icv *icv = gomp_icv (false);
+  switch (icv->run_sched_var)
+	{
+	case GFS_STATIC:
+	  return gomp_loop_ull_ordered_static_start (up, start, end, incr,
+												 icv->run_sched_chunk_size,
+												 istart, iend);
+	case GFS_DYNAMIC:
+	  return gomp_loop_ull_ordered_dynamic_start (up, start, end, incr,
+												  icv->run_sched_chunk_size,
+												  istart, iend);
+	case GFS_GUIDED:
+	  return gomp_loop_ull_ordered_guided_start (up, start, end, incr,
+												 icv->run_sched_chunk_size,
+												 istart, iend);
+	case GFS_AUTO:
+	  /* For now map to schedule(static), later on we could play with feedback
+		 driven choice.  */
+	  return gomp_loop_ull_ordered_static_start (up, start, end, incr,
+												 0, istart, iend);
+	default:
+	  abort ();
+	}
 }
 
 /* The *_doacross_*_start routines are similar.  The only difference is that
@@ -521,104 +557,104 @@ GOMP_loop_ull_ordered_runtime_start (bool up, gomp_ull start, gomp_ull end,
 
 static bool
 gomp_loop_ull_doacross_static_start (unsigned ncounts, gomp_ull *counts,
-                                     gomp_ull chunk_size, gomp_ull *istart,
-                                     gomp_ull *iend)
+									 gomp_ull chunk_size, gomp_ull *istart,
+									 gomp_ull *iend)
 {
-    struct gomp_thread *thr = gomp_thread ();
+  struct gomp_thread *thr = gomp_thread ();
 
-    thr->ts.static_trip = 0;
-    if (gomp_work_share_start (false))
-    {
-        gomp_loop_ull_init (thr->ts.work_share, true, 0, counts[0], 1,
-                            GFS_STATIC, chunk_size, 0);
-        gomp_doacross_ull_init (ncounts, counts, chunk_size);
-        gomp_work_share_init_done ();
-    }
+  thr->ts.static_trip = 0;
+  if (gomp_work_share_start (false))
+	{
+	  gomp_loop_ull_init (thr->ts.work_share, true, 0, counts[0], 1,
+						  GFS_STATIC, chunk_size, 0);
+	  gomp_doacross_ull_init (ncounts, counts, chunk_size);
+	  gomp_work_share_init_done ();
+	}
 
-    return !gomp_iter_ull_static_next (istart, iend);
+  return !gomp_iter_ull_static_next (istart, iend);
 }
 
 static bool
 gomp_loop_ull_doacross_dynamic_start (unsigned ncounts, gomp_ull *counts,
-                                      gomp_ull chunk_size, gomp_ull *istart,
-                                      gomp_ull *iend)
+									  gomp_ull chunk_size, gomp_ull *istart,
+									  gomp_ull *iend)
 {
-    struct gomp_thread *thr = gomp_thread ();
-    bool ret;
+  struct gomp_thread *thr = gomp_thread ();
+  bool ret;
 
-    if (gomp_work_share_start (false))
-    {
-        gomp_loop_ull_init (thr->ts.work_share, true, 0, counts[0], 1,
-                            GFS_DYNAMIC, chunk_size, 0);
-        gomp_doacross_ull_init (ncounts, counts, chunk_size);
-        gomp_work_share_init_done ();
-    }
+  if (gomp_work_share_start (false))
+	{
+	  gomp_loop_ull_init (thr->ts.work_share, true, 0, counts[0], 1,
+						  GFS_DYNAMIC, chunk_size, 0);
+	  gomp_doacross_ull_init (ncounts, counts, chunk_size);
+	  gomp_work_share_init_done ();
+	}
 
 #if defined HAVE_SYNC_BUILTINS && defined __LP64__
-    ret = gomp_iter_ull_dynamic_next (istart, iend);
+  ret = gomp_iter_ull_dynamic_next (istart, iend);
 #else
-    gomp_mutex_lock (&thr->ts.work_share->lock);
-    ret = gomp_iter_ull_dynamic_next_locked (istart, iend);
-    gomp_mutex_unlock (&thr->ts.work_share->lock);
+  gomp_mutex_lock (&thr->ts.work_share->lock);
+  ret = gomp_iter_ull_dynamic_next_locked (istart, iend);
+  gomp_mutex_unlock (&thr->ts.work_share->lock);
 #endif
 
-    return ret;
+  return ret;
 }
 
 static bool
 gomp_loop_ull_doacross_guided_start (unsigned ncounts, gomp_ull *counts,
-                                     gomp_ull chunk_size, gomp_ull *istart,
-                                     gomp_ull *iend)
+									 gomp_ull chunk_size, gomp_ull *istart,
+									 gomp_ull *iend)
 {
-    struct gomp_thread *thr = gomp_thread ();
-    bool ret;
+  struct gomp_thread *thr = gomp_thread ();
+  bool ret;
 
-    if (gomp_work_share_start (false))
-    {
-        gomp_loop_ull_init (thr->ts.work_share, true, 0, counts[0], 1,
-                            GFS_GUIDED, chunk_size, 0);
-        gomp_doacross_ull_init (ncounts, counts, chunk_size);
-        gomp_work_share_init_done ();
-    }
+  if (gomp_work_share_start (false))
+	{
+	  gomp_loop_ull_init (thr->ts.work_share, true, 0, counts[0], 1,
+						  GFS_GUIDED, chunk_size, 0);
+	  gomp_doacross_ull_init (ncounts, counts, chunk_size);
+	  gomp_work_share_init_done ();
+	}
 
 #if defined HAVE_SYNC_BUILTINS && defined __LP64__
-    ret = gomp_iter_ull_guided_next (istart, iend);
+  ret = gomp_iter_ull_guided_next (istart, iend);
 #else
-    gomp_mutex_lock (&thr->ts.work_share->lock);
-    ret = gomp_iter_ull_guided_next_locked (istart, iend);
-    gomp_mutex_unlock (&thr->ts.work_share->lock);
+  gomp_mutex_lock (&thr->ts.work_share->lock);
+  ret = gomp_iter_ull_guided_next_locked (istart, iend);
+  gomp_mutex_unlock (&thr->ts.work_share->lock);
 #endif
 
-    return ret;
+  return ret;
 }
 
 bool
 GOMP_loop_ull_doacross_runtime_start (unsigned ncounts, gomp_ull *counts,
-                                      gomp_ull *istart, gomp_ull *iend)
+									  gomp_ull *istart, gomp_ull *iend)
 {
-    struct gomp_task_icv *icv = gomp_icv (false);
-    switch (icv->run_sched_var)
-    {
-    case GFS_STATIC:
-        return gomp_loop_ull_doacross_static_start (ncounts, counts,
-                                                    icv->run_sched_chunk_size,
-                                                    istart, iend);
-    case GFS_DYNAMIC:
-        return gomp_loop_ull_doacross_dynamic_start (ncounts, counts,
-                                                     icv->run_sched_chunk_size,
-                                                     istart, iend);
-    case GFS_GUIDED:
-        return gomp_loop_ull_doacross_guided_start (ncounts, counts,
-                                                    icv->run_sched_chunk_size,
-                                                    istart, iend);
-    case GFS_AUTO:
-        /* For now map to schedule(static), later on we could play with feedback
-           driven choice.  */
-        return gomp_loop_ull_doacross_static_start (ncounts, counts,
-                                                    0, istart, iend);
-    default:
-        abort ();
-    }
+  struct gomp_task_icv *icv = gomp_icv (false);
+  switch (icv->run_sched_var)
+	{
+	case GFS_STATIC:
+	  return gomp_loop_ull_doacross_static_start (ncounts, counts,
+												  icv->run_sched_chunk_size,
+												  istart, iend);
+	case GFS_DYNAMIC:
+	  return gomp_loop_ull_doacross_dynamic_start (ncounts, counts,
+												   icv->run_sched_chunk_size,
+												   istart, iend);
+	case GFS_GUIDED:
+	  return gomp_loop_ull_doacross_guided_start (ncounts, counts,
+												  icv->run_sched_chunk_size,
+												  istart, iend);
+	case GFS_AUTO:
+	  /* For now map to schedule(static), later on we could play with feedback
+		 driven choice.  */
+	  return gomp_loop_ull_doacross_static_start (ncounts, counts,
+												  0, istart, iend);
+	default:
+	  abort ();
+	}
 }
 
 /* The *_next routines are called when the thread completes processing of
@@ -634,137 +670,147 @@ GOMP_loop_ull_doacross_runtime_start (unsigned ncounts, gomp_ull *counts,
 static bool
 gomp_loop_ull_static_next (gomp_ull *istart, gomp_ull *iend)
 {
-    return !gomp_iter_ull_static_next (istart, iend);
+  return !gomp_iter_ull_static_next (istart, iend);
 }
 
 static bool
 gomp_loop_ull_dynamic_next (gomp_ull *istart, gomp_ull *iend)
 {
-    bool ret;
+  bool ret;
 
 #if defined HAVE_SYNC_BUILTINS && defined __LP64__
-    ret = gomp_iter_ull_dynamic_next (istart, iend);
+  ret = gomp_iter_ull_dynamic_next (istart, iend);
 #else
-    struct gomp_thread *thr = gomp_thread ();
-    gomp_mutex_lock (&thr->ts.work_share->lock);
-    ret = gomp_iter_ull_dynamic_next_locked (istart, iend);
-    gomp_mutex_unlock (&thr->ts.work_share->lock);
+  struct gomp_thread *thr = gomp_thread ();
+  gomp_mutex_lock (&thr->ts.work_share->lock);
+  ret = gomp_iter_ull_dynamic_next_locked (istart, iend);
+  gomp_mutex_unlock (&thr->ts.work_share->lock);
 #endif
 
-    return ret;
+  return ret;
 }
 
 static bool
 gomp_loop_ull_guided_next (gomp_ull *istart, gomp_ull *iend)
 {
-    bool ret;
+  bool ret;
 
 #if defined HAVE_SYNC_BUILTINS && defined __LP64__
-    ret = gomp_iter_ull_guided_next (istart, iend);
+  ret = gomp_iter_ull_guided_next (istart, iend);
 #else
-    struct gomp_thread *thr = gomp_thread ();
-    gomp_mutex_lock (&thr->ts.work_share->lock);
-    ret = gomp_iter_ull_guided_next_locked (istart, iend);
-    gomp_mutex_unlock (&thr->ts.work_share->lock);
+  struct gomp_thread *thr = gomp_thread ();
+  gomp_mutex_lock (&thr->ts.work_share->lock);
+  ret = gomp_iter_ull_guided_next_locked (istart, iend);
+  gomp_mutex_unlock (&thr->ts.work_share->lock);
 #endif
 
-    return ret;
+  return ret;
 }
 
 static bool
 bo_loop_ull_css_next (gomp_ull *istart, gomp_ull *iend)
 {
-    bool ret;
-    ret = gomp_iter_ull_dynamic_next (istart, iend);
-    return ret;
+  bool ret;
+  ret = gomp_iter_ull_dynamic_next (istart, iend);
+  return ret;
 }
 
 static bool
 bo_loop_ull_fac2_next (gomp_ull *istart, gomp_ull *iend)
 {
-    bool ret;
-    ret = bo_iter_ull_fac2_next (istart, iend);
-    return ret;
+  bool ret;
+  ret = bo_iter_ull_fac2_next (istart, iend);
+  return ret;
 }
 
 static bool
 bo_loop_ull_fss_next (gomp_ull *istart, gomp_ull *iend)
 {
-    bool ret;
-    ret = bo_iter_ull_fss_next (istart, iend);
-    return ret;
+  bool ret;
+  ret = bo_iter_ull_fss_next (istart, iend);
+  return ret;
 }
+
+/* static bool */
+/* bo_loop_ull_afac_next (gomp_ull *istart, gomp_ull *iend, */
+/* 					   struct gomp_work_share * ws) */
+/* { */
+/*   bool ret; */
+/*   //ret = bo_iter_ull_afac_next (istart, iend); */
+/*   return ret; */
+/* } */
 
 static bool
 bo_loop_ull_tape_next (gomp_ull *istart, gomp_ull *iend)
 {
-    bool ret;
-    ret = bo_iter_ull_tape_next (istart, iend);
-    return ret;
+  bool ret;
+  ret = bo_iter_ull_tape_next (istart, iend);
+  return ret;
 }
 
 static bool
 bo_loop_ull_tss_next (gomp_ull *istart, gomp_ull *iend)
 {
-    bool ret;
-    ret = bo_iter_ull_tss_next (istart, iend);
-    return ret;
+  bool ret;
+  ret = bo_iter_ull_tss_next (istart, iend);
+  return ret;
 }
 
 bool
 GOMP_loop_ull_runtime_next (gomp_ull *istart, gomp_ull *iend)
 {
-    bo_record_iteration_stop();
+  bo_record_iteration_stop();
 
-    struct gomp_thread *thr = gomp_thread ();
-    bool valid;  
-    struct gomp_work_share *ws = thr->ts.work_share;
+  struct gomp_thread *thr = gomp_thread ();
+  bool valid;  
+  struct gomp_work_share *ws = thr->ts.work_share;
 
-    switch (ws->sched) {
-	case GFS_STATIC:
-	case GFS_AUTO:
-	  valid = gomp_loop_ull_static_next (istart, iend);
-	  break;
-	case GFS_DYNAMIC:
-	  valid = gomp_loop_ull_dynamic_next (istart, iend);
-	  break;
-	case GFS_GUIDED:
-	  valid = gomp_loop_ull_guided_next (istart, iend);
-	  break;
+  switch (ws->sched) {
+  case GFS_STATIC:
+  case GFS_AUTO:
+	valid = gomp_loop_ull_static_next (istart, iend);
+	break;
+  case GFS_DYNAMIC:
+	valid = gomp_loop_ull_dynamic_next (istart, iend);
+	break;
+  case GFS_GUIDED:
+	valid = gomp_loop_ull_guided_next (istart, iend);
+	break;
 
-	case FS_AF:
-	  abort ();
+	/* case FS_AFAC: */
+	/* 	valid = bo_loop_ull_afac_next (istart, iend, ws); */
+  /* 	break; */
 
-	case FS_FAC2:
-	  valid = bo_loop_ull_fac2_next (istart, iend);
-	  break;
+  case FS_FAC2:
+	valid = bo_loop_ull_fac2_next (istart, iend);
+	break;
 
-	case FS_FSS:
-	case BO_FSS:
-	  valid = bo_loop_ull_fss_next (istart, iend);
-	  break;
+  case FS_FSS:
+  case BO_FSS:
+	valid = bo_loop_ull_fss_next (istart, iend);
+	break;
 
-	case FS_TSS:
-	case BO_TSS:
-	  valid = bo_loop_ull_tss_next (istart, iend);
-	  break;
+  case FS_TSS:
+  case BO_TSS:
+	valid = bo_loop_ull_tss_next (istart, iend);
+	break;
 
-	case FS_CSS:
-	case BO_CSS:
-	  valid = bo_loop_ull_css_next (istart, iend);
-	  break;
+  case FS_CSS:
+  case BO_CSS:
+	valid = bo_loop_ull_css_next (istart, iend);
+	break;
 
-	case FS_TAPE:
-	case BO_TAPE:
-	  valid = bo_loop_ull_tape_next (istart, iend);
-	  break;
+  case FS_TAPE:
+  case BO_TAPE:
+	valid = bo_loop_ull_tape_next (istart, iend);
+	break;
 
-	default:
-	  abort ();
-	}
-	if(valid)
-	  bo_record_iteration_start();
-	return valid;
+  default:
+	abort ();
+  }
+  if(valid)
+	bo_record_iteration_start();
+  return valid;
 }
 
 /* The *_ordered_*_next routines are called when the thread completes
@@ -777,72 +823,72 @@ GOMP_loop_ull_runtime_next (gomp_ull *istart, gomp_ull *iend)
 static bool
 gomp_loop_ull_ordered_static_next (gomp_ull *istart, gomp_ull *iend)
 {
-    struct gomp_thread *thr = gomp_thread ();
-    int test;
+  struct gomp_thread *thr = gomp_thread ();
+  int test;
 
-    gomp_ordered_sync ();
-    gomp_mutex_lock (&thr->ts.work_share->lock);
-    test = gomp_iter_ull_static_next (istart, iend);
-    if (test >= 0)
-        gomp_ordered_static_next ();
-    gomp_mutex_unlock (&thr->ts.work_share->lock);
+  gomp_ordered_sync ();
+  gomp_mutex_lock (&thr->ts.work_share->lock);
+  test = gomp_iter_ull_static_next (istart, iend);
+  if (test >= 0)
+	gomp_ordered_static_next ();
+  gomp_mutex_unlock (&thr->ts.work_share->lock);
 
-    return test == 0;
+  return test == 0;
 }
 
 static bool
 gomp_loop_ull_ordered_dynamic_next (gomp_ull *istart, gomp_ull *iend)
 {
-    struct gomp_thread *thr = gomp_thread ();
-    bool ret;
+  struct gomp_thread *thr = gomp_thread ();
+  bool ret;
 
-    gomp_ordered_sync ();
-    gomp_mutex_lock (&thr->ts.work_share->lock);
-    ret = gomp_iter_ull_dynamic_next_locked (istart, iend);
-    if (ret)
-        gomp_ordered_next ();
-    else
-        gomp_ordered_last ();
-    gomp_mutex_unlock (&thr->ts.work_share->lock);
+  gomp_ordered_sync ();
+  gomp_mutex_lock (&thr->ts.work_share->lock);
+  ret = gomp_iter_ull_dynamic_next_locked (istart, iend);
+  if (ret)
+	gomp_ordered_next ();
+  else
+	gomp_ordered_last ();
+  gomp_mutex_unlock (&thr->ts.work_share->lock);
 
-    return ret;
+  return ret;
 }
 
 static bool
 gomp_loop_ull_ordered_guided_next (gomp_ull *istart, gomp_ull *iend)
 {
-    struct gomp_thread *thr = gomp_thread ();
-    bool ret;
+  struct gomp_thread *thr = gomp_thread ();
+  bool ret;
 
-    gomp_ordered_sync ();
-    gomp_mutex_lock (&thr->ts.work_share->lock);
-    ret = gomp_iter_ull_guided_next_locked (istart, iend);
-    if (ret)
-        gomp_ordered_next ();
-    else
-        gomp_ordered_last ();
-    gomp_mutex_unlock (&thr->ts.work_share->lock);
+  gomp_ordered_sync ();
+  gomp_mutex_lock (&thr->ts.work_share->lock);
+  ret = gomp_iter_ull_guided_next_locked (istart, iend);
+  if (ret)
+	gomp_ordered_next ();
+  else
+	gomp_ordered_last ();
+  gomp_mutex_unlock (&thr->ts.work_share->lock);
 
-    return ret;
+  return ret;
 }
 
 bool
 GOMP_loop_ull_ordered_runtime_next (gomp_ull *istart, gomp_ull *iend)
 {
-    struct gomp_thread *thr = gomp_thread ();
+  struct gomp_thread *thr = gomp_thread ();
 
-    switch (thr->ts.work_share->sched)
-    {
-    case GFS_STATIC:
-    case GFS_AUTO:
-        return gomp_loop_ull_ordered_static_next (istart, iend);
-    case GFS_DYNAMIC:
-        return gomp_loop_ull_ordered_dynamic_next (istart, iend);
-    case GFS_GUIDED:
-        return gomp_loop_ull_ordered_guided_next (istart, iend);
-    default:
-        abort ();
-    }
+  switch (thr->ts.work_share->sched)
+	{
+	case GFS_STATIC:
+	case GFS_AUTO:
+	  return gomp_loop_ull_ordered_static_next (istart, iend);
+	case GFS_DYNAMIC:
+	  return gomp_loop_ull_ordered_dynamic_next (istart, iend);
+	case GFS_GUIDED:
+	  return gomp_loop_ull_ordered_guided_next (istart, iend);
+	default:
+	  abort ();
+	}
 }
 
 /* We use static functions above so that we're sure that the "runtime"
@@ -852,193 +898,193 @@ GOMP_loop_ull_ordered_runtime_next (gomp_ull *istart, gomp_ull *iend)
 
 #ifdef HAVE_ATTRIBUTE_ALIAS
 extern __typeof(gomp_loop_ull_static_start) GOMP_loop_ull_static_start
-    __attribute__((alias ("gomp_loop_ull_static_start")));
+  __attribute__((alias ("gomp_loop_ull_static_start")));
 extern __typeof(gomp_loop_ull_dynamic_start) GOMP_loop_ull_dynamic_start
-    __attribute__((alias ("gomp_loop_ull_dynamic_start")));
+  __attribute__((alias ("gomp_loop_ull_dynamic_start")));
 extern __typeof(gomp_loop_ull_guided_start) GOMP_loop_ull_guided_start
-    __attribute__((alias ("gomp_loop_ull_guided_start")));
+  __attribute__((alias ("gomp_loop_ull_guided_start")));
 extern __typeof(gomp_loop_ull_dynamic_start) GOMP_loop_ull_nonmonotonic_dynamic_start
-    __attribute__((alias ("gomp_loop_ull_dynamic_start")));
+  __attribute__((alias ("gomp_loop_ull_dynamic_start")));
 extern __typeof(gomp_loop_ull_guided_start) GOMP_loop_ull_nonmonotonic_guided_start
-    __attribute__((alias ("gomp_loop_ull_guided_start")));
+  __attribute__((alias ("gomp_loop_ull_guided_start")));
 
 extern __typeof(gomp_loop_ull_ordered_static_start) GOMP_loop_ull_ordered_static_start
-    __attribute__((alias ("gomp_loop_ull_ordered_static_start")));
+  __attribute__((alias ("gomp_loop_ull_ordered_static_start")));
 extern __typeof(gomp_loop_ull_ordered_dynamic_start) GOMP_loop_ull_ordered_dynamic_start
-    __attribute__((alias ("gomp_loop_ull_ordered_dynamic_start")));
+  __attribute__((alias ("gomp_loop_ull_ordered_dynamic_start")));
 extern __typeof(gomp_loop_ull_ordered_guided_start) GOMP_loop_ull_ordered_guided_start
-    __attribute__((alias ("gomp_loop_ull_ordered_guided_start")));
+  __attribute__((alias ("gomp_loop_ull_ordered_guided_start")));
 
 extern __typeof(gomp_loop_ull_doacross_static_start) GOMP_loop_ull_doacross_static_start
-    __attribute__((alias ("gomp_loop_ull_doacross_static_start")));
+  __attribute__((alias ("gomp_loop_ull_doacross_static_start")));
 extern __typeof(gomp_loop_ull_doacross_dynamic_start) GOMP_loop_ull_doacross_dynamic_start
-    __attribute__((alias ("gomp_loop_ull_doacross_dynamic_start")));
+  __attribute__((alias ("gomp_loop_ull_doacross_dynamic_start")));
 extern __typeof(gomp_loop_ull_doacross_guided_start) GOMP_loop_ull_doacross_guided_start
-    __attribute__((alias ("gomp_loop_ull_doacross_guided_start")));
+  __attribute__((alias ("gomp_loop_ull_doacross_guided_start")));
 
 extern __typeof(gomp_loop_ull_static_next) GOMP_loop_ull_static_next
-    __attribute__((alias ("gomp_loop_ull_static_next")));
+  __attribute__((alias ("gomp_loop_ull_static_next")));
 extern __typeof(gomp_loop_ull_dynamic_next) GOMP_loop_ull_dynamic_next
-    __attribute__((alias ("gomp_loop_ull_dynamic_next")));
+  __attribute__((alias ("gomp_loop_ull_dynamic_next")));
 extern __typeof(gomp_loop_ull_guided_next) GOMP_loop_ull_guided_next
-    __attribute__((alias ("gomp_loop_ull_guided_next")));
+  __attribute__((alias ("gomp_loop_ull_guided_next")));
 extern __typeof(gomp_loop_ull_dynamic_next) GOMP_loop_ull_nonmonotonic_dynamic_next
-    __attribute__((alias ("gomp_loop_ull_dynamic_next")));
+  __attribute__((alias ("gomp_loop_ull_dynamic_next")));
 extern __typeof(gomp_loop_ull_guided_next) GOMP_loop_ull_nonmonotonic_guided_next
-    __attribute__((alias ("gomp_loop_ull_guided_next")));
+  __attribute__((alias ("gomp_loop_ull_guided_next")));
 
 extern __typeof(gomp_loop_ull_ordered_static_next) GOMP_loop_ull_ordered_static_next
-    __attribute__((alias ("gomp_loop_ull_ordered_static_next")));
+  __attribute__((alias ("gomp_loop_ull_ordered_static_next")));
 extern __typeof(gomp_loop_ull_ordered_dynamic_next) GOMP_loop_ull_ordered_dynamic_next
-    __attribute__((alias ("gomp_loop_ull_ordered_dynamic_next")));
+  __attribute__((alias ("gomp_loop_ull_ordered_dynamic_next")));
 extern __typeof(gomp_loop_ull_ordered_guided_next) GOMP_loop_ull_ordered_guided_next
-    __attribute__((alias ("gomp_loop_ull_ordered_guided_next")));
+  __attribute__((alias ("gomp_loop_ull_ordered_guided_next")));
 #else
 bool
 GOMP_loop_ull_static_start (bool up, gomp_ull start, gomp_ull end,
-                            gomp_ull incr, gomp_ull chunk_size,
-                            gomp_ull *istart, gomp_ull *iend)
+							gomp_ull incr, gomp_ull chunk_size,
+							gomp_ull *istart, gomp_ull *iend)
 {
-    return gomp_loop_ull_static_start (up, start, end, incr, chunk_size, istart,
-                                       iend);
+  return gomp_loop_ull_static_start (up, start, end, incr, chunk_size, istart,
+									 iend);
 }
 
 bool
 GOMP_loop_ull_dynamic_start (bool up, gomp_ull start, gomp_ull end,
-                             gomp_ull incr, gomp_ull chunk_size,
-                             gomp_ull *istart, gomp_ull *iend)
+							 gomp_ull incr, gomp_ull chunk_size,
+							 gomp_ull *istart, gomp_ull *iend)
 {
-    return gomp_loop_ull_dynamic_start (up, start, end, incr, chunk_size, istart,
-                                        iend);
+  return gomp_loop_ull_dynamic_start (up, start, end, incr, chunk_size, istart,
+									  iend);
 }
 
 bool
 GOMP_loop_ull_guided_start (bool up, gomp_ull start, gomp_ull end,
-                            gomp_ull incr, gomp_ull chunk_size,
-                            gomp_ull *istart, gomp_ull *iend)
+							gomp_ull incr, gomp_ull chunk_size,
+							gomp_ull *istart, gomp_ull *iend)
 {
-    return gomp_loop_ull_guided_start (up, start, end, incr, chunk_size, istart,
-                                       iend);
+  return gomp_loop_ull_guided_start (up, start, end, incr, chunk_size, istart,
+									 iend);
 }
 
 bool
 GOMP_loop_ull_nonmonotonic_dynamic_start (bool up, gomp_ull start,
-                                          gomp_ull end, gomp_ull incr,
-                                          gomp_ull chunk_size,
-                                          gomp_ull *istart, gomp_ull *iend)
+										  gomp_ull end, gomp_ull incr,
+										  gomp_ull chunk_size,
+										  gomp_ull *istart, gomp_ull *iend)
 {
-    return gomp_loop_ull_dynamic_start (up, start, end, incr, chunk_size, istart,
-                                        iend);
+  return gomp_loop_ull_dynamic_start (up, start, end, incr, chunk_size, istart,
+									  iend);
 }
 
 bool
 GOMP_loop_ull_nonmonotonic_guided_start (bool up, gomp_ull start, gomp_ull end,
-                                         gomp_ull incr, gomp_ull chunk_size,
-                                         gomp_ull *istart, gomp_ull *iend)
+										 gomp_ull incr, gomp_ull chunk_size,
+										 gomp_ull *istart, gomp_ull *iend)
 {
-    return gomp_loop_ull_guided_start (up, start, end, incr, chunk_size, istart,
-                                       iend);
+  return gomp_loop_ull_guided_start (up, start, end, incr, chunk_size, istart,
+									 iend);
 }
 
 bool
 GOMP_loop_ull_ordered_static_start (bool up, gomp_ull start, gomp_ull end,
-                                    gomp_ull incr, gomp_ull chunk_size,
-                                    gomp_ull *istart, gomp_ull *iend)
+									gomp_ull incr, gomp_ull chunk_size,
+									gomp_ull *istart, gomp_ull *iend)
 {
-    return gomp_loop_ull_ordered_static_start (up, start, end, incr, chunk_size,
-                                               istart, iend);
+  return gomp_loop_ull_ordered_static_start (up, start, end, incr, chunk_size,
+											 istart, iend);
 }
 
 bool
 GOMP_loop_ull_ordered_dynamic_start (bool up, gomp_ull start, gomp_ull end,
-                                     gomp_ull incr, gomp_ull chunk_size,
-                                     gomp_ull *istart, gomp_ull *iend)
+									 gomp_ull incr, gomp_ull chunk_size,
+									 gomp_ull *istart, gomp_ull *iend)
 {
-    return gomp_loop_ull_ordered_dynamic_start (up, start, end, incr, chunk_size,
-                                                istart, iend);
+  return gomp_loop_ull_ordered_dynamic_start (up, start, end, incr, chunk_size,
+											  istart, iend);
 }
 
 bool
 GOMP_loop_ull_ordered_guided_start (bool up, gomp_ull start, gomp_ull end,
-                                    gomp_ull incr, gomp_ull chunk_size,
-                                    gomp_ull *istart, gomp_ull *iend)
+									gomp_ull incr, gomp_ull chunk_size,
+									gomp_ull *istart, gomp_ull *iend)
 {
-    return gomp_loop_ull_ordered_guided_start (up, start, end, incr, chunk_size,
-                                               istart, iend);
+  return gomp_loop_ull_ordered_guided_start (up, start, end, incr, chunk_size,
+											 istart, iend);
 }
 
 bool
 GOMP_loop_ull_doacross_static_start (unsigned ncounts, gomp_ull *counts,
-                                     gomp_ull chunk_size, gomp_ull *istart,
-                                     gomp_ull *iend)
+									 gomp_ull chunk_size, gomp_ull *istart,
+									 gomp_ull *iend)
 {
-    return gomp_loop_ull_doacross_static_start (ncounts, counts, chunk_size,
-                                                istart, iend);
+  return gomp_loop_ull_doacross_static_start (ncounts, counts, chunk_size,
+											  istart, iend);
 }
 
 bool
 GOMP_loop_ull_doacross_dynamic_start (unsigned ncounts, gomp_ull *counts,
-                                      gomp_ull chunk_size, gomp_ull *istart,
-                                      gomp_ull *iend)
+									  gomp_ull chunk_size, gomp_ull *istart,
+									  gomp_ull *iend)
 {
-    return gomp_loop_ull_doacross_dynamic_start (ncounts, counts, chunk_size,
-                                                 istart, iend);
+  return gomp_loop_ull_doacross_dynamic_start (ncounts, counts, chunk_size,
+											   istart, iend);
 }
 
 bool
 GOMP_loop_ull_doacross_guided_start (unsigned ncounts, gomp_ull *counts,
-                                     gomp_ull chunk_size, gomp_ull *istart,
-                                     gomp_ull *iend)
+									 gomp_ull chunk_size, gomp_ull *istart,
+									 gomp_ull *iend)
 {
-    return gomp_loop_ull_doacross_guided_start (ncounts, counts, chunk_size,
-                                                istart, iend);
+  return gomp_loop_ull_doacross_guided_start (ncounts, counts, chunk_size,
+											  istart, iend);
 }
 
 bool
 GOMP_loop_ull_static_next (gomp_ull *istart, gomp_ull *iend)
 {
-    return gomp_loop_ull_static_next (istart, iend);
+  return gomp_loop_ull_static_next (istart, iend);
 }
 
 bool
 GOMP_loop_ull_dynamic_next (gomp_ull *istart, gomp_ull *iend)
 {
-    return gomp_loop_ull_dynamic_next (istart, iend);
+  return gomp_loop_ull_dynamic_next (istart, iend);
 }
 
 bool
 GOMP_loop_ull_guided_next (gomp_ull *istart, gomp_ull *iend)
 {
-    return gomp_loop_ull_guided_next (istart, iend);
+  return gomp_loop_ull_guided_next (istart, iend);
 }
 
 bool
 GOMP_loop_ull_nonmonotonic_dynamic_next (gomp_ull *istart, gomp_ull *iend)
 {
-    return gomp_loop_ull_dynamic_next (istart, iend);
+  return gomp_loop_ull_dynamic_next (istart, iend);
 }
 
 bool
 GOMP_loop_ull_nonmonotonic_guided_next (gomp_ull *istart, gomp_ull *iend)
 {
-    return gomp_loop_ull_guided_next (istart, iend);
+  return gomp_loop_ull_guided_next (istart, iend);
 }
 
 bool
 GOMP_loop_ull_ordered_static_next (gomp_ull *istart, gomp_ull *iend)
 {
-    return gomp_loop_ull_ordered_static_next (istart, iend);
+  return gomp_loop_ull_ordered_static_next (istart, iend);
 }
 
 bool
 GOMP_loop_ull_ordered_dynamic_next (gomp_ull *istart, gomp_ull *iend)
 {
-    return gomp_loop_ull_ordered_dynamic_next (istart, iend);
+  return gomp_loop_ull_ordered_dynamic_next (istart, iend);
 }
 
 bool
 GOMP_loop_ull_ordered_guided_next (gomp_ull *istart, gomp_ull *iend)
 {
-    return gomp_loop_ull_ordered_guided_next (istart, iend);
+  return gomp_loop_ull_ordered_guided_next (istart, iend);
 }
 #endif

@@ -128,22 +128,21 @@ parse_schedule (void)
         gomp_global_icv.run_sched_var = GFS_AUTO;
         env += 4;
     }
-
-    // newly added schedules 
-    // FS_AF,
-    // FS_FAC2,
-    // FS_FSS,
-    // FS_TSS,
-    // FS_CSS,
-    // FS_TAPE,
-    // BO_FSS,
-    // BO_CSS,
-    // BO_TAPE,
-    else if (strncasecmp (env, "af", 2) == 0)
-    {
-        gomp_global_icv.run_sched_var = FS_AF;
-        env += 2;
-    }
+    else if (strncasecmp (env, "afac", 4) == 0)
+	  {
+        gomp_global_icv.run_sched_var = FS_AFAC;
+        env += 4;
+	  }
+    else if (strncasecmp (env, "binlpt", 6) == 0)
+	  {
+        gomp_global_icv.run_sched_var = FS_BINLPT;
+        env += 6;
+	  }
+    else if (strncasecmp (env, "hss", 3) == 0)
+	  {
+        gomp_global_icv.run_sched_var = FS_HSS;
+        env += 3;
+	  }
     else if (strncasecmp (env, "fac2", 4) == 0)
     {
         gomp_global_icv.run_sched_var = FS_FAC2;
@@ -1238,9 +1237,15 @@ handle_omp_display_env (unsigned long stacksize, int wait_policy)
         // BO_FSS,
         // BO_CSS,
         // BO_TAPE,
-    case FS_AF:
-        fputs ("AF", stderr);
-        break;
+    case FS_AFAC:
+	  fputs ("AFAC", stderr);
+	  break;
+    case FS_BINLPT:
+	  fputs ("BINLPT", stderr);
+	  break;
+    case FS_HSS:
+	  fputs ("HSS", stderr);
+	  break;
     case FS_FAC2:
         fputs ("FAC2", stderr);
         break;
