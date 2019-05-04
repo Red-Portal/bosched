@@ -142,7 +142,14 @@ free_work_share (struct gomp_team *team, struct gomp_work_share *ws)
 {
   gomp_fini_work_share (ws);
   if (__builtin_expect (team == NULL, 0))
-    free (ws);
+	{
+	  /* if(ws->sched == FS_AFAC) */
+	  /* 	{ */
+	  /* 	  free(ws->cnt); */
+	  /* 	  free(ws->load); */
+	  /* 	} */
+	  free (ws);
+	}
   else
     {
       struct gomp_work_share *next_ws;

@@ -239,7 +239,7 @@ GOMP_cancel (int which, bool do_cancel)
   gomp_team_barrier_cancel (team);
   return true;
 }
-
+
 /* The public OpenMP API for thread and team related inquiries.  */
 
 int
