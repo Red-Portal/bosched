@@ -180,10 +180,6 @@ gomp_loop_init (struct gomp_work_share *ws, long start, long end, long incr,
 			ws->param = css_transform_range(ws->param);
 			ws->chunk_size = css_chunk_size(ws->param, num_tasks, nthreads);
 		  }
-		else
-		  {
-			bo_workload_profile_init(num_tasks);
-		  }
 		ws->chunk_size *= incr;
 
 #ifdef HAVE_SYNC_BUILTINS
@@ -274,7 +270,6 @@ gomp_loop_dynamic_start (long start, long end, long incr, long chunk_size,
                         GFS_DYNAMIC, chunk_size, region_id );
         gomp_work_share_init_done ();
     }
-	bo_workload_profile_start(*istart);
 
 #ifdef HAVE_SYNC_BUILTINS
     ret = gomp_iter_dynamic_next (istart, iend);
@@ -284,6 +279,8 @@ gomp_loop_dynamic_start (long start, long end, long incr, long chunk_size,
     gomp_mutex_unlock (&thr->ts.work_share->lock);
 #endif
 
+	if(ret)
+	  bo_workload_profile_start(*istart);
     return ret;
 }
 
@@ -474,35 +471,35 @@ bo_loop_fac2_start (long start, long end, long incr,
   } */
 
 bool
-	GOMP_loop_runtime_start (long start, long end, long incr,
-							 long *istart, long *iend,
-							 region_id_t region_id)
+GOMP_loop_runtime_start (long start, long end, long incr,
+						 long *istart, long *iend,
+						 region_id_t region_id)
   {
-    struct gomp_task_icv *icv = gomp_icv (false);
-    bool valid;
-    switch (icv->run_sched_var)
+	struct gomp_task_icv *icv = gomp_icv (false);
+	bool valid;
+	switch (icv->run_sched_var)
 	  {
 	  case GFS_STATIC:
-        valid = gomp_loop_static_start (start, end, incr,
-                                        icv->run_sched_chunk_size,
-                                        istart, iend, region_id);
-        break;
+		valid = gomp_loop_static_start (start, end, incr,
+										icv->run_sched_chunk_size,
+										istart, iend, region_id);
+		break;
 	  case GFS_DYNAMIC:
-        valid = gomp_loop_dynamic_start (start, end, incr,
-                                         icv->run_sched_chunk_size,
+		valid = gomp_loop_dynamic_start (start, end, incr,
+										 icv->run_sched_chunk_size,
 										 istart, iend, region_id);
-        break;
+		break;
 	  case GFS_GUIDED:
 		valid = gomp_loop_guided_start (start, end, incr,
-                                        icv->run_sched_chunk_size,
+										icv->run_sched_chunk_size,
 										istart, iend, region_id);
-        break;
+		break;
 	  case GFS_AUTO:
 		/* For now map to schedule(static), later on we could play with feedback
-           driven choice.  */
-        valid = gomp_loop_static_start (start, end, incr, 0,
-                                        istart, iend, region_id);
-        break;
+		   driven choice.  */
+		valid = gomp_loop_static_start (start, end, incr, 0,
+										istart, iend, region_id);
+		break;
 
 		/* case FS_AFAC: */
 		/*     valid = bo_loop_afac_start (start, end, incr, */
@@ -521,49 +518,49 @@ bool
 		break;
 
 	  case FS_FAC2:
-        valid = bo_loop_fac2_start (start, end, incr,
-                                    istart, iend, icv->run_sched_var,
-                                    region_id);
-        break;
+		valid = bo_loop_fac2_start (start, end, incr,
+									istart, iend, icv->run_sched_var,
+									region_id);
+		break;
 
 	  case FS_FSS:
 	  case BO_FSS:
-        valid = bo_loop_fss_start (start, end, incr,
-                                   istart, iend, icv->run_sched_var,
+		valid = bo_loop_fss_start (start, end, incr,
+								   istart, iend, icv->run_sched_var,
 								   region_id );
-        break;
+		break;
 
 	  case FS_TSS:
 	  case BO_TSS:
-        valid = bo_loop_tss_start(start, end, incr,
-                                  istart, iend, icv->run_sched_var,
-                                  region_id );
-        break;
+		valid = bo_loop_tss_start(start, end, incr,
+								  istart, iend, icv->run_sched_var,
+								  region_id );
+		break;
 
 	  case FS_CSS:
 	  case BO_CSS:
-        valid = bo_loop_css_start (start, end, incr,
-                                   istart, iend, icv->run_sched_var,
+		valid = bo_loop_css_start (start, end, incr,
+								   istart, iend, icv->run_sched_var,
 								   region_id );
-        break;
+		break;
 
 	  case FS_TAPE:
 	  case BO_TAPE:
-        valid = bo_loop_tape_start (start, end, incr,
-                                    istart, iend, icv->run_sched_var,
+		valid = bo_loop_tape_start (start, end, incr,
+									istart, iend, icv->run_sched_var,
 									region_id );
-        break;
+		break;
 
 	  default:
-        abort ();
+		abort ();
 	  }
-    return valid;
+	return valid;
   }
 
-  /* The *_ordered_*_start routines are similar.  The only difference is that
-	 this work-share construct is initialized to expect an ORDERED section.  */
+/* The *_ordered_*_start routines are similar.  The only difference is that
+   this work-share construct is initialized to expect an ORDERED section.  */
 
-  static bool
+static bool
 	gomp_loop_ordered_static_start (long start, long end, long incr,
 									long chunk_size, long *istart, long *iend)
   {
@@ -788,7 +785,6 @@ gomp_loop_dynamic_next (long *istart, long *iend)
 {
   bool ret;
   bo_workload_profile_stop();
-  bo_workload_profile_start(*istart);
 
 #ifdef HAVE_SYNC_BUILTINS
   ret = gomp_iter_dynamic_next (istart, iend);
@@ -799,6 +795,8 @@ gomp_loop_dynamic_next (long *istart, long *iend)
   gomp_mutex_unlock (&thr->ts.work_share->lock);
 #endif
 
+  if(ret)
+	bo_workload_profile_start(*istart);
   return ret;
 }
 
@@ -910,7 +908,6 @@ GOMP_loop_runtime_next (long *istart, long *iend)
   bool valid;  
   struct gomp_work_share *ws = thr->ts.work_share;
 
-  //size_t tasks = (*iend - *istart) / ws->incr;
   switch (ws->sched)
 	{
 	case GFS_STATIC:

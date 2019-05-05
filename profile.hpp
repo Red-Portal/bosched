@@ -9,7 +9,7 @@ namespace prof
 {
     void profiling_init(size_t num_tasks);
 
-    void iteration_profile_start(size_t iter);
+    void iteration_profile_start(long iter);
 
     void iteration_profile_stop();
 

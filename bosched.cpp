@@ -218,7 +218,7 @@ extern "C"
         if(getenv("PROFILE"))
         {
             _profile_loop = true;
-            auto prof_stream = std::ifstream("workload_prof.json"s);
+            auto prof_stream = std::ifstream(".workload.json"s);
             if(prof_stream)
                 prof_stream >> _profile; 
             prof_stream.close();
@@ -259,8 +259,8 @@ extern "C"
 
         if(_profile_loop)
         {
-            auto prof_stream = std::ofstream("workload_prof.json"s);
-            prof_stream << _stats.dump(2); 
+            auto prof_stream = std::ofstream(".workload.json"s);
+            prof_stream << _profile.dump(2); 
             prof_stream.close();
         }
 
@@ -279,21 +279,15 @@ extern "C"
         stream.close();
     }
 
-    void bo_workload_profile_init(unsigned long long num_tasks)
+    void bo_workload_profile_start(long iteration)
     {
-        if(_show_loop_stat)
-            prof::profiling_init(num_tasks);
-    }
-
-    void bo_workload_profile_start(unsigned long long iteration)
-    {
-        if(_show_loop_stat)
+        if(_profile_loop)
             prof::iteration_profile_start(iteration);
     }
 
     void bo_workload_profile_stop()
     {
-        if(_show_loop_stat)
+        if(_profile_loop)
             prof::iteration_profile_stop();
     }
 
@@ -309,6 +303,16 @@ extern "C"
         if(__builtin_expect (_show_loop_stat == false, 1))
             return;
         stat::iteration_stop_record();
+    }
+
+    void bo_binlpt_load_loop(unsigned long long region_id,
+                             int* out_override,
+                             unsigned* inout_task_map)
+    {
+    }
+
+    void bo_hss_load_loop()
+    {
     }
 
     double
@@ -356,6 +360,7 @@ extern "C"
             _procs = procs;
         }
 
+        std::cout << "???" << std::endl;
         if(__builtin_expect(_profile_loop, false))
         {
             prof::profiling_init(N);
@@ -390,45 +395,45 @@ extern "C"
                 else if(!loop_state.warming_up)
                 {
                     loop_state.obs_y.push_back(duration.count());
+                    }
                 }
-            }
 
-            if(__builtin_expect(_profile_loop, false))
-            {
-                auto workload_profile = prof::load_profile();
-                _profile[region_id].emplace_back(workload_profile);
-            }
+                if(__builtin_expect (_show_loop_stat, false))
+                {
+                    auto work_time = std::chrono::duration_cast<time_scale_t>(
+                        stat::total_work()).count();
 
-            if(__builtin_expect (_show_loop_stat, false))
-            {
-                auto work_time = std::chrono::duration_cast<time_scale_t>(
-                    stat::total_work()).count();
+                    auto parallel_time = duration.count();
 
-                auto parallel_time = duration.count();
-
-                auto work_per_processor = stat::work_per_processor();
-                auto performance        =  work_time / parallel_time;
-                auto cost               = parallel_time * _procs;
-                auto effectiveness      =  performance / cost;
-                auto cov                = bosched::coeff_of_variation(work_per_processor);
-                auto slowdown           = bosched::slowdown(work_per_processor);
+                    auto work_per_processor = stat::work_per_processor();
+                    auto performance        =  work_time / parallel_time;
+                    auto cost               = parallel_time * _procs;
+                    auto effectiveness      =  performance / cost;
+                    auto cov                = bosched::coeff_of_variation(work_per_processor);
+                    auto slowdown           = bosched::slowdown(work_per_processor);
 
                 auto& log = _stats[std::to_string(region_id)];
-                log["num_tasks"].push_back(loop_state.num_tasks);
-                log["work_time"].push_back(work_time);
+                log["num_tasks"    ].push_back(loop_state.num_tasks);
+                log["work_time"    ].push_back(work_time);
                 log["parallel_time"].push_back(parallel_time);
                 log["effectiveness"].push_back(effectiveness);
-                log["performance"].push_back(performance);
-                log["task_mean"].push_back(work_time / loop_state.num_tasks);
-                log["slowdown"].push_back(slowdown);
-                log["cov"].push_back(cov);
-                log["cost"].push_back(cost);
+                log["performance"  ].push_back(performance);
+                log["task_mean"    ].push_back(work_time / loop_state.num_tasks);
+                log["slowdown"     ].push_back(slowdown);
+                log["cov"          ].push_back(cov);
+                log["cost"         ].push_back(cost);
                 if(_is_debug)
                 {
                     std::cout << "-- loop " << region_id << " stats \n"
                               << log.dump(2) << '\n' << std::endl;
                 }
             }
+        }
+
+        if(__builtin_expect(_profile_loop, false))
+        {
+            auto workload_profile = prof::load_profile();
+            _profile[std::to_string(region_id)].emplace_back(workload_profile);
         }
 
         if(__builtin_expect (_is_debug, false))

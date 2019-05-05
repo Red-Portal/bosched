@@ -1,6 +1,7 @@
 
 #include "metrics.hpp"
 #include <chrono>
+#include <iostream>
 #include <omp.h>
 #include "profile.hpp"
 
@@ -17,7 +18,7 @@ namespace prof
         _loads = std::vector<float>(num_tasks);
     }
 
-    void iteration_profile_start(size_t iter)
+    void iteration_profile_start(long iter)
     {
         size_t tid = omp_get_thread_num();
         _timestamp[tid] = std::make_pair(static_cast<iter_id>(iter),

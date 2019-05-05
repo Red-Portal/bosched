@@ -32,6 +32,7 @@ set(SOURCE_DIR ${PROJECT_SOURCE_DIR})
 set(SOURCE_FILES
     ${SOURCE_DIR}/bosched.cpp
     ${SOURCE_DIR}/tls.cpp
+    ${SOURCE_DIR}/profile.cpp
     )
 
 message("[ Source files for ${PROJECT_NAME} ]")
