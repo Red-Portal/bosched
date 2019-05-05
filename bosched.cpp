@@ -9,6 +9,7 @@
 #include "utils.hpp"
 #include "performance.hpp"
 #include "profile.hpp"
+#include "param.hpp"
 
 #include <atomic>
 #include <blaze/Blaze.h>
@@ -33,6 +34,7 @@ std::mt19937 _rng __attribute__((init_priority(101)));
 std::unordered_map<size_t, bosched::loop_state_t> _loop_states __attribute__((init_priority(101)));
 nlohmann::json _stats   __attribute__((init_priority(101)));
 nlohmann::json _profile __attribute__((init_priority(101)));
+std::unordered_map<size_t, bosched::workload_params> _params __attribute__((init_priority(101)));
 long _procs;
 
 namespace bosched
@@ -237,6 +239,17 @@ extern "C"
         }
         stream.close();
 
+        {
+            nlohmann::json raw_params;
+            auto param_stream = std::ifstream(".params.json"s);
+            if(param_stream)
+            {
+                param_stream >> raw_params;
+                _params = bosched::load_workload_params(raw_params);
+            }
+            param_stream.close();
+        }
+
         if(getenv("EVAL"))
         {
             bosched::eval_loop_parameters(_loop_states);
@@ -257,15 +270,15 @@ extern "C"
             stat_stream.close();
         }
 
+        if(getenv("EVAL"))
+            return;
+
         if(_profile_loop)
         {
             auto prof_stream = std::ofstream(".workload.json"s);
             prof_stream << _profile.dump(2); 
             prof_stream.close();
         }
-
-        if(getenv("EVAL"))
-            return;
 
         auto updated_states = _is_bo_schedule ?
             update_loop_parameters(std::move(_loop_states)) 
@@ -306,13 +319,27 @@ extern "C"
     }
 
     void bo_binlpt_load_loop(unsigned long long region_id,
-                             int* out_override,
-                             unsigned* inout_task_map)
+                             unsigned** task_map)
     {
+        auto& profile = _params[region_id].binlpt;
+        *task_map = profile.data();
     }
 
-    void bo_hss_load_loop()
+    void bo_hss_load_loop(unsigned long long region_id,
+                          unsigned** task_map)
     {
+        auto& profile = _params[region_id].hss;
+        *task_map = profile.data();
+    }
+
+    double bo_fss_parameter(unsigned long long region_id)
+    {
+        return _params[region_id].fss;
+    }
+
+    double bo_css_parameter(unsigned long long region_id)
+    {
+        return _params[region_id].css;
     }
 
     double

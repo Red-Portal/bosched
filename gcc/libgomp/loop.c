@@ -102,7 +102,15 @@ gomp_loop_init (struct gomp_work_share *ws, long start, long end, long incr,
 	case FS_FSS:
 	case BO_FSS:
 	  {
-		ws->param = fss_transform_range(ws->param);
+		if(sched == BO_FSS)
+		  {
+			ws->param = fss_transform_range(ws->param);
+		  }
+		else if(sched == FS_FSS)
+		  {
+			ws->param = bo_fss_parameter(region_id);
+		  }
+
 		double temp = nthreads / 2.0 * ws->param;
 		double b2 = (1.0 / num_tasks) * temp * temp;
 		double x = 1 + b2 + sqrt( b2 * (b2 + 2));
@@ -136,21 +144,22 @@ gomp_loop_init (struct gomp_work_share *ws, long start, long end, long incr,
 		/* 	struct gomp_team *team = thr->ts.team; */
 		/* 	num_threads = (team != NULL) ? team->nthreads : 1; */
 		/*   } */
+
 		__ntasks = num_tasks;
-		__nchunks = __ntasks;//nthreads;
+		//__nchunks = nthreads;
 
-		int override;
+		//int override;
 		unsigned* taskmap = NULL;
-		bo_binlpt_load_loop(region_id, &override, taskmap);
+		bo_binlpt_load_loop(region_id, &taskmap);
 
-		//struct loop *loop = &loops[curr_loop];
-		if (override || taskmap == NULL) {
-		  /* Refresh the mapping. */
-		  if (taskmap != NULL) {
-			free(taskmap);
-		  }
-		  taskmap = binlpt_balance(__tasks, __ntasks, nthreads);
-		}
+		/* struct loop *loop = &loops[curr_loop]; */
+		/* if (override || taskmap == NULL) { */
+		/*   /\* Refresh the mapping. *\/ */
+		/*   if (taskmap != NULL) { */
+		/* 	free(taskmap); */
+		/*   } */
+		/*   taskmap = binlpt_balance(__tasks, __ntasks, nthreads); */
+		/* } */
 
 		ws->taskmap = taskmap;
 		ws->loop_start = start;
@@ -160,6 +169,9 @@ gomp_loop_init (struct gomp_work_share *ws, long start, long end, long incr,
 
 	case FS_HSS:
 	  {
+		__ntasks = num_tasks;
+		bo_hss_load_loop(region_id, &__tasks);
+
 #ifndef HAVE_SYNC_BUILTINS
 		gomp_mutex_init (&ws->hss_lock);
 #endif
@@ -175,9 +187,14 @@ gomp_loop_init (struct gomp_work_share *ws, long start, long end, long incr,
 	case FS_CSS:
 	case BO_CSS:
 	  {
-		if(sched == FS_CSS || sched == BO_CSS )
+		if(sched == FS_CSS)
 		  {
 			ws->param = css_transform_range(ws->param);
+			ws->chunk_size = css_chunk_size(ws->param, num_tasks, nthreads);
+		  }
+		else if(sched == BO_CSS )
+		  {
+			ws->param = bo_css_parameter(region_id);
 			ws->chunk_size = css_chunk_size(ws->param, num_tasks, nthreads);
 		  }
 		ws->chunk_size *= incr;
