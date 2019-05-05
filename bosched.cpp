@@ -8,6 +8,7 @@
 #include "tls.hpp"
 #include "utils.hpp"
 #include "performance.hpp"
+#include "profile.hpp"
 
 #include <atomic>
 #include <blaze/Blaze.h>
@@ -27,9 +28,11 @@ bool _show_loop_stat = false;
 bool _is_debug       = false;
 bool _is_bo_schedule = false;
 bool _is_new_file    = false;
+bool _profile_loop   = false;
 std::mt19937 _rng __attribute__((init_priority(101)));
 std::unordered_map<size_t, bosched::loop_state_t> _loop_states __attribute__((init_priority(101)));
-nlohmann::json _stats __attribute__((init_priority(101)));
+nlohmann::json _stats   __attribute__((init_priority(101)));
+nlohmann::json _profile __attribute__((init_priority(101)));
 long _procs;
 
 namespace bosched
@@ -206,6 +209,19 @@ extern "C"
         if(getenv("LOOPSTAT"))
         {
             _show_loop_stat = true;
+            auto stat_file_name = ".stat."s + progname;
+            auto stat_stream = std::ifstream(stat_file_name + ".json"s);
+            if(stat_stream)
+                stat_stream >> _stats; 
+            stat_stream.close();
+        }
+        if(getenv("PROFILE"))
+        {
+            _profile_loop = true;
+            auto prof_stream = std::ifstream("workload_prof.json"s);
+            if(prof_stream)
+                prof_stream >> _profile; 
+            prof_stream.close();
         }
 
         if(stream)
@@ -220,15 +236,6 @@ extern "C"
             _is_new_file = true;
         }
         stream.close();
-
-        if(_show_loop_stat)
-        {
-            auto stat_file_name = ".stat."s + progname;
-            auto stat_stream = std::ifstream(stat_file_name + ".json"s);
-            if(stat_stream)
-                stat_stream >> _stats; 
-            stat_stream.close();
-        }
 
         if(getenv("EVAL"))
         {
@@ -250,6 +257,13 @@ extern "C"
             stat_stream.close();
         }
 
+        if(_profile_loop)
+        {
+            auto prof_stream = std::ofstream("workload_prof.json"s);
+            prof_stream << _stats.dump(2); 
+            prof_stream.close();
+        }
+
         if(getenv("EVAL"))
             return;
 
@@ -265,18 +279,36 @@ extern "C"
         stream.close();
     }
 
+    void bo_workload_profile_init(unsigned long long num_tasks)
+    {
+        if(_show_loop_stat)
+            prof::profiling_init(num_tasks);
+    }
+
+    void bo_workload_profile_start(unsigned long long iteration)
+    {
+        if(_show_loop_stat)
+            prof::iteration_profile_start(iteration);
+    }
+
+    void bo_workload_profile_stop()
+    {
+        if(_show_loop_stat)
+            prof::iteration_profile_stop();
+    }
+
     void bo_record_iteration_start()
     {
         if(__builtin_expect (_show_loop_stat == false, 1))
             return;
-        bosched::iteration_start_record();
+        stat::iteration_start_record();
     }
 
     void bo_record_iteration_stop()
     {
         if(__builtin_expect (_show_loop_stat == false, 1))
             return;
-        bosched::iteration_stop_record();
+        stat::iteration_stop_record();
     }
 
     double
@@ -324,9 +356,14 @@ extern "C"
             _procs = procs;
         }
 
+        if(__builtin_expect(_profile_loop, false))
+        {
+            prof::profiling_init(N);
+        }
+
         if(__builtin_expect (_show_loop_stat, false))
         {
-            bosched::init_tls();
+            stat::init_tls();
         }
         if(__builtin_expect (_is_debug, false))
         {
@@ -356,14 +393,20 @@ extern "C"
                 }
             }
 
+            if(__builtin_expect(_profile_loop, false))
+            {
+                auto workload_profile = prof::load_profile();
+                _profile[region_id].emplace_back(workload_profile);
+            }
+
             if(__builtin_expect (_show_loop_stat, false))
             {
                 auto work_time = std::chrono::duration_cast<time_scale_t>(
-                    bosched::total_work()).count();
+                    stat::total_work()).count();
 
                 auto parallel_time = duration.count();
 
-                auto work_per_processor = bosched::work_per_processor();
+                auto work_per_processor = stat::work_per_processor();
                 auto performance        =  work_time / parallel_time;
                 auto cost               = parallel_time * _procs;
                 auto effectiveness      =  performance / cost;

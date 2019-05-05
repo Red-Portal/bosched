@@ -7,7 +7,7 @@
 
 #include "metrics.hpp"
 
-namespace bosched
+namespace stat
 {
     void init_tls();
 

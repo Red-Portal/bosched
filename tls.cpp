@@ -14,14 +14,14 @@
 #include <unordered_map>
 #include <vector>
 
-std::atomic<size_t> _total_runtime;
-std::vector<bosched::clock::time_point> _timestamp;
-
-bosched::clock::time_point _startstamp;
-std::vector<bosched::clock::time_point> _tailstamp;
-
-namespace bosched
+namespace stat
 {
+    std::atomic<size_t> _total_runtime;
+    std::vector<bosched::clock::time_point> _timestamp;
+
+    bosched::clock::time_point _startstamp;
+    std::vector<bosched::clock::time_point> _tailstamp;
+
     void init_tls()
     {
         _total_runtime.store(size_t(0));
