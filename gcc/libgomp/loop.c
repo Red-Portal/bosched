@@ -136,8 +136,8 @@ gomp_loop_init (struct gomp_work_share *ws, long start, long end, long incr,
 		/* 	struct gomp_team *team = thr->ts.team; */
 		/* 	num_threads = (team != NULL) ? team->nthreads : 1; */
 		/*   } */
-		__nchunks = nthreads;
 		__ntasks = num_tasks;
+		__nchunks = __ntasks;//nthreads;
 
 		int override;
 		unsigned* taskmap = NULL;
@@ -179,6 +179,10 @@ gomp_loop_init (struct gomp_work_share *ws, long start, long end, long incr,
 		  {
 			ws->param = css_transform_range(ws->param);
 			ws->chunk_size = css_chunk_size(ws->param, num_tasks, nthreads);
+		  }
+		else
+		  {
+			bo_workload_profile_init(num_tasks);
 		  }
 		ws->chunk_size *= incr;
 
@@ -270,6 +274,7 @@ gomp_loop_dynamic_start (long start, long end, long incr, long chunk_size,
                         GFS_DYNAMIC, chunk_size, region_id );
         gomp_work_share_init_done ();
     }
+	bo_workload_profile_start(*istart);
 
 #ifdef HAVE_SYNC_BUILTINS
     ret = gomp_iter_dynamic_next (istart, iend);
@@ -782,6 +787,8 @@ static bool
 gomp_loop_dynamic_next (long *istart, long *iend)
 {
   bool ret;
+  bo_workload_profile_stop();
+  bo_workload_profile_start(*istart);
 
 #ifdef HAVE_SYNC_BUILTINS
   ret = gomp_iter_dynamic_next (istart, iend);

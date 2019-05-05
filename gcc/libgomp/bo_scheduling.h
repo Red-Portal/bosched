@@ -5,6 +5,12 @@
 #include <string.h>
 #include "libgomp.h"
 
+extern void bo_workload_profile_init(unsigned long long num_tasks);
+
+extern void bo_workload_profile_start(unsigned long long iteration);
+
+extern void bo_workload_profile_stop();
+
 extern void bo_record_iteration_start();
 
 extern void bo_record_iteration_stop();
