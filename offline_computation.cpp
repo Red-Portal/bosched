@@ -1,9 +1,12 @@
 
+#include <algorithm>
+#include <boost/program_options.hpp>
 #include <cmath>
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <nlohmann/json.hpp>
+#include <numeric>
 #include <vector>
 
 #define N 128
@@ -146,6 +149,7 @@ namespace binlpt
                    unsigned const* chunksizes,
                    unsigned nchunks)
     {
+        (void)ntasks;
         unsigned i, k;    /* Loop indexes. */
         unsigned *chunks; /* Chunks.       */
 
@@ -229,62 +233,139 @@ namespace binlpt
     }
 }
 
-template<typename It>
-double mean(It begin, It end)
+template<typename It, typename Float>
+inline Float
+mean(It begin, It end, Float init)
 {
-    double sum = 0;
-    for(It begin; begin != end; ++begin)
+    size_t n = end - begin;
+    for(; begin != end; ++begin)
     {
-        sum += *begin;
+        init += *begin;
     }
-    return sum / (end - begin);
+    return init / n;
 }
 
 
-template<typename It>
-double stdddev(double mean, It begin, It end)
+template<typename It, typename Float>
+inline Float
+stddev(Float mean, It begin, It end)
 {
-    double sum = 0;
-    for(It begin; begin != end; ++begin)
+    Float sum = 0;
+    size_t n  = (end - begin);
+    for(; begin != end; ++begin)
     {
-        double temp = (*begin - mean);
+        Float temp = (*begin - mean);
         sum += temp * temp;
     }
-    size_t n = (end - begin);
     return sqrt(sum / (n - 1));
 }
 
-nlohmann::json
-process_loop(nlohmann::json const& loop)
+inline std::vector<float>
+iteration_mean(nlohmann::json const& loop)
 {
-    auto means = std::vector<double>(loop.size());
-    for(auto& iter: loop)
+    size_t num_iters = loop[0].size();
+    size_t num_samples = loop.size();
+    auto means = std::vector<float>(num_iters);
+    for(size_t i = 0; i < num_iters; ++i)
     {
-        auto begin = iter.cbegin();
-        auto end   = iter.cend();
-        auto mu    = mean(begin, end);
-        //auto sd    = stddev(mu, begin, end);
-        means[]
-            }
+        double sum = 0;
+        for(size_t j = 0; j < num_samples; ++j)
+        {
+            double elem = loop[j][i];
+            sum += elem;
+        }
+        means[i] = sum / num_samples;
+    }
+    return means;
 }
+
+inline std::vector<unsigned>
+quantize(std::vector<float>&& loop)
+{
+    auto sum       = std::accumulate(loop.begin(), loop.end(), 0.0f);
+    auto max_value = std::numeric_limits<unsigned>::max();
+
+    auto T   = [max_value, sum](float elem){
+                   auto scaled = elem / 10.0f * (max_value / sum);
+                   return static_cast<unsigned>(
+                       std::min(scaled, static_cast<float>(max_value)));
+               };
+    auto result = std::vector<unsigned>(loop.size());
+    for(size_t i = 0; i < loop.size(); ++i)
+    {
+        result[i] = T(loop[i]);
+    }
+    return result;
+}
+
 
 int main(int argc, char** argv)
 {
-    (void)argc, (void)argv;
+    namespace po = boost::program_options; 
     using namespace std::literals::string_literals;
 
-    auto loops = nlohmann::json({1, 2, 3, 4});
-    auto path = std::string(argv[1]);
-    auto prof_stream = std::ifstream(path + "/workload_prof.json"s);
+    po::options_description desc("Options"); 
+    desc.add_options() 
+        ("path", po::value<std::string>()->default_value("."), "path") 
+        ("chunks", po::value<unsigned>()->default_value(32), "binlpt chunks")
+        ("threads", po::value<unsigned>()->default_value(32), "threads")
+        ("h", po::value<double>(), "overhead in microsecond");
 
-    for(auto& [key, value] : loops)
+    po::variables_map vm;
+    try 
+    { 
+        po::store(po::command_line_parser(argc, argv)
+                  .options(desc).run(), vm);
+        po::notify(vm); 
+    } 
+    catch(po::error& e) 
+    { 
+      std::cerr << "ERROR: " << e.what() << std::endl << std::endl; 
+      std::cerr << desc << std::endl; 
+      return 1;
+    } 
+
+    double h         = vm["h"].as<double>();
+    auto path        = vm["path"].as<std::string>();
+    unsigned chunks  = vm["chunks"].as<unsigned>();
+    unsigned threads = vm["threads"].as<unsigned>();
+
+    auto loops       = nlohmann::json();
+    auto prof_stream = std::ifstream(path + "/.workload.json"s);
+    if(!prof_stream)
+        throw std::runtime_error("cannot find workload.json!");
+    prof_stream >> loops;
+
+
+    nlohmann::json output;
+    for(auto& [key, value] : loops.items())
     {
-        process_loop(value);
+        auto means = iteration_mean(value);
+        auto mu    = mean(means.begin(), means.end(), 0.0f);
+        auto sigma = stddev(mu, means.begin(), means.end());
+
+        auto quantized = quantize(std::move(means));
+        auto taskmap = binlpt::binlpt_balance(
+            quantized.data(), quantized.size(), threads, chunks);
+
+        double css_param = h / sigma;
+        double fss_param = sigma / mu;
+
+        auto& loop_output     = output[key];
+        loop_output["css"]    = css_param;
+        loop_output["fss"]    = fss_param;
+        loop_output["hss"]    = std::move(quantized);
+        loop_output["binlpt"] = std::move(taskmap);
+
+
+        std::cout << "Loop: " << key << '\n'
+                  << " - mean: " << mu << '\n'
+                  << " - sdev: " << sigma << '\n'
+                  << " - css: " << css_param << '\n'
+                  << " - fss: " << fss_param << '\n'
+                  << std::endl;
     }
-
-
-    auto taskmap = binlpt_balance(unsigned* tasks,
-                                  unsigned ntasks,
-                                  unsigned nthreads,
-                                  unsigned nchunks);
+    auto out_stream = std::ofstream(path + "/.params.json"s);
+    out_stream << output.dump(2);
+    return 0;
 }

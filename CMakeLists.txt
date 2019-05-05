@@ -45,6 +45,8 @@ add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES})
 # Build options
 set(BUILD_FLAGS
     "${CMAKE_CXX_FLAGS} -O3 -g -fPIC -Wall -Wextra -march=native -flto")
+# set(BUILD_FLAGS
+#     "${CMAKE_CXX_FLAGS} -g -fPIC -Wall -Wextra -march=native")
 
 message("C++ flags = ${BUILD_FLAGS}")
 
@@ -62,7 +64,7 @@ find_package(LAPACK REQUIRED)
 
 set(Boost_USE_STATIC_LIBS ON)
 set(Boost_USE_STATIC_RUNTIME ON)
-find_package(Boost REQUIRED COMPONENTS thread)
+find_package(Boost REQUIRED COMPONENTS thread program_options)
 
 set(LBPO_SOURCE_DIR ${PROJECT_SOURCE_DIR}/LBPO)
 # Include directories
@@ -77,3 +79,19 @@ target_link_libraries(${PROJECT_NAME}
     ${BLAS_LIBRARIES}
     ${Boost_LIBRARIES}
     ${LAPACK_LIBRARIES})
+
+add_executable(offline ${PROJECT_SOURCE_DIR}/offline_computation.cpp)
+
+set_target_properties(offline
+    PROPERTIES
+    COMPILE_FLAGS "${BUILD_FLAGS} -fopenmp"
+    CXX_STANDARD 17)
+
+target_include_directories(offline
+    PUBLIC
+    ${Boost_INCLUDE_DIRS})
+
+target_link_libraries(offline
+    PRIVATE
+    ${Boost_LIBRARIES}
+    gomp)
