@@ -158,10 +158,10 @@ parse_schedule (void)
         gomp_global_icv.run_sched_var = FS_TSS;
         env += 3;
     }
-    else if (strncasecmp (env, "trap1", 3) == 0)
+    else if (strncasecmp (env, "trap1", 5) == 0)
 	  {
         gomp_global_icv.run_sched_var = FS_TRAP1;
-        env += 3;
+        env += 5;
 	  }
     else if (strncasecmp (env, "css", 3) == 0)
 	  {
