@@ -77,22 +77,36 @@ gomp_loop_init (struct gomp_work_share *ws, long start, long end, long incr,
 		break;
 	  }
 	case FS_TAPE:
+	case FS_TAPE3:
 	case BO_TAPE:
 	  {
 		if(sched == BO_TAPE)
-		  ws->param = tape_transform_range(ws->param);
+		  {
+			ws->param = tape_transform_range(ws->param);
+		  }
+		else if(sched == FS_TAPE)
+		  {
+			ws->param = bo_tape_parameter(region_id);
+		  }
 		else
-		  ws->param = 3.0;
+		  {
+			ws->param = 3.0;
+		  }
 		break;
 	  }
 
 	case FS_TSS:
 	case BO_TSS:
+	case FS_TRAP1:
 	  {
-		if(sched == FS_TSS)
+		if(sched == FS_TRAP1)
 		  {
 			double temp = (double)num_tasks / (2 * nthreads + 1);
 			ws->param = (2 * num_tasks) / (temp * temp);
+		  }
+		else if(sched == FS_TSS)
+		  {
+			ws->param = bo_tss_parameter(region_id);
 		  }
 		ws->chunk_size = sqrt(2.0 * num_tasks / ws->param) - 1; // f in the original paper
 		ws->count = 0;
@@ -172,9 +186,9 @@ gomp_loop_init (struct gomp_work_share *ws, long start, long end, long incr,
 		__ntasks = num_tasks;
 		bo_hss_load_loop(region_id, &__tasks);
 
-		//#ifndef HAVE_SYNC_BUILTINS
+		// #ifndef HAVE_SYNC_BUILTINS
 		gomp_mutex_init (&ws->lock);
-		//#endif
+		// #endif
 		ws->loop_start = start;
 		ws->wremaining = 0;
 		for (unsigned i = 0; i < __ntasks; i++)
@@ -548,6 +562,7 @@ GOMP_loop_runtime_start (long start, long end, long incr,
 		break;
 
 	  case FS_TSS:
+	  case FS_TRAP1:
 	  case BO_TSS:
 		valid = bo_loop_tss_start(start, end, incr,
 								  istart, iend, icv->run_sched_var,
@@ -562,6 +577,7 @@ GOMP_loop_runtime_start (long start, long end, long incr,
 		break;
 
 	  case FS_TAPE:
+	  case FS_TAPE3:
 	  case BO_TAPE:
 		valid = bo_loop_tape_start (start, end, incr,
 									istart, iend, icv->run_sched_var,
@@ -961,6 +977,7 @@ GOMP_loop_runtime_next (long *istart, long *iend)
 	  break;
 
 	case FS_TSS:
+	case FS_TRAP1:
 	case BO_TSS:
 	  valid = bo_loop_tss_next (istart, iend);
 	  break;
@@ -971,6 +988,7 @@ GOMP_loop_runtime_next (long *istart, long *iend)
 	  break;
 
 	case FS_TAPE:
+	case FS_TAPE3:
 	case BO_TAPE:
 	  valid = bo_loop_tape_next (istart, iend);
 	  break;

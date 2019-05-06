@@ -147,6 +147,8 @@ enum gomp_schedule_type
   FS_TSS,
   FS_CSS,
   FS_TAPE,
+  FS_TRAP1,
+  FS_TAPE3,
   BO_FSS,
   BO_CSS,
   BO_TSS,

@@ -316,9 +316,9 @@ gomp_iter_hss_next (long *pstart, long *pend)
   int nthreads;               /* Number of threads.              */
   
   /* Get scheduler data.. */
-  thr = gomp_thread();
-  team = thr->ts.team;
-  ws = thr->ts.work_share;
+  thr      = gomp_thread();
+  team     = thr->ts.team;
+  ws       = thr->ts.work_share;
   nthreads = (team != NULL) ? team->nthreads : 1;
 
   //#ifndef HAVE_SYNC_BUILTINS

@@ -158,26 +158,36 @@ parse_schedule (void)
         gomp_global_icv.run_sched_var = FS_TSS;
         env += 3;
     }
+    else if (strncasecmp (env, "trap1", 3) == 0)
+	  {
+        gomp_global_icv.run_sched_var = FS_TRAP1;
+        env += 3;
+	  }
     else if (strncasecmp (env, "css", 3) == 0)
-    {
+	  {
         gomp_global_icv.run_sched_var = FS_CSS;
         env += 3;
-    }
+	  }
     else if (strncasecmp (env, "tape", 4) == 0)
     {
         gomp_global_icv.run_sched_var = FS_TAPE;
         env += 4;
     }
+    else if (strncasecmp (env, "tape3", 5) == 0)
+	  {
+		gomp_global_icv.run_sched_var = FS_TAPE3;
+        env += 5;
+	  }
     else if (strncasecmp (env, "bo_tape", 7) == 0)
-    {
+	  {
         gomp_global_icv.run_sched_var = BO_TAPE;
         env += 7;
-    }
+	  }
     else if (strncasecmp (env, "bo_css", 6) == 0)
-    {
+	  {
         gomp_global_icv.run_sched_var = BO_CSS;
         env += 6;
-    }
+	  }
     else if (strncasecmp (env, "bo_fss", 6) == 0)
     {
         gomp_global_icv.run_sched_var = BO_FSS;
@@ -1255,14 +1265,20 @@ handle_omp_display_env (unsigned long stacksize, int wait_policy)
     case FS_TSS:
         fputs ("TSS", stderr);
         break;
+    case FS_TRAP1:
+	  fputs ("TRAP1", stderr);
+	  break;
     case FS_CSS:
-        fputs ("CSS", stderr);
+	  fputs ("CSS", stderr);
         break;
     case FS_TAPE:
         fputs ("TAPE", stderr);
         break;
+    case FS_TAPE3:
+	  fputs ("TAPE3", stderr);
+	  break;
     case BO_TSS:
-        fputs ("BO_TSS", stderr);
+	  fputs ("BO_TSS", stderr);
         break;
     case BO_TAPE:
         fputs ("BO_TAPE", stderr);

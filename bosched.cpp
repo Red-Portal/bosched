@@ -342,6 +342,16 @@ extern "C"
         return _params[region_id].css;
     }
 
+    double bo_tss_parameter(unsigned long long region_id)
+    {
+        return _params[region_id].tss.value();
+    }
+
+    double bo_tape_parameter(unsigned long long region_id)
+    {
+        return _params[region_id].tape.value();
+    }
+
     double
     bo_schedule_parameter(unsigned long long region_id,
                           int is_bo_schedule)

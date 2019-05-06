@@ -4,6 +4,7 @@
 
 #include <vector>
 #include <cstdlib>
+#include <optional>
 #include <unordered_map>
 #include <nlohmann/json.hpp>
 
@@ -13,6 +14,8 @@ namespace bosched
     {
         double css;
         double fss;
+        std::optional<double> tss;
+        std::optional<double> tape;
         std::vector<unsigned> binlpt;
         std::vector<unsigned> hss;
     };
@@ -24,12 +27,26 @@ namespace bosched
         result.reserve(loops_json.size());
         for(auto [key, value] : loops_json.items())
         {
+            auto param_bundle   = workload_params();
+
             double css_param  = value["css"];
             double fss_param  = value["fss"];
+
+            if(value.count("tape") > 0)
+            {
+                double tape = value["tape"];
+                param_bundle.tape.emplace(tape);
+            }
+
+            if(value.count("tss") > 0)
+            {
+                double tss = value["tss"];
+                param_bundle.tss.emplace(tss);
+            }
+
             auto& binlpt_json = value["binlpt"];
             auto& hss_json    = value["hss"];
 
-            auto param_bundle   = workload_params();
             param_bundle.css    = css_param;
             param_bundle.fss    = fss_param;
             param_bundle.binlpt = std::vector<unsigned>(binlpt_json.size());
