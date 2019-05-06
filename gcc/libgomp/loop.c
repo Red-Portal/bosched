@@ -203,12 +203,12 @@ gomp_loop_init (struct gomp_work_share *ws, long start, long end, long incr,
 	case FS_CSS:
 	case BO_CSS:
 	  {
-		if(sched == FS_CSS)
+		if(sched == BO_CSS)
 		  {
 			ws->param = css_transform_range(ws->param);
 			ws->chunk_size = css_chunk_size(ws->param, num_tasks, nthreads);
 		  }
-		else if(sched == BO_CSS )
+		else if(sched == FS_CSS )
 		  {
 			ws->param = bo_css_parameter(region_id);
 			ws->chunk_size = css_chunk_size(ws->param, num_tasks, nthreads);
