@@ -172,9 +172,9 @@ gomp_loop_init (struct gomp_work_share *ws, long start, long end, long incr,
 		__ntasks = num_tasks;
 		bo_hss_load_loop(region_id, &__tasks);
 
-#ifndef HAVE_SYNC_BUILTINS
-		gomp_mutex_init (&ws->hss_lock);
-#endif
+		//#ifndef HAVE_SYNC_BUILTINS
+		gomp_mutex_init (&ws->lock);
+		//#endif
 		ws->loop_start = start;
 		ws->wremaining = 0;
 		for (unsigned i = 0; i < __ntasks; i++)
