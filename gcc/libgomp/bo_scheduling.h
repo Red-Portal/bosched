@@ -54,10 +54,10 @@ inline static bool is_bo_schedule(enum gomp_schedule_type sched)
 
 inline static bool is_parameterized(enum gomp_schedule_type sched)
 {
-  return is_bo_schedule(sched)
-	//|| sched == FS_CSS
+  return is_bo_schedule(sched);
+  //|| sched == FS_CSS
 	//|| sched == FS_FSS
-	|| sched == FS_TAPE;
+	//|| sched == FS_TAPE;
 }
 
 #endif

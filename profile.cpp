@@ -1,7 +1,6 @@
 
 #include "metrics.hpp"
 #include <chrono>
-#include <iostream>
 #include <omp.h>
 #include "profile.hpp"
 

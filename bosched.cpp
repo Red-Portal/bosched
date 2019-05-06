@@ -397,7 +397,6 @@ extern "C"
             _procs = procs;
         }
 
-        std::cout << "???" << std::endl;
         if(__builtin_expect(_profile_loop, false))
         {
             prof::profiling_init(N);
