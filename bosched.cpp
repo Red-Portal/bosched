@@ -323,6 +323,12 @@ extern "C"
     {
         auto& profile = _params[region_id].binlpt;
         *task_map = profile.data();
+        if(__builtin_expect (_is_debug, false))
+        {
+            std::cout << "-- loop " << region_id
+                      << " requested workload binlpt profile"
+                      << std::endl;
+        }
     }
 
     void bo_hss_load_loop(unsigned long long region_id,
@@ -330,26 +336,60 @@ extern "C"
     {
         auto& profile = _params[region_id].hss;
         *task_map = profile.data();
+        if(__builtin_expect (_is_debug, false))
+        {
+            std::cout << "-- loop " << region_id
+                      << " requested workload hss profile"
+                      << std::endl;
+        }
     }
 
     double bo_fss_parameter(unsigned long long region_id)
     {
-        return _params[region_id].fss;
+        double param = _params[region_id].fss;
+        if(__builtin_expect (_is_debug, false))
+        {
+            std::cout << "-- loop " << region_id
+                      << " requested fss schedule parameter " << param
+                      << std::endl;
+        }
+        return param;
     }
 
     double bo_css_parameter(unsigned long long region_id)
     {
-        return _params[region_id].css;
+        double param = _params[region_id].css;
+        if(__builtin_expect (_is_debug, false))
+        {
+            std::cout << "-- loop " << region_id
+                      << " requested css schedule parameter " << param
+                      << std::endl;
+        }
+        return param;
     }
 
     double bo_tss_parameter(unsigned long long region_id)
     {
-        return _params[region_id].tss.value();
+        double param = _params[region_id].tss.value();
+        if(__builtin_expect (_is_debug, false))
+        {
+            std::cout << "-- loop " << region_id
+                      << " requested tss schedule parameter " << param
+                      << std::endl;
+        }
+        return param;
     }
 
     double bo_tape_parameter(unsigned long long region_id)
     {
-        return _params[region_id].tape.value();
+        double param = _params[region_id].tape.value();
+        if(__builtin_expect (_is_debug, false))
+        {
+            std::cout << "-- loop " << region_id
+                      << " requested schedule parameter " << param
+                      << std::endl;
+        }
+        return param;
     }
 
     double
