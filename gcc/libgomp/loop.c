@@ -87,6 +87,7 @@ gomp_loop_init (struct gomp_work_share *ws, long start, long end, long incr,
 		else if(sched == FS_TAPE)
 		  {
 			ws->param = bo_tape_parameter(region_id);
+			ws->param = tape_transform_range(ws->param);
 		  }
 		else
 		  {
@@ -108,6 +109,7 @@ gomp_loop_init (struct gomp_work_share *ws, long start, long end, long incr,
 		  {
 			ws->param = bo_tss_parameter(region_id);
 		  }
+		ws->param += (double)nthreads / num_tasks; // smoothing term
 		ws->chunk_size = sqrt(2.0 * num_tasks / ws->param) - 1; // f in the original paper
 		ws->count = 0;
 		break;
