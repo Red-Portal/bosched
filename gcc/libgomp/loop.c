@@ -87,7 +87,6 @@ gomp_loop_init (struct gomp_work_share *ws, long start, long end, long incr,
 		else if(sched == FS_TAPE)
 		  {
 			ws->param = bo_tape_parameter(region_id);
-			ws->param = tape_transform_range(ws->param);
 		  }
 		else
 		  {

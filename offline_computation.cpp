@@ -18,6 +18,24 @@
         (b) = tmp;                              \
     } while(0);
 
+inline double
+css_transform_range(double param)
+{
+    return exp(15 * param - 10);
+}
+
+inline double
+fss_transform_range(double param)
+{
+  return pow(2, 18.8 * param - 13);
+}
+
+inline double
+tape_transform_range(double param)
+{
+    return exp(15 * param - 10);
+}
+
 namespace binlpt
 {
     inline void
@@ -266,6 +284,8 @@ iteration_mean(nlohmann::json const& loop)
     size_t num_iters = loop[0].size();
     size_t num_samples = loop.size();
     auto means = std::vector<float>(num_iters);
+
+#pragma  omp parallel for schedule(static)
     for(size_t i = 0; i < num_iters; ++i)
     {
         double sum = 0;
@@ -348,8 +368,8 @@ int main(int argc, char** argv)
         auto taskmap = binlpt::binlpt_balance(
             quantized.data(), quantized.size(), threads, chunks);
 
-        double css_param = h / sigma;
-        double fss_param = sigma / mu;
+        double css_param = css_transform_range(h / sigma);
+        double fss_param = fss_transform_range(sigma / mu);
 
         auto& loop_output     = output[key];
         loop_output["css"]    = css_param;

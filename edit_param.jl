@@ -33,6 +33,18 @@ function cmd_args(args, show)
     return args
 end
 
+function css_transform_range(param::Float64)
+    return exp(15 * param - 10);
+end
+
+function fss_transform_range(param::Float64)
+    return 2^(18.8 * param - 13);
+end
+
+function tape_transform_range(param::Float64)
+    return exp(15 * param - 10);
+end
+
 function main(args)
     parsed_args = cmd_args(args, true)
     filename    = fs.joinpath(parsed_args["path"], ".params.json")
@@ -45,11 +57,13 @@ function main(args)
     for (key, value) in loops
         println("-- processing loop ", key)
         if(parsed_args["css"] != nothing)
-            value["css"] = parsed_args["css"];
+            param = parsed_args["css"]
+            value["css"] = css_transform_range(param);
         end
 
         if(parsed_args["fss"] != nothing)
-            value["fss"] = parsed_args["fss"];
+            param = parsed_args["fss"]
+            value["fss"] = fss_transform_range(param);
         end
 
         if(parsed_args["tss"] != nothing)
@@ -57,7 +71,8 @@ function main(args)
         end
 
         if(parsed_args["tape"] != nothing)
-            value["tape"] = parsed_args["tape"];
+            param = parsed_args["tape"]
+            value["tape"] = tape_transform_range(param)
         end
     end
 
