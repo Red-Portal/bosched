@@ -191,6 +191,7 @@ gomp_loop_init (struct gomp_work_share *ws, long start, long end, long incr,
 		gomp_mutex_init (&ws->lock);
 		// #endif
 		ws->loop_start = start;
+		ws->chunk_size = 1;
 		ws->wremaining = 0;
 		for (unsigned i = 0; i < __ntasks; i++)
 		  ws->wremaining += __tasks[i];
