@@ -449,22 +449,22 @@ extern "C"
                     auto cov                = bosched::coeff_of_variation(work_per_processor);
                     auto slowdown           = bosched::slowdown(work_per_processor);
 
-                auto& log = _stats[std::to_string(region_id)];
-                log["num_tasks"    ].push_back(loop_state.num_tasks);
-                log["work_time"    ].push_back(work_time);
-                log["parallel_time"].push_back(parallel_time);
-                log["effectiveness"].push_back(effectiveness);
-                log["performance"  ].push_back(performance);
-                log["task_mean"    ].push_back(work_time / loop_state.num_tasks);
-                log["slowdown"     ].push_back(slowdown);
-                log["cov"          ].push_back(cov);
-                log["cost"         ].push_back(cost);
-                if(_is_debug)
-                {
-                    std::cout << "-- loop " << region_id << " stats \n"
-                              << log.dump(2) << '\n' << std::endl;
+                    auto& log = _stats[std::to_string(region_id)];
+                    log["num_tasks"    ].push_back(loop_state.num_tasks);
+                    log["work_time"    ].push_back(work_time);
+                    log["parallel_time"].push_back(parallel_time);
+                    log["effectiveness"].push_back(effectiveness);
+                    log["performance"  ].push_back(performance);
+                    log["task_mean"    ].push_back(work_time / loop_state.num_tasks);
+                    log["slowdown"     ].push_back(slowdown);
+                    log["cov"          ].push_back(cov);
+                    log["cost"         ].push_back(cost);
+                    if(_is_debug)
+                    {
+                        std::cout << "-- loop " << region_id << " stats \n"
+                                  << log.dump(2) << '\n' << std::endl;
+                    }
                 }
-            }
         }
 
         if(__builtin_expect(_profile_loop, false))
