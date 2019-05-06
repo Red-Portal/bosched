@@ -357,10 +357,10 @@ gomp_iter_hss_next (long *pstart, long *pend)
 	}
 
   *pstart = ws->loop_start;
-  *pend = ws->loop_start + k + 1;
+  *pend = ws->loop_start + k;// + 1;
 
   /* Update scheduler data. */
-  ws->loop_start += k;
+  ws->loop_start += (k);// + 1);
   ws->wremaining -= chunkweight;
 
   //#ifndef HAVE_SYNC_BUILTINS
