@@ -74,15 +74,15 @@ gomp_iter_binlpt_next (long *pstart, long *pend)
 		}
 	}
 
+  long next = __ntasks;
+  for(unsigned t = 0; t < nthreads; ++t)
+	{
+	  start = __atomic_load_n (&ws->thread_start[t], MEMMODEL_RELAXED);
+	  next = start < next ? start : next;
+	}
+
   while(true)
 	{
-	  long next = __ntasks;
-	  for(unsigned t = 0; t < nthreads; ++t)
-		{
-		  start = __atomic_load_n (&ws->thread_start[t], MEMMODEL_RELAXED);
-		  next = start < next ? start : next;
-		}
-
 	  for(i = next; i < __ntasks; ++i)
 		{
 		  tid   = ws->taskmap[i];
