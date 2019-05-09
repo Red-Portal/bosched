@@ -176,8 +176,9 @@ gomp_loop_init (struct gomp_work_share *ws, long start, long end, long incr,
 		/*   taskmap = binlpt_balance(__tasks, __ntasks, nthreads); */
 		/* } */
 
-		ws->taskmap = taskmap;
-		ws->loop_start = start;
+		ws->taskmap      = taskmap;
+		ws->loop_start   = start;
+		ws->nthreads     = nthreads;
 		ws->thread_start = (unsigned *) calloc(nthreads, sizeof(int));
 		break;
 	  }
@@ -195,7 +196,7 @@ gomp_loop_init (struct gomp_work_share *ws, long start, long end, long incr,
 		ws->wremaining = 0;
 		for (unsigned i = 0; i < __ntasks; i++)
 		  ws->wremaining += __tasks[i];
-		
+
 		break;
 	  }
 

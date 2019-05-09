@@ -268,7 +268,7 @@ struct gomp_work_share
 	 are in a different cache line.  */
 
   /* This lock protects the update of the following members.  */
-  gomp_mutex_t lock __attribute__((aligned (64)));
+  gomp_mutex_t lock         __attribute__((aligned (64)));
 
   /* This is the count of the number of threads that have exited the work
 	 share construct.  If the construct was marked nowait, they have moved on
@@ -276,13 +276,14 @@ struct gomp_work_share
 	 of the team to exit the work share construct must deallocate it.  */
   unsigned threads_completed;
 
-
   /*
    * Used in GFS_BINLPT scheduler.
    */
   long loop_start;
   unsigned *taskmap;
   unsigned *thread_start;
+
+  unsigned nthreads;
 
   /*
    * Used in the HSS scheduler.
@@ -292,6 +293,8 @@ struct gomp_work_share
 #endif
   unsigned wremaining;
 
+  
+  unsigned long long hss_ws __attribute__((aligned (64)));
 
   union {
 	/* This is the next iteration value to be allocated.  In the case of
