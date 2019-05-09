@@ -153,29 +153,10 @@ gomp_loop_init (struct gomp_work_share *ws, long start, long end, long incr,
 
 	case FS_BINLPT:
 	  {
-		/* if (num_threads == 0) */
-		/*   { */
-		/* 	struct gomp_thread *thr = gomp_thread (); */
-		/* 	struct gomp_team *team = thr->ts.team; */
-		/* 	num_threads = (team != NULL) ? team->nthreads : 1; */
-		/*   } */
-
 		__ntasks = num_tasks;
-		//__nchunks = nthreads;
 
-		//int override;
 		unsigned* taskmap = NULL;
 		bo_binlpt_load_loop(region_id, &taskmap);
-
-		/* struct loop *loop = &loops[curr_loop]; */
-		/* if (override || taskmap == NULL) { */
-		/*   /\* Refresh the mapping. *\/ */
-		/*   if (taskmap != NULL) { */
-		/* 	free(taskmap); */
-		/*   } */
-		/*   taskmap = binlpt_balance(__tasks, __ntasks, nthreads); */
-		/* } */
-
 		ws->taskmap      = taskmap;
 		ws->loop_start   = start;
 		ws->nthreads     = nthreads;
@@ -187,10 +168,7 @@ gomp_loop_init (struct gomp_work_share *ws, long start, long end, long incr,
 	  {
 		__ntasks = num_tasks;
 		bo_hss_load_loop(region_id, &__tasks);
-
-		// #ifndef HAVE_SYNC_BUILTINS
 		gomp_mutex_init (&ws->lock);
-		// #endif
 		ws->loop_start = start;
 		ws->chunk_size = 1;
 		ws->wremaining = 0;

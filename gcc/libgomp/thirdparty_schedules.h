@@ -43,42 +43,45 @@ gomp_iter_binlpt_next (long *pstart, long *pend)
 		{
 		  for (j = i + 1; j < __ntasks; j++)
 			{
-			  if (ws->taskmap[i] != tid)
+			  if (ws->taskmap[j] != tid)
 				  break;
 			}
 
-		  while(1)
+		  long temp = __sync_val_compare_and_swap (&ws->thread_start[tid], start, j);
+		  if (temp == start)
 			{
-			  long temp = __sync_val_compare_and_swap (&ws->thread_start[tid], start, j);
-			  if (temp != start)
+			  *pstart = ws->loop_start + i;
+			  *pend   = ws->loop_start + j;
+			  return true;
+			}
+		  else
+			{
+			  start = temp;
+			  while(true)
 				{
-				  i = temp;
-				  if(i >= j) // held work already finished find new chunk
-					break;
-				}
-			  else
-				{
-				  // new starting point commited
-				  *pstart = ws->loop_start + i;
-				  *pend   = ws->loop_start + j;
-				  return true;
+				  long temp = __sync_val_compare_and_swap (&ws->thread_start[tid], start, j);
+				  if (temp == start)
+					{
+					  *pstart = ws->loop_start + start;
+					  *pend   = ws->loop_start + j;
+					  return true;
+					}
+				  start = temp;
+				  if(start >= j)
+					  break;
 				}
 			}
 		}
 	}
 
-  // work stealing
   while(true)
 	{
 	  long next = __ntasks;
 	  for(unsigned t = 0; t < nthreads; ++t)
 		{
 		  start = __atomic_load_n (&ws->thread_start[t], MEMMODEL_RELAXED);
-		  next = next > start ? start : next;
+		  next = start < next ? start : next;
 		}
-
-	  if (next == __ntasks)
-		return false;
 
 	  for(i = next; i < __ntasks; ++i)
 		{
@@ -90,17 +93,17 @@ gomp_iter_binlpt_next (long *pstart, long *pend)
 			  long temp = __sync_val_compare_and_swap (&ws->thread_start[tid], start, nend);
 			  if (temp == start)
 				{
-				  printf("fuck!\n");
 				  *pstart = ws->loop_start + i;
 				  *pend   = ws->loop_start + nend;
 				  return true;
 				}
 			  else
-				break;
+				  break;
 			}
-		  else
-			break;
 		}
+
+	  if(i == __ntasks)
+		return false;
 	}
   return false;
 }
