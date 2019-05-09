@@ -293,6 +293,7 @@ quantize(std::vector<float>&& loop)
                        std::min(scaled, static_cast<float>(max_value)));
                };
     auto result = std::vector<unsigned>(loop.size());
+#pragma  omp parallel for schedule(static)
     for(size_t i = 0; i < loop.size(); ++i)
     {
         result[i] = T(loop[i]);
