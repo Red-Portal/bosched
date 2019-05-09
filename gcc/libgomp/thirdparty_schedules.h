@@ -35,7 +35,7 @@ gomp_iter_binlpt_next (long *pstart, long *pend)
   nthreads	= ws->nthreads;
   tid		= omp_get_thread_num();
   /* Search for next task. */
-  start = __atomic_load_n (&ws->thread_start[tid], MEMMODEL_RELAXED);
+  start     = __atomic_load_n (&ws->thread_start[tid], MEMMODEL_RELAXED);
 
   for (i = start; i < __ntasks; i++)
 	{
@@ -81,29 +81,23 @@ gomp_iter_binlpt_next (long *pstart, long *pend)
 	  next = start < next ? start : next;
 	}
 
-  while(true)
+  for(i = next; i < __ntasks; ++i)
 	{
-	  for(i = next; i < __ntasks; ++i)
+	  tid   = ws->taskmap[i];
+	  start = __atomic_load_n (&ws->thread_start[tid], MEMMODEL_RELAXED);
+	  if(i >= start)
 		{
-		  tid   = ws->taskmap[i];
-		  start = __atomic_load_n (&ws->thread_start[tid], MEMMODEL_RELAXED);
-		  if(i >= start)
+		  long nend = i + 1;
+		  long temp = __sync_val_compare_and_swap (&ws->thread_start[tid], start, nend);
+		  if (temp == start)
 			{
-			  long nend = i + 1;
-			  long temp = __sync_val_compare_and_swap (&ws->thread_start[tid], start, nend);
-			  if (temp == start)
-				{
-				  *pstart = ws->loop_start + i;
-				  *pend   = ws->loop_start + nend;
-				  return true;
-				}
-			  else
-				  break;
+			  *pstart = ws->loop_start + i;
+			  *pend   = ws->loop_start + nend;
+			  return true;
 			}
+		  else
+			continue;
 		}
-
-	  if(i == __ntasks)
-		return false;
 	}
   return false;
 }
