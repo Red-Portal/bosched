@@ -23,116 +23,116 @@ extern unsigned __nchunks;
 inline static bool
 gomp_iter_binlpt_next (long *pstart, long *pend)
 {
- /*  int i, j;                   /\* Loop index.           *\/ */
- /*  int tid;                    /\* Thread ID.            *\/ */
- /*  int start;                  /\* Start of search.      *\/ */
- /*  struct gomp_thread *thr;    /\* Thread.               *\/ */
- /*  struct gomp_work_share *ws; /\* Work-Share construct. *\/ */
-
- /*  thr = gomp_thread(); */
- /*  ws = thr->ts.work_share; */
- /*  tid = omp_get_thread_num(); */
- /*  /\* Search for next task. *\/ */
- /*  start = ws->thread_start[tid]; */
- /*  for (i = start; i < __ntasks; i++) */
- /* 	{ */
- /* 	  if (ws->taskmap[i] == tid) */
- /* 		goto found; */
- /* 	} */
-
- /*  return (false); */
-
- /* found: */
-
- /*  for (j = i + 1; j < __ntasks; j++) */
- /* 	{ */
- /* 	  if (ws->taskmap[j] != tid) */
- /* 		break; */
- /* 	} */
-
- /*  ws->thread_start[tid] = j; */
- /*  *pstart = ws->loop_start + i; */
- /*  *pend = ws->loop_start + j; */
-
- /*  return (true); */
-
   int i, j;                   /* Loop index.           */
   int tid;                    /* Thread ID.            */
   int start;                  /* Start of search.      */
-  int nthreads;
   struct gomp_thread *thr;    /* Thread.               */
   struct gomp_work_share *ws; /* Work-Share construct. */
 
-  thr		= gomp_thread();
-  ws		= thr->ts.work_share;
-  nthreads	= ws->nthreads;
-  tid		= omp_get_thread_num();
+  thr = gomp_thread();
+  ws = thr->ts.work_share;
+  tid = omp_get_thread_num();
   /* Search for next task. */
-  start     = __atomic_load_n (&ws->thread_start[tid], MEMMODEL_RELAXED);
-
+  start = ws->thread_start[tid];
   for (i = start; i < __ntasks; i++)
-  	{
-  	  if (ws->taskmap[i] == tid)
-  		{
-  		  for (j = i + 1; j < __ntasks; j++)
-  			{
-  			  if (ws->taskmap[j] != tid)
-  				  break;
-  			}
+ 	{
+ 	  if (ws->taskmap[i] == tid)
+ 		goto found;
+ 	}
 
-  		  long temp = __sync_val_compare_and_swap (&ws->thread_start[tid], start, j);
-  		  if (temp == start)
-  			{
-  			  *pstart = ws->loop_start + i;
-  			  *pend   = ws->loop_start + j;
-  			  return true;
-  			}
-  		  else
-  			{
-  			  start = temp;
-  			  while(true)
-  				{
-  				  long temp = __sync_val_compare_and_swap (&ws->thread_start[tid], start, j);
-  				  if (temp == start)
-  					{
-  					  *pstart = ws->loop_start + start;
-  					  *pend   = ws->loop_start + j;
-  					  return true;
-  					}
-  				  start = temp;
-  				  if(start >= j)
-  					  break;
-  				}
-  			}
-  		}
-  	}
+  return (false);
 
-  long next = __ntasks;
-  for(unsigned t = 0; t < nthreads; ++t)
-  	{
-  	  start = __atomic_load_n (&ws->thread_start[t], MEMMODEL_RELAXED);
-  	  next = start < next ? start : next;
-  	}
+ found:
 
-  for(i = next; i < __ntasks; ++i)
-  	{
-  	  tid   = ws->taskmap[i];
-  	  start = __atomic_load_n (&ws->thread_start[tid], MEMMODEL_RELAXED);
-  	  if(i >= start)
-  		{
-  		  long nend = i + 1;
-  		  long temp = __sync_val_compare_and_swap (&ws->thread_start[tid], start, nend);
-  		  if (temp == start)
-  			{
-  			  *pstart = ws->loop_start + i;
-  			  *pend   = ws->loop_start + nend;
-  			  return true;
-  			}
-  		  else
-  			continue;
-  		}
-  	}
-  return false;
+  for (j = i + 1; j < __ntasks; j++)
+ 	{
+ 	  if (ws->taskmap[j] != tid)
+ 		break;
+ 	}
+
+  ws->thread_start[tid] = j;
+  *pstart = ws->loop_start + i;
+  *pend = ws->loop_start + j;
+
+  return (true);
+
+  /* int i, j;                   /\* Loop index.           *\/ */
+  /* int tid;                    /\* Thread ID.            *\/ */
+  /* int start;                  /\* Start of search.      *\/ */
+  /* int nthreads; */
+  /* struct gomp_thread *thr;    /\* Thread.               *\/ */
+  /* struct gomp_work_share *ws; /\* Work-Share construct. *\/ */
+
+  /* thr		= gomp_thread(); */
+  /* ws		= thr->ts.work_share; */
+  /* nthreads	= ws->nthreads; */
+  /* tid		= omp_get_thread_num(); */
+  /* /\* Search for next task. *\/ */
+  /* start     = __atomic_load_n (&ws->thread_start[tid], MEMMODEL_RELAXED); */
+
+  /* for (i = start; i < __ntasks; i++) */
+  /* 	{ */
+  /* 	  if (ws->taskmap[i] == tid) */
+  /* 		{ */
+  /* 		  for (j = i + 1; j < __ntasks; j++) */
+  /* 			{ */
+  /* 			  if (ws->taskmap[j] != tid) */
+  /* 				  break; */
+  /* 			} */
+
+  /* 		  long temp = __sync_val_compare_and_swap (&ws->thread_start[tid], start, j); */
+  /* 		  if (temp == start) */
+  /* 			{ */
+  /* 			  *pstart = ws->loop_start + i; */
+  /* 			  *pend   = ws->loop_start + j; */
+  /* 			  return true; */
+  /* 			} */
+  /* 		  else */
+  /* 			{ */
+  /* 			  start = temp; */
+  /* 			  while(true) */
+  /* 				{ */
+  /* 				  long temp = __sync_val_compare_and_swap (&ws->thread_start[tid], start, j); */
+  /* 				  if (temp == start) */
+  /* 					{ */
+  /* 					  *pstart = ws->loop_start + start; */
+  /* 					  *pend   = ws->loop_start + j; */
+  /* 					  return true; */
+  /* 					} */
+  /* 				  start = temp; */
+  /* 				  if(start >= j) */
+  /* 					  break; */
+  /* 				} */
+  /* 			} */
+  /* 		} */
+  /* 	} */
+
+  /* long next = __ntasks; */
+  /* for(unsigned t = 0; t < nthreads; ++t) */
+  /* 	{ */
+  /* 	  start = __atomic_load_n (&ws->thread_start[t], MEMMODEL_RELAXED); */
+  /* 	  next = start < next ? start : next; */
+  /* 	} */
+
+  /* for(i = next; i < __ntasks; ++i) */
+  /* 	{ */
+  /* 	  tid   = ws->taskmap[i]; */
+  /* 	  start = __atomic_load_n (&ws->thread_start[tid], MEMMODEL_RELAXED); */
+  /* 	  if(i >= start) */
+  /* 		{ */
+  /* 		  long nend = i + 1; */
+  /* 		  long temp = __sync_val_compare_and_swap (&ws->thread_start[tid], start, nend); */
+  /* 		  if (temp == start) */
+  /* 			{ */
+  /* 			  *pstart = ws->loop_start + i; */
+  /* 			  *pend   = ws->loop_start + nend; */
+  /* 			  return true; */
+  /* 			} */
+  /* 		  else */
+  /* 			continue; */
+  /* 		} */
+  /* 	} */
+  /* return false; */
 }
 
 inline static bool
