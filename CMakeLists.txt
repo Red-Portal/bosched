@@ -44,7 +44,7 @@ add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES})
 
 # Build options
 set(BUILD_FLAGS
-    "${CMAKE_CXX_FLAGS} -O3 -g -fPIC -Wall -Wextra -march=native -flto")
+    "${CMAKE_CXX_FLAGS} -O3 -g -fPIC -Wall -Wextra -march=native -pthread")
 # set(BUILD_FLAGS
 #     "${CMAKE_CXX_FLAGS} -g -fPIC -Wall -Wextra -march=native")
 
