@@ -168,11 +168,11 @@ parse_schedule (void)
         gomp_global_icv.run_sched_var = FS_CSS;
         env += 3;
 	  }
-    else if (strncasecmp (env, "tape", 4) == 0)
-    {
+    else if (strncasecmp (env, "taper", 5) == 0)
+	  {
         gomp_global_icv.run_sched_var = FS_TAPE;
         env += 4;
-    }
+	  }
     else if (strncasecmp (env, "tape3", 5) == 0)
 	  {
 		gomp_global_icv.run_sched_var = FS_TAPE3;
@@ -1272,8 +1272,8 @@ handle_omp_display_env (unsigned long stacksize, int wait_policy)
 	  fputs ("CSS", stderr);
         break;
     case FS_TAPE:
-        fputs ("TAPE", stderr);
-        break;
+	  fputs ("TAPER", stderr);
+	  break;
     case FS_TAPE3:
 	  fputs ("TAPE3", stderr);
 	  break;
