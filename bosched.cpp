@@ -36,6 +36,7 @@ nlohmann::json _stats   __attribute__((init_priority(101)));
 nlohmann::json _profile __attribute__((init_priority(101)));
 std::unordered_map<size_t, bosched::workload_params> _params __attribute__((init_priority(101)));
 long _procs;
+size_t _profile_count = 0;
 
 namespace bosched
 {
@@ -294,13 +295,13 @@ extern "C"
 
     void bo_workload_profile_start(long iteration)
     {
-        if(_profile_loop)
+        if(_profile_loop && _profile_count < 4)
             prof::iteration_profile_start(iteration);
     }
 
     void bo_workload_profile_stop()
     {
-        if(_profile_loop)
+        if(_profile_loop && _profile_count < 4)
             prof::iteration_profile_stop();
     }
 
@@ -439,7 +440,8 @@ extern "C"
 
         if(__builtin_expect(_profile_loop, false))
         {
-            prof::profiling_init(N);
+            if(_profile_count < 4)
+                prof::profiling_init(N);
         }
 
         if(__builtin_expect (_show_loop_stat, false))
@@ -508,8 +510,12 @@ extern "C"
 
         if(__builtin_expect(_profile_loop, false))
         {
-            auto workload_profile = prof::load_profile();
-            _profile[std::to_string(region_id)].emplace_back(workload_profile);
+            if(_profile_count <= 4)
+            {
+                auto workload_profile = prof::load_profile();
+                _profile[std::to_string(region_id)].emplace_back(workload_profile);
+                ++_profile_count;
+            }
         }
 
         if(__builtin_expect (_is_debug, false))
