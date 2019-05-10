@@ -237,8 +237,9 @@ template<typename It, typename Float>
 inline Float
 mean(It begin, It end, Float init)
 {
-    size_t n = end - begin;
-    for(; begin != end; ++begin)
+    int n = end - begin;
+#pragma  omp parallel for reduction(+:init) schedule(static)
+    for(int i = 0; i < n; ++i)
     {
         init += *begin;
     }
@@ -251,8 +252,9 @@ inline Float
 stddev(Float mean, It begin, It end)
 {
     Float sum = 0;
-    size_t n  = (end - begin);
-    for(; begin != end; ++begin)
+    int n     = (end - begin);
+#pragma  omp parallel for reduction(+:sum) schedule(static)
+    for(int i = 0; i < n; ++i)
     {
         Float temp = (*begin - mean);
         sum += temp * temp;
@@ -263,20 +265,28 @@ stddev(Float mean, It begin, It end)
 inline std::vector<float>
 iteration_mean(nlohmann::json const& loop)
 {
-    size_t num_iters = loop[0].size();
+    size_t num_iters   = loop[0].size();
     size_t num_samples = loop.size();
     auto means = std::vector<float>(num_iters);
 
 #pragma  omp parallel for schedule(static)
-    for(size_t i = 0; i < num_iters; ++i)
+    for(int i = 0; i < static_cast<int>(num_iters); ++i)
     {
-        double sum = 0;
+        auto buffer = std::vector<float>(num_samples);
+
         for(size_t j = 0; j < num_samples; ++j)
-        {
-            double elem = loop[j][i];
-            sum += elem;
-        }
-        means[i] = sum / num_samples;
+            buffer[j] = loop[j][i];
+        std::nth_element(buffer.begin(),
+                         buffer.begin() + num_samples / 2,
+                         buffer.end());
+        // double sum = 0;
+        // for(size_t j = 0; j < num_samples; ++j)
+        // {
+        //     double elem = loop[j][i];
+        //     sum += elem;
+        // }
+        // means[i] = sum / num_samples;
+        means[i] = buffer[num_samples / 2];
     }
     return means;
 }
@@ -294,7 +304,7 @@ quantize(std::vector<float>&& loop)
                };
     auto result = std::vector<unsigned>(loop.size());
 #pragma  omp parallel for schedule(static)
-    for(size_t i = 0; i < loop.size(); ++i)
+    for(int i = 0; i < static_cast<int>(loop.size()); ++i)
     {
         result[i] = T(loop[i]);
     }
