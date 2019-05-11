@@ -182,7 +182,8 @@ namespace binlpt
     {
         unsigned i;               /* Loop index.       */
         //unsigned *taskmap;        /* Task map.         */
-        unsigned sortmap[ntasks]; /* Sorting map.       */
+        auto sortmap = std::vector<unsigned>(ntasks);
+        //unsigned sortmap[ntasks]; /* Sorting map.       */
         unsigned *load;           /* Assigned load.    */
         unsigned *chunksizes;     /* Chunks sizes.     */
         unsigned *chunks;         /* Chunks.           */
@@ -192,7 +193,6 @@ namespace binlpt
 
         /* Initialize scheduler data. */
         // taskmap = (unsigned*)calloc(ntasks, sizeof(unsigned));
-        std::cout << "fuck: " << ntasks << std::endl;
         auto taskmap = std::vector<unsigned>(ntasks);
 
         load    = (unsigned*)calloc(nthreads, sizeof(unsigned));
@@ -203,7 +203,7 @@ namespace binlpt
         chunkoff = compute_cummulativesum(chunksizes, nchunks);
 
         /* Sort tasks. */
-        sort(chunks, nchunks, sortmap);
+        sort(chunks, nchunks, sortmap.data());
 
         for (i = nchunks; i > 0; i--)
         {
