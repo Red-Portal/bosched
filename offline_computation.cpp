@@ -347,12 +347,18 @@ int main(int argc, char** argv)
     auto prof_stream = std::ifstream(path + "/.workload.json"s);
     if(!prof_stream)
         throw std::runtime_error("cannot find workload.json!");
-    prof_stream >> loops;
+    else
+        prof_stream >> loops;
 
 
     nlohmann::json output;
     for(auto& [key, value] : loops.items())
     {
+        std::cout << "Loop: " << key << '\n'
+                  << " - iterations: " << value[0].size() << '\n'
+                  << " - samples: " << value[0].size() << '\n'
+                  << std::endl;
+
         auto means = iteration_mean(value);
         auto mu    = mean(means.begin(), means.end(), 0.0f);
         auto sigma = stddev(mu, means.begin(), means.end());
@@ -371,11 +377,10 @@ int main(int argc, char** argv)
         loop_output["binlpt"] = std::move(taskmap);
 
 
-        std::cout << "Loop: " << key << '\n'
-                  << " - mean: " << mu << '\n'
+        std::cout << " - mean: " << mu << '\n'
                   << " - sdev: " << sigma << '\n'
-                  << " - css: " << css_param << '\n'
-                  << " - fss: " << fss_param << '\n'
+                  << " - css:  " << css_param << '\n'
+                  << " - fss:  " << fss_param << '\n'
                   << std::endl;
     }
     auto out_stream = std::ofstream(path + "/.params.json"s);
