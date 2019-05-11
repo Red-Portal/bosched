@@ -192,7 +192,7 @@ namespace binlpt
 
         /* Initialize scheduler data. */
         // taskmap = (unsigned*)calloc(ntasks, sizeof(unsigned));
-        auto taskmap = std::vector<unsigned>(ntasks, static_cast<unsigned>(0));
+        auto taskmap = std::vector<unsigned>(ntasks, 0);
 
         load    = (unsigned*)calloc(nthreads, sizeof(unsigned));
         assert(load != NULL);
@@ -356,7 +356,7 @@ int main(int argc, char** argv)
     {
         std::cout << "Loop: " << key << '\n'
                   << " - iterations: " << value[0].size() << '\n'
-                  << " - samples: " << value[0].size() << '\n'
+                  << " - samples: " << value.size() << '\n'
                   << std::endl;
 
         auto means = iteration_mean(value);
