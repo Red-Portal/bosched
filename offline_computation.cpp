@@ -192,7 +192,7 @@ namespace binlpt
 
         /* Initialize scheduler data. */
         // taskmap = (unsigned*)calloc(ntasks, sizeof(unsigned));
-        auto taskmap = std::vector<unsigned>(ntasks, 0);
+        auto taskmap = std::vector<unsigned>(ntasks);
 
         load    = (unsigned*)calloc(nthreads, sizeof(unsigned));
         assert(load != NULL);
