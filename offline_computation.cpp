@@ -174,7 +174,7 @@ namespace binlpt
  * @brief Bin Packing Longest Processing Time First loop scheduler.
  */
 
-    inline std::vector<unsigned>
+    inline std::vector<int>
     binlpt_balance(unsigned* tasks,
                    unsigned ntasks,
                    unsigned nthreads,
@@ -192,7 +192,7 @@ namespace binlpt
 
         /* Initialize scheduler data. */
         // taskmap = (unsigned*)calloc(ntasks, sizeof(unsigned));
-        auto taskmap = std::vector<unsigned>(ntasks);
+        auto taskmap = std::vector<int>(ntasks);
 
         load    = (unsigned*)calloc(nthreads, sizeof(unsigned));
         assert(load != NULL);
