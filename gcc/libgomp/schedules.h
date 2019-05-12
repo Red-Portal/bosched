@@ -57,13 +57,13 @@ css_chunk_size(double param, long N, size_t P)
 inline double
 css_transform_range(double param)
 {
-    return exp(15 * param - 10);
+  return exp(15 * param - 8);
 }
 
 inline double
 fss_transform_range(double param)
 {
-  return pow(2, 18.8 * param - 13);
+  return pow(2, 27 * param - 20);
 }
 
 inline double

@@ -184,10 +184,10 @@ namespace binlpt
         //unsigned *taskmap;        /* Task map.         */
         auto sortmap = std::vector<unsigned>(ntasks);
         //unsigned sortmap[ntasks]; /* Sorting map.       */
-        unsigned *load;           /* Assigned load.    */
-        unsigned *chunksizes;     /* Chunks sizes.     */
-        unsigned *chunks;         /* Chunks.           */
-        unsigned *chunkoff;       /* Offset to chunks. */
+        unsigned* load;           /* Assigned load.    */
+        unsigned* chunksizes;     /* Chunks sizes.     */
+        unsigned* chunks;         /* Chunks.           */
+        unsigned* chunkoff;       /* Offset to chunks. */
 
         //printf("[binlpt] Balancing loop %s:%i\n", loops[curr_loop].filename, loops[curr_loop].line);
 

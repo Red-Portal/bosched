@@ -34,11 +34,11 @@ function cmd_args(args, show)
 end
 
 function css_transform_range(param::Float64)
-    return exp(15 * param - 10);
+    return exp(15 * param - 8);
 end
 
 function fss_transform_range(param::Float64)
-    return 2^(18.8 * param - 13);
+    return 2.0^(27 * param - 20);
 end
 
 function tape_transform_range(param::Float64)
