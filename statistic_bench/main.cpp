@@ -321,10 +321,10 @@ int main()
         size_t ntasks = 1024 * 16;
         auto gen = generate_biased(ntasks, gaussian, rng,
                                    [ntasks](size_t i) {
-                                       if(i < 64 || ntasks - 64 < i)
-                                           return 1;
+                                       if(i < 128 || ntasks - 128 < i)
+                                           return 1.0;
                                        else
-                                           return 2;
+                                           return 2.0;
                                    });
         benchmark(gen, "gaussian_biased3", 10, 1);
     }

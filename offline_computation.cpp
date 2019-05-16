@@ -312,6 +312,38 @@ quantize(std::vector<float>&& loop)
     return result;
 }
 
+inline std::vector<double>
+bias1(size_t ntasks)
+{
+    auto tasks = std::vector<double>(ntasks);
+    for(size_t i = 0; i < ntasks; ++i)
+        tasks[i] = static_cast<double>(-i) / ntasks + 3;
+    return tasks;
+}
+
+inline std::vector<double>
+bias2(size_t ntasks)
+{
+    auto tasks = std::vector<double>(ntasks);
+    for(size_t i = 0; i < ntasks; ++i)
+        tasks[i] = static_cast<double>(i) / ntasks + 1;
+    return tasks;
+}
+
+
+inline std::vector<double>
+bias3(size_t ntasks)
+{
+    auto tasks = std::vector<double>(ntasks);
+    for(size_t i = 0; i < ntasks; ++i)
+    {
+        if(i < 128 || ntasks - 128 < i)
+            tasks[i] = 1.0;
+        else
+            tasks[i] = 2.0;
+    }
+    return tasks;
+}
 
 int main(int argc, char** argv)
 {
@@ -323,6 +355,9 @@ int main(int argc, char** argv)
         ("path", po::value<std::string>()->default_value("."), "path") 
         ("chunks", po::value<unsigned>()->default_value(32), "binlpt chunks")
         ("threads", po::value<unsigned>()->default_value(32), "threads")
+        ("bias1", po::value<std::string>(), "loop id of bias1")
+        ("bias2", po::value<std::string>(), "loop id of bias2")
+        ("bias3", po::value<std::string>(), "loop id of bias3")
         ("h", po::value<double>(), "overhead in microsecond");
 
     po::variables_map vm;
@@ -334,9 +369,9 @@ int main(int argc, char** argv)
     } 
     catch(po::error& e) 
     { 
-      std::cerr << "ERROR: " << e.what() << std::endl << std::endl; 
-      std::cerr << desc << std::endl; 
-      return 1;
+        std::cerr << "ERROR: " << e.what() << std::endl << std::endl; 
+        std::cerr << desc << std::endl; 
+        return 1;
     } 
 
     double h         = vm["h"].as<double>();
@@ -350,7 +385,6 @@ int main(int argc, char** argv)
         throw std::runtime_error("cannot find workload.json!");
     else
         prof_stream >> loops;
-
 
     nlohmann::json output;
     for(auto& [key, value] : loops.items())
@@ -384,6 +418,38 @@ int main(int argc, char** argv)
                   << " - fss:  " << fss_param << '\n'
                   << std::endl;
     }
+
+    if(vm.count("bias1"))
+    {
+        auto loop_id   = vm["bias1"].as<std::string>();
+        auto workload  = bias1(loops[loop_id][0].size());
+        auto quantized = quantize(std::move(workload));
+        auto taskmap   = binlpt::binlpt_balance(
+            quantized.data(), workload.size(), threads, chunks);
+        output[loop_id]["binlpt"] = std::move(taskmap);
+    }
+
+    if(vm.count("bias1"))
+    {
+        auto loop_id   = vm["bias2"].as<std::string>();
+        auto workload  = bias2(loops[loop_id][0].size());
+        auto quantized = quantize(std::move(workload));
+        auto taskmap   = binlpt::binlpt_balance(
+            quantized.data(), workload.size(), threads, chunks);
+        output[loop_id]["binlpt"] = std::move(taskmap);
+    }
+
+    if(vm.count("bias3"))
+    {
+        auto loop_id   = vm["bias3"].as<std::string>();
+        auto workload  = bias3(loops[loop_id][0].size());
+        auto quantized = quantize(std::move(workload));
+        auto taskmap   = binlpt::binlpt_balance(
+            quantized.data(), workload.size(), threads, chunks);
+        output[loop_id]["binlpt"] = std::move(taskmap);
+    }
+
+
     auto out_stream = std::ofstream(path + "/.params.json"s);
     out_stream << output.dump(2);
     return 0;

@@ -16,6 +16,12 @@ function cmd_args(args, show)
         arg_type = Float64
         "--tss"
         arg_type = Float64
+        "--bias1"
+        arg_type = String
+        "--bias2"
+        arg_type = String
+        "--bias3"
+        arg_type = String
         "--path"
         arg_type = String
         default  = "."
@@ -43,6 +49,37 @@ end
 
 function tape_transform_range(param::Float64)
     return exp(15 * param - 10);
+end
+
+function bias1()
+    ntasks = 2^14;
+    tasks  = zeros(Float64, ntasks)
+    for i in 0:ntasks
+        tasks[i+1] = (-1 * convert(Float64, i) / ntasks) + 3;
+    end
+    return tasks
+end
+
+function bias2()
+    ntasks = 2^14;
+    tasks  = zeros(Float64, ntasks)
+    for i in 0:ntasks
+        tasks[i+1] = convert(Float64, i) / ntasks + 1;
+    end
+    return tasks
+end
+
+function bias3()
+    ntasks = 2^14;
+    tasks  = zeros(Float64, ntasks)
+    for i in 0:ntasks
+        if i < 128 && ntasks - 128 < i
+            tasks[i] = 1.0;
+        else
+            tasks[i] = 2.0;
+        end
+    end
+    return tasks
 end
 
 function main(args)
@@ -74,6 +111,22 @@ function main(args)
             param = parsed_args["tape"]
             value["tape"] = tape_transform_range(param)
         end
+
+    end
+
+    if(parsed_args["bias1"] != nothing)
+        loop        = parsed_args["bias1"]
+        loops[loop] = bias1()
+    end
+
+    if(parsed_args["bias2"] != nothing)
+        loop = parsed_args["bias2"]
+        loops[loop] = bias2()
+    end
+
+    if(parsed_args["bias3"] != nothing)
+        loop = parsed_args["bias3"]
+        loops[loop] = bias3()
     end
 
     str = JSON.json(loops)
