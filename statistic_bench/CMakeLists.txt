@@ -30,7 +30,10 @@ set(CMAKE_MODULE_PATH
 # project source files
 set(SOURCE_DIR ${PROJECT_SOURCE_DIR})
 set(SOURCE_FILES
-    ${SOURCE_DIR}/main.cpp
+    ${SOURCE_DIR}/uniform.cpp
+    
+    ${SOURCE_DIR}/bias2.cpp
+    ${SOURCE_DIR}/bias3.cpp
     )
 
 message("[ Source files for ${PROJECT_NAME} ]")
@@ -38,7 +41,10 @@ foreach(SOURCE_FILE ${SOURCE_FILES})
     message(STATUS "${SOURCE_FILE}")
 endforeach()
 
-add_executable(${PROJECT_NAME} ${SOURCE_FILES})
+add_executable(uniform ${SOURCE_DIR}/uniform.cpp)
+add_executable(bias1   ${SOURCE_DIR}/bias1.cpp)
+add_executable(bias2   ${SOURCE_DIR}/bias2.cpp)
+add_executable(bias3   ${SOURCE_DIR}/bias3.cpp)
 
 # Build options
 set(BUILD_FLAGS
@@ -46,7 +52,19 @@ set(BUILD_FLAGS
 
 message("C++ flags = ${BUILD_FLAGS}")
 
-set_target_properties(${PROJECT_NAME}
+set_target_properties(uniform
+    PROPERTIES
+    COMPILE_FLAGS "${BUILD_FLAGS}"
+    CXX_STANDARD 17)
+set_target_properties(bias1
+    PROPERTIES
+    COMPILE_FLAGS "${BUILD_FLAGS}"
+    CXX_STANDARD 17)
+set_target_properties(bias2
+    PROPERTIES
+    COMPILE_FLAGS "${BUILD_FLAGS}"
+    CXX_STANDARD 17)
+set_target_properties(bias3
     PROPERTIES
     COMPILE_FLAGS "${BUILD_FLAGS}"
     CXX_STANDARD 17)
@@ -55,25 +73,59 @@ set_target_properties(${PROJECT_NAME}
 find_package(BLAZE REQUIRED)
 #find_package(dlib REQUIRED)
 
-set(BLA_STATIC ON)
-find_package(BLAS REQUIRED)
-find_package(LAPACK REQUIRED)
+#set(BLA_STATIC ON)
+#find_package(BLAS REQUIRED)
+#find_package(LAPACK REQUIRED)
 
 set(Boost_USE_STATIC_LIBS ON)
 set(Boost_USE_STATIC_RUNTIME ON)
-find_package(Boost REQUIRED COMPONENTS thread)
+find_package(Boost REQUIRED COMPONENTS program_options thread)
 
 # Include directories
-target_include_directories(${PROJECT_NAME}
+target_include_directories(uniform
     PUBLIC
     ${Boost_INCLUDE_DIRS}
     ${BLAZE_INCLUDE_DIR})
 
-target_link_libraries(${PROJECT_NAME}
-    PRIVATE
-    dlib
+target_include_directories(bias1
+    PUBLIC
+    ${Boost_INCLUDE_DIRS}
+    ${BLAZE_INCLUDE_DIR})
+
+target_include_directories(bias2
+    PUBLIC
+    ${Boost_INCLUDE_DIRS}
+    ${BLAZE_INCLUDE_DIR})
+
+target_include_directories(bias3
+    PUBLIC
+    ${Boost_INCLUDE_DIRS}
+    ${BLAZE_INCLUDE_DIR})
+
+target_link_libraries(uniform
     gomp
-    #bosched
-    ${BLAS_LIBRARIES}
+    openblas
+    lapack
+    ${Boost_LIBRARIES}
+    ${LAPACK_LIBRARIES})
+
+target_link_libraries(bias1
+    gomp
+    openblas
+    lapack
+    ${Boost_LIBRARIES}
+    ${LAPACK_LIBRARIES})
+
+target_link_libraries(bias2
+    gomp
+    openblas
+    lapack
+    ${Boost_LIBRARIES}
+    ${LAPACK_LIBRARIES})
+
+target_link_libraries(bias3
+    gomp
+    openblas
+    lapack
     ${Boost_LIBRARIES}
     ${LAPACK_LIBRARIES})
