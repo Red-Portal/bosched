@@ -106,6 +106,7 @@ target_link_libraries(uniform
     gomp
     openblas
     lapack
+    bosched
     ${Boost_LIBRARIES}
     ${LAPACK_LIBRARIES})
 
@@ -113,6 +114,7 @@ target_link_libraries(bias1
     gomp
     openblas
     lapack
+    bosched
     ${Boost_LIBRARIES}
     ${LAPACK_LIBRARIES})
 
@@ -120,6 +122,7 @@ target_link_libraries(bias2
     gomp
     openblas
     lapack
+    bosched
     ${Boost_LIBRARIES}
     ${LAPACK_LIBRARIES})
 
@@ -127,5 +130,6 @@ target_link_libraries(bias3
     gomp
     openblas
     lapack
+    bosched
     ${Boost_LIBRARIES}
     ${LAPACK_LIBRARIES})
