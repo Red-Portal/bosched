@@ -53,7 +53,6 @@ int main(int argc, char** argv)
             {
                 double value;
                 double const mu    = 10;
-                double const sigma = sigma;
                 do
                     {
                         value = stats::rnorm(mu, sigma, rng);   
