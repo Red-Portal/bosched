@@ -33,33 +33,29 @@ int main(int argc, char** argv)
     double sigma = vm["sigma"].as<double>();
     std::cout << "distribution,mean,+-,dist_mean,dist_stddev"  << std::endl;
 
-    {
-        auto warmup =
-            [](std::mt19937_64& rng)
-            {
-                double value;
-                double const mu    = 1;
-                double const sigma = 1;
-                do { value = stats::rlnorm(mu, sigma, rng); } while(value < 0.0);
-                return value;
-            };
-        auto gen = workload(1024, warmup, rng);
-        benchmark<0>(gen, "warmup", 10, 1);
-    }
+    auto warmup =
+        [](std::mt19937_64& rng)
+        {
+            double value;
+            double const mu    = 1;
+            double const sigma = 1;
+            do { value = stats::rlnorm(mu, sigma, rng); } while(value < 0.0);
+            return value;
+        };
+    auto gen = workload(1024, warmup, rng);
+    benchmark<0>(gen, "warmup", 10, 1);
 
-    {
-        auto gaussian =
-            [sigma](std::mt19937_64& rng) -> double
-            {
-                double value;
-                double const mu = 10;
+    auto dist =
+        [sigma](std::mt19937_64& rng) -> double
+                {
+                    double value;
+                    double const mu = 10;
                 do
                 {
                     value = stats::rnorm(mu, sigma, rng);   
                 } while(value < 0.0);
                 return value;
             };
-        auto gen = workload(N, gaussian, rng);
-        benchmark<1>(gen, "uniform", 10, sigma);
-    }
+    auto work_gen = workload(N, dist, rng);
+    benchmark<1>(work_gen, "uniform", 10, sigma);
 }

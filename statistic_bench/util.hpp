@@ -132,7 +132,7 @@ stddev(It begin, It end, Type mean)
     return sqrt(sum / (end - begin - 1));
 }
 
-template<typename Gen>
+template<size_t id, typename Gen>
 void benchmark(Gen&& tasks,
                std::string_view name,
                double dist_mean,
