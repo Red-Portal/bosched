@@ -150,7 +150,7 @@ void benchmark(Gen&& tasks,
     {
         auto loop_start = clock::now();
 #pragma omp parallel for schedule(runtime)
-        for(int i = 0; i < num_tasks; ++i)
+        for(int i = 0; i < static_cast<int>(num_tasks); ++i)
         {
             auto start = clock::now();
             auto runtime = tasks[i];
@@ -161,7 +161,7 @@ void benchmark(Gen&& tasks,
                 do_not_optimize(now);
             }
         }
-        auto loop_end = clock::now();
+                auto loop_end = clock::now();
         measures[it] = std::chrono::duration_cast<duration_t>(
             loop_end - loop_start).count();
     }

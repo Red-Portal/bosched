@@ -49,7 +49,7 @@ int main(int argc, char** argv)
 
     {
         auto gaussian =
-            [sigma](std::mt19937_64& rng)
+            [sigma](std::mt19937_64& rng) -> double
             {
                 double value;
                 double const mu    = 10;
