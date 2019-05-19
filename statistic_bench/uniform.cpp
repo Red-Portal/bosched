@@ -44,7 +44,7 @@ int main(int argc, char** argv)
                 return value;
             };
         auto gen = workload(1024, warmup, rng);
-        benchmark(gen, "warmup", 10, 1);
+        benchmark<0>(gen, "warmup", 10, 1);
     }
 
     {
@@ -60,6 +60,6 @@ int main(int argc, char** argv)
                 return value;
             };
         auto gen = workload(N, gaussian, rng);
-        benchmark(gen, "uniform", 10, sigma);
+        benchmark<1>(gen, "uniform", 10, sigma);
     }
 }
