@@ -36,7 +36,7 @@ int main(int argc, char** argv)
     std::cout << "distribution,mean,+-,dist_mean,dist_stddev"  << std::endl;
 
     for(size_t it = 0; it < 32; ++it) {
-#pragma omp parallel for schedule()
+#pragma omp parallel for schedule(guided)
         for(int i = 0; i < 1024; ++i) {
             do_not_optimize(i);
         }
