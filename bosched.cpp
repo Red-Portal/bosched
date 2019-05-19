@@ -297,12 +297,14 @@ extern "C"
     {
         if(_profile_loop && _profile_count < 4)
             prof::iteration_profile_start(iteration);
+        printf("fuck!\n");
     }
 
     void bo_workload_profile_stop()
     {
         if(_profile_loop && _profile_count < 4)
             prof::iteration_profile_stop();
+        printf("fuck?\n");
     }
 
     void bo_record_iteration_start()
@@ -473,39 +475,39 @@ extern "C"
                 else if(!loop_state.warming_up)
                 {
                     loop_state.obs_y.push_back(duration.count());
-                    }
                 }
+            }
 
-                if(__builtin_expect (_show_loop_stat, false))
+            if(__builtin_expect (_show_loop_stat, false))
+            {
+                auto work_time = std::chrono::duration_cast<time_scale_t>(
+                    stat::total_work()).count();
+
+                auto parallel_time = duration.count();
+
+                auto work_per_processor = stat::work_per_processor();
+                auto performance        =  work_time / parallel_time;
+                auto cost               = parallel_time * _procs;
+                auto effectiveness      =  performance / cost;
+                auto cov                = bosched::coeff_of_variation(work_per_processor);
+                auto slowdown           = bosched::slowdown(work_per_processor);
+
+                auto& log = _stats[std::to_string(region_id)];
+                log["num_tasks"    ].push_back(loop_state.num_tasks);
+                log["work_time"    ].push_back(work_time);
+                log["parallel_time"].push_back(parallel_time);
+                log["effectiveness"].push_back(effectiveness);
+                log["performance"  ].push_back(performance);
+                log["task_mean"    ].push_back(work_time / loop_state.num_tasks);
+                log["slowdown"     ].push_back(slowdown);
+                log["cov"          ].push_back(cov);
+                log["cost"         ].push_back(cost);
+                if(_is_debug)
                 {
-                    auto work_time = std::chrono::duration_cast<time_scale_t>(
-                        stat::total_work()).count();
-
-                    auto parallel_time = duration.count();
-
-                    auto work_per_processor = stat::work_per_processor();
-                    auto performance        =  work_time / parallel_time;
-                    auto cost               = parallel_time * _procs;
-                    auto effectiveness      =  performance / cost;
-                    auto cov                = bosched::coeff_of_variation(work_per_processor);
-                    auto slowdown           = bosched::slowdown(work_per_processor);
-
-                    auto& log = _stats[std::to_string(region_id)];
-                    log["num_tasks"    ].push_back(loop_state.num_tasks);
-                    log["work_time"    ].push_back(work_time);
-                    log["parallel_time"].push_back(parallel_time);
-                    log["effectiveness"].push_back(effectiveness);
-                    log["performance"  ].push_back(performance);
-                    log["task_mean"    ].push_back(work_time / loop_state.num_tasks);
-                    log["slowdown"     ].push_back(slowdown);
-                    log["cov"          ].push_back(cov);
-                    log["cost"         ].push_back(cost);
-                    if(_is_debug)
-                    {
-                        std::cout << "-- loop " << region_id << " stats \n"
-                                  << log.dump(2) << '\n' << std::endl;
-                    }
+                    std::cout << "-- loop " << region_id << " stats \n"
+                              << log.dump(2) << '\n' << std::endl;
                 }
+            }
         }
 
         if(__builtin_expect(_profile_loop, false))
