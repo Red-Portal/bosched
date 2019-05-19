@@ -90,7 +90,6 @@ public:
         {
             auto runtime = dist(rng);
             _runtimes[i] = duration_t(runtime); 
-            std::cout << _runtimes[i].count() << std::endl;
         }
     }
 
