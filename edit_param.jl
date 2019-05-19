@@ -2,6 +2,7 @@
 import JSON
 import ArgParse
 import Base.Filesystem
+using Statistics
 
 const fs  = Base.Filesystem
 
@@ -22,6 +23,8 @@ function cmd_args(args, show)
         arg_type = String
         "--bias3"
         arg_type = String
+        "--N"
+        arg_type = Int
         "--path"
         arg_type = String
         default  = "."
@@ -52,31 +55,32 @@ function tape_transform_range(param::Float64)
 end
 
 function bias1()
-    ntasks = 2^14;
+    ntasks = 2^15;
     tasks  = zeros(Float64, ntasks)
-    for i in 0:ntasks
-        tasks[i+1] = (-1 * convert(Float64, i) / ntasks) + 3;
+    for i in 0:ntasks-1
+        tasks[i+1] = convert(Float64, i)* (10.0 / (32 * 1024) + 10);
     end
     return tasks
 end
 
 function bias2()
-    ntasks = 2^14;
+    ntasks = 2^15;
     tasks  = zeros(Float64, ntasks)
-    for i in 0:ntasks
-        tasks[i+1] = convert(Float64, i) / ntasks + 1;
+    for i in 0:ntasks-1
+        tasks[i+1] = convert(Float64, i) * (-10.0 / (32 * 1024)) + 20;
     end
     return tasks
 end
 
 function bias3()
-    ntasks = 2^14;
+    ntasks = 2^15;
     tasks  = zeros(Float64, ntasks)
-    for i in 0:ntasks
-        if i < 128 && ntasks - 128 < i
-            tasks[i] = 1.0;
+    key    = UInt16(1024)
+    for i in 0:ntasks-1
+        if key & UInt16(i) > 0
+            tasks[i+1] = 10.0;
         else
-            tasks[i] = 2.0;
+            tasks[i+1] = 20.0;
         end
     end
     return tasks
@@ -111,22 +115,36 @@ function main(args)
             param = parsed_args["tape"]
             value["tape"] = tape_transform_range(param)
         end
-
     end
 
     if(parsed_args["bias1"] != nothing)
-        loop        = parsed_args["bias1"]
-        loops[loop] = bias1()
+        loop     = parsed_args["bias1"]
+        workload = bias1()[1:parsed_args["N"]]
+        μ        = mean(workload)
+        σ        = stdm(workload, μ, corrected = size(workload)[1] > 1)
+        println("μ: ", μ, ", σ: ", σ)
+        loops[loop]["fss"] = σ / μ;
+        loops[loop]["css"] = 0.074401855 / σ;
     end
 
     if(parsed_args["bias2"] != nothing)
-        loop = parsed_args["bias2"]
-        loops[loop] = bias2()
+        loop     = parsed_args["bias2"]
+        workload = bias2()[1:parsed_args["N"]]
+        μ        = mean(workload)
+        σ        = stdm(workload, μ, corrected = size(workload)[1] > 1)
+        println("μ: ", μ, ", σ: ", σ)
+        loops[loop]["fss"] = σ / μ;
+        loops[loop]["css"] = 0.074401855 / σ;
     end
 
     if(parsed_args["bias3"] != nothing)
-        loop = parsed_args["bias3"]
-        loops[loop] = bias3()
+        loop     = parsed_args["bias3"]
+        workload = bias3()[1:parsed_args["N"]]
+        μ        = mean(workload)
+        σ        = stdm(workload, μ, corrected = size(workload)[1] > 1)
+        println("μ: ", μ, ", σ: ", σ)
+        loops[loop]["fss"] = σ / μ;
+        loops[loop]["css"] = 0.074401855 / σ;
     end
 
     str = JSON.json(loops)
