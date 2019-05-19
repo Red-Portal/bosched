@@ -313,6 +313,13 @@ quantize(std::vector<float>&& loop)
 }
 
 inline std::vector<float>
+uniform(size_t ntasks)
+{
+    auto tasks = std::vector<float>(ntasks, 1.0);
+    return tasks;
+}
+
+inline std::vector<float>
 bias1(size_t ntasks)
 {
     auto tasks = std::vector<float>(ntasks);
@@ -355,6 +362,7 @@ int main(int argc, char** argv)
         ("path", po::value<std::string>()->default_value("."), "path") 
         ("chunks", po::value<unsigned>()->default_value(32), "binlpt chunks")
         ("threads", po::value<unsigned>()->default_value(32), "threads")
+        ("uniform", po::value<std::string>(), "loop id of uniform")
         ("bias1", po::value<std::string>(), "loop id of bias1")
         ("bias2", po::value<std::string>(), "loop id of bias2")
         ("bias3", po::value<std::string>(), "loop id of bias3")
@@ -417,6 +425,16 @@ int main(int argc, char** argv)
                   << " - css:  " << css_param << '\n'
                   << " - fss:  " << fss_param << '\n'
                   << std::endl;
+    }
+
+    if(vm.count("uniform"))
+    {
+        auto loop_id   = vm["uniform"].as<std::string>();
+        auto workload  = uniform(loops[loop_id][0].size());
+        auto quantized = quantize(std::move(workload));
+        auto taskmap   = binlpt::binlpt_balance(
+            quantized.data(), workload.size(), threads, chunks);
+        output[loop_id]["binlpt"] = std::move(taskmap);
     }
 
     if(vm.count("bias1"))
