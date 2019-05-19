@@ -312,29 +312,29 @@ quantize(std::vector<float>&& loop)
     return result;
 }
 
-inline std::vector<double>
+inline std::vector<float>
 bias1(size_t ntasks)
 {
-    auto tasks = std::vector<double>(ntasks);
+    auto tasks = std::vector<float>(ntasks);
     for(size_t i = 0; i < ntasks; ++i)
-        tasks[i] = static_cast<double>(-i) / ntasks + 3;
+        tasks[i] = -1 * static_cast<float>(i) / ntasks + 3;
     return tasks;
 }
 
-inline std::vector<double>
+inline std::vector<float>
 bias2(size_t ntasks)
 {
-    auto tasks = std::vector<double>(ntasks);
+    auto tasks = std::vector<float>(ntasks);
     for(size_t i = 0; i < ntasks; ++i)
-        tasks[i] = static_cast<double>(i) / ntasks + 1;
+        tasks[i] = static_cast<float>(i) / ntasks + 1;
     return tasks;
 }
 
 
-inline std::vector<double>
+inline std::vector<float>
 bias3(size_t ntasks)
 {
-    auto tasks = std::vector<double>(ntasks);
+    auto tasks = std::vector<float>(ntasks);
     for(size_t i = 0; i < ntasks; ++i)
     {
         if(i < 128 || ntasks - 128 < i)
