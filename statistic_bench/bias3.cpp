@@ -36,7 +36,7 @@ int main(int argc, char** argv)
     std::cout << "distribution,mean,+-,dist_mean,dist_stddev"  << std::endl;
 
     for(size_t it = 0; it < 32; ++it) {
-#pragma omp parallel for schedule(runtime)
+#pragma omp parallel for schedule()
         for(int i = 0; i < 1024; ++i) {
             do_not_optimize(i);
         }
@@ -51,7 +51,7 @@ int main(int argc, char** argv)
                 return stats::rnorm(mu, sigma, rng);   
             };
         auto gen = workload_biased(N, gaussian, rng,
-                                   [N](size_t i) {
+                                   [](size_t i) {
                                        uint64_t key = 1024u;
                                        if(key & i)
                                            return 10;
