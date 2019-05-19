@@ -33,29 +33,24 @@ int main(int argc, char** argv)
     double sigma = vm["sigma"].as<double>();
     std::cout << "distribution,mean,+-,dist_mean,dist_stddev"  << std::endl;
 
-    auto warmup =
-        [](std::mt19937_64& rng)
-        {
-            double value;
-            double const mu    = 1;
-            double const sigma = 1;
-            do { value = stats::rlnorm(mu, sigma, rng); } while(value < 0.0);
-            return value;
-        };
-    auto gen = workload(1024, warmup, rng);
-    benchmark<0>(gen, "warmup", 10, 1);
+    for(size_t it = 0; it < 32; ++it) {
+#pragma omp parallel for schedule(runtime)
+        for(int i = 0; i < 1024; ++i) {
+            do_not_optimize(i);
+        }
+    }
 
     auto dist =
         [sigma](std::mt19937_64& rng) -> double
-                {
-                    double value;
-                    double const mu = 10;
-                do
-                {
-                    value = stats::rnorm(mu, sigma, rng);   
-                } while(value < 0.0);
-                return value;
-            };
+        {
+            double value;
+            double const mu = 10;
+            do
+            {
+                value = stats::rnorm(mu, sigma, rng);   
+            } while(value < 0.0);
+            return value;
+        };
     auto work_gen = workload(N, dist, rng);
-    benchmark<1>(work_gen, "uniform", 10, sigma);
+    benchmark(work_gen, "uniform", 10, sigma);
 }
