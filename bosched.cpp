@@ -297,14 +297,12 @@ extern "C"
     {
         if(_profile_loop && _profile_count < 4)
             prof::iteration_profile_start(iteration);
-        printf("fuck!\n");
     }
 
     void bo_workload_profile_stop()
     {
         if(_profile_loop && _profile_count < 4)
             prof::iteration_profile_stop();
-        printf("fuck?\n");
     }
 
     void bo_record_iteration_start()
