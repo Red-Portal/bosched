@@ -40,7 +40,7 @@ int main(int argc, char** argv)
                 double value;
                 double const mu    = 1;
                 double const sigma = 1;
-                do { value = stats::rnorm(mu, sigma, rng); } while(value < 0.0);
+                do { value = stats::rlnorm(mu, sigma, rng); } while(value < 0.0);
                 return value;
             };
         auto gen = workload(1024, warmup, rng);
@@ -52,7 +52,7 @@ int main(int argc, char** argv)
             [sigma](std::mt19937_64& rng) -> double
             {
                 double value;
-                double const mu    = 10;
+                double const mu = 10;
                 do
                 {
                     value = stats::rnorm(mu, sigma, rng);   
