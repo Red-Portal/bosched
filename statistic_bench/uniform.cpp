@@ -53,5 +53,5 @@ int main(int argc, char** argv)
             return value;
         };
     auto work_gen = workload(N, dist, rng);
-    benchmark(work_gen, "uniform", iter, 10, sigma);
+    benchmark(work_gen, "uniform", N, iter, 10, sigma);
 }
