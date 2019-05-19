@@ -1,4 +1,5 @@
 
+
 #include "util.hpp"
 
 int main(int argc, char** argv)
@@ -46,18 +47,14 @@ int main(int argc, char** argv)
         auto gaussian =
             [sigma](std::mt19937_64& rng)
             {
-                double value;
-                double const mu    = 10;
-                do
-                {
-                    value = stats::rnorm(mu, sigma, rng);   
-                } while(value < 0.0);
-                return value;
+                double const mu = 0;
+                return stats::rnorm(mu, sigma, rng); 
             };
-        auto gen = workload_biased(N, gaussian, rng,
-                                   [N](size_t i) {
-                                       return static_cast<double>(i) / N + 1;
-                                   });
-        benchmark(gen, "bias1", iter, 10, sigma);
+        auto gen = workload_biased(
+            32 * 1024, gaussian, rng,
+            [](size_t i) {
+                return static_cast<double>(i) * (-10.0 / (32 * 1024)) + 20;
+            });
+        benchmark(gen, "bias2", N, iter, 10, sigma);
     }
 }

@@ -47,17 +47,17 @@ int main(int argc, char** argv)
             [sigma](std::mt19937_64& rng)
             {
                 double value;
-                double const mu    = 10;
-                do
-                    {
-                        value = stats::rnorm(mu, sigma, rng);   
-                    } while(value < 0.0);
-                return value;
+                double const mu = 0;
+                return stats::rnorm(mu, sigma, rng);   
             };
         auto gen = workload_biased(N, gaussian, rng,
                                    [N](size_t i) {
-                                       return static_cast<double>(i) / N + 1;
+                                       uint64_t key = 1024u;
+                                       if(key & i)
+                                           return 10;
+                                       else
+                                           return 20;
                                    });
-        benchmark(gen, "bias1", iter, 10, sigma);
+        benchmark(gen, "bias3", N, iter, 10, sigma);
     }
 }

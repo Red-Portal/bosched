@@ -135,6 +135,7 @@ stddev(It begin, It end, Type mean)
 template<typename Gen>
 void benchmark(Gen&& tasks,
                std::string_view name,
+               size_t max_tasks,
                size_t iteration,
                double dist_mean,
                double dist_stddev)

@@ -189,10 +189,6 @@ namespace binlpt
         unsigned* chunks;         /* Chunks.           */
         unsigned* chunkoff;       /* Offset to chunks. */
 
-        //printf("[binlpt] Balancing loop %s:%i\n", loops[curr_loop].filename, loops[curr_loop].line);
-
-        /* Initialize scheduler data. */
-        // taskmap = (unsigned*)calloc(ntasks, sizeof(unsigned));
         auto taskmap = std::vector<unsigned>(ntasks);
 
         load    = (unsigned*)calloc(nthreads, sizeof(unsigned));
@@ -324,7 +320,7 @@ bias1(size_t ntasks)
 {
     auto tasks = std::vector<float>(ntasks);
     for(size_t i = 0; i < ntasks; ++i)
-        tasks[i] = -1 * static_cast<float>(i) / ntasks + 3;
+        tasks[i] = static_cast<double>(i) * (10.0 / (32 * 1024) + 10);
     return tasks;
 }
 
@@ -333,10 +329,9 @@ bias2(size_t ntasks)
 {
     auto tasks = std::vector<float>(ntasks);
     for(size_t i = 0; i < ntasks; ++i)
-        tasks[i] = static_cast<float>(i) / ntasks + 1;
+        tasks[i] = static_cast<double>(i) * (-10.0 / (32 * 1024)) + 20;
     return tasks;
 }
-
 
 inline std::vector<float>
 bias3(size_t ntasks)
@@ -344,10 +339,11 @@ bias3(size_t ntasks)
     auto tasks = std::vector<float>(ntasks);
     for(size_t i = 0; i < ntasks; ++i)
     {
-        if(i < 128 || ntasks - 128 < i)
-            tasks[i] = 1.0;
+        uint64_t key = 1024u;
+        if(key & i)
+            tasks[i] = 10;
         else
-            tasks[i] = 2.0;
+            tasks[i] = 20;
     }
     return tasks;
 }
@@ -359,13 +355,14 @@ int main(int argc, char** argv)
 
     po::options_description desc("Options"); 
     desc.add_options() 
-        ("path", po::value<std::string>()->default_value("."), "path") 
-        ("chunks", po::value<unsigned>()->default_value(32), "binlpt chunks")
+        ("path",    po::value<std::string>()->default_value("."), "path") 
+        ("chunks",  po::value<unsigned>()->default_value(32), "binlpt chunks")
         ("threads", po::value<unsigned>()->default_value(32), "threads")
+        ("N",       po::value<int>(), "max iteration to process")
         ("uniform", po::value<std::string>(), "loop id of uniform")
-        ("bias1", po::value<std::string>(), "loop id of bias1")
-        ("bias2", po::value<std::string>(), "loop id of bias2")
-        ("bias3", po::value<std::string>(), "loop id of bias3")
+        ("bias1",   po::value<std::string>(), "loop id of bias1")
+        ("bias2",   po::value<std::string>(), "loop id of bias2")
+        ("bias3",   po::value<std::string>(), "loop id of bias3")
         ("h", po::value<double>(), "overhead in microsecond");
 
     po::variables_map vm;
@@ -402,13 +399,18 @@ int main(int argc, char** argv)
                   << " - samples: " << value.size() << '\n'
                   << std::endl;
 
-        auto means = iteration_mean(value);
-        auto mu    = mean(means.begin(), means.end(), 0.0f);
-        auto sigma = stddev(mu, means.begin(), means.end());
+        auto means  = iteration_mean(value);
+        float mu    = mean(means.begin(), means.end(), 0.0f);
+        float sigma = stddev(mu, means.begin(), means.end());
 
         auto quantized = quantize(std::move(means));
-        auto taskmap = binlpt::binlpt_balance(
-            quantized.data(), quantized.size(), threads, chunks);
+        auto taskmap   = std::vector<unsigned>();
+        if(vm.count("N") > 0)
+            taskmap = binlpt::binlpt_balance(
+                quantized.data(), vm["N"].as<int>(), threads, chunks);
+        else
+            taskmap = binlpt::binlpt_balance(
+                quantized.data(), quantized.size(), threads, chunks);
 
         double css_param = h / sigma;
         double fss_param = sigma / mu;
@@ -431,6 +433,11 @@ int main(int argc, char** argv)
     {
         auto loop_id   = vm["uniform"].as<std::string>();
         auto workload  = uniform(loops[loop_id][0].size());
+        if(vm.count("N") > 0)
+        {
+            workload = std::vector<float>(
+                workload.begin(), workload.begin() + vm["N"].as<int>());
+        }
         auto quantized = quantize(std::move(workload));
         auto taskmap   = binlpt::binlpt_balance(
             quantized.data(), workload.size(), threads, chunks);
@@ -441,19 +448,29 @@ int main(int argc, char** argv)
     {
         auto loop_id   = vm["bias1"].as<std::string>();
         auto workload  = bias1(loops[loop_id][0].size());
+        if(vm.count("N") > 0)
+        {
+            workload = std::vector<float>(
+                workload.begin(), workload.begin() + vm["N"].as<int>());
+        }
         auto quantized = quantize(std::move(workload));
         auto taskmap   = binlpt::binlpt_balance(
             quantized.data(), workload.size(), threads, chunks);
         output[loop_id]["binlpt"] = std::move(taskmap);
     }
 
-    if(vm.count("bias1"))
+    if(vm.count("bias2"))
     {
         auto loop_id   = vm["bias2"].as<std::string>();
         auto workload  = bias2(loops[loop_id][0].size());
+        if(vm.count("N") > 0)
+        {
+            workload = std::vector<float>(
+                workload.begin(), workload.begin() + vm["N"].as<int>());
+        }
         auto quantized = quantize(std::move(workload));
         auto taskmap   = binlpt::binlpt_balance(
-            quantized.data(), workload.size(), threads, chunks);
+            quantized.data(), quantized.size(), threads, chunks);
         output[loop_id]["binlpt"] = std::move(taskmap);
     }
 
@@ -461,12 +478,16 @@ int main(int argc, char** argv)
     {
         auto loop_id   = vm["bias3"].as<std::string>();
         auto workload  = bias3(loops[loop_id][0].size());
+        if(vm.count("N") > 0)
+        {
+            workload = std::vector<float>(
+                workload.begin(), workload.begin() + vm["N"].as<int>());
+        }
         auto quantized = quantize(std::move(workload));
         auto taskmap   = binlpt::binlpt_balance(
             quantized.data(), workload.size(), threads, chunks);
         output[loop_id]["binlpt"] = std::move(taskmap);
     }
-
 
     auto out_stream = std::ofstream(path + "/.params.json"s);
     out_stream << output.dump(2);
