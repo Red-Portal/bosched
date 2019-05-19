@@ -309,35 +309,35 @@ quantize(std::vector<float>&& loop)
 }
 
 inline std::vector<float>
-uniform(size_t ntasks)
+uniform()
 {
-    auto tasks = std::vector<float>(ntasks, 1.0);
+    auto tasks = std::vector<float>(32*1024, 1.0);
     return tasks;
 }
 
 inline std::vector<float>
-bias1(size_t ntasks)
+bias1()
 {
-    auto tasks = std::vector<float>(ntasks);
-    for(size_t i = 0; i < ntasks; ++i)
-        tasks[i] = static_cast<double>(i) * (10.0 / (32 * 1024) + 10);
+    auto tasks = std::vector<float>(32*1024);
+    for(size_t i = 0; i < tasks.size(); ++i)
+        tasks[i] = static_cast<double>(i) * (10.0 / (32 * 1024)) + 10;
     return tasks;
 }
 
 inline std::vector<float>
-bias2(size_t ntasks)
+bias2()
 {
-    auto tasks = std::vector<float>(ntasks);
-    for(size_t i = 0; i < ntasks; ++i)
+    auto tasks = std::vector<float>(32*1024);
+    for(size_t i = 0; i < tasks.size(); ++i)
         tasks[i] = static_cast<double>(i) * (-10.0 / (32 * 1024)) + 20;
     return tasks;
 }
 
 inline std::vector<float>
-bias3(size_t ntasks)
+bias3()
 {
-    auto tasks = std::vector<float>(ntasks);
-    for(size_t i = 0; i < ntasks; ++i)
+    auto tasks = std::vector<float>(32*1024);
+    for(size_t i = 0; i < tasks.size(); ++i)
     {
         uint64_t key = 1024u;
         if(key & i)
@@ -432,7 +432,7 @@ int main(int argc, char** argv)
     if(vm.count("uniform"))
     {
         auto loop_id   = vm["uniform"].as<std::string>();
-        auto workload  = uniform(loops[loop_id][0].size());
+        auto workload  = uniform();
         if(vm.count("N") > 0)
         {
             workload = std::vector<float>(
@@ -447,12 +447,9 @@ int main(int argc, char** argv)
     if(vm.count("bias1"))
     {
         auto loop_id   = vm["bias1"].as<std::string>();
-        auto workload  = bias1(loops[loop_id][0].size());
-        if(vm.count("N") > 0)
-        {
-            workload = std::vector<float>(
+        auto workload  = bias1();
+        workload = std::vector<float>(
                 workload.begin(), workload.begin() + vm["N"].as<int>());
-        }
         auto quantized = quantize(std::move(workload));
         auto taskmap   = binlpt::binlpt_balance(
             quantized.data(), workload.size(), threads, chunks);
@@ -462,12 +459,9 @@ int main(int argc, char** argv)
     if(vm.count("bias2"))
     {
         auto loop_id   = vm["bias2"].as<std::string>();
-        auto workload  = bias2(loops[loop_id][0].size());
-        if(vm.count("N") > 0)
-        {
+        auto workload  = bias2();
             workload = std::vector<float>(
                 workload.begin(), workload.begin() + vm["N"].as<int>());
-        }
         auto quantized = quantize(std::move(workload));
         auto taskmap   = binlpt::binlpt_balance(
             quantized.data(), quantized.size(), threads, chunks);
@@ -477,12 +471,10 @@ int main(int argc, char** argv)
     if(vm.count("bias3"))
     {
         auto loop_id   = vm["bias3"].as<std::string>();
-        auto workload  = bias3(loops[loop_id][0].size());
-        if(vm.count("N") > 0)
-        {
-            workload = std::vector<float>(
+        auto workload  = bias3();
+
+workload = std::vector<float>(
                 workload.begin(), workload.begin() + vm["N"].as<int>());
-        }
         auto quantized = quantize(std::move(workload));
         auto taskmap   = binlpt::binlpt_balance(
             quantized.data(), workload.size(), threads, chunks);

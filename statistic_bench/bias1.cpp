@@ -53,7 +53,7 @@ int main(int argc, char** argv)
         auto gen = workload_biased(
             32 * 1024, gaussian, rng,
             [](size_t i) {
-                return static_cast<double>(i) * (10.0 / (32 * 1024) + 10);
+                return static_cast<double>(i) * (10.0 / (32 * 1024)) + 10;
             });
         benchmark(gen, "bias1", N, iter, 10, sigma);
     }

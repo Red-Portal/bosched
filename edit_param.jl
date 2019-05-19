@@ -58,7 +58,7 @@ function bias1()
     ntasks = 2^15;
     tasks  = zeros(Float64, ntasks)
     for i in 0:ntasks-1
-        tasks[i+1] = convert(Float64, i)* (10.0 / (32 * 1024) + 10);
+        tasks[i+1] = convert(Float64, i)* (10.0 / (32 * 1024)) + 10;
     end
     return tasks
 end
