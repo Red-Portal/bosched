@@ -5,7 +5,6 @@ int main(int argc, char** argv)
 {
     auto seed = std::random_device();
     auto rng  = std::mt19937_64(seed());
-    auto str  = std::string(argv[1]);
 
     namespace po = boost::program_options; 
     using namespace std::literals::string_literals;
@@ -13,6 +12,7 @@ int main(int argc, char** argv)
     po::options_description desc("Options"); 
     desc.add_options() 
         ("N", po::value<int>(), "iterations") 
+        ("iter", po::value<int>()->default_value(32), "iterations") 
         ("sigma", po::value<double>()->default_value(1.0), "variance");
 
     po::variables_map vm;
@@ -30,6 +30,7 @@ int main(int argc, char** argv)
     } 
 
     int N        = vm["N"].as<int>();
+    int iter     = vm["iter"].as<int>();
     double sigma = vm["sigma"].as<double>();
     std::cout << "distribution,mean,+-,dist_mean,dist_stddev"  << std::endl;
 
@@ -52,5 +53,5 @@ int main(int argc, char** argv)
             return value;
         };
     auto work_gen = workload(N, dist, rng);
-    benchmark(work_gen, "uniform", 10, sigma);
+    benchmark(work_gen, "uniform", iter, 10, sigma);
 }

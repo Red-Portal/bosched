@@ -13,6 +13,7 @@ int main(int argc, char** argv)
     po::options_description desc("Options"); 
     desc.add_options() 
         ("N", po::value<int>(), "iterations") 
+        ("iter", po::value<int>()->default_value(32), "iterations") 
         ("sigma", po::value<double>()->default_value(1.0), "variance");
 
     po::variables_map vm;
@@ -30,6 +31,7 @@ int main(int argc, char** argv)
     } 
 
     int N        = vm["N"].as<int>();
+    int iter     = vm["iter"].as<int>();
     double sigma = vm["sigma"].as<double>();
     std::cout << "distribution,mean,+-,dist_mean,dist_stddev"  << std::endl;
 
@@ -63,6 +65,6 @@ int main(int argc, char** argv)
                                    [N](size_t i) {
                                        return static_cast<double>(i) / N + 1;
                                    });
-        benchmark(gen, "bias1", 10, sigma);
+        benchmark(gen, "bias1", iter, 10, sigma);
     }
 }
