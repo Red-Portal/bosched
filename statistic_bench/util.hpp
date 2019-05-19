@@ -135,14 +135,13 @@ stddev(It begin, It end, Type mean)
 template<typename Gen>
 void benchmark(Gen&& tasks,
                std::string_view name,
-               size_t max_tasks,
+               size_t num_tasks,
                size_t iteration,
                double dist_mean,
                double dist_stddev)
 {
     using clock      = std::chrono::steady_clock;
     using duration_t = std::chrono::duration<double, std::milli>;
-    size_t num_tasks = tasks.num_tasks();
     auto measures    = std::vector<double>(iteration);
     for(size_t it = 0; it < iteration; ++it)
     {
