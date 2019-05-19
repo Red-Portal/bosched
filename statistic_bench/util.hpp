@@ -90,6 +90,7 @@ public:
         {
             auto runtime = dist(rng);
             _runtimes[i] = duration_t(runtime); 
+            std::cout << _runtimes[i].count() << std::endl;
         }
     }
 
@@ -146,24 +147,24 @@ void benchmark(Gen&& tasks,
 
     auto measures = std::vector<double>(iteration);
     for(size_t it = 0; it < iteration; ++it)
-        {
-            auto loop_start = clock::now();
+    {
+        auto loop_start = clock::now();
 #pragma omp parallel for schedule(runtime)
-            for(size_t i = 0; i < num_tasks; ++i)
+        for(int i = 0; i < num_tasks; ++i)
+        {
+            auto start = clock::now();
+            auto runtime = tasks[i];
+            auto now = clock::now();
+            while(now - start < runtime)
             {
-                auto start = clock::now();
-                auto runtime = tasks[i];
-                auto now = clock::now();
-                while(now - start < runtime)
-                {
-                    now = clock::now();
-                    do_not_optimize(now);
-                }
+                now = clock::now();
+                do_not_optimize(now);
             }
-            auto loop_end = clock::now();
-            measures[it] = std::chrono::duration_cast<duration_t>(
-                loop_end - loop_start).count();
         }
+        auto loop_end = clock::now();
+        measures[it] = std::chrono::duration_cast<duration_t>(
+            loop_end - loop_start).count();
+    }
 
     auto mu    = mean(measures.begin(), measures.end(), 0.0);
     auto sigma = stddev(measures.begin(), measures.end(), mu);
