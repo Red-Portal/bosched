@@ -17,6 +17,8 @@ function cmd_args(args, show)
         arg_type = Float64
         "--tss"
         arg_type = Float64
+        "--uniform"
+        arg_type = String
         "--bias1"
         arg_type = String
         "--bias2"
@@ -142,6 +144,16 @@ function main(args)
         workload = bias3()[1:parsed_args["N"]]
         μ        = mean(workload)
         σ        = stdm(workload, μ, corrected = size(workload)[1] > 1)
+        println("μ: ", μ, ", σ: ", σ)
+        loops[loop]["fss"] = σ / μ;
+        loops[loop]["css"] = 0.074401855 / σ;
+    end
+
+    if(parsed_args["uniform"] != nothing)
+        loop     = parsed_args["uniform"]
+        workload = bias3()[1:parsed_args["N"]]
+        μ        = 10
+        σ        = 1.0
         println("μ: ", μ, ", σ: ", σ)
         loops[loop]["fss"] = σ / μ;
         loops[loop]["css"] = 0.074401855 / σ;
