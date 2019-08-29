@@ -2,7 +2,7 @@
 using AdvancedHMC
 
 function nuts(gp, num_samples=100, num_adapts=100;
-              precomputed=false, verbose=false)
+              precomputed=true, verbose=false)
     function logp∂logp(θ::AbstractVector)
         set_params!(gp, θ; domean=false, kern=true, noise=true)
         update_target_and_dtarget!(

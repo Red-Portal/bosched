@@ -51,7 +51,7 @@ function acquisition(x::AbstractArray, gp::PrecomputedParticleGP)
     α_res = Matrix{eltype(x)}(undef, N, P)
     for i = 1:P
         μ, σ² = predict_f(gp.gp[i], x)
-        σ²    = max.(σ², σe[i]^2 + 1e-10)
+        σ²    += σe[i]^2
         α_res[:,i] .= α.(μ, σ², t, Ref(η[:,i]))
     end
     res = α_res * w 
