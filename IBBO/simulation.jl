@@ -91,8 +91,7 @@ function chunk!(::Type{BO_FAC}, i, R, P, N, h, dist, θ::Dict)
         θ[:index] = P
         μ = mean(dist)
         σ = std(dist)
-        b = P / (2 * √R) * θ[:param]
-        K = R / (2 * P)
+        K = R / P * θ[:param]
         K = ceil(Int64, K)
         θ[:chunk] = K
         return K
@@ -226,13 +225,71 @@ end
 
 function print_csv(df::DataFrame)
     println("exec,+-,slow,+-,speed,+-,eff,+-,cov,+-")
-    println(df.exec_mean[1]       , ",", df.exec_conf[1],
-            df.slow_mean[1]       , ",", df.slow_conf[1],
-            df.speedup_mean[1]    , ",", df.speedup_conf[1],
-            df.efficiency_mean[1] , ",", df.efficiency_conf[1],
-            df.cov_mean[1]        , ",", df.cov_conf[1])
+    for i = 1:size(df, 1)
+        println(df.exec_mean[i]       , ",", df.exec_conf[i], ",",
+                df.slow_mean[i]       , ",", df.slow_conf[i], ",",
+                df.speedup_mean[i]    , ",", df.speedup_conf[i], ",",
+                df.efficiency_mean[i] , ",", df.efficiency_conf[i], ",",
+                df.cov_mean[i]        , ",", df.cov_conf[i])
+    end
 end
 
-function main()
-    
+function make_2d(filename, x_labels, y_labels, arr)
+    arr      = reshape(arr, (length(x_labels), length(y_labels)))
+    arr      = hcat(x_labels, arr)
+    y_labels = vcat(Nothing, y_labels)
+    y_labels = convert(Array{Any, 2},
+                       reshape(y_labels, (1, length(y_labels))))
+    arr      = convert(Array{Any, 2}, arr)
+    arr      = vcat(y_labels, arr)
+
+    open(filename, "w") do io
+        writedlm(io, arr, ',')
+    end
+end
+
+function experiment1()
+    df = DataFrame()
+    axis1 = collect(0:0.2:8)
+    axis2 = collect(-5:0.2:10)
+    for i in axis1
+        for j in axis2
+            μ     = 10.0 
+            σ     = 2^i
+            dist  = TruncatedNormal(μ, σ, 0.0, Inf);
+            iters = 128
+            h     = 10.0
+            N     = 8192
+            P     = 32
+            
+            θ   = Dict{Symbol, Any}(:param=>Float64(2^j));
+            res = run(BO_FSS, iters, prng, dist, P, N, h, θ)
+            df  = vcat(df, res)
+            println("processed $i $j")
+        end
+    end
+    return df, 2 .^axis2, 2 .^axis1
+end
+
+function experiment2()
+    df = DataFrame()
+    axis1 = collect(0:0.2:10)
+    axis2 = collect(-10:0.2:0)
+    for i in axis1
+        for j in axis2
+            μ     = 10.0 
+            σ     = 2^i
+            dist  = TruncatedNormal(μ, σ, 0.0, Inf);
+            iters = 128
+            h     = 10.0
+            N     = 8192
+            P     = 32
+            
+            θ   = Dict{Symbol, Any}(:param=>Float64(2^j));
+            res = run(BO_FAC, iters, prng, dist, P, N, h, θ)
+            df  = vcat(df, res)
+            println("processed $i $j")
+        end
+    end
+    return df, 2 .^axis2, 2 .^axis1
 end
