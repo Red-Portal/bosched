@@ -113,62 +113,6 @@ function experiment2_1(prng)
     return df, 2 .^axis2, 2 .^axis1
 end
 
-function experiment2_2(prng)
-    df = DataFrame()
-    axis1 = collect(8:0.3:17)
-    axis2 = collect(0:0.2:8)
-
-    @showprogress "Running simulation..." for (i, y) in enumerate(axis1)
-        seeds  = MersenneTwister.(rand(prng, UInt64, length(axis2)))
-        outbuf = Array{DataFrame}(undef, length(axis2))
-
-        Threads.@threads for j in 1:length(axis2)
-            x     = axis2[j]
-            μ     = 1.0 
-            σ     = 1.0
-            dist  = TruncatedNormal(μ, σ, 0.0, Inf);
-            iters = 128
-            h     = 0.1
-            N     = floor(Int64, 2^y)
-            P     = 32
-            
-            θ   = Dict{Symbol, Any}(:param=>Float64(2^x));
-            res = run(BO_FAC, iters, seeds[j], dist, P, N, h, θ)
-            outbuf[j] = res
-        end
-        df = vcat(df, outbuf...)
-    end
-    return df, 2 .^axis2, 2 .^axis1
-end
-
-function experiment2_3(prng)
-    df = DataFrame()
-    axis1 = collect(8:0.3:17)
-    axis2 = collect(-10:0.5:10)
-
-    @showprogress "Running simulation..." for (i, y) in enumerate(axis1)
-        seeds  = MersenneTwister.(rand(prng, UInt64, length(axis2)))
-        outbuf = Array{DataFrame}(undef, length(axis2))
-
-        Threads.@threads for j in 1:length(axis2)
-            x     = axis2[j]
-            μ     = 1.0 
-            σ     = 1.0
-            dist  = TruncatedNormal(μ, σ, 0.0, Inf);
-            iters = 128
-            h     = 0.1
-            N     = floor(Int64, 2^y)
-            P     = 32
-            
-            θ   = Dict{Symbol, Any}(:param=>Float64(2^x));
-            res = run(BO_CSS, iters, seeds[j], dist, P, N, h, θ)
-            outbuf[j] = res
-        end
-        df = vcat(df, outbuf...)
-    end
-    return df, 2 .^axis2, 2 .^axis1
-end
-
 function experiment3_1(prng)
     df = DataFrame()
     axis1 = collect(-4:0.2:4)
@@ -339,3 +283,284 @@ function exectime_cdf2(prng, sched, θ)
     end
     return samples
 end
+
+function experiment2_1(prng)
+    df = DataFrame()
+    axis1 = collect(8:0.3:17)
+    axis2 = collect(-15:0.5:7)
+
+    @showprogress "Running simulation..." for (i, y) in enumerate(axis1)
+        seeds  = MersenneTwister.(rand(prng, UInt64, length(axis2)))
+        outbuf = Array{DataFrame}(undef, length(axis2))
+
+        Threads.@threads for j = 1:length(axis2)
+            x     = axis2[j]
+            μ     = 1.0 
+            σ     = 1.0
+            dist  = TruncatedNormal(μ, σ, 0.0, Inf);
+            iters = 128
+            h     = 0.1
+            N     = floor(Int64, 2^y)
+            P     = 32
+            
+            θ   = Dict{Symbol, Any}(:param=>Float64(2^x));
+            res = run(BO_FSS, iters, seeds[j], dist, P, N, h, θ)
+            outbuf[j] = res
+        end
+        df = vcat(df, outbuf...)
+    end
+    return df, 2 .^axis2, 2 .^axis1
+end
+
+function experiment2_2(prng)
+    df = DataFrame()
+    axis1 = collect(8:0.3:17)
+    axis2 = collect(0:0.2:8)
+
+    @showprogress "Running simulation..." for (i, y) in enumerate(axis1)
+        seeds  = MersenneTwister.(rand(prng, UInt64, length(axis2)))
+        outbuf = Array{DataFrame}(undef, length(axis2))
+
+        Threads.@threads for j in 1:length(axis2)
+            x     = axis2[j]
+            μ     = 1.0 
+            σ     = 1.0
+            dist  = TruncatedNormal(μ, σ, 0.0, Inf);
+            iters = 128
+            h     = 0.1
+            N     = floor(Int64, 2^y)
+            P     = 32
+            
+            θ   = Dict{Symbol, Any}(:param=>Float64(2^x));
+            res = run(BO_FAC, iters, seeds[j], dist, P, N, h, θ)
+            outbuf[j] = res
+        end
+        df = vcat(df, outbuf...)
+    end
+    return df, 2 .^axis2, 2 .^axis1
+end
+
+function experiment2_3(prng)
+    df = DataFrame()
+    axis1 = collect(8:0.3:17)
+    axis2 = collect(-10:0.5:10)
+
+    @showprogress "Running simulation..." for (i, y) in enumerate(axis1)
+        seeds  = MersenneTwister.(rand(prng, UInt64, length(axis2)))
+        outbuf = Array{DataFrame}(undef, length(axis2))
+
+        Threads.@threads for j in 1:length(axis2)
+            x     = axis2[j]
+            μ     = 1.0 
+            σ     = 1.0
+            dist  = TruncatedNormal(μ, σ, 0.0, Inf);
+            iters = 128
+            h     = 0.1
+            N     = floor(Int64, 2^y)
+            P     = 32
+            
+            θ   = Dict{Symbol, Any}(:param=>Float64(2^x));
+            res = run(BO_CSS, iters, seeds[j], dist, P, N, h, θ)
+            outbuf[j] = res
+        end
+        df = vcat(df, outbuf...)
+    end
+    return df, 2 .^axis2, 2 .^axis1
+end
+
+function experiment2_4(prng)
+    df = DataFrame()
+    axis1 = collect(8:0.3:17)
+    axis2 = collect(-7:0.2:4)
+
+    @showprogress "Running simulation..." for (i, y) in enumerate(axis1)
+        seeds  = MersenneTwister.(rand(prng, UInt64, length(axis2)))
+        outbuf = Array{DataFrame}(undef, length(axis2))
+
+        Threads.@threads for j in 1:length(axis2)
+            x     = axis2[j]
+            μ     = 1.0 
+            σ     = 1.0
+            dist  = TruncatedNormal(μ, σ, 0.0, Inf);
+            iters = 128
+            h     = 0.1
+            N     = floor(Int64, 2^y)
+            P     = 32
+            
+            θ   = Dict{Symbol, Any}(:param=>Float64(2^x));
+            res = run(BO_TSS, iters, seeds[j], dist, P, N, h, θ)
+            outbuf[j] = res
+        end
+        df = vcat(df, outbuf...)
+    end
+    return df, 2 .^axis2, 2 .^axis1
+end
+
+function experiment2_5(prng)
+    df = DataFrame()
+    axis1 = collect(8:0.3:17)
+    axis2 = collect(-7:0.5:10)
+
+    @showprogress "Running simulation..." for (i, y) in enumerate(axis1)
+        seeds  = MersenneTwister.(rand(prng, UInt64, length(axis2)))
+        outbuf = Array{DataFrame}(undef, length(axis2))
+
+        Threads.@threads for j in 1:length(axis2)
+            x     = axis2[j]
+            μ     = 1.0 
+            σ     = 1.0
+            dist  = TruncatedNormal(μ, σ, 0.0, Inf);
+            iters = 128
+            h     = 0.1
+            N     = floor(Int64, 2^y)
+            P     = 32
+            
+            θ   = Dict{Symbol, Any}(:param=>Float64(2^x));
+            res = run(BO_TAPER, iters, seeds[j], dist, P, N, h, θ)
+            outbuf[j] = res
+        end
+        df = vcat(df, outbuf...)
+    end
+    return df, 2 .^axis2, 2 .^axis1
+end
+
+function experiment5_1(prng)
+    df = DataFrame()
+    axis1 = collect(4:0.2:10)
+    axis2 = collect(-15:0.5:7)
+
+    @showprogress "Running simulation..." for (i, y) in enumerate(axis1)
+        seeds  = MersenneTwister.(rand(prng, UInt64, length(axis2)))
+        outbuf = Array{DataFrame}(undef, length(axis2))
+
+        Threads.@threads for j = 1:length(axis2)
+            x     = axis2[j]
+            μ     = 1.0 
+            σ     = 1.0
+            dist  = TruncatedNormal(μ, σ, 0.0, Inf);
+            iters = 128
+            h     = 0.1
+            N     = 2^14
+            P     = floor(Int64, 2^y)
+            
+            θ   = Dict{Symbol, Any}(:param=>Float64(2^x));
+            res = run(BO_FSS, iters, seeds[j], dist, P, N, h, θ)
+            outbuf[j] = res
+        end
+        df = vcat(df, outbuf...)
+    end
+    return df, 2 .^axis2, 2 .^axis1
+end
+
+function experiment5_2(prng)
+    df = DataFrame()
+    axis1 = collect(4:0.2:10)
+    axis2 = collect(0:0.2:8)
+
+    @showprogress "Running simulation..." for (i, y) in enumerate(axis1)
+        seeds  = MersenneTwister.(rand(prng, UInt64, length(axis2)))
+        outbuf = Array{DataFrame}(undef, length(axis2))
+
+        Threads.@threads for j in 1:length(axis2)
+            x     = axis2[j]
+            μ     = 1.0 
+            σ     = 1.0
+            dist  = TruncatedNormal(μ, σ, 0.0, Inf);
+            iters = 128
+            h     = 0.1
+            N     = 2^14
+            P     = floor(Int64, 2^y)
+            
+            θ   = Dict{Symbol, Any}(:param=>Float64(2^x));
+            res = run(BO_FAC, iters, seeds[j], dist, P, N, h, θ)
+            outbuf[j] = res
+        end
+        df = vcat(df, outbuf...)
+    end
+    return df, 2 .^axis2, 2 .^axis1
+end
+
+function experiment5_3(prng)
+    df = DataFrame()
+    axis1 = collect(4:0.2:10)
+    axis2 = collect(-10:0.5:10)
+
+    @showprogress "Running simulation..." for (i, y) in enumerate(axis1)
+        seeds  = MersenneTwister.(rand(prng, UInt64, length(axis2)))
+        outbuf = Array{DataFrame}(undef, length(axis2))
+
+        Threads.@threads for j in 1:length(axis2)
+            x     = axis2[j]
+            μ     = 1.0 
+            σ     = 1.0
+            dist  = TruncatedNormal(μ, σ, 0.0, Inf);
+            iters = 128
+            h     = 0.1
+            N     = 2^14
+            P     = floor(Int64, 2^y)
+            
+            θ   = Dict{Symbol, Any}(:param=>Float64(2^x));
+            res = run(BO_CSS, iters, seeds[j], dist, P, N, h, θ)
+            outbuf[j] = res
+        end
+        df = vcat(df, outbuf...)
+    end
+    return df, 2 .^axis2, 2 .^axis1
+end
+
+function experiment5_4(prng)
+    df = DataFrame()
+    axis1 = collect(4:0.2:10)
+    axis2 = collect(-7:0.2:4)
+
+    @showprogress "Running simulation..." for (i, y) in enumerate(axis1)
+        seeds  = MersenneTwister.(rand(prng, UInt64, length(axis2)))
+        outbuf = Array{DataFrame}(undef, length(axis2))
+
+        Threads.@threads for j in 1:length(axis2)
+            x     = axis2[j]
+            μ     = 1.0 
+            σ     = 1.0
+            dist  = TruncatedNormal(μ, σ, 0.0, Inf);
+            iters = 128
+            h     = 0.1
+            N     = 2^14
+            P     = floor(Int64, 2^y)
+            
+            θ   = Dict{Symbol, Any}(:param=>Float64(2^x));
+            res = run(BO_TSS, iters, seeds[j], dist, P, N, h, θ)
+            outbuf[j] = res
+        end
+        df = vcat(df, outbuf...)
+    end
+    return df, 2 .^axis2, 2 .^axis1
+end
+
+function experiment5_5(prng)
+    df = DataFrame()
+    axis1 = collect(4:0.2:10)
+    axis2 = collect(-7:0.5:10)
+
+    @showprogress "Running simulation..." for (i, y) in enumerate(axis1)
+        seeds  = MersenneTwister.(rand(prng, UInt64, length(axis2)))
+        outbuf = Array{DataFrame}(undef, length(axis2))
+
+        Threads.@threads for j in 1:length(axis2)
+            x     = axis2[j]
+            μ     = 1.0 
+            σ     = 1.0
+            dist  = TruncatedNormal(μ, σ, 0.0, Inf);
+            iters = 128
+            h     = 0.1
+            N     = 2^14
+            P     = floor(Int64, 2^y)
+            
+            θ   = Dict{Symbol, Any}(:param=>Float64(2^x));
+            res = run(BO_TAPER, iters, seeds[j], dist, P, N, h, θ)
+            outbuf[j] = res
+        end
+        df = vcat(df, outbuf...)
+    end
+    return df, 2 .^axis2, 2 .^axis1
+end
+
