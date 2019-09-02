@@ -8,6 +8,7 @@ using ScikitLearn
 
 const fs  = Base.Filesystem
 
+include("bayesian_treatment.jl")
 include("particle_gp.jl")
 include("acquisition.jl")
 include("slice_sampler.jl")
@@ -23,7 +24,7 @@ function entropy_upperbound(w, μ, σ)
         return 1/2 * log(2*π*ℯ*σ²)
     end
     n = length(w)
-    first_term  = sum([ws[i] * H(σ[i]^2) for i = 1:n])
+    first_term  = sum([w[i] * H(σ[i]^2) for i = 1:n])
     second_term = 0.0
     if(n == 1)
         return first_term
@@ -55,58 +56,50 @@ function IBBO(x, y, verbose::Bool)
     set_priors!(k, [Normal(), Normal()])
 
     if(verbose)
-        println(" fitting initial gp")
+        println("- fitting initial gp")
     end
     k  = fix(k, :lσ)
     ϵ  = -1.0
-    gp = GP(x[:], y[:], m, k, ϵ)
+    gp = GP(x[:,:]', y, m, k, ϵ)
     if(verbose)
-        println(" fitting initial gp - done")
+        println("- fitting initial gp - done")
+        println("- optimizing hyperparameters")
     end
 
-    if(verbose)
-        println(" optimizing hyperparameters")
-    end
     gp = nuts(gp)
     if(verbose)
-        println(" optimizing hyperparameters - done")
+        println("- optimizing hyperparameters - done")
+        println("- sampling y*")
     end
 
-    if(verbose)
-        println(" sampling y*")
-    end
     η         = maximum(y)
     P         = length(gp.weights)
     num_ystar = 100
-    num_gridx = 100
+    num_gridx = 1000
     ystar = Matrix{Float64}(undef, P, 100)
-    for i = 1:particles
-        ystar[i,:] = sample_ystar(i, num_ystar, num_gridx,ctx)
+    for i = 1:P
+        ystar[i,:] = sample_ystar(i, η, num_ystar, num_gridx, gp)
     end
     gp.particles = vcat(gp.particles, ystar')
     if(verbose)
-        println(" sampling y* - done")
+        println("- sampling y* - done")
+        println("- sampling acquisition function ")
     end
 
+    α(x) = acquisition(x, gp)
+    sampler = batch_slice_sampler(α, 100, 1000, 5000)
     if(verbose)
-        println(" sampling acquisition function ")
-    end
-    acq_samples = acquisition(sample_points)
-    sampler     = batch_slice_sampler(x->acquisition(x, gp), 100, 1000, 5000)
-    if(verbose)
-        println(" sampling acquisition function - done")
+        println("- sampling acquisition function - done")
+        println("- fitting gaussian mixture model")
     end
 
-    if(verbose)
-        println(" fitting gaussian mixture model")
-    end
     gmm_config = BayesianGaussianMixture(n_components=10,
                                          max_iter=1000,
                                          weight_concentration_prior=1.0)
-    model = fit!(gmm_config, particles')
+    model = fit!(gmm_config, sampler[:,:])
     w = model.weights_[:,1,1]
     μ = model.means_[:,1,1]
-    σ = sqrt(model.covariances_[:,1,1])
+    σ = sqrt.(model.covariances_[:,1,1])
 
     # Truncate mixtures at weight probability .1%
     trunc = w .> 0.001
@@ -115,9 +108,15 @@ function IBBO(x, y, verbose::Bool)
     μ  = μ[trunc]
     σ  = σ[trunc]
     if(verbose)
-        println(" fitting gaussian mixture model - done")
+        println("- fitting gaussian mixture model - done")
+        println("- computing entropy bound")
     end
-    
-    return ws, μs, σs, ent
+
+    H = entropy_upperbound(w, μ, σ)
+    if(verbose)
+        println("- computing entropy bound - done")
+        println(" num mixtures = $(length(w)), entropy bound = $(H)")
+    end
+    return w, μ, σ, H
 end
 

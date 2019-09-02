@@ -14,7 +14,7 @@ function batch_slice_sampler(p, batch_size, num_samples, max_proposals)
     while(length(samples) < num_samples && num_prop < max_proposals)
         u[acc] = rand.(Uniform.(0.0, α[acc]))
         s      = rand(proposal, batch_size)
-        α      = p(s[:,:]')
+        α      = [p(s[i]) for i = 1:batch_size]
         acc    = α .> u
 
         num_acc  += count(acc)

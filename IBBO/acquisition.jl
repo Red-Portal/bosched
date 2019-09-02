@@ -7,21 +7,19 @@ normal_pdf(μ, σ²) = 1/√(2π*σ²) * exp(-μ^2/(2*σ²))
 normal_cdf(μ, σ²) = 1/2 * (1 + erf(μ/√(2σ²)))
 
 function sample_ystar(idx::Int64,
-                      η::Float64
+                      η::Float64,
                       num_samples::Int64,
                       num_grid_points::Int64,
                       gp::PrecomputedParticleGP) where {G}
-    D      = gp.dim
-    xgrid  = rand(D, num_grid_points)
-    μ, σ²  = predict_f(gp.gp[idx], xgrid)
-    σe     = exp.(gp.particles[1,idx])
-    σ²     = max.(σ², σe^2 + 1e-10)
-    σ      = sqrt.(σ²)
-    ystar  = Vector{Float64}(undef, num_samples)
+    D     = gp.dim
+    xgrid = rand(D, num_grid_points)
+    μ, σ² = predict_y(gp.gp[idx], xgrid)
+    σe    = exp.(gp.particles[1,idx])
+    σ     = sqrt.(σ²)
+    ystar = Vector{Float64}(undef, num_samples)
+    left  = η
 
     probf(x) = prod(cdf.(Normal.(μ, sqrt.(σ²)), x))
-    
-    left  = optimum_y
     if(probf(left) < 0.25)
         right = maximum(μ .+ 5*σ)
         while(probf(right) < 0.75)
@@ -41,18 +39,15 @@ function sample_ystar(idx::Int64,
     return ystar
 end
 
-function acquisition(x::AbstractArray, gp::PrecomputedParticleGP)
+function acquisition(x, gp::PrecomputedParticleGP)
     P  = length(gp.weights)
     N  = size(x, 2)
     w  = gp.weights
     η  = gp.particles[gp.num_gpparam+1:end,:]
-    σe = exp.(gp.particles[1,:])
-
     α_res = Matrix{eltype(x)}(undef, N, P)
     for i = 1:P
-        μ, σ² = predict_f(gp.gp[i], x)
-        σ²    += σe[i]^2
-        α_res[:,i] .= α.(μ, σ², t, Ref(η[:,i]))
+        μ, σ²       = predict_y(gp.gp[i], [x])
+        α_res[:,i] .= α.(μ, σ², Ref(η[:,i]))
     end
     res = α_res * w 
     if(N == 1)
@@ -61,7 +56,7 @@ function acquisition(x::AbstractArray, gp::PrecomputedParticleGP)
     return res
 end
 
-@inline function α(μ, σ², t, η)
+@inline function α(μ, σ², η)
 """
  "MES Acquisition Function"
  Wang, Zi, and Stefanie Jegelka. "Max-value entropy search for efficient 
