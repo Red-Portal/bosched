@@ -93,6 +93,8 @@ bo_iter_fac2_next (long *pstart, long *pend)
     bo_ul R = (end - start) / incr;
     bo_ul nend;
 
+    double param = fac_transform_range(ws->param);
+
     while (1)
     {
         if (start == end)
@@ -102,7 +104,7 @@ bo_iter_fac2_next (long *pstart, long *pend)
 
         if(barrier == start)
         {
-            bo_ul F = (R / 2) / nthreads;
+            bo_ul F = (R / param) / nthreads;
             bo_ul PF  = F * nthreads;
             bo_ul nbarrier = barrier + (PF * incr);
 
@@ -176,6 +178,8 @@ bo_iter_ull_fac2_next (gomp_ull *pstart, gomp_ull *pend)
     gomp_ull nend;
     gomp_ull R;
 
+    double param = fac_transform_range(ws->param);
+
     while (1)
     {
         if (start == end)
@@ -188,7 +192,7 @@ bo_iter_ull_fac2_next (gomp_ull *pstart, gomp_ull *pend)
 
         if(barrier == start)
         {
-            gomp_ull F = (R / 2) / nthreads;
+            gomp_ull F = (R / param) / nthreads;
             gomp_ull PF  = F * nthreads;
             gomp_ull nbarrier;
 
