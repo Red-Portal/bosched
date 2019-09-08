@@ -76,9 +76,11 @@ gomp_loop_init (struct gomp_work_share *ws, long start, long end, long incr,
       case FS_FAC2:
 	{
 	  if (sched == FS_FAC2)
-	    {
-	      ws->param = 2.0;
-	    }
+	    ws->param = 2.0;
+	  else
+	    ws->param = bo_fac_parameter (region_id);
+
+	  ws->chunk_size = num_tasks / ws->param / nthreads;
 	  break;
 	}
       case FS_TAPE:
