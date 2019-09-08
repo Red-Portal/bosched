@@ -169,11 +169,11 @@ function simulate(sched::Type{<:Schedule}, prng, dist, P, N, h,
     i       = 1
     hist    = zeros(Float64, P)
     total_w = 0.0
-    while(i < N)
+    whil(i < N)
         R = N - i + 1
         p = argmin(hist)
         K = chunk!(sched, i, R, P, N, h, dist, θ)
-        K = min(R, K)
+        K = max(min(R, K), 1)
 
         work     = rand(prng, dist, K)
         hist[p] += h + sum(work)
