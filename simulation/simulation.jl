@@ -169,7 +169,7 @@ function simulate(sched::Type{<:Schedule}, prng, dist, P, N, h,
     i       = 1
     hist    = zeros(Float64, P)
     total_w = 0.0
-    whil(i < N)
+    while(i < N)
         R = N - i + 1
         p = argmin(hist)
         K = chunk!(sched, i, R, P, N, h, dist, θ)

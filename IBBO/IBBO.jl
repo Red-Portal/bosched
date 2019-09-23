@@ -65,22 +65,21 @@ function IBBO(x, y, verbose::Bool)
 
     m  = MeanConst(0.0)
     k  = SE(0.0, 1.0)
-    set_priors!(k, [Normal(0.0, 0.5), Normal(0.0, 0.5)])
+    set_priors!(k, [Normal(1.0,2.0), Normal(1.0,2.0)])
+    k  = fix(k, :lσ)
 
     if(verbose)
         println("- fitting initial gp")
     end
-    k  = fix(k, :lσ)
+    #k  = fix(k, :lσ)
     ϵ  = -1.0
     gp = GP(x[:,:]', y, m, k, ϵ)
+    set_priors!(gp.logNoise, [Normal(1.0,2.0)])
     if(verbose)
         println("- fitting initial gp - done")
         println("- optimizing hyperparameters")
     end
-
-    gp = @suppress begin
-        nuts(gp)
-    end
+    gp = slice(gp, 200, 10, thinning=1)
     if(verbose)
         println("- optimizing hyperparameters - done")
         println("- sampling y*")
@@ -101,7 +100,7 @@ function IBBO(x, y, verbose::Bool)
     end
 
     α(x) = acquisition(x, gp)
-    samples = batch_slice_sampler(α, 100, 1000, 500, 5000)
+    samples = batch_slice_sampler(α, 16, 300, 100, 1000)
     if(verbose)
         println("- sampling acquisition function - done")
         println("- fitting gaussian mixture model")
@@ -142,7 +141,8 @@ function IBBO_log(x, y, verbose::Bool)
 
     m  = MeanConst(0.0)
     k  = SE(0.0, 1.0)
-    set_priors!(k, [Normal(0.0, 0.5), Normal(0.0, 0.5)])
+    set_priors!(k, [Normal(1.0,2.0), Normal(1.0,2.0)])
+    k  = fix(k, :lσ)
 
     if(verbose)
         println("- fitting initial gp")
@@ -150,14 +150,12 @@ function IBBO_log(x, y, verbose::Bool)
     k  = fix(k, :lσ)
     ϵ  = -1.0
     gp = GP(x[:,:]', y, m, k, ϵ)
+    set_priors!(gp.logNoise, [Normal(1.0,2.0)])
     if(verbose)
         println("- fitting initial gp - done")
         println("- optimizing hyperparameters")
     end
-
-    gp = @suppress begin
-        nuts(gp)
-    end
+    gp = slice(gp, 200, 10, thinning=1)
     gp_gridx = collect(0.0:0.01:1.0)
     μs, σs   = predict_y(gp, gp_gridx')
     gp_gridμ = μs
@@ -185,7 +183,7 @@ function IBBO_log(x, y, verbose::Bool)
     α(x) = acquisition(x, gp)
     α_gridx = collect(0.0:0.01:1.0)
     α_gridy = α.(α_gridx)
-    samples = batch_slice_sampler(α, 100, 1000, 500, 5000)
+    samples = batch_slice_sampler(α, 16, 300, 100, 1000)
     if(verbose)
         println("- sampling acquisition function - done")
         println("- fitting gaussian mixture model")
