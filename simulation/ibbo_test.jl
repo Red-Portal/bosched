@@ -118,20 +118,17 @@ function ibbo_bayesched(prng, max_subsample)
         y[i] = time
     end
 
-    #push!(log, Dict("x"=>x, "y"=>y))
-    push!(dataset_x, x[1:subsample]...)
-    push!(dataset_y, y[1:subsample]...)
+    x_sub = x[1:subsample]
+    y_sub = y[1:subsample]
+    push!(dataset_x, x_sub...)
+    push!(dataset_y, y_sub...)
+    push!(log, Dict("x"=>x_sub, "y"=>y_sub, "reg"=>minimum(dataset_y)))
 
     for i = 1:32
         w, μ, σ, H, αx, αy, gpx, gpμ, gpσ, samples = IBBO_log(dataset_x,
                                                               dataset_y,
                                                               true)
         gmm = MixtureModel(Normal, collect(zip(μ, σ)), w)       
-
-        push!(log, Dict("x"=>x_sub, "y"=>y_sub, "gmm"=>gmm, "H"=>H,
-                        "ax"=>αx, "ay"=>αy, "gpx"=>gpx, "gpm"=>gpμ,
-                        "gps"=>gpσ, "samples"=>samples,
-                        "reg"=>minimum(dataset_y)))
 
         for t = 1:T
             θ = begin
