@@ -7,6 +7,7 @@ using ScikitLearn
 using StatsFuns
 @sk_import mixture: BayesianGaussianMixture
 
+import NLopt
 import GaussianProcesses.predict_y
 
 const fs  = Base.Filesystem
@@ -24,6 +25,53 @@ function GaussianProcesses.predict_y(gp::PrecomputedParticleGP, x)
     μ  = hcat(μ...) * gp.weights
     σ² = hcat(σ²...) * gp.weights
     return μ, σ²
+end
+
+function optimize_acquisition(gp, verbose)
+    ϵ        = 1e-10
+    dim      = 1
+
+    f(x, g) = acquisition(x[1], gp)
+
+    opt = NLopt.Opt(:GN_DIRECT, dim)
+
+    opt.lower_bounds  = [0]
+    opt.upper_bounds  = [1]
+    opt.ftol_abs      = 1e-20
+    opt.xtol_abs      = 1e-20
+    opt.maxeval       = 1024
+    opt.max_objective = f
+    opt_y, opt_x, ret = NLopt.optimize(opt, rand(dim))
+
+    if(verbose)
+        println("-----------------------------------")
+        println("Acquisition optimizer = ", opt_x)
+        println("Acquisition optimum   = ", opt_y)
+        println("Result                = ", ret)
+    end
+    return opt_x[1], opt_y
+end
+
+function optimize_mean(gp, verbose)
+    ϵ        = 1e-10
+    dim      = gp.dim
+
+    f(x, g) = predict_y(gp, x)[1]
+
+    opt = NLopt.Opt(:GN_DIRECT, dim)
+    opt.lower_bounds  = [0]
+    opt.upper_bounds  = [1]
+    opt.ftol_abs      = 1e-20
+    opt.xtol_abs      = 1e-20
+    opt.max_objective = f
+    opt_y, opt_x, ret = NLopt.optimize(opt, rand(dim))
+    if(verbose)
+        println("-----------------------------------")
+        println("Acquisition optimizer = ", opt_x)
+        println("Acquisition optimum   = ", opt_y)
+        println("Result                = ", ret)
+    end
+    return opt_x[1], opt_y
 end
 
 function entropy_upperbound(w, μ, σ)
@@ -57,45 +105,67 @@ function entropy_upperbound(w, μ, σ)
     return first_term - second_term
 end
 
-function IBBO(x, y, verbose::Bool)
+function fit_gp(x, y, verbose::Bool)
+    y *= -1
     μ  = mean(y)
     σ  = stdm(y, μ) 
-    x .-= μ
-    x ./= σ
+    y .-= μ
+    y ./= σ
 
     m  = MeanConst(0.0)
     k  = SE(0.0, 1.0)
-    set_priors!(k, [Normal(1.0,2.0), Normal(1.0,2.0)])
+    set_priors!(k, [Normal(-1.0,2.0), Normal(-1.0,2.0)])
     k  = fix(k, :lσ)
 
     if(verbose)
         println("- fitting initial gp")
     end
-    #k  = fix(k, :lσ)
     ϵ  = -1.0
     gp = GP(x[:,:]', y, m, k, ϵ)
-    set_priors!(gp.logNoise, [Normal(1.0,2.0)])
+    set_priors!(gp.logNoise, [Normal(-1.0,3.0)])
     if(verbose)
         println("- fitting initial gp - done")
         println("- optimizing hyperparameters")
     end
-    gp = slice(gp, 200, 10, thinning=1)
+    gp = slice(gp, 200, 100, thinning=1)
+    #gp = (gp, 200, 10, thinning=1)
+    #gp  = hmc(gp; ε=0.1, iteration=200, burnin=100, thinning=1)
     if(verbose)
         println("- optimizing hyperparameters - done")
         println("- sampling y*")
     end
-
+    
     η         = maximum(y)
     P         = length(gp.weights)
-    num_ystar = 100
-    num_gridx = 1000
-    ystar = Matrix{Float64}(undef, P, 100)
+    num_ystar = 128
+    num_gridx = 1024
+    ystar = Matrix{Float64}(undef, P, 128)
     for i = 1:P
         ystar[i,:] = sample_ystar(i, η, num_ystar, num_gridx, gp)
     end
     gp.particles = vcat(gp.particles, ystar')
     if(verbose)
         println("- sampling y* - done")
+    end
+    return gp
+end
+
+function MES(x, y, verbose::Bool)
+    gp = fit_gp(x, y, verbose)
+    if(verbose)
+        println("- solving inner optimization problem")
+    end
+    x, y = optimize_acquisition(gp, verbose)
+    if(verbose)
+        println("- solving inner optimization problem - done")
+    end
+    return x
+end
+
+function IBBO(x, y, verbose::Bool)
+    gp = fit_gp(x, y, verbose)
+
+    if(verbose)
         println("- sampling acquisition function ")
     end
 
@@ -134,49 +204,14 @@ function IBBO(x, y, verbose::Bool)
 end
 
 function IBBO_log(x, y, verbose::Bool)
-    μ  = mean(y)
-    σ  = stdm(y, μ) 
-    y .-= μ
-    y ./= -σ # Sign flipping for converting to maximiation
+    gp = fit_gp(x, y, verbose)
 
-    m  = MeanConst(0.0)
-    k  = SE(0.0, 1.0)
-    set_priors!(k, [Normal(1.0,2.0), Normal(1.0,2.0)])
-    k  = fix(k, :lσ)
-
-    if(verbose)
-        println("- fitting initial gp")
-    end
-    k  = fix(k, :lσ)
-    ϵ  = -1.0
-    gp = GP(x[:,:]', y, m, k, ϵ)
-    set_priors!(gp.logNoise, [Normal(1.0,2.0)])
-    if(verbose)
-        println("- fitting initial gp - done")
-        println("- optimizing hyperparameters")
-    end
-    gp = slice(gp, 200, 10, thinning=1)
     gp_gridx = collect(0.0:0.01:1.0)
     μs, σs   = predict_y(gp, gp_gridx')
     gp_gridμ = μs
     gp_gridσ = σs
 
     if(verbose)
-        println("- optimizing hyperparameters - done")
-        println("- sampling y*")
-    end
-
-    η         = maximum(y)
-    P         = length(gp.weights)
-    num_ystar = 100
-    num_gridx = 1000
-    ystar = Matrix{Float64}(undef, P, 100)
-    for i = 1:P
-        ystar[i,:] = sample_ystar(i, η, num_ystar, num_gridx, gp)
-    end
-    gp.particles = vcat(gp.particles, ystar')
-    if(verbose)
-        println("- sampling y* - done")
         println("- sampling acquisition function ")
     end
 
@@ -190,6 +225,7 @@ function IBBO_log(x, y, verbose::Bool)
     end
 
     gmm_config = BayesianGaussianMixture(n_components=10,
+                                         n_init=16,
                                          max_iter=1000,
                                          weight_concentration_prior=1.0)
     model = fit!(gmm_config, samples[:,:])
@@ -214,4 +250,10 @@ function IBBO_log(x, y, verbose::Bool)
         println(" num mixtures = $(length(w)), entropy bound = $(H)")
     end
     return w, μ, σ, H, α_gridx, α_gridy, gp_gridx, gp_gridμ, gp_gridσ, samples
+end
+
+function BO_eval(x, y, verbose::Bool)
+    gp = fit_gp(x, y, verbose)
+    x, y = optimize_mean(gp, verbose)
+    return x
 end

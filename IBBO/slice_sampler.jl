@@ -2,7 +2,7 @@
 using Distributions
 
 function batch_slice_sampler(p, batch_size, num_samples, burnin, max_proposals)
-    xdom     = (-0.1, 1.1)
+    xdom     = (-0.05, 1.05)
     proposal = Uniform(xdom[1], xdom[2])
     samples  = Float64[]
     num_acc  = 0

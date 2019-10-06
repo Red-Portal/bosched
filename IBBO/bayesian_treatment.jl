@@ -86,7 +86,6 @@ function slice(gp::GPBase,
     return PrecomputedParticleGP(gp, samples)
 end
 
-
 function nuts(gp, num_samples=100, num_adapts=100; verbose=false)
     function logp∂logp(θ::AbstractVector)
         GaussianProcesses.set_params!(
@@ -119,3 +118,11 @@ function nuts(gp, num_samples=100, num_adapts=100; verbose=false)
     return PrecomputedParticleGP(gp, samples)
 end
 
+function hmc(gp; ε=0.01, iteration::Int64=1000, burnin::Int64=100,
+             thinning::Int64=1, precomputed=false)
+    orig_param = GaussianProcesses.get_params(
+        gp; noise=true, domean=true, kern=true);
+    chain = mcmc(gp; burn=burnin, nIter=iteration*thinning+burnin, ε=ε,
+                 domean=false, thin=thinning)
+    return PrecomputedParticleGP(gp, chain)
+end

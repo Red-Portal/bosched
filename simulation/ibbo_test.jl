@@ -84,7 +84,7 @@ function export_result(d::Array{Dict,1})
     end
 end
 
-function bayesched(prng, max_subsample)
+function ibbo_bayesched(prng, max_subsample)
     Random.seed!(prng)
     df = DataFrame()
     axis1 = collect(4:0.2:10)
@@ -99,9 +99,14 @@ function bayesched(prng, max_subsample)
     N = 2^14
     T = 32
 
+    subsample = min(max_subsample, T)
+
     log = Dict[]
     x = zeros(Float64, T)
     y = zeros(Float64, T)
+
+    dataset_x = Float64[]
+    dataset_y = Float64[]
     
     init_d = Uniform(0.0, 1.0)
     for i = 1:T
@@ -112,20 +117,21 @@ function bayesched(prng, max_subsample)
         x[i] = θ
         y[i] = time
     end
-    println(x)
-    println(y)
 
-    for i = 1:8
-        subsample = min(max_subsample, length(x))
-        x_sub = x[1:subsample]
-        y_sub = y[1:subsample]
-        w, μ, σ, H, αx, αy, gpx, gpμ, gpσ, samples = IBBO_log(copy(x_sub),
-                                                              copy(y_sub),
+    #push!(log, Dict("x"=>x, "y"=>y))
+    push!(dataset_x, x[1:subsample]...)
+    push!(dataset_y, y[1:subsample]...)
+
+    for i = 1:32
+        w, μ, σ, H, αx, αy, gpx, gpμ, gpσ, samples = IBBO_log(dataset_x,
+                                                              dataset_y,
                                                               true)
         gmm = MixtureModel(Normal, collect(zip(μ, σ)), w)       
+
         push!(log, Dict("x"=>x_sub, "y"=>y_sub, "gmm"=>gmm, "H"=>H,
                         "ax"=>αx, "ay"=>αy, "gpx"=>gpx, "gpm"=>gpμ,
-                        "gps"=>gpσ, "samples"=>samples))
+                        "gps"=>gpσ, "samples"=>samples,
+                        "reg"=>minimum(dataset_y)))
 
         for t = 1:T
             θ = begin
@@ -141,9 +147,72 @@ function bayesched(prng, max_subsample)
             params = Dict{Symbol, Any}(:param=>bo_fss_transform(θ));
             time, slow, speed, effi, cov = simulate(
                 BO_FSS, prng, dist, P, N, h, params)
+           x[t] = θ
+            y[t] = time
+        end
+        x_sub = x[1:subsample]
+        y_sub = y[1:subsample]
+        push!(dataset_x, x_sub...)
+        push!(dataset_y, y_sub...)
+        push!(log, Dict("x"=>x_sub, "y"=>y_sub, "gmm"=>gmm, "H"=>H,
+                        "ax"=>αx, "ay"=>αy, "gpx"=>gpx, "gpm"=>gpμ,
+                        "gps"=>gpσ, "samples"=>samples,
+                        "reg"=>minimum(dataset_y)))
+    end
+    return log
+end
+
+
+function mes_bayesched(prng, max_subsample)
+    Random.seed!(prng)
+    df = DataFrame()
+    axis1 = collect(4:0.2:10)
+    axis2 = collect(-7:0.5:10)
+
+    μ    = 1.0 
+    σ    = 1.0
+    dist = TruncatedNormal(μ, σ, 0.0, Inf);
+
+    P = 16
+    h = 0.1
+    N = 2^14
+    T = 32
+
+    subsample = min(max_subsample, T)
+
+    log = Dict[]
+    x = zeros(Float64, T)
+    y = zeros(Float64, T)
+
+    dataset_x = Float64[]
+    dataset_y = Float64[]
+    
+    init_d = Uniform(0.0, 1.0)
+    for i = 1:T
+        θ      = rand(prng, init_d)
+        params = Dict{Symbol, Any}(:param=>bo_fss_transform(θ));
+        time, slow, speed, effi, cov = simulate(
+            BO_FSS, prng, dist, P, N, h, params)
+        x[i] = θ
+        y[i] = time
+    end
+    #push!(log, Dict("x"=>x, "y"=>y))
+    push!(dataset_x, x[1:subsample]...)
+    push!(dataset_y, y[1:subsample]...)
+    for i = 1:32
+        θ = MES(dataset_x, dataset_y, true)
+        for t = 1:T
+            params = Dict{Symbol, Any}(:param=>bo_fss_transform(θ));
+            time, slow, speed, effi, cov = simulate(
+                BO_FSS, prng, dist, P, N, h, params)
             x[t] = θ
             y[t] = time
         end
+        x_sub = x[1:subsample]
+        y_sub = y[1:subsample]
+        push!(dataset_x, x_sub...)
+        push!(dataset_y, y_sub...)
+        push!(log, Dict("x"=>x_sub, "y"=>y_sub, "reg"=>minimum(dataset_y)))
     end
     return log
 end

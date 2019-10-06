@@ -20,10 +20,10 @@ mutable struct PrecomputedParticleGP <: AbstractParticleGP
             GaussianProcesses.set_params!(
                 local_model, particles[:,i],
                 noise=noise, domean=domean, kern=kern)
-            GaussianProcesses.push!(
-                models, GaussianProcesses.update_mll!(local_model))
+            push!(models, GaussianProcesses.update_mll!(local_model))
         end
-        return new(models, particles, weights, gp.dim, 2, kwargs)
+        nparam = GaussianProcesses.num_params(gp, domean=false)
+        return new(models, particles, weights, gp.dim, nparam, kwargs)
     end
 end
 
