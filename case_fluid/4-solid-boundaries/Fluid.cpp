@@ -408,14 +408,10 @@ public:
     
     void advect(double timestep, const FluidQuantity &u, const FluidQuantity &v,
             const vector<const SolidBody *> &bodies) {
-	auto map = std::vector<double>(_h * _w, 0);
-	for (int i = 0; i < 16; ++i)
-	{
-	    
 #pragma omp parallel for schedule(static) collapse(2)
         for (int iy = 0; iy < _h; iy++) {
             for (int ix = 0; ix < _w; ix++) {
-		auto start = std::chrono::steady_clock::now();
+		//auto start = std::chrono::steady_clock::now();
 		int idx = ix  + iy * _w;
                 if (_cell[idx] == CELL_FLUID) {
                     double x = ix + _ox;
@@ -430,27 +426,12 @@ public:
                     backProject(x, y, bodies);
                     _dst[idx] = cerp(x, y);
                 }
-		auto stop     = std::chrono::steady_clock::now();
-		auto duration = std::chrono::duration_cast<
-		    std::chrono::duration<double, std::milli>>(stop - start);
+		// auto stop     = std::chrono::steady_clock::now();
+		// auto duration = std::chrono::duration_cast<
+		//     std::chrono::duration<double, std::milli>>(stop - start);
 		//std::cout << duration.count() << "ms\n";
-		map[ix + iy * _w] += duration.count();
             }
         }
-	}
-
-
-        for (int iy = 0; iy < _h; iy++) {
-            for (int ix = 0; ix < _w; ix++) {
-		map[ix + iy + _w] /= 16;
-	    }
-	}
-	auto file = HighFive::File("perfmap.h5", HighFive::File::Create);
-	std::vector<size_t> dims = {static_cast<size_t>(_h),
-				    static_cast<size_t>(_w)};
-	auto dataset = file.createDataSet<double>("map", HighFive::DataSpace(dims));
-	dataset.write(reinterpret_cast<double**>(map.data()));
-	exit(0);
     }
     
     void addInflow(double x0, double y0, double x1, double y1, double v) {
@@ -931,17 +912,22 @@ public:
     
     void toImage(unsigned char *rgba) {
         for (int i = 0; i < _w*_h; i++) {
-            int shade = (int)((1.0 - _d->src()[i])*255.0);
-            shade = max(min(shade, 255), 0);
-            
+            double shade = _d->src()[i];
             if (_d->cell()[i] == CELL_SOLID)
-                shade = 0.0;
-            
-            rgba[i*4 + 0] = shade;
-            rgba[i*4 + 1] = shade;
-            rgba[i*4 + 2] = shade;
-            rgba[i*4 + 3] = 0xFF;
-        }
+	    {
+		rgba[i*4 + 0] = 0x00;
+		rgba[i*4 + 1] = 0x00;
+		rgba[i*4 + 2] = 0x00;
+		rgba[i*4 + 3] = 0xFF;
+	    }
+	    else
+	    {
+		rgba[i*4 + 0] = 128 * shade + (1 - shade) * 255;
+		rgba[i*4 + 1] = 128 * shade + (1 - shade) * 255;
+		rgba[i*4 + 2] = 255;
+		rgba[i*4 + 3] = 0xFF;
+	    }
+	}
     }
 };
 
