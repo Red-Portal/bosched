@@ -87,7 +87,7 @@ function slice_sampler(p, num_samples, burnin)
         x_curr, p_x, props = sample(x_curr, p, 0.1, 16, xdom[1], xdom[2], p_x)
     end
 
-    total_props
+    total_props = 0
     for i = 1:num_samples
         x_curr, p_x, props = sample(x_curr, p, 0.1, 16, xdom[1], xdom[2], p_x)
         samples[i]   = x_curr
