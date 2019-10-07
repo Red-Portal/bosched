@@ -13,14 +13,16 @@ function batch_slice_sampler(p, batch_size, num_samples, burnin, max_proposals)
     acc      = trues(batch_size)
 
     for t = 1:burnin
-        u[acc] = rand.(Uniform.(0.0, α[acc]))
+        α_acc  = α[acc]
+        u[acc] = α_acc - rand.(Exponential(1.0), length(α_acc))
         s      = rand(proposal, batch_size)
         α      = [p(s[i]) for i = 1:batch_size]
         acc    = α .> u
     end
 
     while(length(samples) < num_samples && num_prop < max_proposals)
-        u[acc] = rand.(Uniform.(0.0, α[acc]))
+        α_acc  = α[acc]
+        u[acc] = α_acc - rand.(Exponential(1.0), length(α_acc))
         s      = rand(proposal, batch_size)
         α      = [p(s[i]) for i = 1:batch_size]
         acc    = α .> u
@@ -33,60 +35,59 @@ function batch_slice_sampler(p, batch_size, num_samples, burnin, max_proposals)
     return samples
 end
 
-# function slice_sampler(p, num_samples, burnin, max_proposals
-#     x0::Float64, g::Function, w::Float64, m::Int64, gx0::Float64)
-#     function sample()
-#         x0 = rand(Uniform(lower, upper))
-#         w  = 0.2
-#         lower = 0.0
-#         upper = 1.0
-#         logy::Float64 = gx0 - rand(Exponential(1.0))
+function slice_sampler(p, num_samples, burnin)
+    function sample(x0::Float64, g::Function, w::Float64, m::Int64,
+                    lower::Float64, upper::Float64, gx0::Float64)
+        logy = gx0 - rand(Exponential(1.0))
+        u    = rand() * w
+        L    = x0 - u
 
-#         # Find the initial interval to sample from.
-#         u::Float64 = rand() * w
-#         L::Float64 = x0 - u
-#         R::Float64 = x0 + (w-u)
+        R    = x0 + (w-u)
+        J    = floor(rand() * m)
+        K    = (m-1) - J
 
-#         # Expand the interval until its ends are outside the slice, or until
-#         # the limit on steps is reached.  
-#         J::Int64 = floor(rand() * m)
-#         K::Int64 = (m-1) - J
+        while J > 0 && L > lower && g(L) > logy
+            L -= w
+            J -= 1
+        end
 
-#         while J > 0
-#             if L <= lower || p(L)::Float64 <= logy
-#                 break
-#             end
-#             L -= w
-#             J -= 1
-#         end
+        while K > 0 && R < upper && g(R) > logy
+            R += w
+            K -= 1
+        end
 
-#         while K > 0
-#             if R >= upper || p(R)::Float64 <= logy
-#                 break
-#             end
-#             R += w
-#             K -= 1
-#         end
-
-#         # Shrink interval to lower and upper bounds.
-#         L = L < lower ? lower : L
-#         R = R > upper ? upper : R
+        L = L < lower ? lower : L
+        R = R > upper ? upper : R
         
-#         # Sample from the interval, shrinking it on each rejection.
-#         x1::Float64 = 0.0  # need to initialize it in this scope first
-#         gx1::Float64 = 0.0
-#         while true 
-#             x1 = rand() * (R-L) + L
-#             gx1 = p(x1)::Float64
-#             if gx1 >= logy
-#                 break
-#             end
-#             if x1 > x0
-#                 R = x1
-#             else
-#                 L = x1
-#             end
-#         end
-#         return x1,gx1
-#     end
-# end
+        x1::Float64 = 0.0  # need to initialize it in this scope first
+        gx1::Float64 = 0.0
+        while true 
+            x1 = rand() * (R-L) + L
+            gx1 = g(x1)::Float64
+            if gx1 >= logy
+                break
+            end
+            if x1 > x0
+                R = x1
+            else
+                L = x1
+            end
+        end
+        return x1, gx1
+    end
+
+    samples  = zeros(num_samples) 
+    xdom     = (0.0, 1.0)
+    proposal = Uniform(xdom[1], xdom[2])
+    x_curr   = rand(proposal)
+    p_x      = p(x_curr)
+    for i = 1:burnin
+        x_curr, p_x = sample(x_curr, p, 0.1, 16, xdom[1], xdom[2], p_x)
+    end
+
+    for i = 1:num_samples
+        x_curr, p_x = sample(x_curr, p, 0.1, 16, xdom[1], xdom[2], p_x)
+        samples[i] = x_curr
+    end
+    return samples
+end
