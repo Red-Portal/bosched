@@ -172,6 +172,7 @@ function IBBO(x, y, verbose::Bool)
     logα(x) = log(acquisition(x, gp))
     #samples = batch_slice_sampler(logα, 16, 300, 100, 1000)
     samples = slice_sampler(logα, 300, 100)
+
     if(verbose)
         println("- sampling acquisition function - done")
         println("- fitting gaussian mixture model")

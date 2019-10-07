@@ -58,22 +58,24 @@ function slice_sampler(p, num_samples, burnin)
 
         L = L < lower ? lower : L
         R = R > upper ? upper : R
-        
-        x1::Float64 = 0.0  # need to initialize it in this scope first
-        gx1::Float64 = 0.0
+
+        props = 0
+        x1    = 0.0  # need to initialize it in this scope first
+        gx1   = 0.0
         while true 
             x1 = rand() * (R-L) + L
             gx1 = g(x1)::Float64
             if gx1 >= logy
                 break
             end
+
             if x1 > x0
                 R = x1
             else
                 L = x1
             end
         end
-        return x1, gx1
+        return x1, gx1, props
     end
 
     samples  = zeros(num_samples) 
@@ -82,12 +84,15 @@ function slice_sampler(p, num_samples, burnin)
     x_curr   = rand(proposal)
     p_x      = p(x_curr)
     for i = 1:burnin
-        x_curr, p_x = sample(x_curr, p, 0.1, 16, xdom[1], xdom[2], p_x)
+        x_curr, p_x, props = sample(x_curr, p, 0.1, 16, xdom[1], xdom[2], p_x)
     end
 
+    total_props
     for i = 1:num_samples
-        x_curr, p_x = sample(x_curr, p, 0.1, 16, xdom[1], xdom[2], p_x)
-        samples[i] = x_curr
+        x_curr, p_x, props = sample(x_curr, p, 0.1, 16, xdom[1], xdom[2], p_x)
+        samples[i]   = x_curr
+        total_props += props
     end
+    println("acceptance: $(samples / total_props), samples: $(length(samples))")
     return samples
 end
