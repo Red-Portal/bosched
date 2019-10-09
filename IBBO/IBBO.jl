@@ -56,7 +56,7 @@ function optimize_mean(gp, verbose)
     ϵ        = 1e-10
     dim      = gp.dim
 
-    f(x, g) = predict_y(gp, x)[1]
+    f(x, g) = predict_y(gp, x[1])[1]
 
     opt = NLopt.Opt(:GN_DIRECT, dim)
     opt.lower_bounds  = [0]
