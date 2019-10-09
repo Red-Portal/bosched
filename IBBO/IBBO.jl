@@ -151,7 +151,7 @@ function fit_gp(x, y, verbose::Bool)
     return gp
 end
 
-function MES(x, y, find_best::Bool=false, verbose::Bool)
+function MES(x, y, find_best::Bool=false, verbose::Bool=false)
     gp = fit_gp(x, y, verbose)
     if(verbose)
         println("- solving inner optimization problem")
