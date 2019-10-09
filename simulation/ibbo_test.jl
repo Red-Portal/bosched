@@ -154,7 +154,6 @@ function ibbo_bayesched(prng, max_subsample)
             params = Dict{Symbol, Any}(:param=>bo_fss_transform(best_θ));
             time, slow, speed, effi, cov = simulate(
                 BO_FSS, prng, dist, P, N, h, params)
-            x[t] = θ
             y[t] = time
         end
         push!(log, Dict("x"=>x_sub, "y"=>y_sub, "gmm"=>gmm, "H"=>H,
@@ -221,7 +220,6 @@ function mes_bayesched(prng, max_subsample)
             params = Dict{Symbol, Any}(:param=>bo_fss_transform(best_θ));
             time, slow, speed, effi, cov = simulate(
                 BO_FSS, prng, dist, P, N, h, params)
-            x[t] = θ
             y[t] = time
         end
         push!(log, Dict("x"=>x_sub, "y"=>y_sub, "ir"=>minimum(dataset_y),
