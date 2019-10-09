@@ -44,7 +44,7 @@ function optimize_acquisition(gp, verbose)
     opt_y, opt_x, ret = NLopt.optimize(opt, rand(dim))
 
     if(verbose)
-        println("-----------------------------------")
+        println("----------------------------------")
         println("Acquisition optimizer = ", opt_x)
         println("Acquisition optimum   = ", opt_y)
         println("Result                = ", ret)
@@ -54,7 +54,7 @@ end
 
 function optimize_mean(gp, verbose)
     ϵ        = 1e-10
-    dim      = gp.dim
+    dim      = 1
 
     f(x, g) = predict_y(gp, x[1])[1]
 
@@ -67,9 +67,9 @@ function optimize_mean(gp, verbose)
     opt.max_objective = f
     opt_y, opt_x, ret = NLopt.optimize(opt, rand(dim))
     if(verbose)
-        println("-----------------------------------")
-        println("Acquisition optimizer = ", opt_x)
-        println("Acquisition optimum   = ", opt_y)
+        println("----------------------------------")
+        println("Mean optimizer = ", opt_x)
+        println("Mean optimum   = ", opt_y)
         println("Result                = ", ret)
     end
     return opt_x[1], opt_y

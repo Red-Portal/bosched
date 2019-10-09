@@ -124,6 +124,7 @@ function ibbo_bayesched(prng, max_subsample)
     push!(log, Dict("x"=>x_sub, "y"=>y_sub, "ir"=>minimum(dataset_y)))
 
     for i = 1:32
+        println("--------- iteration $i -----------")
         w, μ, σ, H, αx, αy, gpx, gpμ, gpσ, samples, best_θ, best_y =
             IBBO_log(dataset_x, dataset_y, true, true)
         gmm = MixtureModel(Normal, collect(zip(μ, σ)), w)       
@@ -203,6 +204,7 @@ function mes_bayesched(prng, max_subsample)
     push!(dataset_y, y[1:subsample]...)
     push!(log, Dict("x"=>x, "y"=>y, "ir"=>minimum(dataset_y)))
     for i = 1:32
+        println("--------- iteration $i -----------")
         θ, best_θ, best_y = MES(dataset_x, dataset_y, true, true)
         for t = 1:T
             params = Dict{Symbol, Any}(:param=>bo_fss_transform(θ));
