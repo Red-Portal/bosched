@@ -63,6 +63,7 @@ function optimize_mean(gp, verbose)
     opt.upper_bounds  = [1]
     opt.ftol_abs      = 1e-20
     opt.xtol_abs      = 1e-20
+    opt.maxeval       = 1024
     opt.max_objective = f
     opt_y, opt_x, ret = NLopt.optimize(opt, rand(dim))
     if(verbose)
@@ -150,7 +151,7 @@ function fit_gp(x, y, verbose::Bool)
     return gp
 end
 
-function MES(x, y, verbose::Bool)
+function MES(x, y, find_best::Bool=false, verbose::Bool)
     gp = fit_gp(x, y, verbose)
     if(verbose)
         println("- solving inner optimization problem")
@@ -159,10 +160,18 @@ function MES(x, y, verbose::Bool)
     if(verbose)
         println("- solving inner optimization problem - done")
     end
-    return x
+    
+    best_x, best_y = begin
+        if(find_best)
+            optimize_mean(gp, verbose)
+        else
+            nothing, nothing
+        end
+    end
+    return x, best_x, best_y
 end
 
-function IBBO(x, y, verbose::Bool)
+function IBBO(x, y, find_best::Bool=false, verbose::Bool=false)
     gp = fit_gp(x, y, verbose)
 
     if(verbose)
@@ -202,10 +211,18 @@ function IBBO(x, y, verbose::Bool)
         println("- computing entropy bound - done")
         println(" num mixtures = $(length(w)), entropy bound = $(H)")
     end
-    return w, μ, σ, H
+
+    best_x, best_y = begin
+        if(find_best)
+            optimize_mean(gp, verbose)
+        else
+            nothing, nothing
+        end
+    end
+    return w, μ, σ, H, best_x, best_y
 end
 
-function IBBO_log(x, y, verbose::Bool)
+function IBBO_log(x, y, find_best::Bool=false, verbose::Bool=false)
     gp = fit_gp(x, y, verbose)
 
     gp_gridx = collect(0.0:0.01:1.0)
@@ -252,11 +269,13 @@ function IBBO_log(x, y, verbose::Bool)
         println("- computing entropy bound - done")
         println(" num mixtures = $(length(w)), entropy bound = $(H)")
     end
-    return w, μ, σ, H, α_gridx, α_gridy, gp_gridx, gp_gridμ, gp_gridσ, samples
-end
 
-function BO_eval(x, y, verbose::Bool)
-    gp = fit_gp(x, y, verbose)
-    x, y = optimize_mean(gp, verbose)
-    return x
+    best_x, best_y = begin
+        if(find_best)
+            optimize_mean(gp, verbose)
+        else
+            nothing, nothing
+        end
+    end
+    return w, μ, σ, H, α_gridx, α_gridy, gp_gridx, gp_gridμ, gp_gridσ, samples, best_x, best_y
 end

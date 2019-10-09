@@ -50,22 +50,22 @@ function export_gmm_csv(fname, gmm::Distributions.MixtureModel)
     end
 end
 
-function export_result(d::Array{Dict,1})
+function export_result(d::Array{Dict,1}, path)
     for i = 1:length(d)
-        export_csv("plots/gp_$(i).csv", d[i]["gpx"], -d[i]["gpm"],
-                   sqrt.(d[i]["gps"])*1.96)
-
-        export_gmm_csv("plots/gmm_$(i).csv", d[i]["gmm"])
-
         px = vcat([d[t]["x"] for t = 1:i]...)
         py = vcat([d[t]["y"] for t = 1:i]...)
         μ    = mean(py)
         py .-= μ
         py ./= stdm(py, mean(py))
+
         if(i == 1)
-            export_csv("plots/points_$(i).csv", px, py)
+            export_csv(path * "/points_$(i).csv", px, py)
         else
-            open("plots/points_$(i).csv", "w") do io
+            export_csv(path * "/gp_$(i).csv", d[i]["gpx"], -d[i]["gpm"],
+                       sqrt.(d[i]["gps"])*1.96)
+
+            export_gmm_csv(path * "/gmm_$(i).csv", d[i]["gmm"])
+            open(path * "/points_$(i).csv", "w") do io
                 queries = length(d[i]["x"])
                 println(io, "x,y,qx,qy")
                 for j = 1:(length(px)-queries)
@@ -78,9 +78,8 @@ function export_result(d::Array{Dict,1})
                 end
                 close(io)
             end
+            export_csv(path * "/acq_$(i).csv", d[i]["ax"], d[i]["ay"])
         end
-
-        export_csv("plots/acq_$(i).csv", d[i]["ax"], d[i]["ay"])
     end
 end
 
@@ -122,12 +121,11 @@ function ibbo_bayesched(prng, max_subsample)
     y_sub = y[1:subsample]
     push!(dataset_x, x_sub...)
     push!(dataset_y, y_sub...)
-    push!(log, Dict("x"=>x_sub, "y"=>y_sub, "reg"=>minimum(dataset_y)))
+    push!(log, Dict("x"=>x_sub, "y"=>y_sub, "ir"=>minimum(dataset_y)))
 
     for i = 1:32
-        w, μ, σ, H, αx, αy, gpx, gpμ, gpσ, samples = IBBO_log(dataset_x,
-                                                              dataset_y,
-                                                              true)
+        w, μ, σ, H, αx, αy, gpx, gpμ, gpσ, samples, best_θ, best_y =
+            IBBO_log(dataset_x, dataset_y, true, true)
         gmm = MixtureModel(Normal, collect(zip(μ, σ)), w)       
 
         for t = 1:T
@@ -151,10 +149,19 @@ function ibbo_bayesched(prng, max_subsample)
         y_sub = y[1:subsample]
         push!(dataset_x, x_sub...)
         push!(dataset_y, y_sub...)
+
+        for t = 1:T
+            params = Dict{Symbol, Any}(:param=>bo_fss_transform(best_θ));
+            time, slow, speed, effi, cov = simulate(
+                BO_FSS, prng, dist, P, N, h, params)
+            x[t] = θ
+            y[t] = time
+        end
         push!(log, Dict("x"=>x_sub, "y"=>y_sub, "gmm"=>gmm, "H"=>H,
                         "ax"=>αx, "ay"=>αy, "gpx"=>gpx, "gpm"=>gpμ,
                         "gps"=>gpσ, "samples"=>samples,
-                        "reg"=>minimum(dataset_y)))
+                        "ir"=>minimum(dataset_y),
+                        "sr"=>mean(y)))
     end
     return log
 end
@@ -193,11 +200,11 @@ function mes_bayesched(prng, max_subsample)
         x[i] = θ
         y[i] = time
     end
-    #push!(log, Dict("x"=>x, "y"=>y))
     push!(dataset_x, x[1:subsample]...)
     push!(dataset_y, y[1:subsample]...)
+    push!(log, Dict("x"=>x, "y"=>y, "ir"=>minimum(dataset_y)))
     for i = 1:32
-        θ = MES(dataset_x, dataset_y, true)
+        θ, best_θ, best_y = MES(dataset_x, dataset_y, true, true)
         for t = 1:T
             params = Dict{Symbol, Any}(:param=>bo_fss_transform(θ));
             time, slow, speed, effi, cov = simulate(
@@ -209,7 +216,16 @@ function mes_bayesched(prng, max_subsample)
         y_sub = y[1:subsample]
         push!(dataset_x, x_sub...)
         push!(dataset_y, y_sub...)
-        push!(log, Dict("x"=>x_sub, "y"=>y_sub, "reg"=>minimum(dataset_y)))
+
+        for t = 1:T
+            params = Dict{Symbol, Any}(:param=>bo_fss_transform(best_θ));
+            time, slow, speed, effi, cov = simulate(
+                BO_FSS, prng, dist, P, N, h, params)
+            x[t] = θ
+            y[t] = time
+        end
+        push!(log, Dict("x"=>x_sub, "y"=>y_sub, "ir"=>minimum(dataset_y),
+                        "sr"=>mean(y)))
     end
     return log
 end
