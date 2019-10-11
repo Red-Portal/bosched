@@ -206,7 +206,7 @@ namespace binlpt
             unsigned j;
             unsigned tid;
 
-            if (chunks[i - 1] == 0)
+            if (chunks[sortmap[i - 1]] == 0)
                 continue;
 
             tid = 0;
@@ -218,7 +218,7 @@ namespace binlpt
 
             for (j = 0; j < chunksizes[sortmap[i - 1]]; j++)
                 taskmap[chunkoff[sortmap[i - 1]] + j] = tid;
-            load[tid] += chunks[i - 1];
+            load[tid] += chunks[sortmap[i - 1]];
         }
 
         /* House keeping. */
