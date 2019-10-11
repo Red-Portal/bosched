@@ -7,6 +7,8 @@ using Base.Threads
 using ProgressMeter
 using DelimitedFiles
 
+include("binlpt_utils.jl")
+
 abstract type Schedule end
 abstract type FSS    <: Schedule end
 abstract type AFAC   <: Schedule end
@@ -233,6 +235,7 @@ function chunk!(::Type{HSS}, i, p, R, P, N, h, dist, θ::Dict)
 end
 
 function chunk!(::Type{BinLPT}, i, p, R, P, N, h, dist, θ::Dict)
+    
     if()
         
     end
