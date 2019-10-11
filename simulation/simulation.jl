@@ -8,21 +8,23 @@ using ProgressMeter
 using DelimitedFiles
 
 abstract type Schedule end
-abstract type FSS  <: Schedule end
-abstract type CSS  <: Schedule end
-abstract type TSS  <: Schedule end
-abstract type QSS  <: Schedule end
-abstract type TAPER <: Schedule end
+abstract type FSS    <: Schedule end
+abstract type AFAC   <: Schedule end
+abstract type FAC2   <: Schedule end
+abstract type CSS    <: Schedule end
+abstract type TSS    <: Schedule end
+abstract type QSS    <: Schedule end
+abstract type HSS    <: Schedule end
+abstract type BinLPT <: Schedule end
+abstract type TAPER  <: Schedule end
 
-abstract type FAC2 <: Schedule end
-
-abstract type BO_FSS  <: Schedule end
-abstract type BO_FAC  <: Schedule end
-abstract type BO_CSS  <: Schedule end
-abstract type BO_TSS  <: Schedule end
+abstract type BO_FSS   <: Schedule end
+abstract type BO_FAC   <: Schedule end
+abstract type BO_CSS   <: Schedule end
+abstract type BO_TSS   <: Schedule end
 abstract type BO_TAPER <: Schedule end
 
-function chunk!(::Type{BO_TSS}, i, R, P, N, h, dist, θ::Dict)
+function chunk!(::Type{BO_TSS}, i, p, R, P, N, h, dist, θ::Dict)
     δ  = θ[:param]
     Kl = 1
     Kf = √(1 + 2*N*δ)
@@ -35,7 +37,7 @@ function chunk!(::Type{BO_TSS}, i, R, P, N, h, dist, θ::Dict)
     return ceil(Int64, K)
 end
 
-function chunk!(::Type{TSS}, i, R, P, N, h, dist, θ::Dict)
+function chunk!(::Type{TSS}, i, p, R, P, N, h, dist, θ::Dict)
     Kf = θ[:K_first]
     Kl = θ[:K_last]
     if(i == 1)
@@ -50,7 +52,7 @@ function chunk!(::Type{TSS}, i, R, P, N, h, dist, θ::Dict)
     return ceil(Int64, K)
 end
 
-function chunk!(::Type{TAPER}, i, R, P, N, h, dist, θ::Dict)
+function chunk!(::Type{TAPER}, i, p, R, P, N, h, dist, θ::Dict)
     α  = θ[:α]
     Km = θ[:K_min]
     μ  = mean(dist)
@@ -62,7 +64,7 @@ function chunk!(::Type{TAPER}, i, R, P, N, h, dist, θ::Dict)
     return K
 end
 
-function chunk!(::Type{BO_TAPER}, i, R, P, N, h, dist, θ::Dict)
+function chunk!(::Type{BO_TAPER}, i, p, R, P, N, h, dist, θ::Dict)
     Km = 1
     μ  = mean(dist)
     σ  = std(dist)
@@ -73,7 +75,7 @@ function chunk!(::Type{BO_TAPER}, i, R, P, N, h, dist, θ::Dict)
     return K
 end
 
-function chunk!(::Type{FAC2}, i, R, P, N, h, dist, θ::Dict)
+function chunk!(::Type{FAC2}, i, p, R, P, N, h, dist, θ::Dict)
     if(!haskey(θ, :index) || θ[:index] == 1)
         θ[:index] = P
         μ = mean(dist)
@@ -89,7 +91,7 @@ function chunk!(::Type{FAC2}, i, R, P, N, h, dist, θ::Dict)
     end
 end
 
-function chunk!(::Type{BO_FAC}, i, R, P, N, h, dist, θ::Dict)
+function chunk!(::Type{BO_FAC}, i, p, R, P, N, h, dist, θ::Dict)
     if(!haskey(θ, :index) || θ[:index] == 1)
         θ[:index] = P
         μ = mean(dist)
@@ -104,7 +106,7 @@ function chunk!(::Type{BO_FAC}, i, R, P, N, h, dist, θ::Dict)
     end
 end
 
-function chunk!(::Type{FSS}, i, R, P, N, h, dist, θ::Dict)
+function chunk!(::Type{FSS}, i, p, R, P, N, h, dist, θ::Dict)
     if(!haskey(θ, :index) || θ[:index] == 1)
         θ[:index] = P
         μ = mean(dist)
@@ -127,7 +129,7 @@ function chunk!(::Type{FSS}, i, R, P, N, h, dist, θ::Dict)
     end
 end
 
-function chunk!(::Type{BO_FSS}, i, R, P, N, h, dist, θ::Dict)
+function chunk!(::Type{BO_FSS}, i, p, R, P, N, h, dist, θ::Dict)
     if(!haskey(θ, :index) || θ[:index] == 1)
         θ[:index] = P
         μ = mean(dist)
@@ -150,34 +152,129 @@ function chunk!(::Type{BO_FSS}, i, R, P, N, h, dist, θ::Dict)
     end
 end
 
-function chunk!(::Type{CSS}, i, R, P, N, h, dist, θ::Dict)
+function chunk!(::Type{CSS}, i, p, R, P, N, h, dist, θ::Dict)
     μ = mean(dist)
     σ = std(dist)
     K = ((h*√2*N) / (σ*P*√log(P)))^(2/3)
     return ceil(Int64, K)
 end
 
-function chunk!(::Type{BO_CSS}, i, R, P, N, h, dist, θ::Dict)
+function chunk!(::Type{BO_CSS}, i, p, R, P, N, h, dist, θ::Dict)
     μ = mean(dist)
     σ = std(dist)
     K = ((√2*N) / (P*√log(P)) * θ[:param])^(2/3)
     return ceil(Int64, K)
 end
 
-function simulate(sched::Type{<:Schedule}, prng, dist, P, N, h,
+function chunk!(::Type{AFAC}, i, p, R, P, N, h, dist, θ::Dict)
+    K = 1
+    if(!haskey(θ, :index))
+        θ[:index] = 1
+    end
+
+    if(θ[:index] == 0)
+        return 1
+    elseif(θ[:index] < P+1)
+        K = R / (2 * P)
+    else
+        μs    = θ[:P_μ]
+        σs    = θ[:P_σ]
+        nz    = μs .!= 0
+        μs_nz = μs[nz]
+        σs_nz = σs[nz]
+
+        D  = sum(σs_nz.^2 ./ μs_nz) 
+        T  = 1/sum(1 ./ μs) 
+        K  = (D + 2*T*R - √(D^2 + 4*D*T*R)) / (2 * μs[p])
+    end
+    θ[:index] += 1
+    if(K <= 1)
+        θ[:index] = 0
+    end
+    return ceil(Int64, K)
+end
+
+function chunk!(::Type{HSS}, i, p, R, P, N, h, dist, θ::Dict)
+    k = 0
+    chunksize = 0
+    chunkweight = 0
+
+    tasks = θ[:mean]
+    chunksize = ceil(R/(1.5*P));
+    for i = R:N
+        w1 = 0
+        w2 = 0
+
+        k += 1
+        chunkweight += tasks(i)
+
+        w1 = chunkweight
+        w2 = begin
+            if((i + 1) <= N)
+                chunkweight + tasks(i+1)
+            else
+                0
+            end
+        end
+
+        if(w2 <= chunksize)
+            continue
+        end
+
+        if(w1 >= chunksize)
+            break
+        end
+
+        if((w2 - chunksize) > (chunksize - w1))
+            break
+        end
+    end
+    return k
+end
+
+function chunk!(::Type{BinLPT}, i, p, R, P, N, h, dist, θ::Dict)
+    if()
+        
+    end
+    tasks = θ[:mean]
+    
+    return ceil(Int64, K)
+end
+
+function sample_work(prng, dist::Distributions.Distribution, i, K, N)
+    return rand(prng, dist, K)
+end
+
+function sample_work(prng, f, it, K, N)
+    return [f(prng, it + i, N) for i = 1:K]
+end
+
+function simulate(sched::Type{<:Schedule}, prng, f, P, N, h,
                   θ::Dict{Symbol, Any})
     i       = 1
     hist    = zeros(Float64, P)
     total_w = 0.0
+
+    if(sched == AFAC)
+        θ[:P_μ] = zeros(P)
+        θ[:P_σ] = zeros(P)
+    end
+    
     while(i < N)
         R = N - i + 1
         p = argmin(hist)
-        K = chunk!(sched, i, R, P, N, h, dist, θ)
+        K = chunk!(sched, i, p, R, P, N, h, f, θ)
         K = max(min(R, K), 1)
 
-        work     = rand(prng, dist, K)
+        work     = sample_work(prng, f, i, K, N)
         hist[p] += h + sum(work)
         total_w += sum(work)
+
+        if(sched == AFAC)
+            afac_μ     = mean(work)
+            θ[:P_μ][p] = afac_μ
+            θ[:P_σ][p] = stdm(work, afac_μ)
+        end
 
         i += K
     end
@@ -206,7 +303,7 @@ function run(sched::Type{<:Schedule}, iters, prng, dist, P, N, h,
                    slow = Float64[],
                    speedup = Float64[],
                    efficiency = Float64[],
-                   cov= Float64[])
+                   cov = Float64[])
     for i = 1:iters
         result = simulate(sched::Type{<:Schedule}, prng, dist, P, N, h, θ)
         push!(df, result)
