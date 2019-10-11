@@ -17,38 +17,38 @@
 
 /* workloads. */
 extern unsigned __ntasks; /* number of tasks. */
-extern unsigned *__tasks;  /* Tasks.           */
+extern unsigned *__tasks; /* Tasks.           */
 extern unsigned __nchunks;
 
 inline static bool
 gomp_iter_binlpt_next (long *pstart, long *pend)
 {
-  int i, j;                   /* Loop index.           */
-  int tid;                    /* Thread ID.            */
-  int start;                  /* Start of search.      */
+  int i, j;		      /* Loop index.           */
+  int tid;		      /* Thread ID.            */
+  int start;		      /* Start of search.      */
   struct gomp_thread *thr;    /* Thread.               */
   struct gomp_work_share *ws; /* Work-Share construct. */
 
-  thr = gomp_thread();
+  thr = gomp_thread ();
   ws = thr->ts.work_share;
-  tid = omp_get_thread_num();
+  tid = omp_get_thread_num ();
   /* Search for next task. */
   start = ws->thread_start[tid];
   for (i = start; i < __ntasks; i++)
- 	{
- 	  if (ws->taskmap[i] == tid)
- 		goto found;
- 	}
+    {
+      if (ws->taskmap[i] == tid)
+	goto found;
+    }
 
   return (false);
 
- found:
+found:
 
   for (j = i + 1; j < __ntasks; j++)
- 	{
- 	  if (ws->taskmap[j] != tid)
- 		break;
- 	}
+    {
+      if (ws->taskmap[j] != tid)
+	break;
+    }
 
   ws->thread_start[tid] = j;
   *pstart = ws->loop_start + i;
@@ -80,7 +80,8 @@ gomp_iter_binlpt_next (long *pstart, long *pend)
   /* 				  break; */
   /* 			} */
 
-  /* 		  long temp = __sync_val_compare_and_swap (&ws->thread_start[tid], start, j); */
+  /* 		  long temp = __sync_val_compare_and_swap (&ws->thread_start[tid],
+   * start, j); */
   /* 		  if (temp == start) */
   /* 			{ */
   /* 			  *pstart = ws->loop_start + i; */
@@ -92,7 +93,8 @@ gomp_iter_binlpt_next (long *pstart, long *pend)
   /* 			  start = temp; */
   /* 			  while(true) */
   /* 				{ */
-  /* 				  long temp = __sync_val_compare_and_swap (&ws->thread_start[tid], start, j); */
+  /* 				  long temp = __sync_val_compare_and_swap
+   * (&ws->thread_start[tid], start, j); */
   /* 				  if (temp == start) */
   /* 					{ */
   /* 					  *pstart = ws->loop_start + start; */
@@ -121,7 +123,8 @@ gomp_iter_binlpt_next (long *pstart, long *pend)
   /* 	  if(i >= start) */
   /* 		{ */
   /* 		  long nend = i + 1; */
-  /* 		  long temp = __sync_val_compare_and_swap (&ws->thread_start[tid], start, nend); */
+  /* 		  long temp = __sync_val_compare_and_swap (&ws->thread_start[tid],
+   * start, nend); */
   /* 		  if (temp == start) */
   /* 			{ */
   /* 			  *pstart = ws->loop_start + i; */
@@ -138,63 +141,64 @@ gomp_iter_binlpt_next (long *pstart, long *pend)
 inline static bool
 gomp_iter_hss_next (long *pstart, long *pend)
 {
-  unsigned k;                 /* Number of scheduled iterations. */
-  long chunksize;             /* Chunksize.                      */
+  unsigned k;		      /* Number of scheduled iterations. */
+  long chunksize;	     /* Chunksize.                      */
   unsigned chunkweight;       /* Chunk weight.                   */
   struct gomp_thread *thr;    /* Thread.                         */
   struct gomp_team *team;     /* Tead of threads.                */
   struct gomp_work_share *ws; /* Work-Share construct.           */
-  int nthreads;               /* Number of threads.              */
-  
+  int nthreads;		      /* Number of threads.              */
+
   /* Get scheduler data.. */
-  thr      = gomp_thread();
-  team     = thr->ts.team;
-  ws       = thr->ts.work_share;
+  thr = gomp_thread ();
+  team = thr->ts.team;
+  ws = thr->ts.work_share;
   nthreads = (team != NULL) ? team->nthreads : 1;
 
-  gomp_mutex_lock(&ws->lock);
+  gomp_mutex_lock (&ws->lock);
 
   /* Comput chunksize. */
-  chunksize = ceil(ws->wremaining/(1.5*nthreads));
+  chunksize = ceil (ws->wremaining / (1.5 * nthreads));
   if (chunksize < ws->chunk_size)
-	chunksize = ws->chunk_size;
+    chunksize = ws->chunk_size;
 
   /* Schedule iterations. */
-  chunkweight = 0; k = 0;
+  chunkweight = 0;
+  k = 0;
   for (unsigned i = ws->loop_start; i < __ntasks; i++)
-	{
-	  unsigned w1;
-	  unsigned w2;
+    {
+      unsigned w1;
+      unsigned w2;
 
-	  k++;
-	  chunkweight += __tasks[i];
+      k++;
+      chunkweight += __tasks[i];
 
-	  w1 = chunkweight;
-	  w2 = ((i + 1) < __ntasks) ? chunkweight + __tasks[i + 1] : 0;
+      w1 = chunkweight;
+      w2 = ((i + 1) < __ntasks) ? chunkweight + __tasks[i + 1] : 0;
 
-	  /* Keep scheduling. */
-	  if (w2 <= chunksize)
-		continue;
+      /* Keep scheduling. */
+      if (w2 <= chunksize)
+	continue;
 
-	  /* Best fit. */
-	  if (w1 >= chunksize)
-		break;
+      /* Best fit. */
+      if (w1 >= chunksize)
+	break;
 
-	  /* Best range approximation. */
-	  if ((w2 - chunksize) > (chunksize - w1))
-		break;
-	}
+      /* Best range approximation. */
+      if ((w2 - chunksize) > (chunksize - w1))
+	break;
+    }
 
   *pstart = ws->loop_start;
-  *pend = ws->loop_start + k;// + 1;
+  *pend = ws->loop_start + k; // + 1;
 
   /* Update scheduler data. */
-  ws->loop_start += (k);// + 1);
+  ws->loop_start += (k); // + 1);
   ws->wremaining -= chunkweight;
 
-  gomp_mutex_unlock(&ws->lock);
+  gomp_mutex_unlock (&ws->lock);
 
   return ((*pstart == __ntasks) ? false : true);
 }
 
-#endif 
+#endif
