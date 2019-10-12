@@ -10,31 +10,28 @@ end
 function compute_chunksizes(tasks, ntasks, nchunks)
     chunksizes  = zeros(Int64, nchunks)
     workload    = offset_cumsum(tasks)
-    chunkweight = (workload[ntasks] + tasks[ntasks])/nchunks;
+    chunkweight = (workload[end] + tasks[end])/nchunks;
     k = 1
     i = 1
     while (i <= ntasks)
-        j = ntasks;
-        if (k < nchunks)
-            j = i + 1
-            while (j <= ntasks)
-                if (workload[j] - workload[i] > chunkweight)
-                    break
-                end
-                j += 1
+        j = i + 1
+        while (j <= ntasks)
+            if (workload[j] - workload[i] >= chunkweight)
+                break
             end
+            j += 1
         end
-        chunksizes[k] = j - i;
-        i = j;
+        chunksizes[k] = j - i
+        i  = j
         k += 1
     end
     return chunksizes;
 end
 
-function compute_chunks(tasks, ntasks, chunksizes, nchunks)
+function compute_chunkweights(tasks, ntasks, chunksizes, nchunks)
     chunks = zeros(Int64, nchunks)
 
-    # Compute chunks. */
+    # Compute chunks.
     k = 1
     for i = 1:nchunks
         for j = 1:chunksizes[i]
@@ -48,10 +45,10 @@ end
 function binlpt_balance(f, N, P, K_max)
     tasks   = f.(1:N)
     load    = zeros(P)
-    taskmap = zeros(Int64, N) 
+    taskmap = zeros(UInt16, N) 
 
     chunksizes = compute_chunksizes(tasks, N, K_max)
-    chunks     = compute_chunks(tasks, N, chunksizes, K_max)
+    chunks     = compute_chunkweights(tasks, N, chunksizes, K_max)
     chunkoff   = offset_cumsum(chunksizes)
 
     # Sort tasks.
@@ -61,7 +58,6 @@ function binlpt_balance(f, N, P, K_max)
         if (chunks[sortmap[i]] == 0)
             continue
         end
-
         tid = 1
         for j = 2:P
             if (load[j] < load[tid])

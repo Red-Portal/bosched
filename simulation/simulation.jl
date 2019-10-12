@@ -20,11 +20,29 @@ abstract type HSS    <: Schedule end
 abstract type BinLPT <: Schedule end
 abstract type TAPER  <: Schedule end
 
-abstract type BO_FSS   <: Schedule end
-abstract type BO_FAC   <: Schedule end
-abstract type BO_CSS   <: Schedule end
-abstract type BO_TSS   <: Schedule end
-abstract type BO_TAPER <: Schedule end
+abstract type BOSchedule <: Schedule
+
+abstract type BO_FSS   <: BOSchedule end
+abstract type BO_FAC   <: BOSchedule end
+abstract type BO_CSS   <: BOschedule  end
+abstract type BO_TSS   <: BOSchedule end
+abstract type BO_TAPER <: BOSchedule end
+
+function bo_fss_transform(x)
+    return 2^(11*x - 7)
+end
+
+function bo_tss_transform(x)
+    return 2^(11*x - 7)
+end
+
+function bo_tape_transform(x)
+    return 2^(13*x - 7)
+end
+
+function bo_css_transform(x)
+    return 2^(10*x - 5)
+end
 
 function chunk!(::Type{BO_TSS}, i, p, R, P, N, h, dist, θ::Dict)
     δ  = θ[:param]
@@ -32,11 +50,11 @@ function chunk!(::Type{BO_TSS}, i, p, R, P, N, h, dist, θ::Dict)
     Kf = √(1 + 2*N*δ)
     if(i == 1)
         θ[:K_prev] = Kf
-        return floor(Int64, Kf)
+        return i,i+floor(Int64, Kf)
     end
     K = max(θ[:K_prev] - δ, Kl)
     θ[:K_prev] = K
-    return ceil(Int64, K)
+    return i,i+ceil(Int64, K)
 end
 
 function chunk!(::Type{TSS}, i, p, R, P, N, h, dist, θ::Dict)
@@ -44,75 +62,72 @@ function chunk!(::Type{TSS}, i, p, R, P, N, h, dist, θ::Dict)
     Kl = θ[:K_last]
     if(i == 1)
         θ[:K_prev] = Float64(Kf)
-        return ceil(Int64, Kf)
+        return i, i+ceil(Int64, Kf)
     end
 
     C = 2 * N / (Kf + Kl)
     δ = (Kf - Kl) / (C - 1)
     K = max(θ[:K_prev] - δ, Kl)
     θ[:K_prev] = K
-    return ceil(Int64, K)
+    return i, i+ceil(Int64, K)
 end
 
 function chunk!(::Type{TAPER}, i, p, R, P, N, h, dist, θ::Dict)
     α  = θ[:α]
     Km = θ[:K_min]
-    μ  = mean(dist)
-    σ  = std(dist)
+    μ  = θ[:μ]
+    σ  = θ[:σ]
     v  = α*σ/μ
 
     x = R / P + Km / 2
     K = max(Km, ceil(Int64, x + v^2 / 2 - v * √(2 * x + v^2/4)))
-    return K
+    return i, i+K
 end
 
 function chunk!(::Type{BO_TAPER}, i, p, R, P, N, h, dist, θ::Dict)
     Km = 1
-    μ  = mean(dist)
-    σ  = std(dist)
+    μ  = θ[:μ]
+    σ  = θ[:σ]
     v  = θ[:param]
 
     x = R / P + Km / 2
     K = max(Km, ceil(Int64, x + v^2 / 2 - v * √(2 * x + v^2/4)))
-    return K
+    return i, i+K
 end
 
 function chunk!(::Type{FAC2}, i, p, R, P, N, h, dist, θ::Dict)
     if(!haskey(θ, :index) || θ[:index] == 1)
         θ[:index] = P
-        μ = mean(dist)
-        σ = std(dist)
-        b = (P * σ) / (2 * √R * μ)
         K = R / (2 * P)
         K = ceil(Int64, K)
         θ[:chunk] = K
-        return K
+        return i, i+K
     else
         θ[:index] -= 1
-        return θ[:chunk]
+        return i, i+θ[:chunk]
     end
 end
 
 function chunk!(::Type{BO_FAC}, i, p, R, P, N, h, dist, θ::Dict)
     if(!haskey(θ, :index) || θ[:index] == 1)
         θ[:index] = P
-        μ = mean(dist)
-        σ = std(dist)
+        μ = θ[:μ]
+        σ = θ[:σ]
         K = R / P / θ[:param]
         K = ceil(Int64, K)
         θ[:chunk] = K
-        return K
+        return i,i+K
     else
         θ[:index] -= 1
-        return θ[:chunk]
+        return i,i+θ[:chunk]
     end
 end
 
 function chunk!(::Type{FSS}, i, p, R, P, N, h, dist, θ::Dict)
     if(!haskey(θ, :index) || θ[:index] == 1)
         θ[:index] = P
-        μ = mean(dist)
-        σ = std(dist)
+        μ = θ[:μ]
+        σ = θ[:σ]
         b = (P * σ) / (2 * √R * μ)
         x = begin
                 if(i == 1)
@@ -124,18 +139,18 @@ function chunk!(::Type{FSS}, i, p, R, P, N, h, dist, θ::Dict)
         K = R / (x * P)
         K = ceil(Int64, K)
         θ[:chunk] = K
-        return K
+        return i, i+K
     else
         θ[:index] -= 1
-        return θ[:chunk]
+        return i, i+θ[:chunk]
     end
 end
 
 function chunk!(::Type{BO_FSS}, i, p, R, P, N, h, dist, θ::Dict)
     if(!haskey(θ, :index) || θ[:index] == 1)
         θ[:index] = P
-        μ = mean(dist)
-        σ = std(dist)
+        μ = θ[:μ]
+        σ = θ[:σ]
         b = P / (2 * √R) * θ[:param]
         x = begin
                 if(i == 1)
@@ -147,25 +162,25 @@ function chunk!(::Type{BO_FSS}, i, p, R, P, N, h, dist, θ::Dict)
         K = R / (x * P)
         K = ceil(Int64, K)
         θ[:chunk] = K
-        return K
+        return i, i+K
     else
         θ[:index] -= 1
-        return θ[:chunk]
+        return i, i+θ[:chunk]
     end
 end
 
 function chunk!(::Type{CSS}, i, p, R, P, N, h, dist, θ::Dict)
-    μ = mean(dist)
-    σ = std(dist)
+    μ = θ[:μ]
+    σ = θ[:σ]
     K = ((h*√2*N) / (σ*P*√log(P)))^(2/3)
-    return ceil(Int64, K)
+    return i, i+ceil(Int64, K)
 end
 
 function chunk!(::Type{BO_CSS}, i, p, R, P, N, h, dist, θ::Dict)
-    μ = mean(dist)
-    σ = std(dist)
+    μ  = θ[:μ]
+    σ  = θ[:σ]
     K = ((√2*N) / (P*√log(P)) * θ[:param])^(2/3)
-    return ceil(Int64, K)
+    return i, i+ceil(Int64, K)
 end
 
 function chunk!(::Type{AFAC}, i, p, R, P, N, h, dist, θ::Dict)
@@ -175,7 +190,7 @@ function chunk!(::Type{AFAC}, i, p, R, P, N, h, dist, θ::Dict)
     end
 
     if(θ[:index] == 0)
-        return 1
+        return i, i+1
     elseif(θ[:index] < P+1)
         K = R / (2 * P)
     else
@@ -193,16 +208,15 @@ function chunk!(::Type{AFAC}, i, p, R, P, N, h, dist, θ::Dict)
     if(K <= 1)
         θ[:index] = 0
     end
-    return ceil(Int64, K)
+    return i, i+ceil(Int64, K)
 end
 
 function chunk!(::Type{HSS}, i, p, R, P, N, h, dist, θ::Dict)
-    k = 0
-    chunksize = 0
-    chunkweight = 0
-
+    k     = 0
     tasks = θ[:mean]
-    chunksize = ceil(R/(1.5*P));
+
+    chunkweight = 0
+    chunksize   = ceil(R/(1.5*P));
     for i = R:N
         w1 = 0
         w2 = 0
@@ -231,25 +245,47 @@ function chunk!(::Type{HSS}, i, p, R, P, N, h, dist, θ::Dict)
             break
         end
     end
-    return k
+    return i, i+k
 end
 
 function chunk!(::Type{BinLPT}, i, p, R, P, N, h, dist, θ::Dict)
-    
-    if()
-        
+    if(i == 1)
+        θ[:first] = 1
+        θ[:last]  = N
+        K = 2*P
+        tasks   = θ[:mean]
+        taskmap = binlpt_balance(tasks, N, P, K)
+        θ[:map] = taskmap
+        load = zeros(P)
+        for (idx, i) in enumerate(taskmap)
+            load[i] += tasks(idx)
+        end
     end
-    tasks = θ[:mean]
-    
-    return ceil(Int64, K)
+    taskmap = θ[:map]
+    last    = θ[:last]
+    first   = 1
+    start   = findfirst(x->x == p, @view taskmap[first:last])
+
+    # Dynamic Scheduling Fallback 
+    if(start == nothing)
+        idx  = findfirst(x->x != p, @view taskmap[last:-1:first])
+        θ[:map][last-idx+1] = UInt16(p)
+        θ[:last] -= 1
+        return idx,idx
+    end
+    offset = findfirst(x->x != p, @view taskmap[first+start:last])
+    if(offset == nothing)
+        return N - (first + start) + 1
+    end
+    return start+first, start+first+offset
 end
 
-function sample_work(prng, dist::Distributions.Distribution, i, K, N)
-    return rand(prng, dist, K)
-end
+# function sample_work(prng, dist::Distributions.Distribution, start, stop, N)
+#     return rand(prng, dist, K)
+# end
 
-function sample_work(prng, f, it, K, N)
-    return [f(prng, it + i, N) for i = 1:K]
+function sample_work(prng, f, start, stop, N)
+    return f.(Ref(prng), collect(start:stop), Ref(N))
 end
 
 function simulate(sched::Type{<:Schedule}, prng, f, P, N, h,
@@ -263,13 +299,15 @@ function simulate(sched::Type{<:Schedule}, prng, f, P, N, h,
         θ[:P_σ] = zeros(P)
     end
     
-    while(i < N)
-        R = N - i + 1
+    R = N
+    while(i <= N)
         p = argmin(hist)
-        K = chunk!(sched, i, p, R, P, N, h, f, θ)
-        K = max(min(R, K), 1)
+        start, stop = chunk!(sched, i, p, R, P, N, h, f, θ)
 
-        work     = sample_work(prng, f, i, K, N)
+        K = stop - start + 1
+        stop = start + min(R, K)
+
+        work     = sample_work(prng, f, start, stop, N)
         hist[p] += h + sum(work)
         total_w += sum(work)
 
@@ -279,6 +317,7 @@ function simulate(sched::Type{<:Schedule}, prng, f, P, N, h,
             θ[:P_σ][p] = stdm(work, afac_μ)
         end
 
+        R -= K
         i += K
     end
     max_idx = argmax(hist)
@@ -308,10 +347,26 @@ function run(sched::Type{<:Schedule}, iters, prng, dist, P, N, h,
                    efficiency = Float64[],
                    cov = Float64[])
     for i = 1:iters
-        result = simulate(sched::Type{<:Schedule}, prng, dist, P, N, h, θ)
+        result = simulate(sched::Type{<:Schedule}, prng, dist, P, N, h,
+                          deepcopy(θ))
         push!(df, result)
     end
     return aggregate(df, [mean, conf])
+end
+
+function run_raw(sched::Type{<:Schedule}, iters, prng, dist, P, N, h,
+                 θ::Dict{Symbol, Any})
+    df = DataFrame(exec = Float64[],
+                   slow = Float64[],
+                   speedup = Float64[],
+                   efficiency = Float64[],
+                   cov = Float64[])
+    @showprogress for i = 1:iters
+        result = simulate(sched::Type{<:Schedule}, prng, dist, P, N, h,
+                          deepcopy(θ))
+        push!(df, result)
+    end
+    return df
 end
 
 function run_optimize(sched::Type{<:Schedule}, iters, prng, dist, P, N, h,

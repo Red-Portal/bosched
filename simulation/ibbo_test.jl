@@ -4,10 +4,6 @@ using Plots
 include("../IBBO/IBBO.jl")
 include("simulation.jl")
 
-function bo_fss_transform(x)
-    return 2^(11*x - 7)
-end
-
 function export_csv(fname, x, y, conf)
     open(fname, "w") do io
         println(io, "x,y,+-")
