@@ -20,11 +20,11 @@ abstract type HSS    <: Schedule end
 abstract type BinLPT <: Schedule end
 abstract type TAPER  <: Schedule end
 
-abstract type BOSchedule <: Schedule
+abstract type BOSchedule <: Schedule end
 
 abstract type BO_FSS   <: BOSchedule end
 abstract type BO_FAC   <: BOSchedule end
-abstract type BO_CSS   <: BOschedule  end
+abstract type BO_CSS   <: BOSchedule  end
 abstract type BO_TSS   <: BOSchedule end
 abstract type BO_TAPER <: BOSchedule end
 
