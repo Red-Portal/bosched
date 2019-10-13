@@ -29,7 +29,7 @@ function compute_chunksizes(tasks, ntasks, nchunks)
 end
 
 function compute_chunkweights(tasks, ntasks, chunksizes, nchunks)
-    chunks = zeros(Int64, nchunks)
+    chunks = zeros(Float64, nchunks)
 
     # Compute chunks.
     k = 1

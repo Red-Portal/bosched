@@ -15,10 +15,10 @@ abstract type AFAC   <: Schedule end
 abstract type FAC2   <: Schedule end
 abstract type CSS    <: Schedule end
 abstract type TSS    <: Schedule end
-abstract type QSS    <: Schedule end
 abstract type HSS    <: Schedule end
 abstract type BinLPT <: Schedule end
 abstract type TAPER  <: Schedule end
+abstract type TAPER3 <: Schedule end
 
 abstract type BOSchedule <: Schedule end
 
@@ -36,7 +36,7 @@ function bo_tss_transform(x)
     return 2^(11*x - 7)
 end
 
-function bo_tape_transform(x)
+function bo_taper_transform(x)
     return 2^(13*x - 7)
 end
 
@@ -81,6 +81,13 @@ function chunk!(::Type{TAPER}, i, p, R, P, N, h, dist, θ::Dict)
 
     x = R / P + Km / 2
     K = max(Km, ceil(Int64, x + v^2 / 2 - v * √(2 * x + v^2/4)))
+    return i, i+K
+end
+
+function chunk!(::Type{TAPER3}, i, p, R, P, N, h, dist, θ::Dict)
+    v = 3
+    x = R / P + Km / 2
+    K = max(1, ceil(Int64, x + v^2 / 2 - v * √(2 * x + v^2/4)))
     return i, i+K
 end
 
@@ -149,8 +156,6 @@ end
 function chunk!(::Type{BO_FSS}, i, p, R, P, N, h, dist, θ::Dict)
     if(!haskey(θ, :index) || θ[:index] == 1)
         θ[:index] = P
-        μ = θ[:μ]
-        σ = θ[:σ]
         b = P / (2 * √R) * θ[:param]
         x = begin
                 if(i == 1)
