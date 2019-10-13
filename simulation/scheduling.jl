@@ -466,185 +466,185 @@ end
 
 function run_all(prng, path="")
     Random.seed!(prng)
-    begin
-        println("------- FSS -------")
-        d     = Dict()
-        sched = FSS
+    # begin
+    #     println("------- FSS -------")
+    #     d     = Dict()
+    #     sched = FSS
 
-        d["b1"]  = bench1(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b2"]  = bench2(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b3"]  = bench3(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b4"]  = bench4(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b5"]  = bench5(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b6"]  = bench6(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b7"]  = bench7(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b8"]  = bench8(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b9"]  = bench9(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b10"] = bench10(prng, sched, Dict{Symbol, Any}(), transform=nothing)
-        save(joinpath(path, "FSS.jld"), d)
-    end
+    #     d["b1"]  = bench1(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b2"]  = bench2(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b3"]  = bench3(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b4"]  = bench4(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b5"]  = bench5(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b6"]  = bench6(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b7"]  = bench7(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b8"]  = bench8(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b9"]  = bench9(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b10"] = bench10(prng, sched, Dict{Symbol, Any}(), transform=nothing)
+    #     save(joinpath(path, "FSS.jld"), d)
+    # end
 
-    begin
-        println("------- FAC2 -------")
-        d     = Dict()
-        sched = FAC2
+    # begin
+    #     println("------- FAC2 -------")
+    #     d     = Dict()
+    #     sched = FAC2
 
-        d["b1"]  = bench1(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b2"]  = bench2(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b3"]  = bench3(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b4"]  = bench4(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b5"]  = bench5(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b6"]  = bench6(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b7"]  = bench7(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b8"]  = bench8(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b9"]  = bench9(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b10"] = bench10(prng, sched, Dict{Symbol, Any}(), transform=nothing)
-        save(joinpath(path, "FAC2.jld"), d)
-    end
+    #     d["b1"]  = bench1(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b2"]  = bench2(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b3"]  = bench3(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b4"]  = bench4(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b5"]  = bench5(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b6"]  = bench6(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b7"]  = bench7(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b8"]  = bench8(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b9"]  = bench9(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b10"] = bench10(prng, sched, Dict{Symbol, Any}(), transform=nothing)
+    #     save(joinpath(path, "FAC2.jld"), d)
+    # end
 
-    begin
-        println("------- CSS -------")
-        d     = Dict()
-        sched = CSS
+    # begin
+    #     println("------- CSS -------")
+    #     d     = Dict()
+    #     sched = CSS
 
-        d["b1"]  = bench1(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b2"]  = bench2(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b3"]  = bench3(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b4"]  = bench4(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b5"]  = bench5(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b6"]  = bench6(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b7"]  = bench7(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b8"]  = bench8(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b9"]  = bench9(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b10"] = bench10(prng, sched, Dict{Symbol, Any}(), transform=nothing)
-        save(joinpath(path, "CSS.jld"), d)
-    end
+    #     d["b1"]  = bench1(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b2"]  = bench2(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b3"]  = bench3(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b4"]  = bench4(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b5"]  = bench5(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b6"]  = bench6(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b7"]  = bench7(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b8"]  = bench8(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b9"]  = bench9(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b10"] = bench10(prng, sched, Dict{Symbol, Any}(), transform=nothing)
+    #     save(joinpath(path, "CSS.jld"), d)
+    # end
 
-    begin
-        d     = Dict()
-        sched = TSS
-        d["b1"]  = bench1(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b2"]  = bench2(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b3"]  = bench3(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b4"]  = bench4(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b5"]  = bench5(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b6"]  = bench6(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b7"]  = bench7(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b8"]  = bench8(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b9"]  = bench9(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b10"] = bench10(prng, sched, Dict{Symbol, Any}(), transform=nothing)
-        save(joinpath(path, "TSS.jld"), d)
-    end
+    # begin
+    #     d     = Dict()
+    #     sched = TSS
+    #     d["b1"]  = bench1(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b2"]  = bench2(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b3"]  = bench3(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b4"]  = bench4(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b5"]  = bench5(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b6"]  = bench6(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b7"]  = bench7(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b8"]  = bench8(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b9"]  = bench9(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b10"] = bench10(prng, sched, Dict{Symbol, Any}(), transform=nothing)
+    #     save(joinpath(path, "TSS.jld"), d)
+    # end
 
-    begin
-        println("------- TAPER -------")
-        d     = Dict()
-        sched = TAPER
-        d["b1"]  = bench1(prng,  sched, Dict{Symbol, Any}(:α=>1.3), transform=nothing)
-        d["b2"]  = bench2(prng,  sched, Dict{Symbol, Any}(:α=>1.3), transform=nothing)
-        d["b3"]  = bench3(prng,  sched, Dict{Symbol, Any}(:α=>1.3), transform=nothing)
-        d["b4"]  = bench4(prng,  sched, Dict{Symbol, Any}(:α=>1.3), transform=nothing)
-        d["b5"]  = bench5(prng,  sched, Dict{Symbol, Any}(:α=>1.3), transform=nothing)
-        d["b6"]  = bench6(prng,  sched, Dict{Symbol, Any}(:α=>1.3), transform=nothing)
-        d["b7"]  = bench7(prng,  sched, Dict{Symbol, Any}(:α=>1.3), transform=nothing)
-        d["b8"]  = bench8(prng,  sched, Dict{Symbol, Any}(:α=>1.3), transform=nothing)
-        d["b9"]  = bench9(prng,  sched, Dict{Symbol, Any}(:α=>1.3), transform=nothing)
-        d["b10"] = bench10(prng, sched, Dict{Symbol, Any}(:α=>1.3), transform=nothing)
-        save(joinpath(path, "TAPER.jld"), d)
-    end
+    # begin
+    #     println("------- TAPER -------")
+    #     d     = Dict()
+    #     sched = TAPER
+    #     d["b1"]  = bench1(prng,  sched, Dict{Symbol, Any}(:α=>1.3), transform=nothing)
+    #     d["b2"]  = bench2(prng,  sched, Dict{Symbol, Any}(:α=>1.3), transform=nothing)
+    #     d["b3"]  = bench3(prng,  sched, Dict{Symbol, Any}(:α=>1.3), transform=nothing)
+    #     d["b4"]  = bench4(prng,  sched, Dict{Symbol, Any}(:α=>1.3), transform=nothing)
+    #     d["b5"]  = bench5(prng,  sched, Dict{Symbol, Any}(:α=>1.3), transform=nothing)
+    #     d["b6"]  = bench6(prng,  sched, Dict{Symbol, Any}(:α=>1.3), transform=nothing)
+    #     d["b7"]  = bench7(prng,  sched, Dict{Symbol, Any}(:α=>1.3), transform=nothing)
+    #     d["b8"]  = bench8(prng,  sched, Dict{Symbol, Any}(:α=>1.3), transform=nothing)
+    #     d["b9"]  = bench9(prng,  sched, Dict{Symbol, Any}(:α=>1.3), transform=nothing)
+    #     d["b10"] = bench10(prng, sched, Dict{Symbol, Any}(:α=>1.3), transform=nothing)
+    #     save(joinpath(path, "TAPER.jld"), d)
+    # end
 
-    begin
-        println("------- TAPER3 -------")
-        d     = Dict()
-        sched = TAPER3
-        d["b1"]  = bench1(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b2"]  = bench2(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b3"]  = bench3(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b4"]  = bench4(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b5"]  = bench5(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b6"]  = bench6(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b7"]  = bench7(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b8"]  = bench8(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b9"]  = bench9(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b10"] = bench10(prng, sched, Dict{Symbol, Any}(), transform=nothing)
-        save(joinpath(path, "TAPER3.jld"), d)
-    end
+    # begin
+    #     println("------- TAPER3 -------")
+    #     d     = Dict()
+    #     sched = TAPER3
+    #     d["b1"]  = bench1(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b2"]  = bench2(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b3"]  = bench3(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b4"]  = bench4(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b5"]  = bench5(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b6"]  = bench6(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b7"]  = bench7(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b8"]  = bench8(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b9"]  = bench9(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b10"] = bench10(prng, sched, Dict{Symbol, Any}(), transform=nothing)
+    #     save(joinpath(path, "TAPER3.jld"), d)
+    # end
 
-    begin
-        println("------- AFAC -------")
-        d     = Dict()
-        sched = AFAC
-        d["b1"]  = bench1(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b2"]  = bench2(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b3"]  = bench3(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b4"]  = bench4(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b5"]  = bench5(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b6"]  = bench6(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b7"]  = bench7(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b8"]  = bench8(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b9"]  = bench9(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b10"] = bench10(prng, sched, Dict{Symbol, Any}(), transform=nothing)
-        save(joinpath(path, "AFAC.jld"), d)
-    end
+    # begin
+    #     println("------- AFAC -------")
+    #     d     = Dict()
+    #     sched = AFAC
+    #     d["b1"]  = bench1(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b2"]  = bench2(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b3"]  = bench3(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b4"]  = bench4(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b5"]  = bench5(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b6"]  = bench6(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b7"]  = bench7(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b8"]  = bench8(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b9"]  = bench9(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b10"] = bench10(prng, sched, Dict{Symbol, Any}(), transform=nothing)
+    #     save(joinpath(path, "AFAC.jld"), d)
+    # end
 
-    begin
-        println("------- HSS -------")
-        d     = Dict()
-        sched = HSS
-        d["b1"]  = bench1(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b2"]  = bench2(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b3"]  = bench3(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b4"]  = bench4(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b5"]  = bench5(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b6"]  = bench6(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b7"]  = bench7(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b8"]  = bench8(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b9"]  = bench9(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b10"] = bench10(prng, sched, Dict{Symbol, Any}(), transform=nothing)
-        save(joinpath(path, "HSS.jld"), d)
-    end
+    # begin
+    #     println("------- HSS -------")
+    #     d     = Dict()
+    #     sched = HSS
+    #     d["b1"]  = bench1(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b2"]  = bench2(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b3"]  = bench3(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b4"]  = bench4(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b5"]  = bench5(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b6"]  = bench6(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b7"]  = bench7(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b8"]  = bench8(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b9"]  = bench9(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b10"] = bench10(prng, sched, Dict{Symbol, Any}(), transform=nothing)
+    #     save(joinpath(path, "HSS.jld"), d)
+    # end
 
-    begin
-        println("------- BinLPT -------")
-        d     = Dict()
-        sched = BinLPT
-        d["b1"]  = bench1(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b2"]  = bench2(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b3"]  = bench3(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b4"]  = bench4(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b5"]  = bench5(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b6"]  = bench6(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b7"]  = bench7(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b8"]  = bench8(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b9"]  = bench9(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-        d["b10"] = bench10(prng, sched, Dict{Symbol, Any}(), transform=nothing)
-        save(joinpath(path, "BinLPT.jld"), d)
-    end
+    # begin
+    #     println("------- BinLPT -------")
+    #     d     = Dict()
+    #     sched = BinLPT
+    #     d["b1"]  = bench1(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b2"]  = bench2(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b3"]  = bench3(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b4"]  = bench4(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b5"]  = bench5(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b6"]  = bench6(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b7"]  = bench7(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b8"]  = bench8(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b9"]  = bench9(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b10"] = bench10(prng, sched, Dict{Symbol, Any}(), transform=nothing)
+    #     save(joinpath(path, "BinLPT.jld"), d)
+    # end
 
-    begin
-        println("------- BO_FSS -------")
-        d      = Dict()
-        sched  = BO_FSS
-        transf = bo_fss_transform
-        d["b1"]  = vcat([bench1(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        d["b2"]  = vcat([bench2(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        d["b3"]  = vcat([bench3(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        d["b4"]  = vcat([bench4(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        d["b5"]  = vcat([bench5(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        d["b6"]  = vcat([bench6(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        d["b7"]  = vcat([bench7(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        d["b8"]  = vcat([bench8(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        d["b9"]  = vcat([bench9(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        d["b10"] = vcat([bench10(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        save(joinpath(path, "BO_FSS.jld"), d)
-    end
+    # begin
+    #     println("------- BO_FSS -------")
+    #     d      = Dict()
+    #     sched  = BO_FSS
+    #     transf = bo_fss_transform
+    #     d["b1"]  = vcat([bench1(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
+    #     d["b2"]  = vcat([bench2(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
+    #     d["b3"]  = vcat([bench3(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
+    #     d["b4"]  = vcat([bench4(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
+    #     d["b5"]  = vcat([bench5(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
+    #     d["b6"]  = vcat([bench6(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
+    #     d["b7"]  = vcat([bench7(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
+    #     d["b8"]  = vcat([bench8(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
+    #     d["b9"]  = vcat([bench9(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
+    #     d["b10"] = vcat([bench10(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
+    #     save(joinpath(path, "BO_FSS.jld"), d)
+    # end
 
 
     begin
         println("------- BO_FAC -------")
         d      = Dict()
         sched  = BO_FAC
-        transf = bo_fac_transform
+        transf = bo_fss_transform
         d["b1"]  = vcat([bench1(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
         d["b2"]  = vcat([bench2(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
         d["b3"]  = vcat([bench3(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
