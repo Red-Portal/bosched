@@ -85,6 +85,7 @@ function chunk!(::Type{TAPER}, i, p, R, P, N, h, dist, θ::Dict)
 end
 
 function chunk!(::Type{TAPER3}, i, p, R, P, N, h, dist, θ::Dict)
+    Km = 1
     v = 3
     x = R / P + Km / 2
     K = max(1, ceil(Int64, x + v^2 / 2 - v * √(2 * x + v^2/4)))
