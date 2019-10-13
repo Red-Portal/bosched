@@ -136,6 +136,16 @@ function bench3(prng, sched, params; transform=nothing)
     function f(x)
         return 1
     end
+    if(sched <: BOSchedule)
+        function bo_f(θ)
+            locparams = Dict{Symbol, Any}(:param=>transform(θ));
+            time, _, _, _, _ = simulate(
+                BO_FSS, prng, gen, P, N, h, locparams)
+            return time / (N / P)
+        end
+        log, best_θ = ibbo_bayesched(prng, bo_f, 32)
+        params[:param] = transform(best_θ)
+    end
     params[:K_first] = N/(2*P)
     params[:K_last]  = 1
     params[:K_min]   = 1
