@@ -457,6 +457,24 @@ end
 function run_all(prng, path="")
     Random.seed!(prng)
     begin
+        println("------- BO_FSS -------")
+        d      = Dict()
+        sched  = BO_FSS
+        transf = bo_fss_transform
+        d["b1"]  = vcat([bench1(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:2]...)
+        d["b2"]  = vcat([bench2(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:2]...)
+        d["b3"]  = vcat([bench3(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:2]...)
+        d["b4"]  = vcat([bench4(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:2]...)
+        d["b5"]  = vcat([bench5(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:2]...)
+        d["b6"]  = vcat([bench6(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:2]...)
+        d["b7"]  = vcat([bench7(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:2]...)
+        d["b8"]  = vcat([bench8(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:2]...)
+        d["b9"]  = vcat([bench9(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:2]...)
+        d["b10"] = vcat([bench10(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:2]...)
+        save(joinpath(path, "BO_FSS.jld"), d)
+    end
+
+    begin
         println("------- FSS -------")
         d     = Dict()
         sched = FSS
@@ -471,7 +489,7 @@ function run_all(prng, path="")
         d["b8"]  = bench8(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
         d["b9"]  = bench9(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
         d["b10"] = bench10(prng, sched, Dict{Symbol, Any}(), transform=nothing)
-        save(joinpath("FSS.jld", d))
+        save(joinpath(path, "FSS.jld"), d)
     end
 
     begin
@@ -489,7 +507,7 @@ function run_all(prng, path="")
         d["b8"]  = bench8(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
         d["b9"]  = bench9(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
         d["b10"] = bench10(prng, sched, Dict{Symbol, Any}(), transform=nothing)
-        save(joinpath("FAC2.jld", d))
+        save(joinpath(path, "FAC2.jld"), d)
     end
 
     begin
@@ -507,7 +525,7 @@ function run_all(prng, path="")
         d["b8"]  = bench8(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
         d["b9"]  = bench9(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
         d["b10"] = bench10(prng, sched, Dict{Symbol, Any}(), transform=nothing)
-        save(joinpath("CSS.jld", d))
+        save(joinpath(path, "CSS.jld"), d)
     end
 
     begin
@@ -523,7 +541,7 @@ function run_all(prng, path="")
         d["b8"]  = bench8(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
         d["b9"]  = bench9(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
         d["b10"] = bench10(prng, sched, Dict{Symbol, Any}(), transform=nothing)
-        save(joinpath("TSS.jld", d))
+        save(joinpath(path, "TSS.jld"), d)
     end
 
     begin
@@ -540,7 +558,7 @@ function run_all(prng, path="")
         d["b8"]  = bench8(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
         d["b9"]  = bench9(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
         d["b10"] = bench10(prng, sched, Dict{Symbol, Any}(), transform=nothing)
-        save(joinpath("TAPER.jld", d))
+        save(joinpath(path, "TAPER.jld"), d)
     end
 
     begin
@@ -557,7 +575,7 @@ function run_all(prng, path="")
         d["b8"]  = bench8(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
         d["b9"]  = bench9(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
         d["b10"] = bench10(prng, sched, Dict{Symbol, Any}(), transform=nothing)
-        save(joinpath("TAPER3.jld", d))
+        save(joinpath(path, "TAPER3.jld"), d)
     end
 
     begin
@@ -574,7 +592,7 @@ function run_all(prng, path="")
         d["b8"]  = bench8(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
         d["b9"]  = bench9(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
         d["b10"] = bench10(prng, sched, Dict{Symbol, Any}(), transform=nothing)
-        save(joinpath("AFAC.jld", d))
+        save(joinpath(path, "AFAC.jld"), d)
     end
 
     begin
@@ -591,7 +609,7 @@ function run_all(prng, path="")
         d["b8"]  = bench8(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
         d["b9"]  = bench9(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
         d["b10"] = bench10(prng, sched, Dict{Symbol, Any}(), transform=nothing)
-        save(joinpath("HSS.jld", d))
+        save(joinpath(path, "HSS.jld"), d)
     end
 
     begin
@@ -608,25 +626,7 @@ function run_all(prng, path="")
         d["b8"]  = bench8(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
         d["b9"]  = bench9(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
         d["b10"] = bench10(prng, sched, Dict{Symbol, Any}(), transform=nothing)
-        save(joinpath("BinLPT.jld", d))
-    end
-
-    begin
-        println("------- BO_FSS -------")
-        d      = Dict()
-        sched  = BO_FSS
-        transf = bo_fss_transform
-        d["b1"]  = vcat([bench1(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        d["b2"]  = vcat([bench2(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        d["b3"]  = vcat([bench3(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        d["b4"]  = vcat([bench4(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        d["b5"]  = vcat([bench5(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        d["b6"]  = vcat([bench6(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        d["b7"]  = vcat([bench7(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        d["b8"]  = vcat([bench8(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        d["b9"]  = vcat([bench9(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        d["b10"] = vcat([bench10(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        save(joinpath("BO_FSS.jld", d))
+        save(joinpath(path, "BinLPT.jld"), d)
     end
 
     begin
@@ -644,7 +644,7 @@ function run_all(prng, path="")
         d["b8"]  = vcat([bench8(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
         d["b9"]  = vcat([bench9(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
         d["b10"] = vcat([bench10(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        save(joinpath("BO_FAC.jld", d))
+        save(joinpath(path, "BO_FAC.jld"), d)
     end
 
     begin
@@ -662,7 +662,7 @@ function run_all(prng, path="")
         d["b8"]  = vcat([bench8(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
         d["b9"]  = vcat([bench9(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
         d["b10"] = vcat([bench10(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        save(joinpath("BO_TSS.jld", d))
+        save(joinpath(path, "BO_TSS.jld"), d)
     end
 
     begin
@@ -680,7 +680,7 @@ function run_all(prng, path="")
         d["b8"]  = vcat([bench8(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
         d["b9"]  = vcat([bench9(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
         d["b10"] = vcat([bench10(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        save(joinpath("BO_CSS.jld", d))
+        save(joinpath(path, "BO_CSS.jld"), d)
     end
 
     begin
@@ -698,6 +698,6 @@ function run_all(prng, path="")
         d["b8"]  = vcat([bench8(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
         d["b9"]  = vcat([bench9(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
         d["b10"] = vcat([bench10(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        save(joinpath("BO_TAPER.jld", d))
+        save(joinpath(path, "BO_TAPER.jld"), d)
     end
 end
