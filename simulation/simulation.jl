@@ -32,6 +32,10 @@ function bo_fss_transform(x)
     return 2^(11*x - 7)
 end
 
+function bo_fac_transform(x)
+    return 2^(5*x)
+end
+
 function bo_tss_transform(x)
     return 2^(11*x - 7)
 end
@@ -119,8 +123,6 @@ end
 function chunk!(::Type{BO_FAC}, i, p, R, P, N, h, dist, θ::Dict)
     if(!haskey(θ, :index) || θ[:index] == 1)
         θ[:index] = P
-        μ = θ[:μ]
-        σ = θ[:σ]
         K = R / P / θ[:param]
         K = ceil(Int64, K)
         θ[:chunk] = K

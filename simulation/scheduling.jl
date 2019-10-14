@@ -644,7 +644,7 @@ function run_all(prng, path="")
         println("------- BO_FAC -------")
         d      = Dict()
         sched  = BO_FAC
-        transf = bo_fss_transform
+        transf = bo_fac_transform
         d["b1"]  = vcat([bench1(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
         d["b2"]  = vcat([bench2(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
         d["b3"]  = vcat([bench3(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
@@ -658,57 +658,57 @@ function run_all(prng, path="")
         save(joinpath(path, "BO_FAC.jld"), d)
     end
 
-    begin
-        println("------- BO_TSS -------")
-        d      = Dict()
-        sched  = BO_TSS
-        transf = bo_tss_transform
-        d["b1"]  = vcat([bench1(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        d["b2"]  = vcat([bench2(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        d["b3"]  = vcat([bench3(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        d["b4"]  = vcat([bench4(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        d["b5"]  = vcat([bench5(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        d["b6"]  = vcat([bench6(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        d["b7"]  = vcat([bench7(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        d["b8"]  = vcat([bench8(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        d["b9"]  = vcat([bench9(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        d["b10"] = vcat([bench10(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        save(joinpath(path, "BO_TSS.jld"), d)
-    end
+    # begin
+    #     println("------- BO_TSS -------")
+    #     d      = Dict()
+    #     sched  = BO_TSS
+    #     transf = bo_tss_transform
+    #     d["b1"]  = vcat([bench1(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
+    #     d["b2"]  = vcat([bench2(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
+    #     d["b3"]  = vcat([bench3(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
+    #     d["b4"]  = vcat([bench4(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
+    #     d["b5"]  = vcat([bench5(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
+    #     d["b6"]  = vcat([bench6(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
+    #     d["b7"]  = vcat([bench7(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
+    #     d["b8"]  = vcat([bench8(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
+    #     d["b9"]  = vcat([bench9(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
+    #     d["b10"] = vcat([bench10(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
+    #     save(joinpath(path, "BO_TSS.jld"), d)
+    # end
 
-    begin
-        println("------- BO_CSS -------")
-        d      = Dict()
-        sched  = BO_CSS
-        transf = bo_css_transform
-        d["b1"]  = vcat([bench1(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        d["b2"]  = vcat([bench2(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        d["b3"]  = vcat([bench3(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        d["b4"]  = vcat([bench4(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        d["b5"]  = vcat([bench5(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        d["b6"]  = vcat([bench6(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        d["b7"]  = vcat([bench7(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        d["b8"]  = vcat([bench8(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        d["b9"]  = vcat([bench9(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        d["b10"] = vcat([bench10(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        save(joinpath(path, "BO_CSS.jld"), d)
-    end
+    # begin
+    #     println("------- BO_CSS -------")
+    #     d      = Dict()
+    #     sched  = BO_CSS
+    #     transf = bo_css_transform
+    #     d["b1"]  = vcat([bench1(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
+    #     d["b2"]  = vcat([bench2(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
+    #     d["b3"]  = vcat([bench3(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
+    #     d["b4"]  = vcat([bench4(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
+    #     d["b5"]  = vcat([bench5(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
+    #     d["b6"]  = vcat([bench6(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
+    #     d["b7"]  = vcat([bench7(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
+    #     d["b8"]  = vcat([bench8(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
+    #     d["b9"]  = vcat([bench9(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
+    #     d["b10"] = vcat([bench10(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
+    #     save(joinpath(path, "BO_CSS.jld"), d)
+    # end
 
-    begin
-        println("------- BO_TAPER -------")
-        d      = Dict()
-        sched  = BO_TAPER
-        transf = bo_taper_transform
-        d["b1"]  = vcat([bench1(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        d["b2"]  = vcat([bench2(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        d["b3"]  = vcat([bench3(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        d["b4"]  = vcat([bench4(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        d["b5"]  = vcat([bench5(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        d["b6"]  = vcat([bench6(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        d["b7"]  = vcat([bench7(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        d["b8"]  = vcat([bench8(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        d["b9"]  = vcat([bench9(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        d["b10"] = vcat([bench10(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
-        save(joinpath(path, "BO_TAPER.jld"), d)
-    end
+    # begin
+    #     println("------- BO_TAPER -------")
+    #     d      = Dict()
+    #     sched  = BO_TAPER
+    #     transf = bo_taper_transform
+    #     d["b1"]  = vcat([bench1(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
+    #     d["b2"]  = vcat([bench2(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
+    #     d["b3"]  = vcat([bench3(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
+    #     d["b4"]  = vcat([bench4(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
+    #     d["b5"]  = vcat([bench5(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
+    #     d["b6"]  = vcat([bench6(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
+    #     d["b7"]  = vcat([bench7(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
+    #     d["b8"]  = vcat([bench8(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
+    #     d["b9"]  = vcat([bench9(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
+    #     d["b10"] = vcat([bench10(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:8]...)
+    #     save(joinpath(path, "BO_TAPER.jld"), d)
+    # end
 end
