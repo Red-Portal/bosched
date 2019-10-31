@@ -64,7 +64,7 @@ find_package(LAPACK REQUIRED)
 
 set(Boost_USE_STATIC_LIBS ON)
 set(Boost_USE_STATIC_RUNTIME ON)
-find_package(Boost REQUIRED COMPONENTS thread program_options)
+find_package(Boost REQUIRED COMPONENTS program_options)
 
 set(LBPO_SOURCE_DIR ${PROJECT_SOURCE_DIR}/LBPO)
 # Include directories

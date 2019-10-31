@@ -2,8 +2,6 @@
 #ifndef _BOSCHED_LOOP_STATE_HPP_
 #define _BOSCHED_LOOP_STATE_HPP_
 
-#include "LPBO/GP.hpp"
-#include "LPBO/LPBO.hpp"
 #include "metrics.hpp"
 
 #include <atomic>
@@ -16,16 +14,15 @@ namespace bosched
     {
         bosched::time_point_t start;
         double param;
+        double eval_param;
         size_t num_tasks;
         std::vector<double> obs_y;
         std::vector<double> obs_x;
         bool warming_up;
-        size_t iteration;
         //std::atomic<double> mean_us;
-        std::vector<double> pred_mean;
-        std::vector<double> pred_var;
-        std::vector<double> pred_acq;
-        std::optional<lpbo::smc_gp> gp;
+        std::vector<double> gmm_weight;
+        std::vector<double> gmm_mean;
+        std::vector<double> gmm_stddev;
 
         inline bosched::time_point_t
         loop_start() noexcept

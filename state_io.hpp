@@ -19,32 +19,32 @@ namespace bosched
         for(auto const& l : loop_data)
         {
             loop_state_t state;
-            auto loop_id = l["id"];
-            state.param = l["param"];
+            auto loop_id     = l["id"];
+            state.param      = l["param"];
             state.warming_up = l["warmup"];
-            state.iteration = l["iteration"];
 
-            if(state.warming_up)
-            {
-                auto obs_x = l["obs_x"];
-                auto obs_y = l["obs_y"];
-                state.obs_x = std::vector<double>(obs_x.cbegin(), obs_x.cend());
-                state.obs_y = std::vector<double>(obs_y.cbegin(), obs_y.cend());
-            }
-            else
-            {
-                auto bytes = l["gp"];
-                auto byte_vec = std::vector<uint8_t>(bytes.begin(), bytes.end());
-                auto str = std::string(byte_vec.begin(), byte_vec.end());
-                state.gp.emplace(str);
+	    if(state.warming_up)
+	    {
+		state.eval_param = l["eval_param"];
 
-                auto mean = l["mean"];
-                auto var  = l["var"];
-                auto acq  = l["acq"];
-                state.pred_mean = std::vector<double>(mean.cbegin(), mean.cend());
-                state.pred_var  = std::vector<double>(var.cbegin(), var.cend());
-                state.pred_acq  = std::vector<double>(acq.cbegin(), acq.cend());
-            }
+		auto& gmm_weight_json = l["gmm_weight"];
+		state.gmm_weight = std::vector<double>(gmm_weight_json.begin(),
+						       gmm_weight_json.end());
+
+		auto& gmm_mean_json = l["gmm_weight"];
+		state.gmm_mean = std::vector<double>(gmm_mean_json.begin(),
+						     gmm_mean_json.end());
+
+		auto& gmm_stddev_json = l["gmm_weight"];
+		state.gmm_stddev = std::vector<double>(gmm_stddev_json.begin(),
+						       gmm_stddev_json.end());
+	    }
+
+
+	    auto obs_x  = l["obs_x"];
+	    auto obs_y  = l["obs_y"];
+	    state.obs_x = std::vector<double>(obs_x.cbegin(), obs_x.cend());
+	    state.obs_y = std::vector<double>(obs_y.cbegin(), obs_y.cend());
 
             if(getenv("DEBUG"))
             {
@@ -70,28 +70,13 @@ namespace bosched
             auto const& loop_state = l.second;
 
             nlohmann::json serialized_state;
-            serialized_state["id"] = loop_id;
-            serialized_state["param"] = loop_state.param;
-            serialized_state["warmup"] = loop_state.warming_up;
-            serialized_state["iteration"] = loop_state.iteration;
+            serialized_state["id"]        = loop_id;
+            serialized_state["param"]     = loop_state.param;
+            serialized_state["warmup"]    = loop_state.warming_up;
+	    serialized_state["obs_x"]     = nlohmann::json(std::move(loop_state.obs_x));
+	    serialized_state["obs_y"]     = nlohmann::json(std::move(loop_state.obs_y));
 
-            if(loop_state.warming_up)
-            {
-                serialized_state["obs_x"] = nlohmann::json(std::move(loop_state.obs_x));
-                serialized_state["obs_y"] = nlohmann::json(std::move(loop_state.obs_y));
-            }
-            else
-            {
-                auto str = loop_state.gp->serialize();
-                auto bytes = std::vector<uint8_t>(str.begin(), str.end());
-                serialized_state["gp"] = bytes;
-
-                serialized_state["mean"] = loop_state.pred_mean;
-                serialized_state["var"] = loop_state.pred_var;
-                serialized_state["acq"] = loop_state.pred_acq;
-            }
-
-            if(getenv("DEBUG"))
+	    if(getenv("DEBUG"))
             {
                 std::cout << "-- serialized loop " << serialized_state["id"]
                           << " parameter: "        << serialized_state["param"]
