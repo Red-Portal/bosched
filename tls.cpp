@@ -2,6 +2,7 @@
 #include "tls.hpp"
 #include "metrics.hpp"
 
+#include <algorithm>
 #include <atomic>
 #include <boost/thread/tss.hpp>
 #include <cmath>
