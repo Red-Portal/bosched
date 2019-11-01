@@ -159,39 +159,44 @@ parse_schedule (void)
         env += 3;
     }
     else if (strncasecmp (env, "trap1", 5) == 0)
-	  {
-        gomp_global_icv.run_sched_var = FS_TRAP1;
-        env += 5;
-	  }
+	{
+	    gomp_global_icv.run_sched_var = FS_TRAP1;
+	    env += 5;
+	}
     else if (strncasecmp (env, "css", 3) == 0)
-	  {
-        gomp_global_icv.run_sched_var = FS_CSS;
-        env += 3;
-	  }
+	{
+	    gomp_global_icv.run_sched_var = FS_CSS;
+	    env += 3;
+	}
     else if (strncasecmp (env, "taper", 5) == 0)
-	  {
-        gomp_global_icv.run_sched_var = FS_TAPE;
-        env += 4;
-	  }
+	{
+	    gomp_global_icv.run_sched_var = FS_TAPE;
+	    env += 4;
+	}
     else if (strncasecmp (env, "tape3", 5) == 0)
-	  {
-		gomp_global_icv.run_sched_var = FS_TAPE3;
-        env += 5;
-	  }
+	{
+	    gomp_global_icv.run_sched_var = FS_TAPE3;
+	    env += 5;
+	}
     else if (strncasecmp (env, "bo_tape", 7) == 0)
-	  {
-        gomp_global_icv.run_sched_var = BO_TAPE;
-        env += 7;
-	  }
+	{
+	    gomp_global_icv.run_sched_var = BO_TAPE;
+	    env += 7;
+	}
     else if (strncasecmp (env, "bo_css", 6) == 0)
-	  {
-        gomp_global_icv.run_sched_var = BO_CSS;
-        env += 6;
-	  }
+	{
+	    gomp_global_icv.run_sched_var = BO_CSS;
+	    env += 6;
+	}
     else if (strncasecmp (env, "bo_fss", 6) == 0)
     {
-        gomp_global_icv.run_sched_var = BO_FSS;
-        env += 6;
+	gomp_global_icv.run_sched_var = BO_FSS;
+	env += 6;
+    }
+    else if (strncasecmp (env, "bo_fac", 6) == 0)
+    {
+	gomp_global_icv.run_sched_var = BO_FAC;
+	env += 6;
     }
     else if (strncasecmp (env, "bo_tss", 6) == 0)
     {
@@ -1285,6 +1290,9 @@ handle_omp_display_env (unsigned long stacksize, int wait_policy)
         break;
     case BO_FSS:
         fputs ("BO_FSS", stderr);
+        break;
+    case BO_FAC:
+        fputs ("BO_FAC", stderr);
         break;
     case BO_CSS:
         fputs ("BO_CSS", stderr);

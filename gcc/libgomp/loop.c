@@ -494,91 +494,91 @@ bo_loop_fac2_start (long start, long end, long incr,
 
 bool
 GOMP_loop_runtime_start (long start, long end, long incr,
-						 long *istart, long *iend,
-						 region_id_t region_id)
+			 long *istart, long *iend,
+			 region_id_t region_id)
   {
-	struct gomp_task_icv *icv = gomp_icv (false);
-	bool valid;
-	switch (icv->run_sched_var)
+      struct gomp_task_icv *icv = gomp_icv (false);
+      bool valid;
+      switch (icv->run_sched_var)
 	  {
 	  case GFS_STATIC:
-		valid = gomp_loop_static_start (start, end, incr,
-										icv->run_sched_chunk_size,
-										istart, iend, region_id);
-		break;
+	      valid = gomp_loop_static_start (start, end, incr,
+					      icv->run_sched_chunk_size,
+					      istart, iend, region_id);
+	      break;
 	  case GFS_DYNAMIC:
-		valid = gomp_loop_dynamic_start (start, end, incr,
-										 icv->run_sched_chunk_size,
-										 istart, iend, region_id);
-		break;
+	      valid = gomp_loop_dynamic_start (start, end, incr,
+					       icv->run_sched_chunk_size,
+					       istart, iend, region_id);
+	      break;
 	  case GFS_GUIDED:
-		valid = gomp_loop_guided_start (start, end, incr,
-										icv->run_sched_chunk_size,
-										istart, iend, region_id);
-		break;
+	      valid = gomp_loop_guided_start (start, end, incr,
+					      icv->run_sched_chunk_size,
+					      istart, iend, region_id);
+	      break;
 	  case GFS_AUTO:
-		/* For now map to schedule(static), later on we could play with feedback
-		   driven choice.  */
-		valid = gomp_loop_static_start (start, end, incr, 0,
-										istart, iend, region_id);
-		break;
+	      /* For now map to schedule(static), later on we could play with feedback
+		 driven choice.  */
+	      valid = gomp_loop_static_start (start, end, incr, 0,
+					      istart, iend, region_id);
+	      break;
 
-		/* case FS_AFAC: */
-		/*     valid = bo_loop_afac_start (start, end, incr, */
-		/* 								istart, iend, icv->run_sched_var, */
-		/*                                 region_id); */
-		/* 	break; */
+	      /* case FS_AFAC: */
+	      /*     valid = bo_loop_afac_start (start, end, incr, */
+	      /* 								istart, iend, icv->run_sched_var, */
+	      /*                                 region_id); */
+	      /* 	break; */
 
 	  case FS_BINLPT:
-		valid = gomp_loop_binlpt_start (start, end, incr, istart, iend,
-										0, icv->run_sched_var, region_id);
-		break;
+	      valid = gomp_loop_binlpt_start (start, end, incr, istart, iend,
+					      0, icv->run_sched_var, region_id);
+	      break;
 
 	  case FS_HSS:
-		valid = gomp_loop_hss_start (start, end, incr, 0, istart, iend,
-									 icv->run_sched_var,region_id);
-		break;
+	      valid = gomp_loop_hss_start (start, end, incr, 0, istart, iend,
+					   icv->run_sched_var,region_id);
+	      break;
 
 	  case FS_FAC2:
-		valid = bo_loop_fac2_start (start, end, incr,
-									istart, iend, icv->run_sched_var,
-									region_id);
-		break;
+	      valid = bo_loop_fac2_start (start, end, incr,
+					  istart, iend, icv->run_sched_var,
+					  region_id);
+	      break;
 
 	  case FS_FSS:
 	  case BO_FSS:
-		valid = bo_loop_fss_start (start, end, incr,
-								   istart, iend, icv->run_sched_var,
-								   region_id );
-		break;
+	      valid = bo_loop_fss_start (start, end, incr,
+					 istart, iend, icv->run_sched_var,
+					 region_id );
+	      break;
 
 	  case FS_TSS:
 	  case FS_TRAP1:
 	  case BO_TSS:
-		valid = bo_loop_tss_start(start, end, incr,
-								  istart, iend, icv->run_sched_var,
-								  region_id );
-		break;
+	      valid = bo_loop_tss_start(start, end, incr,
+					istart, iend, icv->run_sched_var,
+					region_id );
+	      break;
 
 	  case FS_CSS:
 	  case BO_CSS:
-		valid = bo_loop_css_start (start, end, incr,
-								   istart, iend, icv->run_sched_var,
-								   region_id );
-		break;
+	      valid = bo_loop_css_start (start, end, incr,
+					 istart, iend, icv->run_sched_var,
+					 region_id );
+	      break;
 
 	  case FS_TAPE:
 	  case FS_TAPE3:
 	  case BO_TAPE:
-		valid = bo_loop_tape_start (start, end, incr,
-									istart, iend, icv->run_sched_var,
-									region_id );
-		break;
+	      valid = bo_loop_tape_start (start, end, incr,
+					  istart, iend, icv->run_sched_var,
+					  region_id );
+	      break;
 
 	  default:
-		abort ();
+	      abort ();
 	  }
-	return valid;
+      return valid;
   }
 
 /* The *_ordered_*_start routines are similar.  The only difference is that

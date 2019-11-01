@@ -14,6 +14,7 @@ namespace bosched
     {
         double css;
         double fss;
+        double fac;
         std::optional<double> tss;
         std::optional<double> tape;
         std::vector<unsigned> binlpt;
@@ -31,6 +32,7 @@ namespace bosched
 
             double css_param  = value["css"];
             double fss_param  = value["fss"];
+            double fac_param  = value["fac"];
 
             if(value.count("tape") > 0)
             {
@@ -49,6 +51,7 @@ namespace bosched
 
             param_bundle.css    = css_param;
             param_bundle.fss    = fss_param;
+            param_bundle.fac    = fac_param;
             param_bundle.binlpt = std::vector<unsigned>(binlpt_json.size());
             param_bundle.hss    = std::vector<unsigned>(hss_json.size());
 

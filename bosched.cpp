@@ -103,23 +103,15 @@ extern "C"
             auto data = nlohmann::json();
             stream >> data;
             _loop_states = bosched::read_loops(data);
+
+            if(data.count("params") > 0)
+		_params = bosched::load_workload_params(data);
         }
         else
         {
             _is_new_file = true;
         }
         stream.close();
-
-        {
-            nlohmann::json raw_params;
-            auto param_stream = std::ifstream(".params.json"s);
-            if(param_stream)
-            {
-                param_stream >> raw_params;
-                _params = bosched::load_workload_params(raw_params);
-            }
-            param_stream.close();
-        }
 
         if(getenv("EVAL"))
         {
@@ -214,6 +206,18 @@ extern "C"
     double bo_fss_parameter(unsigned long long region_id)
     {
         double param = _params[region_id].fss;
+        if(__builtin_expect (_is_debug, false))
+        {
+            std::cout << "-- loop " << region_id
+                      << " requested fss schedule parameter " << param
+                      << std::endl;
+        }
+        return param;
+    }
+
+    double bo_fac_parameter(unsigned long long region_id)
+    {
+        double param = _params[region_id].fac;
         if(__builtin_expect (_is_debug, false))
         {
             std::cout << "-- loop " << region_id

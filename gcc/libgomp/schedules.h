@@ -67,6 +67,12 @@ fss_transform_range(double param)
 }
 
 inline double
+fac_transform_range(double param)
+{
+  return pow(2, 27 * param - 20);
+}
+
+inline double
 tape_transform_range(double param)
 {
     return exp(15 * param - 10);

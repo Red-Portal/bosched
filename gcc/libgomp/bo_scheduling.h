@@ -30,6 +30,8 @@ extern double bo_tape_parameter(unsigned long long region_id);
 
 extern double bo_fss_parameter(unsigned long long region_id);
 
+extern double bo_fac_parameter(unsigned long long region_id);
+
 extern double bo_css_parameter(unsigned long long region_id);
 
 extern void bo_save_data(char const* progname,
