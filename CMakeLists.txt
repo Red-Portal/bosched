@@ -65,9 +65,15 @@ find_package(LAPACK REQUIRED)
 set(Boost_USE_STATIC_LIBS ON)
 set(Boost_USE_STATIC_RUNTIME ON)
 find_package(Boost REQUIRED COMPONENTS program_options)
+find_package(HighFive REQUIRED)
 
 set(LBPO_SOURCE_DIR ${PROJECT_SOURCE_DIR}/LBPO)
 # Include directories
+
+target_compile_definitions(${PROJECT_NAME}
+    PUBLIC
+    USE_BOOST=1)
+
 target_include_directories(${PROJECT_NAME}
     PUBLIC
     ${LPBO_SOURCE_DIR}
@@ -78,7 +84,8 @@ target_link_libraries(${PROJECT_NAME}
     PRIVATE
     ${BLAS_LIBRARIES}
     ${Boost_LIBRARIES}
-    ${LAPACK_LIBRARIES})
+    ${LAPACK_LIBRARIES}
+    HighFive)
 
 add_executable(offline ${PROJECT_SOURCE_DIR}/offline_computation.cpp)
 

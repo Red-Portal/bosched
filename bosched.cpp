@@ -1,5 +1,6 @@
 
 #include <iostream>
+#include <highfive/H5File.hpp>
 
 #include "loop_state.hpp"
 #include "metrics.hpp"
@@ -28,11 +29,11 @@ bool _is_bo_schedule = false;
 bool _is_new_file    = false;
 bool _profile_loop   = false;
 bool _is_eval        = false;
-std::mt19937 _rng __attribute__((init_priority(101)));
-std::unordered_map<size_t, bosched::loop_state_t> _loop_states __attribute__((init_priority(101)));
-nlohmann::json _stats   __attribute__((init_priority(101)));
-nlohmann::json _profile __attribute__((init_priority(101)));
-std::unordered_map<size_t, bosched::workload_params> _params __attribute__((init_priority(101)));
+std::mt19937   _rng __attribute__((init_priority(101)));
+nlohmann::json _stats       __attribute__((init_priority(101)));
+std::unordered_map<size_t, bosched::loop_state_t>    _loop_states __attribute__((init_priority(101)));
+std::unordered_map<size_t, prof::profiles>           _profiles    __attribute__((init_priority(101)));
+std::unordered_map<size_t, bosched::workload_params> _params      __attribute__((init_priority(101)));
 long _procs;
 size_t _profile_count = 0;
 
@@ -91,10 +92,6 @@ extern "C"
         if(getenv("PROFILE"))
         {
             _profile_loop = true;
-            auto prof_stream = std::ifstream(".workload.json"s);
-            if(prof_stream)
-                prof_stream >> _profile; 
-            prof_stream.close();
         }
 
         if(stream)
@@ -133,15 +130,14 @@ extern "C"
             stat_stream.close();
         }
 
-        if(_is_eval)
-            return;
-
         if(_profile_loop)
         {
-            auto prof_stream = std::ofstream(".workload.json"s);
-            prof_stream << _profile.dump(2); 
-            prof_stream.close();
+            auto prof_file_name = ".workload."s + progname + ".h5"s;
+	    prof::save_profiles(prof_file_name, std::move(_profiles));
         }
+
+        if(_is_eval)
+            return;
 
         auto next = bosched::write_loops(std::move(_loop_states));
 
@@ -376,17 +372,14 @@ extern "C"
             }
         }
 
-        if(__builtin_expect(_profile_loop, false))
+        if(__builtin_expect(_profile_loop, false) && _profile_count <= 4)
         {
-            if(_profile_count <= 4)
-            {
-                auto workload_profile = prof::load_profile();
-                _profile[std::to_string(region_id)].emplace_back(workload_profile);
-                ++_profile_count;
-            }
-        }
+	    auto workload_profile = prof::load_profile();
+	    _profiles[region_id].push(workload_profile);
+	    ++_profile_count;
+	}
 
-        if(__builtin_expect (_is_debug, false))
+	if(__builtin_expect (_is_debug, false))
         {
             std::cout << "-- loop " << region_id << " ending execution" << std::endl;
         }
