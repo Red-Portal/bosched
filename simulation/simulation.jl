@@ -58,7 +58,6 @@ function chunk!(::Type{BO_TSS}, i, p, R, P, N, h, dist, θ::Dict)
     end
     K = max(θ[:K_prev] - δ, Kl)
     θ[:K_prev] = K
-    println(K)
     return i,i+floor(Int64, K)
 end
 
@@ -327,7 +326,6 @@ function simulate(sched::Type{<:Schedule}, prng, f, P, N, h,
 
         R -= K
         i += K
-        println(i)
     end
     max_idx = argmax(hist)
     min_idx = argmin(hist)
