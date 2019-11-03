@@ -57,26 +57,27 @@ css_chunk_size(double param, long N, size_t P)
 inline double
 css_transform_range(double param)
 {
-  return exp(15 * param - 8);
+    return pow(2, 10*param - 5);
 }
 
 inline double
 fss_transform_range(double param)
 {
-  return pow(2, 27 * param - 20);
+    return pow(2, 11*param - 7);
 }
 
 inline double
 fac_transform_range(double param)
 {
-  return pow(2, 27 * param - 20);
+    return pow(2, 5*param);
 }
 
 inline double
 tape_transform_range(double param)
 {
-    return exp(15 * param - 10);
+    return pow(2, 13*param - 7);
 }
+
 
 #ifdef HAVE_SYNC_BUILTINS
 /* Similar, but doesn't require the lock held, and uses compare-and-swap
