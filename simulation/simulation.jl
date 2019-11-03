@@ -36,9 +36,9 @@ function bo_fac_transform(x)
     return 2^(5*x)
 end
 
-function bo_tss_transform(x)
-    return 2^(11*x - 7)
-end
+# function bo_tss_transform(x)
+#     return 2^(11*x - 7)
+# end
 
 function bo_taper_transform(x)
     return 2^(13*x - 7)
@@ -49,16 +49,17 @@ function bo_css_transform(x)
 end
 
 function chunk!(::Type{BO_TSS}, i, p, R, P, N, h, dist, θ::Dict)
-    δ  = θ[:param]
+    δ  = 1/θ[:param]
     Kl = 1
-    Kf = √(1 + 2*N*δ)
+    Kf = √(2*N*δ - 1)
     if(i == 1)
         θ[:K_prev] = Kf
         return i,i+floor(Int64, Kf)
     end
     K = max(θ[:K_prev] - δ, Kl)
     θ[:K_prev] = K
-    return i,i+ceil(Int64, K)
+    println(K)
+    return i,i+floor(Int64, K)
 end
 
 function chunk!(::Type{TSS}, i, p, R, P, N, h, dist, θ::Dict)
@@ -68,12 +69,11 @@ function chunk!(::Type{TSS}, i, p, R, P, N, h, dist, θ::Dict)
         θ[:K_prev] = Float64(Kf)
         return i, i+ceil(Int64, Kf)
     end
-
-    C = 2 * N / (Kf + Kl)
+    C = ceil(2 * N / (Kf + Kl))
     δ = (Kf - Kl) / (C - 1)
     K = max(θ[:K_prev] - δ, Kl)
     θ[:K_prev] = K
-    return i, i+ceil(Int64, K)
+    return i, floor(Int64,i+K)
 end
 
 function chunk!(::Type{TAPER}, i, p, R, P, N, h, dist, θ::Dict)
@@ -312,7 +312,7 @@ function simulate(sched::Type{<:Schedule}, prng, f, P, N, h,
         p = argmin(hist)
         start, stop = chunk!(sched, i, p, R, P, N, h, f, θ)
 
-        K = stop - start + 1
+        K = stop - start
         stop = start + min(R, K)
 
         work     = sample_work(prng, f, start, stop, N)
@@ -327,6 +327,7 @@ function simulate(sched::Type{<:Schedule}, prng, f, P, N, h,
 
         R -= K
         i += K
+        println(i)
     end
     max_idx = argmax(hist)
     min_idx = argmin(hist)

@@ -178,17 +178,22 @@ function experiment3_1(prng)
         seeds  = MersenneTwister.(rand(prng, UInt64, length(axis2)))
         outbuf = Array{DataFrame}(undef, length(axis2))
 
-        Threads.@threads for j in 1:length(axis2)
+        #Threads.@threads for j in 1:length(axis2)
+        for j in 1:length(axis2)
             x     = axis2[j]
             λ     = 2^y
             dist  = Exponential(λ);
             iters = 128
-            h     = 1.0
+            h     = 8.0
             N     = 2^14
             P     = 32
+
+            gen(prng, i, x) = rand(prng, dist)
             
-            θ   = Dict{Symbol, Any}(:param=>Float64(2^x));
-            res = run(BO_FSS, iters, seeds[j], dist, P, N, h, θ)
+            θ   = Dict{Symbol, Any}(:param=>Float64(2^x),
+                                    :μ=>mean(dist),
+                                    :σ=>mean(dist));
+            res = run(BO_FSS, iters, seeds[j], gen, P, N, h, θ)
             outbuf[j] = res
         end
         df = vcat(df, outbuf...)
