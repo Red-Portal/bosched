@@ -78,7 +78,7 @@ gomp_loop_init (struct gomp_work_share *ws, long start, long end, long incr,
 	  if (sched == FS_FAC2)
 	    ws->param = 2.0;
 	  else
-	    ws->param = bo_fac_parameter (region_id);
+	    ws->param = fac_transform_range (ws->param);
 
 	  ws->chunk_size = num_tasks / ws->param / nthreads;
 	  break;

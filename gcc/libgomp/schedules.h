@@ -100,7 +100,7 @@ bo_iter_fac2_next (long *pstart, long *pend)
     bo_ul R = (end - start) / incr;
     bo_ul nend;
 
-    double param = fac_transform_range(ws->param);
+    double param = ws->param; //fac_transform_range(ws->param);
 
     while (1)
     {
@@ -185,7 +185,7 @@ bo_iter_ull_fac2_next (gomp_ull *pstart, gomp_ull *pend)
     gomp_ull nend;
     gomp_ull R;
 
-    double param = fac_transform_range(ws->param);
+    double param = ws->param;
 
     while (1)
     {
@@ -283,7 +283,7 @@ bo_iter_fss_next (long *pstart, long *pend)
     bo_ul R = (end - start) / incr;
     bo_ul nend;
 
-    double param = fss_transform_range(ws->param);
+    double param = ws->param;
 
     while (1)
     {
@@ -371,7 +371,7 @@ bo_iter_ull_fss_next (gomp_ull *pstart, gomp_ull *pend)
     gomp_ull nend;
     gomp_ull R;
 
-    double param = fss_transform_range(ws->param);
+    double param = ws->param;
 
     while (1)
     {
