@@ -211,17 +211,17 @@ extern "C"
         return param;
     }
 
-    double bo_fac_parameter(unsigned long long region_id)
-    {
-        double param = _params[region_id].fac;
-        if(__builtin_expect (_is_debug, false))
-        {
-            std::cout << "-- loop " << region_id
-                      << " requested fss schedule parameter " << param
-                      << std::endl;
-        }
-        return param;
-    }
+    // double bo_fac_parameter(unsigned long long region_id)
+    // {
+    //     double param = _params[region_id].fac;
+    //     if(__builtin_expect (_is_debug, false))
+    //     {
+    //         std::cout << "-- loop " << region_id
+    //                   << " requested fss schedule parameter " << param
+    //                   << std::endl;
+    //     }
+    //     return param;
+    // }
 
     double bo_css_parameter(unsigned long long region_id)
     {
@@ -374,8 +374,7 @@ extern "C"
 
         if(__builtin_expect(_profile_loop, false) && _profile_count <= 4)
         {
-	    auto workload_profile = prof::load_profile();
-	    _profiles[region_id].push(workload_profile);
+	    _profiles[region_id].push(prof::load_profile());
 	    ++_profile_count;
 	}
 

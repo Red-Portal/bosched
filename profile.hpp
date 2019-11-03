@@ -2,7 +2,6 @@
 #ifndef _PROFILE_HPP_
 #define _PROFILE_HPP_
 
-#include <boost/multi_array.hpp>
 #include <cassert>
 #include <cstdlib>
 #include <highfive/H5File.hpp>
@@ -14,33 +13,36 @@ namespace prof
 {
     class profiles
     {
-	boost::multi_array<float, 2>  _data;
+	std::vector<std::vector<float>>  _data;
 	
     public:
 	inline
 	profiles() : _data() {}
 
-	inline
-	profiles(boost::multi_array<float, 2>&& loaded)
-	    : _data(std::move(loaded))
-	{}
-
 	inline void
-	push(std::vector<float> const& data) 
+	push(std::vector<float>&& data) 
 	{
-	    //assert(data.size() == _data.shape()[0]);
-	    size_t num_entry = _data.shape()[1];
-	    auto extents = decltype(_data)::extent_gen();
-	    // row major order
-	    _data.resize(extents[num_entry + 1][data.size()]);
-	    std::copy(data.begin(), data.end(),
-		      _data[num_entry].end() - data.size());
+	    if(_data.size() > 0)
+		assert(_data.back().size() == _data.size());
+	    _data.push_back(std::move(data));
 	}
 
-	inline boost::multi_array<float, 2>
+	inline std::vector<std::vector<float>>
 	data() const
 	{
 	    return _data;
+	}
+
+	inline size_t
+	entries() const
+	{
+	    return _data.size();
+	}
+
+	inline size_t
+	length() const
+	{
+	    return _data.back().size();
 	}
     };
 
