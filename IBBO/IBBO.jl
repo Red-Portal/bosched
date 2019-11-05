@@ -107,13 +107,17 @@ function entropy_upperbound(w, μ, σ)
     return first_term - second_term
 end
 
-function fit_gp(x, y, verbose::Bool)
+function whitening(y)
     y *= -1
     μ  = mean(y)
     σ  = stdm(y, μ) 
     y .-= μ
     y ./= σ
+    return y
+end
 
+function fit_gp(x, y, verbose::Bool)
+    y  = whitening(y)
     m  = MeanConst(0.0)
     k  = SE(0.0, 1.0)
     set_priors!(k, [Normal(-1.0,2.0), Normal(-1.0,2.0)])
@@ -130,7 +134,6 @@ function fit_gp(x, y, verbose::Bool)
         println("- optimizing hyperparameters")
     end
     gp = slice(gp, 200, 100, thinning=1)
-    #gp = (gp, 200, 10, thinning=1)
     #gp  = hmc(gp; ε=0.1, iteration=200, burnin=100, thinning=1)
     if(verbose)
         println("- optimizing hyperparameters - done")
