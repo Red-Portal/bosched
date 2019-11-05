@@ -4,6 +4,7 @@
 
 #include "metrics.hpp"
 
+#include <nlohmann/json.hpp>
 #include <atomic>
 #include <vector>
 #include <optional>
@@ -12,17 +13,20 @@ namespace bosched
 {
     struct loop_state_t
     {
-        bosched::time_point_t start;
         double param;
-        double eval_param;
         size_t num_tasks;
-        std::vector<double> obs_y;
-        std::vector<double> obs_x;
-        bool warming_up;
-        //std::atomic<double> mean_us;
+        double eval_param;
         std::vector<double> gmm_weight;
         std::vector<double> gmm_mean;
         std::vector<double> gmm_stddev;
+        std::vector<double> obs_x;
+        std::vector<double> obs_y;
+        //std::atomic<double> mean_us;
+        bool warming_up;
+        bosched::time_point_t start;
+	nlohmann::json hist_x;
+        nlohmann::json hist_y;
+        size_t iteration;
 
         inline bosched::time_point_t
         loop_start() noexcept

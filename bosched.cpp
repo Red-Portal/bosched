@@ -73,13 +73,38 @@ extern "C"
         std::random_device seed;
         _rng = std::mt19937(seed());
 
-        auto file_name = ".bostate."s + progname;
-        std::ifstream stream(file_name + ".json"s);
-
         if(getenv("DEBUG"))
         {
             _is_debug = true;
         }
+
+
+        if(getenv("PROFILE"))
+        {
+            _profile_loop = true;
+        }
+	else
+	{
+	    auto file_name = ".bostate."s + progname;
+	    std::ifstream stream(file_name + ".json"s);
+
+	    if(stream)
+	    {
+		_is_new_file = false;
+		auto data = nlohmann::json();
+		stream >> data;
+		_loop_states = bosched::read_loops(data);
+
+		if(data.count("params") > 0)
+		    _params = bosched::load_workload_params(data);
+	    }
+	    else
+	    {
+		_is_new_file = true;
+	    }
+	    stream.close();
+	}
+
         if(getenv("LOOPSTAT"))
         {
             _show_loop_stat = true;
@@ -88,31 +113,11 @@ extern "C"
             if(stat_stream)
                 stat_stream >> _stats; 
             stat_stream.close();
-        }
-        if(getenv("PROFILE"))
-        {
-            _profile_loop = true;
-        }
+	}
 
-        if(stream)
-        {
-            _is_new_file = false;
-            auto data = nlohmann::json();
-            stream >> data;
-            _loop_states = bosched::read_loops(data);
-
-            if(data.count("params") > 0)
-		_params = bosched::load_workload_params(data);
-        }
-        else
-        {
-            _is_new_file = true;
-        }
-        stream.close();
-
-        if(getenv("EVAL"))
-        {
-            _is_eval = true;
+	if(getenv("EVAL"))
+	{
+	    _is_eval = true;
         }
     }
 
@@ -130,21 +135,23 @@ extern "C"
             stat_stream.close();
         }
 
+        if(_is_eval)
+            return;
+
         if(_profile_loop)
         {
             auto prof_file_name = ".workload."s + progname + ".h5"s;
 	    prof::save_profiles(prof_file_name, std::move(_profiles));
         }
+	else if(_loop_states.size() > 0)
+	{
+	    auto next = bosched::write_loops(std::move(_loop_states));
 
-        if(_is_eval)
-            return;
-
-        auto next = bosched::write_loops(std::move(_loop_states));
-
-        auto file_name = ".bostate."s + progname;
-        auto stream = std::ofstream(file_name + ".json"s);
-        stream << next.dump(2); 
-        stream.close();
+	    auto file_name = ".bostate."s + progname;
+	    auto stream = std::ofstream(file_name + ".json"s);
+	    stream << next.dump(2); 
+	    stream.close();
+	}
     }
 
     void bo_workload_profile_start(long iteration)
