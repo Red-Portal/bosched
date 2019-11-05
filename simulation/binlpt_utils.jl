@@ -42,6 +42,37 @@ function compute_chunkweights(tasks, ntasks, chunksizes, nchunks)
     return chunks;
 end
 
+function binlpt_balance(tasks, P, K_max)
+    N = length(tasks)
+    load = zeros(P)
+    taskmap = zeros(UInt16, N) 
+
+    chunksizes = compute_chunksizes(tasks, N, K_max)
+    chunks     = compute_chunkweights(tasks, N, chunksizes, K_max)
+    chunkoff   = offset_cumsum(chunksizes)
+
+    # Sort tasks.
+    sortmap = sortperm(chunks)
+
+    for i = K_max:-1:1
+        if (chunks[sortmap[i]] == 0)
+            continue
+        end
+        tid = 1
+        for j = 2:P
+            if (load[j] < load[tid])
+                tid = j
+            end
+        end
+
+        for j = 1:chunksizes[sortmap[i]]
+            taskmap[chunkoff[sortmap[i]] + j] = tid
+        end
+        load[tid] += chunks[sortmap[i]]
+    end
+    return taskmap;
+end
+
 function binlpt_balance(f, N, P, K_max)
     tasks   = f.(1:N)
     load    = zeros(P)

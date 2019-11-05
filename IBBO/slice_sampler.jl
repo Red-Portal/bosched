@@ -1,5 +1,7 @@
 
+import ProgressMeter
 using Distributions
+using Random
 
 function batch_slice_sampler(p, batch_size, num_samples, burnin, max_proposals)
     xdom     = (0.00, 1.00)
@@ -84,10 +86,10 @@ function slice_sampler(p, num_samples, burnin)
     x_curr   = rand(proposal)
     p_x      = p(x_curr)
 
-    prog = Progress(burnin + num_samples)
+    prog = ProgressMeter.Progress(burnin + num_samples, "Sampling acquisition function...")
     for i = 1:burnin
         x_curr, p_x, props = sample(x_curr, p, 0.1, 16, xdom[1], xdom[2], p_x)
-        next!(prog)
+        ProgressMeter.next!(prog)
     end
 
     total_props = 0
@@ -95,7 +97,7 @@ function slice_sampler(p, num_samples, burnin)
         x_curr, p_x, props = sample(x_curr, p, 0.1, 16, xdom[1], xdom[2], p_x)
         samples[i]   = x_curr
         total_props += props
-        next!(prog)
+        ProgressMeter.next!(prog)
     end
     println("acceptance: $(num_samples / total_props), samples: $(length(samples))")
     return samples
