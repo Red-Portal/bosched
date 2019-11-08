@@ -124,7 +124,7 @@ end
 function update_dataset(loop_state)
     if(!haskey(loop_state, "hist_x") || loop_state["hist_x"] == nothing)
         loop_state["hist_x"] = []
-        loop["hist_y"] = []
+        loop_state["hist_y"] = []
     end
     push!(loop_state["hist_x"], loop_state["obs_x"]) 
     push!(loop_state["hist_y"], loop_state["obs_y"]) 
