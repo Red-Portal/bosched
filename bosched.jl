@@ -126,10 +126,12 @@ function update_dataset(loop_state)
         loop_state["hist_x"] = []
         loop_state["hist_y"] = []
     end
-    push!(loop_state["hist_x"], loop_state["obs_x"]) 
-    push!(loop_state["hist_y"], loop_state["obs_y"]) 
-    loop_state["obs_x"] = empty(loop_state["obs_x"])
-    loop_state["obs_y"] = empty(loop_state["obs_y"])
+    if(!isempty(loop_state["obs_x"]))
+        push!(loop_state["hist_x"], loop_state["obs_x"]) 
+        push!(loop_state["hist_y"], loop_state["obs_y"]) 
+        loop_state["obs_x"] = empty(loop_state["obs_x"])
+        loop_state["obs_y"] = empty(loop_state["obs_y"])
+    end
     return loop_state
 end
 
