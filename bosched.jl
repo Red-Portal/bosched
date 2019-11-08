@@ -115,8 +115,8 @@ function bo_subsample(obs_x, obs_y, subsample)
     for i = 1:length(obs_x)
         x = obs_x[i]
         y = obs_y[i]
-        push!(res_x, x[1:length(x)])
-        push!(res_y, y[1:length(y)])
+        push!(res_x, x[1:min(length(x), subsample)])
+        push!(res_y, y[1:min(length(y), subsample)])
     end
     return vcat(res_x...), vcat(res_y...)
 end
@@ -127,8 +127,8 @@ function bosched_mode(loop_states, subsize)
             loop["hist_x"] = []
             loop["hist_y"] = []
         end
-        append!(loop["hist_x"], loop["obs_x"]) 
-        append!(loop["hist_y"], loop["obs_y"]) 
+        push!(loop["hist_x"], loop["obs_x"]) 
+        push!(loop["hist_y"], loop["obs_y"]) 
         x, y = bo_subsample(loop["hist_x"], loop["hist_y"], subsize)
         x = convert(Array{Float64}, x)
         y = convert(Array{Float64}, y)
