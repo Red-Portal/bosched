@@ -121,14 +121,21 @@ function bo_subsample(obs_x, obs_y, subsample)
     return vcat(res_x...), vcat(res_y...)
 end
 
+function update_dataset(loop_state)
+    if(!haskey(loop_state, "hist_x") || loop_state["hist_x"] == nothing)
+        loop_state["hist_x"] = []
+        loop["hist_y"] = []
+    end
+    push!(loop_state["hist_x"], loop_state["obs_x"]) 
+    push!(loop_state["hist_y"], loop_state["obs_y"]) 
+    loop_state["obs_x"] = empty(loop_state["obs_x"])
+    loop_state["obs_y"] = empty(loop_state["obs_y"])
+    return loop_state
+end
+
 function bosched_mode(loop_states, subsize)
     for loop in loop_states
-        if(!haskey(loop, "hist_x") || loop["hist_x"] == nothing)
-            loop["hist_x"] = []
-            loop["hist_y"] = []
-        end
-        push!(loop["hist_x"], loop["obs_x"]) 
-        push!(loop["hist_y"], loop["obs_y"]) 
+        loop = update_dataset(loop)
         x, y = bo_subsample(loop["hist_x"], loop["hist_y"], subsize)
         x = convert(Array{Float64}, x)
         y = convert(Array{Float64}, y)
