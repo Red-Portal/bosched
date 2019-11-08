@@ -1,4 +1,7 @@
 
+module IBBO
+export ibbo, ibbo_log, MES, whitening
+
 using Suppressor
 using ForwardDiff
 using GaussianProcesses
@@ -6,7 +9,7 @@ using Statistics
 using Distributions
 using ScikitLearn
 using StatsFuns
-@sk_import mixture: BayesianGaussianMixture
+using PyCall
 
 import NLopt
 import GaussianProcesses.predict_y
@@ -17,6 +20,12 @@ include("bayesian_treatment.jl")
 include("particle_gp.jl")
 include("acquisition.jl")
 include("slice_sampler.jl")
+
+const mixture = PyNULL()
+
+function __init__()
+    copy!(mixture, pyimport("sklearn.mixture"))
+end
 
 function GaussianProcesses.predict_y(gp::PrecomputedParticleGP, x)
     bundle = GaussianProcesses.predict_y.(gp.gp, Ref(x))
@@ -175,7 +184,7 @@ function MES(x, y, find_best::Bool=false, verbose::Bool=false)
     return x, best_x, best_y
 end
 
-function IBBO(x, y, find_best::Bool=false, verbose::Bool=false)
+function ibbo(x, y, find_best::Bool=false, verbose::Bool=false)
     gp = fit_gp(x, y, verbose)
 
     if(verbose)
@@ -191,9 +200,9 @@ function IBBO(x, y, find_best::Bool=false, verbose::Bool=false)
         println("- fitting gaussian mixture model")
     end
 
-    gmm_config = BayesianGaussianMixture(n_components=10,
-                                         max_iter=1000,
-                                         weight_concentration_prior=1.0)
+    gmm_config = mixture.BayesianGaussianMixture(n_components=10,
+                                                 max_iter=1000,
+                                                 weight_concentration_prior=1.0)
     model = fit!(gmm_config, samples[:,:])
     w = model.weights_[:,1,1]
     μ = model.means_[:,1,1]
@@ -226,7 +235,7 @@ function IBBO(x, y, find_best::Bool=false, verbose::Bool=false)
     return w, μ, σ, H, best_x, best_y
 end
 
-function IBBO_log(x, y, find_best::Bool=false, verbose::Bool=false)
+function ibbo_log(x, y, find_best::Bool=false, verbose::Bool=false)
     gp = fit_gp(x, y, verbose)
 
     gp_gridx = collect(0.0:0.01:1.0)
@@ -248,10 +257,10 @@ function IBBO_log(x, y, find_best::Bool=false, verbose::Bool=false)
         println("- fitting gaussian mixture model")
     end
 
-    gmm_config = BayesianGaussianMixture(n_components=10,
-                                         n_init=16,
-                                         max_iter=1000,
-                                         weight_concentration_prior=1.0)
+    gmm_config = mixture.BayesianGaussianMixture(n_components=10,
+                                                 n_init=16,
+                                                 max_iter=1000,
+                                                 weight_concentration_prior=1.0)
     model = fit!(gmm_config, samples[:,:])
     w = model.weights_[:,1,1]
     μ = model.means_[:,1,1]
@@ -282,4 +291,6 @@ function IBBO_log(x, y, find_best::Bool=false, verbose::Bool=false)
         end
     end
     return w, μ, σ, H, α_gridx, α_gridy, gp_gridx, gp_gridμ, gp_gridσ, samples, best_x, best_y
+end
+
 end

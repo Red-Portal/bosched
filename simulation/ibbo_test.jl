@@ -1,8 +1,9 @@
 
-using Plots
-
 include("../IBBO/IBBO.jl")
 include("simulation.jl")
+
+using Plots
+using .IBBO
 
 function export_csv(fname, x, y, conf)
     open(fname, "w") do io
@@ -122,7 +123,7 @@ function ibbo_bayesched(prng, max_subsample)
     for i = 1:32
         println("--------- iteration $i -----------")
         w, μ, σ, H, αx, αy, gpx, gpμ, gpσ, samples, best_θ, best_y =
-            IBBO_log(dataset_x, dataset_y, true, true)
+            ibbo_log(dataset_x, dataset_y, true, true)
         gmm = MixtureModel(Normal, collect(zip(μ, σ)), w)       
 
         for t = 1:T

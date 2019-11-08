@@ -1,14 +1,15 @@
 
+include("simulation/binlpt_utils.jl")
+include("IBBO/IBBO.jl")
+
 import ArgParse
 import Base.Filesystem
 import JSON
+using .IBBO
 using HDF5
 using Plots
 using Statistics
 using TerminalMenus
-
-include("simulation/binlpt_utils.jl")
-include("IBBO/IBBO.jl")
 
 const fs  = Base.Filesystem
 
@@ -110,13 +111,13 @@ function classic_mode(workload_profile, loop_states, h, P)
 end
 
 function bo_subsample(obs_x, obs_y, subsample)
-    res_x = []
-    res_y = []
+    res_x = Float64[]
+    res_y = Float64[]
     for i = 1:length(obs_x)
-        x = obs_x[i]
-        y = obs_y[i]
-        push!(res_x, x[1:min(length(x), subsample)])
-        push!(res_y, y[1:min(length(y), subsample)])
+        x = convert(Array{Float64}, obs_x[i])
+        y = convert(Array{Float64}, obs_y[i])
+        append!(res_x, x[1:min(length(x), subsample)])
+        append!(res_y, y[1:min(length(y), subsample)])
     end
     return vcat(res_x...), vcat(res_y...)
 end
@@ -139,12 +140,10 @@ function bosched_mode(loop_states, subsize)
     for loop in loop_states
         loop = update_dataset(loop)
         x, y = bo_subsample(loop["hist_x"], loop["hist_y"], subsize)
-        x = convert(Array{Float64}, x)
-        y = convert(Array{Float64}, y)
         @assert length(x) == length(y)
 
         println("----- $(loop["id"]) bosched mode -----")
-        w, μ, σ, H, best_θ, best_y = IBBO(x, y, true, false)
+        w, μ, σ, H, best_θ, best_y = ibbo(x, y, true, false)
         loop["eval_param"] = best_θ
         loop["gmm_weight"] = w
         loop["gmm_mean"]   = μ
@@ -163,12 +162,10 @@ function visualize_gp(loop_states, subsize)
     menu    = RadioMenu(options, pagesize=3)
     for loop in loop_states
         x, y = bo_subsample(loop["hist_x"], loop["hist_y"], subsize)
-        x = convert(Array{Float64}, x)
-        y = convert(Array{Float64}, y)
 
         @assert length(x) == length(y)
         w, μ, σ, H, αx, αy, gpx, gpμ, gpσ², samples, best_θ, best_y =
-            IBBO_log(x, y, true, true)
+            ibbo_log(x, y, true, true)
         p1 = Plots.plot(gpx, gpμ, grid=false, ribbon=sqrt.(gpσ²)*1.96,
                         fillalpha=.5, label="GP (95%)", xlims=(0.0,1.0))
         Plots.scatter!(p1, x, whitening(y), label="data points", xlims=(0.0,1.0))
@@ -230,4 +227,9 @@ function main(args)
     end
 end
 
-main(ARGS)
+#main(ARGS)
+
+Base.@ccallable function julia_main(ARGS::Vector{String})::Cint
+    main(ARGS)
+    return 0
+end
