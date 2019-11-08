@@ -123,7 +123,7 @@ end
 
 function bosched_mode(loop_states, subsize)
     for loop in loop_states
-        if(!haskey(loop, "hist_x"))
+        if(!haskey(loop, "hist_x") || loop["hist_x"] == nothing)
             loop["hist_x"] = []
             loop["hist_y"] = []
         end
