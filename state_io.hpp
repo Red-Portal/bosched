@@ -25,7 +25,7 @@ namespace bosched
 
 	    if(!state.warming_up)
 	    {
-		auto& gmm = l["params"];
+		auto& gmm = l["gmm"];
 		state.eval_param = gmm["eval_param"];
 		auto& gmm_weight_json = gmm["gmm_weight"];
 		state.gmm_weight = std::vector<double>(gmm_weight_json.begin(),
@@ -89,7 +89,7 @@ namespace bosched
 		gmm["gmm_mean"]   = nlohmann::json(std::move(loop_state.gmm_mean));
 		gmm["gmm_stddev"] = nlohmann::json(std::move(loop_state.gmm_stddev));
 		gmm["eval_param"] = nlohmann::json(std::move(loop_state.eval_param));
-		serialized_state["params"] = std::move(gmm);
+		serialized_state["gmm"] = std::move(gmm);
 	    }
 
 	    if(getenv("DEBUG"))

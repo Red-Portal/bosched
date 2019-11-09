@@ -28,26 +28,27 @@ namespace bosched
         result.reserve(loops_json.size());
         for(auto [key, value] : loops_json.items())
         {
-            auto param_bundle   = workload_params();
+            auto param_bundle = workload_params();
+	    auto params       = value["params"];
 
-            double css_param  = value["css"];
-            double fss_param  = value["fss"];
+            double css_param  = params["css"];
+            double fss_param  = params["fss"];
             //double fac_param  = value["fac"];
 
-            if(value.count("tape") > 0)
+            if(params.count("tape") > 0)
             {
-                double tape = value["tape"];
+                double tape = params["tape"];
                 param_bundle.tape.emplace(tape);
             }
 
-            if(value.count("tss") > 0)
+            if(params.count("tss") > 0)
             {
-                double tss = value["tss"];
+                double tss = params["tss"];
                 param_bundle.tss.emplace(tss);
             }
 
-            auto& binlpt_json = value["binlpt"];
-            auto& hss_json    = value["hss"];
+            auto& binlpt_json = params["binlpt"];
+            auto& hss_json    = params["hss"];
 
             param_bundle.css    = css_param;
             param_bundle.fss    = fss_param;

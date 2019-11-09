@@ -157,7 +157,7 @@ function bosched_mode(loop_states, subsize)
         gmm["gmm_weight"] = w
         gmm["gmm_mean"]   = μ
         gmm["gmm_stddev"] = σ
-        loop["params"]    = gmm
+        loop["gmm"]       = gmm
         loop["warmup"]    = false
 
         println(" num components  = $(length(w))")
