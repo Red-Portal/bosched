@@ -34,7 +34,7 @@ function bo_css_transform(x)
 end
 
 function cmd_args(args, show)
-    s = ArgParse.ArgParseSettings()
+    s = ArgParse.ArgParseSettings("Bayesian Optimization Loop Scheduling Offline Routine")
     ArgParse.@add_arg_table s begin
         "--mode"
         arg_type     = String
@@ -50,12 +50,12 @@ function cmd_args(args, show)
         "--h"
         arg_type = Float64
         help     = "Scheduling overhead parameter (ms)."
-        metavar  = "<h>"
+        metavar  = "<millisecs>"
         default  = 0.1
         "--P"
         arg_type = Int64
         help     = "Number of cores."
-        metavar  = "<P>"
+        metavar  = "<cores>"
         default  = 32 
         "--subsize"
         arg_type = Int64
@@ -234,9 +234,11 @@ function main(args)
     end
 end
 
-#main(ARGS)
-
 Base.@ccallable function julia_main(ARGS::Vector{String})::Cint
     main(ARGS)
     return 0
+end
+
+if get(ENV, "COMPILE_STATIC", "false") == "false"
+    julia_main(ARGS)
 end

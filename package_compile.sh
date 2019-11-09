@@ -4,5 +4,5 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$GRPATH
 julia --startup-file=no $PCPATH --compile all --compiled-modules yes -vare bosched.jl
 if [[ $* == *--install* ]]
 then
-   ln -s builddir/bosched /usr/local/bin/bosched
+   sudo ln -s $PWD/builddir/bosched /usr/local/bin/bosched
 fi
