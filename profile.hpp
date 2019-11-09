@@ -23,7 +23,7 @@ namespace prof
 	push(std::vector<float>&& data) 
 	{
 	    if(_data.size() > 0)
-		assert(_data.back().size() == _data.size());
+		assert(_data.back().size() == data.size());
 	    _data.push_back(std::move(data));
 	}
 
