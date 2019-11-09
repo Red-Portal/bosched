@@ -24,9 +24,8 @@ namespace bosched
         //std::atomic<double> mean_us;
         bool warming_up;
         bosched::time_point_t start;
-	nlohmann::json hist_x;
-        nlohmann::json hist_y;
         size_t iteration;
+	nlohmann::json loop_json;
 
         inline bosched::time_point_t
         loop_start() noexcept
