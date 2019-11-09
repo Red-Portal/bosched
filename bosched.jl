@@ -10,6 +10,7 @@ using HDF5
 using Plots
 using Statistics
 using TerminalMenus
+using UnicodePlots
 
 const fs  = Base.Filesystem
 
@@ -151,11 +152,13 @@ function bosched_mode(loop_states, subsize)
 
         println("----- $(loop["id"]) bosched mode -----")
         w, μ, σ, H, best_θ, best_y = ibbo(x, y, true, false)
-        loop["eval_param"] = best_θ
-        loop["gmm_weight"] = w
-        loop["gmm_mean"]   = μ
-        loop["gmm_stddev"] = σ
-        loop["warmup"]     = false
+        gmm = Dict()
+        gmm["eval_param"] = best_θ
+        gmm["gmm_weight"] = w
+        gmm["gmm_mean"]   = μ
+        gmm["gmm_stddev"] = σ
+        loop["params"]    = gmm
+        loop["warmup"]    = false
 
         println(" num components  = $(length(w))")
         println(" mixture entropy = $H")
@@ -165,6 +168,10 @@ function bosched_mode(loop_states, subsize)
 end
 
 function visualize_gp(loop_states, subsize)
+    uimodes  = ["GUI", "CUI"]
+    uimenu   = RadioMenu(uimodes, pagesize=2)
+    uichoice = request("choose interface:", uimenu)
+
     options = ["continue", "export", "exit"]
     menu    = RadioMenu(options, pagesize=3)
     for loop in loop_states
@@ -173,11 +180,25 @@ function visualize_gp(loop_states, subsize)
         @assert length(x) == length(y)
         w, μ, σ, H, αx, αy, gpx, gpμ, gpσ², samples, best_θ, best_y =
             ibbo_log(x, y, true, true)
-        p1 = Plots.plot(gpx, gpμ, grid=false, ribbon=sqrt.(gpσ²)*1.96,
-                        fillalpha=.5, label="GP (95%)", xlims=(0.0,1.0))
-        Plots.scatter!(p1, x, whitening(y), label="data points", xlims=(0.0,1.0))
-        p2 = Plots.plot(αx, αy, label="acquisition", xlims=(0.0,1.0))
-        display(plot(p1, p2, layout=(2,1)))
+
+        if(uimodes[uichoice] == "GUI")
+            p1 = Plots.plot(gpx, gpμ, grid=false, ribbon=sqrt.(gpσ²)*1.96,
+                            fillalpha=.5, label="GP (95%)", xlims=(0.0,1.0))
+            Plots.scatter!(p1, x, whitening(y), label="data points", xlims=(0.0,1.0))
+            p2 = Plots.plot(αx, αy, label="acquisition", xlims=(0.0,1.0))
+            display(plot(p1, p2, layout=(2,1)))
+        else
+            conf = sqrt.(gpσ²)*1.96
+            p1 = lineplot(gpx, gpμ, color=:blue, name="μ", xlim=[0.0,1.0]) 
+            lineplot!(p1, gpx, gpμ+conf, color=:green, name="95%") 
+            lineplot!(p1, gpx, gpμ-conf, color=:green) 
+            scatterplot!(p1, x, whitening(y), color=:red) 
+
+            p2 = lineplot(αx, αy, name="acquisition", xlim=[0.0,1.0]) 
+            io = IOContext(stdout, :color => true)
+            println(io, p1)
+            println(io, p2)
+        end
 
         choice = request("choose action:", menu)
         if(options[choice] == "export")
@@ -192,6 +213,7 @@ function main(args)
     args  = cmd_args(args, true)
     path  = args["path"]
     files = readdir(path)
+    
 
     bostate_fname = filter(x->occursin(".bostate", x), files) |>
         f-> filter(x->occursin(args["name"], x), f) |>
