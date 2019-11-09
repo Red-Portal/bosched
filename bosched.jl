@@ -151,7 +151,7 @@ function bosched_mode(loop_states, subsize)
         @assert length(x) == length(y)
 
         println("----- $(loop["id"]) bosched mode -----")
-        w, μ, σ, H, best_θ, best_y = ibbo(x, y, true, false)
+        w, μ, σ, H, best_θ, best_y = ibbo(x, -y, true, false)
         gmm = Dict()
         gmm["eval_param"] = best_θ
         gmm["gmm_weight"] = w
@@ -179,7 +179,8 @@ function visualize_gp(loop_states, subsize)
 
         @assert length(x) == length(y)
         w, μ, σ, H, αx, αy, gpx, gpμ, gpσ², samples, best_θ, best_y =
-            ibbo_log(x, y, true, true)
+            ibbo_log(x, -y, true, true)
+        gpμ *= -1
 
         if(uimodes[uichoice] == "GUI")
             p1 = Plots.plot(gpx, gpμ, grid=false, ribbon=sqrt.(gpσ²)*1.96,
@@ -190,8 +191,8 @@ function visualize_gp(loop_states, subsize)
         else
             conf = sqrt.(gpσ²)*1.96
             p1 = lineplot(gpx, gpμ, color=:blue, name="μ", xlim=[0.0,1.0]) 
-            lineplot!(p1, gpx, gpμ+conf, color=:green, name="95%") 
-            lineplot!(p1, gpx, gpμ-conf, color=:green) 
+            #lineplot!(p1, gpx, gpμ+conf, color=:green, name="95%") 
+            #lineplot!(p1, gpx, gpμ-conf, color=:green) 
             scatterplot!(p1, x, whitening(y), color=:red) 
 
             p2 = lineplot(αx, αy, name="acquisition", xlim=[0.0,1.0]) 
