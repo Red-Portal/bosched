@@ -16,7 +16,7 @@ namespace bosched
     read_state(nlohmann::json const& loop_data)
     {
         std::unordered_map<size_t, loop_state_t> loop_states;
-        for(auto&& l : loop_data)
+        for(auto& l : loop_data)
         {
             loop_state_t state;
             auto loop_id     = l["id"];

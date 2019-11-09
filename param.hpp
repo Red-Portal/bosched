@@ -22,18 +22,17 @@ namespace bosched
     };
 
     inline std::unordered_map<size_t, bosched::workload_params>
-    load_workload_params(nlohmann::json const& loops_json)
+    load_workload_params(nlohmann::json& loops_json)
     {
         auto result = std::unordered_map<size_t, bosched::workload_params>();
         result.reserve(loops_json.size());
-        for(auto [key, value] : loops_json.items())
+        for(auto& loop : loops_json)
         {
             auto param_bundle = workload_params();
-	    if(value.count("params") == 0)
+	    if(loop.count("params") == 0)
 		continue;
 
-	    auto params       = value["params"];
-
+	    auto params       = loop["params"];
             double css_param  = params["css"];
             double fss_param  = params["fss"];
             //double fac_param  = value["fac"];
@@ -73,7 +72,7 @@ namespace bosched
                                return static_cast<unsigned>(elem);
                            });
 
-            result[std::stoi(key)] = std::move(param_bundle);
+            result[loop["id"]] = std::move(param_bundle);
         }
         return result;
     }
