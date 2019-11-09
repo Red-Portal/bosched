@@ -99,9 +99,7 @@ extern "C"
 		auto data = nlohmann::json();
 		stream >> data;
 		_loop_states = bosched::read_loops(data);
-
-		if(data.count("params") > 0)
-		    _params = bosched::load_workload_params(data);
+		_params      = bosched::load_workload_params(data);
 	    }
 	    else
 	    {

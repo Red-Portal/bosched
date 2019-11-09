@@ -29,6 +29,9 @@ namespace bosched
         for(auto [key, value] : loops_json.items())
         {
             auto param_bundle = workload_params();
+	    if(value.count("params") == 0)
+		continue;
+
 	    auto params       = value["params"];
 
             double css_param  = params["css"];
