@@ -25,8 +25,8 @@ namespace bosched
     load_workload_params(nlohmann::json& loops_json)
     {
         auto result = std::unordered_map<size_t, bosched::workload_params>();
-        result.reserve(loops_json.size());
-        for(auto& loop : loops_json)
+        result.reserve(loops_json["num_loops"]);
+        for(auto& loop : loops_json["loops"])
         {
             auto param_bundle = workload_params();
 	    if(loop.count("params") == 0)
