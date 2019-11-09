@@ -37,28 +37,35 @@ function cmd_args(args, show)
     s = ArgParse.ArgParseSettings()
     ArgParse.@add_arg_table s begin
         "--mode"
-        arg_type = String
-        help     = "Mode of operation. mode ∈ {\"classic\", \"bosched\", \"both\", \"visualize\"}."
-        required = true
+        arg_type     = String
+        help         = "Mode of operation. mode ∈ ."
+        metavar      = "{classic|bosched|both|visualize}"
+        range_tester = (mode-> mode ∈ ["classic", "bosched", "both", "visualize"])
+        required     = true
         "--path"
         arg_type = String
         help     = "Path of workload data."
+        metavar  = "<dir>"
         default  = "."
         "--h"
         arg_type = Float64
         help     = "Scheduling overhead parameter (ms)."
+        metavar  = "<h>"
         default  = 0.1
         "--P"
         arg_type = Int64
         help     = "Number of cores."
+        metavar  = "<P>"
         default  = 32 
         "--subsize"
         arg_type = Int64
         help     = "Bayesian optimization subsample size"
+        metavar  = "<size>"
         default  = 32 
         "name"
         arg_type = String
         help     = "Name of workload executable."
+        metavar  = "<file>"
         default  = ""
     end
 
