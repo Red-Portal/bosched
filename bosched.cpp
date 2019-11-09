@@ -56,7 +56,12 @@ namespace bosched
 							  weight.end());
 	auto mixidx  = mixdist(_rng);
 	auto dist    = std::normal_distribution(mu[mixidx], sigma[mixidx]);
-	return dist(_rng);
+	double param = 0.0;
+	do 
+	{
+	    param = dist(_rng);
+	} while(param < 0);
+	return param;
     }
 }
 
