@@ -261,6 +261,6 @@ Base.@ccallable function julia_main(ARGS::Vector{String})::Cint
     return 0
 end
 
-if get(ENV, "COMPILE_STATIC", "false") == "false"
-    julia_main(ARGS)
-end
+# if get(ENV, "COMPILE_STATIC", "false") == "false"
+#     julia_main(ARGS)
+# end
