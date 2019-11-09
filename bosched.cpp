@@ -192,7 +192,8 @@ extern "C"
         *task_map = profile.data();
         if(__builtin_expect (_is_debug, false))
         {
-            std::cout << "-- loop " << region_id
+            std::cout << "-- loop " << region_id << '\n'
+		      << " workload size = " << profile.size() << '\n'
                       << " requested workload binlpt profile"
                       << std::endl;
         }
@@ -205,7 +206,8 @@ extern "C"
         *task_map = profile.data();
         if(__builtin_expect (_is_debug, false))
         {
-            std::cout << "-- loop " << region_id
+            std::cout << "-- loop " << region_id << '\n'
+		      << " workload size = " << profile.size() << '\n'
                       << " requested workload hss profile"
                       << std::endl;
         }
