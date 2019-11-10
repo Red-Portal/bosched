@@ -30,7 +30,7 @@ function ibbo_bayesched(prng, f, T)
     for i = 1:8
         println("--------- iteration $i -----------")
         println(" dataset size = $(length(dataset_x))")
-        w, μ, σ, H, best_θ, best_y = ibbo(dataset_x, dataset_y, true, true)
+        w, μ, σ, H, best_θ, best_y = ibbo(dataset_x, -dataset_y, true, true)
         gmm = MixtureModel(Normal, collect(zip(μ, σ)), w)       
         for t = 1:T
             θ = begin

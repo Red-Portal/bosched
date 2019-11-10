@@ -117,7 +117,6 @@ function entropy_upperbound(w, μ, σ)
 end
 
 function whitening(y)
-    y *= -1
     μ  = mean(y)
     σ  = stdm(y, μ) 
     y .-= μ
