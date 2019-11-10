@@ -49,7 +49,7 @@ function bo_css_transform(x)
 end
 
 function chunk!(::Type{BO_TSS}, i, p, R, P, N, h, dist, θ::Dict)
-    δ  = 1/θ[:param]
+    δ  = 1/(θ[:param] + 1e-7)
     Kl = 1
     Kf = √(2*N*δ - 1)
     if(i == 1)
