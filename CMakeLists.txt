@@ -64,15 +64,12 @@ find_package(LAPACK REQUIRED)
 
 set(Boost_USE_STATIC_LIBS ON)
 set(Boost_USE_STATIC_RUNTIME ON)
-find_package(Boost REQUIRED COMPONENTS program_options)
+find_package(Boost REQUIRED)
 find_package(HighFive REQUIRED)
 
-set(LBPO_SOURCE_DIR ${PROJECT_SOURCE_DIR}/LBPO)
-# Include directories
-
-target_compile_definitions(${PROJECT_NAME}
-    PUBLIC
-    USE_BOOST=1)
+# target_compile_definitions(${PROJECT_NAME}
+#     PUBLIC
+#     USE_BOOST=1)
 
 target_include_directories(${PROJECT_NAME}
     PUBLIC
@@ -86,19 +83,3 @@ target_link_libraries(${PROJECT_NAME}
     ${Boost_LIBRARIES}
     ${LAPACK_LIBRARIES}
     HighFive)
-
-add_executable(offline ${PROJECT_SOURCE_DIR}/offline_computation.cpp)
-
-set_target_properties(offline
-    PROPERTIES
-    COMPILE_FLAGS "${BUILD_FLAGS} -fopenmp"
-    CXX_STANDARD 17)
-
-target_include_directories(offline
-    PUBLIC
-    ${Boost_INCLUDE_DIRS})
-
-target_link_libraries(offline
-    PRIVATE
-    ${Boost_LIBRARIES}
-    gomp)
