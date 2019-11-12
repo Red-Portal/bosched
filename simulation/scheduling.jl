@@ -1,4 +1,9 @@
 
+include("../IBBO/IBBO.jl")	
+include("simulation.jl")	
+
+using JLD	
+using .IBBO
 
 function ibbo_bayesched(prng, f, T)
     log = Dict[]
