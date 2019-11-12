@@ -50,7 +50,7 @@ function cmd_args(args, show)
         default  = "."
         "--h"
         arg_type = Float64
-        help     = "Scheduling overhead parameter (ms)."
+        help     = "Scheduling overhead parameter (us)."
         metavar  = "<millisecs>"
         default  = 0.1
         "--P"
