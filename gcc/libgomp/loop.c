@@ -1089,118 +1089,118 @@ gomp_parallel_loop_start (void (*fn) (void *), void *data,
 
 void
 GOMP_parallel_loop_static_start (void (*fn) (void *), void *data,
-								 unsigned num_threads, long start, long end,
-								 long incr, long chunk_size)
+				 unsigned num_threads, long start, long end,
+				 long incr, long chunk_size)
 {
-  gomp_parallel_loop_start (fn, data, num_threads, start, end, incr,
-							GFS_STATIC, chunk_size, 0, 0);
+    gomp_parallel_loop_start (fn, data, num_threads, start, end, incr,
+			      GFS_STATIC, chunk_size, 0, 0);
 }
 
 void
 GOMP_parallel_loop_dynamic_start (void (*fn) (void *), void *data,
-								  unsigned num_threads, long start, long end,
-								  long incr, long chunk_size)
+				  unsigned num_threads, long start, long end,
+				  long incr, long chunk_size)
 {
-  gomp_parallel_loop_start (fn, data, num_threads, start, end, incr,
-							GFS_DYNAMIC, chunk_size, 0, 0);
+    gomp_parallel_loop_start (fn, data, num_threads, start, end, incr,
+			      GFS_DYNAMIC, chunk_size, 0, 0);
 }
 
 void
 GOMP_parallel_loop_guided_start (void (*fn) (void *), void *data,
-								 unsigned num_threads, long start, long end,
-								 long incr, long chunk_size)
+				 unsigned num_threads, long start, long end,
+				 long incr, long chunk_size)
 {
-  gomp_parallel_loop_start (fn, data, num_threads, start, end, incr,
-							GFS_GUIDED, chunk_size, 0, 0);
+    gomp_parallel_loop_start (fn, data, num_threads, start, end, incr,
+			      GFS_GUIDED, chunk_size, 0, 0);
 }
 
 void
 GOMP_parallel_loop_runtime_start (void (*fn) (void *), void *data,
-								  unsigned num_threads, long start, long end,
-								  long incr, region_id_t id)
+				  unsigned num_threads, long start, long end,
+				  long incr, region_id_t id)
 {
-  struct gomp_task_icv *icv = gomp_icv (false);
-  gomp_parallel_loop_start (fn, data, num_threads, start, end, incr,
-							icv->run_sched_var, icv->run_sched_chunk_size, 0, id);
+    struct gomp_task_icv *icv = gomp_icv (false);
+    gomp_parallel_loop_start (fn, data, num_threads, start, end, incr,
+			      icv->run_sched_var, icv->run_sched_chunk_size, 0, id);
 }
 
 ialias_redirect (GOMP_parallel_end)
 
-  void
-  GOMP_parallel_loop_static (void (*fn) (void *), void *data,
-							 unsigned num_threads, long start, long end,
-							 long incr, long chunk_size, unsigned flags)
+    void
+    GOMP_parallel_loop_static (void (*fn) (void *), void *data,
+			       unsigned num_threads, long start, long end,
+			       long incr, long chunk_size, unsigned flags)
 {
-  gomp_parallel_loop_start (fn, data, num_threads, start, end, incr,
-							GFS_STATIC, chunk_size, flags, 0);
-  fn (data);
-  GOMP_parallel_end (0);
+    gomp_parallel_loop_start (fn, data, num_threads, start, end, incr,
+			      GFS_STATIC, chunk_size, flags, 0);
+    fn (data);
+    GOMP_parallel_end (0);
 }
 
 void
 GOMP_parallel_loop_dynamic (void (*fn) (void *), void *data,
-							unsigned num_threads, long start, long end,
-							long incr, long chunk_size, unsigned flags)
+			    unsigned num_threads, long start, long end,
+			    long incr, long chunk_size, unsigned flags)
 {
-  gomp_parallel_loop_start (fn, data, num_threads, start, end, incr,
-							GFS_DYNAMIC, chunk_size, flags, 0);
-  fn (data);
-  GOMP_parallel_end (0);
+    gomp_parallel_loop_start (fn, data, num_threads, start, end, incr,
+			      GFS_DYNAMIC, chunk_size, flags, 0);
+    fn (data);
+    GOMP_parallel_end (0);
 }
 
 void
 GOMP_parallel_loop_guided (void (*fn) (void *), void *data,
-						   unsigned num_threads, long start, long end,
-						   long incr, long chunk_size, unsigned flags)
+			   unsigned num_threads, long start, long end,
+			   long incr, long chunk_size, unsigned flags)
 {
-  gomp_parallel_loop_start (fn, data, num_threads, start, end, incr,
-							GFS_GUIDED, chunk_size, flags, 0);
-  fn (data);
-  GOMP_parallel_end (0);
+    gomp_parallel_loop_start (fn, data, num_threads, start, end, incr,
+			      GFS_GUIDED, chunk_size, flags, 0);
+    fn (data);
+    GOMP_parallel_end (0);
 }
 
 #ifdef HAVE_ATTRIBUTE_ALIAS
 extern __typeof(GOMP_parallel_loop_dynamic) GOMP_parallel_loop_nonmonotonic_dynamic
-  __attribute__((alias ("GOMP_parallel_loop_dynamic")));
+    __attribute__((alias ("GOMP_parallel_loop_dynamic")));
 extern __typeof(GOMP_parallel_loop_guided) GOMP_parallel_loop_nonmonotonic_guided
-  __attribute__((alias ("GOMP_parallel_loop_guided")));
+    __attribute__((alias ("GOMP_parallel_loop_guided")));
 #else
 void
 GOMP_parallel_loop_nonmonotonic_dynamic (void (*fn) (void *), void *data,
-										 unsigned num_threads, long start,
-										 long end, long incr, long chunk_size,
-										 unsigned flags)
+					 unsigned num_threads, long start,
+					 long end, long incr, long chunk_size,
+					 unsigned flags)
 {
-  gomp_parallel_loop_start (fn, data, num_threads, start, end, incr,
-							GFS_DYNAMIC, chunk_size, flags, 0);
-  fn (data);
-  GOMP_parallel_end (0);
+    gomp_parallel_loop_start (fn, data, num_threads, start, end, incr,
+			      GFS_DYNAMIC, chunk_size, flags, 0);
+    fn (data);
+    GOMP_parallel_end (0);
 }
 
 void
 GOMP_parallel_loop_nonmonotonic_guided (void (*fn) (void *), void *data,
-										unsigned num_threads, long start,
-										long end, long incr, long chunk_size,
-										unsigned flags)
+					unsigned num_threads, long start,
+					long end, long incr, long chunk_size,
+					unsigned flags)
 {
-  gomp_parallel_loop_start (fn, data, num_threads, start, end, incr,
-							GFS_GUIDED, chunk_size, flags, 0);
-  fn (data);
-  GOMP_parallel_end (0);
+    gomp_parallel_loop_start (fn, data, num_threads, start, end, incr,
+			      GFS_GUIDED, chunk_size, flags, 0);
+    fn (data);
+    GOMP_parallel_end (0);
 }
 #endif
 
 void
 GOMP_parallel_loop_runtime (void (*fn) (void *), void *data,
-							unsigned num_threads, long start, long end,
-							long incr, unsigned flags, region_id_t id)
+			    unsigned num_threads, long start, long end,
+			    long incr, unsigned flags, region_id_t id)
 {
-  struct gomp_task_icv *icv = gomp_icv (false);
-  gomp_parallel_loop_start (fn, data, num_threads, start, end,
-							incr, icv->run_sched_var,
-							icv->run_sched_chunk_size, flags, id);
-  fn (data);
-  GOMP_parallel_end (id);
+    struct gomp_task_icv *icv = gomp_icv (false);
+    gomp_parallel_loop_start (fn, data, num_threads, start, end,
+			      incr, icv->run_sched_var,
+			      icv->run_sched_chunk_size, flags, id);
+    fn (data);
+    GOMP_parallel_end (id);
 }
 
 /* The GOMP_loop_end* routines are called after the thread is told that
@@ -1298,77 +1298,77 @@ GOMP_loop_guided_start (long start, long end, long incr, long chunk_size,
 
 bool
 GOMP_loop_nonmonotonic_dynamic_start (long start, long end, long incr,
-									  long chunk_size, long *istart,
-									  long *iend)
+				      long chunk_size, long *istart,
+				      long *iend)
 {
-  return gomp_loop_dynamic_start (start, end, incr, chunk_size, istart, iend);
+    return gomp_loop_dynamic_start (start, end, incr, chunk_size, istart, iend);
 }
 
 bool
 GOMP_loop_nonmonotonic_guided_start (long start, long end, long incr,
-									 long chunk_size, long *istart, long *iend)
+				     long chunk_size, long *istart, long *iend)
 {
-  return gomp_loop_guided_start (start, end, incr, chunk_size, istart, iend);
+    return gomp_loop_guided_start (start, end, incr, chunk_size, istart, iend);
 }
 
 bool
 GOMP_loop_ordered_static_start (long start, long end, long incr,
-								long chunk_size, long *istart, long *iend)
+				long chunk_size, long *istart, long *iend)
 {
-  return gomp_loop_ordered_static_start (start, end, incr, chunk_size,
-										 istart, iend);
+    return gomp_loop_ordered_static_start (start, end, incr, chunk_size,
+					   istart, iend);
 }
 
 bool
 GOMP_loop_ordered_dynamic_start (long start, long end, long incr,
-								 long chunk_size, long *istart, long *iend)
+				 long chunk_size, long *istart, long *iend)
 {
-  return gomp_loop_ordered_dynamic_start (start, end, incr, chunk_size,
-										  istart, iend);
+    return gomp_loop_ordered_dynamic_start (start, end, incr, chunk_size,
+					    istart, iend);
 }
 
 bool
 GOMP_loop_ordered_guided_start (long start, long end, long incr,
-								long chunk_size, long *istart, long *iend)
+				long chunk_size, long *istart, long *iend)
 {
-  return gomp_loop_ordered_guided_start (start, end, incr, chunk_size,
-										 istart, iend);
+    return gomp_loop_ordered_guided_start (start, end, incr, chunk_size,
+					   istart, iend);
 }
 
 bool
 GOMP_loop_doacross_static_start (unsigned ncounts, long *counts,
-								 long chunk_size, long *istart, long *iend)
+				 long chunk_size, long *istart, long *iend)
 {
-  return gomp_loop_doacross_static_start (ncounts, counts, chunk_size,
-										  istart, iend);
+    return gomp_loop_doacross_static_start (ncounts, counts, chunk_size,
+					    istart, iend);
 }
 
 bool
 GOMP_loop_doacross_dynamic_start (unsigned ncounts, long *counts,
-								  long chunk_size, long *istart, long *iend)
+				  long chunk_size, long *istart, long *iend)
 {
-  return gomp_loop_doacross_dynamic_start (ncounts, counts, chunk_size,
-										   istart, iend);
+    return gomp_loop_doacross_dynamic_start (ncounts, counts, chunk_size,
+					     istart, iend);
 }
 
 bool
 GOMP_loop_doacross_guided_start (unsigned ncounts, long *counts,
-								 long chunk_size, long *istart, long *iend)
+				 long chunk_size, long *istart, long *iend)
 {
-  return gomp_loop_doacross_guided_start (ncounts, counts, chunk_size,
-										  istart, iend);
+    return gomp_loop_doacross_guided_start (ncounts, counts, chunk_size,
+					    istart, iend);
 }
 
 bool
 GOMP_loop_static_next (long *istart, long *iend)
 {
-  return gomp_loop_static_next (istart, iend);
+    return gomp_loop_static_next (istart, iend);
 }
 
 bool
 GOMP_loop_dynamic_next (long *istart, long *iend)
 {
-  return gomp_loop_dynamic_next (istart, iend);
+    return gomp_loop_dynamic_next (istart, iend);
 }
 
 bool

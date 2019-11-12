@@ -35,7 +35,6 @@ std::unordered_map<size_t, bosched::loop_state_t>    _loop_states __attribute__(
 std::unordered_map<size_t, prof::profiles>           _profiles    __attribute__((init_priority(101)));
 std::unordered_map<size_t, bosched::workload_params> _params      __attribute__((init_priority(101)));
 long _procs;
-size_t _profile_count = 0;
 
 namespace bosched
 {
@@ -159,13 +158,13 @@ extern "C"
 
     void bo_workload_profile_start(long iteration)
     {
-        if(_profile_loop && _profile_count < 4)
+        if(_profile_loop)
             prof::iteration_profile_start(iteration);
     }
 
     void bo_workload_profile_stop()
     {
-        if(_profile_loop && _profile_count < 4)
+        if(_profile_loop)
             prof::iteration_profile_stop();
     }
 
@@ -323,8 +322,7 @@ extern "C"
 
         if(__builtin_expect(_profile_loop, false))
         {
-            if(_profile_count < 4)
-                prof::profiling_init(N);
+	    prof::profiling_init(N);
         }
 
         if(__builtin_expect (_show_loop_stat, false))
@@ -384,10 +382,9 @@ extern "C"
             }
         }
 
-        if(__builtin_expect(_profile_loop, false) && _profile_count <= 4)
+        if(__builtin_expect(_profile_loop, false))
         {
 	    _profiles[region_id].push(prof::load_profile());
-	    ++_profile_count;
 	}
 
 	if(__builtin_expect (_is_debug, false))

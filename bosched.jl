@@ -92,9 +92,8 @@ function stretch(arr, lo, hi)
 end
 
 function classic_mode(workload_profile, loop_states, h, P)
-    loops = names(workload_profile)
-    for loop in loops
-        arr = read(workload_profile, loop)
+    for loop in loop_states
+        arr = read(workload_profile, loop["id"])
         μ   = mean(arr)
         σ   = stdm(arr, μ)
 
@@ -105,9 +104,7 @@ function classic_mode(workload_profile, loop_states, h, P)
         d["fss"]    = μ / σ
         d["binlpt"] = binlpt_balance(prof, P, 2 * P)
         d["hss"]    = stretch(prof, 0, 255)
-
-        idx = findfirst(x->x["id"] == parse(Int64, loop), loop_states)
-        loop_states[idx]["params"] = d
+        loop["params"] = d
 
         println("----- $loop classic mode -----")
         println(" μ   = $μ")
