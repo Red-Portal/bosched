@@ -71,6 +71,7 @@ namespace bosched
             auto serialized_state      = loop_state.loop_json;
             serialized_state["id"]     = loop_id;
             serialized_state["warmup"] = loop_state.warming_up;
+	    serialized_state["N"]      = loop_state.num_tasks;
 	    serialized_state["obs_x"]  = nlohmann::json(std::move(loop_state.obs_x));
 	    serialized_state["obs_y"]  = nlohmann::json(std::move(loop_state.obs_y));
 

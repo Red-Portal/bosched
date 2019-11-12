@@ -92,7 +92,6 @@ function stretch(arr, lo, hi)
 end
 
 function classic_mode(workload_profile, loop_states, h, P)
-    println(loop_states)
     for loop in loop_states
         println(loop)
         println(loop["id"])
@@ -144,10 +143,11 @@ function update_dataset(loop_state)
     return loop_state
 end
 
-function bosched_mode(loop_states, subsize)
+function bosched_mode(loop_states, subsize, P)
     for loop in loop_states
         loop = update_dataset(loop)
         x, y = bo_subsample(loop["hist_x"], loop["hist_y"], subsize)
+        y   /= (N / P)
         @assert length(x) == length(y)
 
         println("----- $(loop["id"]) bosched mode -----")
@@ -249,7 +249,7 @@ function main(args)
         end
     end
     if(args["mode"] == "bosched" || args["mode"] == "both")
-        bostate["loops"]  = bosched_mode(bostate["loops"], args["subsize"])
+        bostate["loops"]  = bosched_mode(bostate["loops"], args["subsize"], args["P"])
     end
     if(args["mode"] == "visualize")
         visualize_gp(bostate["loops"], args["subsize"])

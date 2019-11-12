@@ -1,9 +1,4 @@
 
-include("../IBBO/IBBO.jl")
-include("simulation.jl")
-
-using JLD
-using .IBBO
 
 function ibbo_bayesched(prng, f, T)
     log = Dict[]
@@ -17,7 +12,6 @@ function ibbo_bayesched(prng, f, T)
     for i = 1:T
         θ    = rand(prng, init_d)
         time = f(θ)
-
         x[i] = θ
         y[i] = time
     end
@@ -30,7 +24,9 @@ function ibbo_bayesched(prng, f, T)
     for i = 1:8
         println("--------- iteration $i -----------")
         println(" dataset size = $(length(dataset_x))")
-        w, μ, σ, H, best_θ, best_y = ibbo(dataset_x, -dataset_y, true, true)
+        w, μ, σ, H, αx, αy, gpx, gpμ, gpσ, samples, best_θ, best_y =
+            ibbo_log(dataset_x, -dataset_y, true, true)
+
         gmm = MixtureModel(Normal, collect(zip(μ, σ)), w)       
         for t = 1:T
             θ = begin
@@ -49,14 +45,30 @@ function ibbo_bayesched(prng, f, T)
         end
         push!(dataset_x, x...)
         push!(dataset_y, y...)
-        push!(log, Dict("x"=>x, "y"=>y))
+        println("length: $(length(dataset_x)), $(length(dataset_y))")
+        d = Dict()
+        d["x"] = x
+        d["y"] = y
+        d["w"] = w
+        d["μ"] = μ
+        d["σ"] = σ
+        d["H"] = H
+        d["αx"] = αx
+        d["αy"] = αy
+        d["gpx"] = gpx
+        d["gpμ"] = gpμ
+        d["gpσ"] = gpσ
+        d["samples"] = samples
+        d["best_θ"]  = best_θ
+        d["best_y"]  = best_y
+        push!(log, d)
+        GC.gc()
     end
     return log, best_θ
 end
 
 function bench1(prng, sched, params; transform=nothing)
     # Normal distribution
-
     T = 512
     N = 2^20
     P = 128
@@ -69,6 +81,7 @@ function bench1(prng, sched, params; transform=nothing)
         return 1
     end
 
+    log = nothing
     if(sched <: BOSchedule)
         function bo_f(θ)
             locparams = Dict{Symbol, Any}(:param=>transform(θ));
@@ -76,7 +89,7 @@ function bench1(prng, sched, params; transform=nothing)
                 BO_FSS, prng, gen, P, N, h, locparams)
             return time / (N / P)
         end
-        log, best_θ = ibbo_bayesched(prng, bo_f, 32)
+        log, best_θ = ibbo_bayesched(prng, bo_f, 64)
         params[:param] = transform(best_θ)
     end
     params[:K_first] = N/(2*P)
@@ -86,7 +99,7 @@ function bench1(prng, sched, params; transform=nothing)
     params[:mean]    = f
     params[:μ]       = mean(d)
     params[:σ]       = std(d)
-    return run_raw(sched, T, prng, gen, P, N, h, params)
+    return run_raw(sched, T, prng, gen, P, N, h, params), log
 end
 
 function bench2(prng, sched, params; transform=nothing)
@@ -110,7 +123,7 @@ function bench2(prng, sched, params; transform=nothing)
                 BO_FSS, prng, gen, P, N, h, locparams)
             return time / (N / P)
         end
-        log, best_θ = ibbo_bayesched(prng, bo_f, 32)
+        log, best_θ = ibbo_bayesched(prng, bo_f, 64)
         params[:param] = transform(best_θ)
     end
     params[:K_first] = N/(2*P)
@@ -120,7 +133,7 @@ function bench2(prng, sched, params; transform=nothing)
     params[:mean] = f
     params[:μ]    = mean(d)
     params[:σ]    = std(d)
-    return run_raw(sched, T, prng, gen, P, N, h, params)
+    return run_raw(sched, T, prng, gen, P, N, h, params), log
 end
 
 function bench3(prng, sched, params; transform=nothing)
@@ -144,7 +157,7 @@ function bench3(prng, sched, params; transform=nothing)
                 BO_FSS, prng, gen, P, N, h, locparams)
             return time / (N / P)
         end
-        log, best_θ = ibbo_bayesched(prng, bo_f, 32)
+        log, best_θ = ibbo_bayesched(prng, bo_f, 64)
         params[:param] = transform(best_θ)
     end
     params[:K_first] = N/(2*P)
@@ -154,7 +167,7 @@ function bench3(prng, sched, params; transform=nothing)
     params[:mean] = f
     params[:μ]    = mean(d)
     params[:σ]    = std(d)
-    return run_raw(sched, T, prng, gen, P, N, h, params)
+    return run_raw(sched, T, prng, gen, P, N, h, params), log
 end
 
 function bench4(prng, sched, params; transform=nothing)
@@ -178,7 +191,7 @@ function bench4(prng, sched, params; transform=nothing)
                 BO_FSS, prng, gen, P, N, h, locparams)
             return time / (N / P)
         end
-        log, best_θ = ibbo_bayesched(prng, bo_f, 32)
+        log, best_θ = ibbo_bayesched(prng, bo_f, 64)
         params[:param] = transform(best_θ)
     end
     params[:K_first] = N/(2*P)
@@ -188,12 +201,11 @@ function bench4(prng, sched, params; transform=nothing)
     params[:mean] = f
     params[:μ]    = mean(d)
     params[:σ]    = std(d)
-    return run_raw(sched, T, prng, gen, P, N, h, params)
+    return run_raw(sched, T, prng, gen, P, N, h, params), log
 end
 
 function bench5(prng, sched, params; transform=nothing)
     # Biased distribution, Square 
-
     T = 512
     N = 2^20
     P = 128
@@ -203,14 +215,11 @@ function bench5(prng, sched, params; transform=nothing)
     b = 5
     d = TruncatedNormal(0.0, σ, 0.0, Inf)
     function gen(prng, i, N)
-        w = begin
-            if(i & (1 << 10) != 0)
-                rand(prng, d) + a
-            else
-                rand(prng, d) + b
-            end
+        if(i & (1 << 10) != 0)
+            return rand(prng, d) + a
+        else
+            return rand(prng, d) + b
         end
-        return w
     end
     function f(x)
         w = begin
@@ -229,7 +238,7 @@ function bench5(prng, sched, params; transform=nothing)
                 BO_FSS, prng, gen, P, N, h, locparams)
             return time / (N / P)
         end
-        log, best_θ = ibbo_bayesched(prng, bo_f, 32)
+        log, best_θ = ibbo_bayesched(prng, bo_f, 64)
         params[:param] = transform(best_θ)
     end
     params[:K_first] = N/(2*P)
@@ -239,12 +248,11 @@ function bench5(prng, sched, params; transform=nothing)
     params[:mean] = f
     params[:μ]    = (b + a) / 2
     params[:σ]    = √(var(d) + (b - a)^2/4)
-    return run_raw(sched, T, prng, gen, P, N, h, params)
+    return run_raw(sched, T, prng, gen, P, N, h, params), log
 end
 
 function bench6(prng, sched, params; transform=nothing)
     # Biased distribution, Increasing
-
     T = 512
     N = 2^20
     P = 128
@@ -254,16 +262,10 @@ function bench6(prng, sched, params; transform=nothing)
     b = 5
     d = TruncatedNormal(0.0, σ, 0.0, Inf)
     function gen(prng, i, N)
-        w = begin
-            return (i*(b-a)/N + a) + rand(prng, d)
-        end
-        return w
+        return (i*(b-a)/N + a) + rand(prng, d)
     end
     function f(x)
-        w = begin
-            return (x*(b-a)/N + a)
-        end
-        return w
+        return (x*(b-a)/N + a)
     end
     if(sched <: BOSchedule)
         function bo_f(θ)
@@ -272,7 +274,7 @@ function bench6(prng, sched, params; transform=nothing)
                 BO_FSS, prng, gen, P, N, h, locparams)
             return time / (N / P)
         end
-        log, best_θ = ibbo_bayesched(prng, bo_f, 32)
+        log, best_θ = ibbo_bayesched(prng, bo_f, 64)
         params[:param] = transform(best_θ)
     end
     params[:K_first] = N/(2*P)
@@ -282,12 +284,11 @@ function bench6(prng, sched, params; transform=nothing)
     params[:mean] = f
     params[:μ]    = (b + a) / 2
     params[:σ]    = √(var(d) + (b - a)^2/12)
-    return run_raw(sched, T, prng, gen, P, N, h, params)
+    return run_raw(sched, T, prng, gen, P, N, h, params), log
 end
 
 function bench7(prng, sched, params; transform=nothing)
     # Biased distribution, Decreasing
-
     T = 512
     N = 2^20
     P = 128
@@ -297,16 +298,10 @@ function bench7(prng, sched, params; transform=nothing)
     b = 5
     d = TruncatedNormal(0.0, σ, 0.0, Inf)
     function gen(prng, i, N)
-        w = begin
-            return (b - i*(b-a)/N) + rand(prng, d)
-        end
-        return w
+        return (b - i*(b-a)/N) + rand(prng, d)
     end
     function f(x)
-        w = begin
-            return (b - x*(b-a)/N)
-        end
-        return w
+        return b - x*(b-a)/N
     end
     if(sched <: BOSchedule)
         function bo_f(θ)
@@ -315,7 +310,7 @@ function bench7(prng, sched, params; transform=nothing)
                 BO_FSS, prng, gen, P, N, h, locparams)
             return time / (N / P)
         end
-        log, best_θ = ibbo_bayesched(prng, bo_f, 32)
+        log, best_θ = ibbo_bayesched(prng, bo_f, 64)
         params[:param] = transform(best_θ)
     end
     params[:K_first] = N/(2*P)
@@ -325,12 +320,11 @@ function bench7(prng, sched, params; transform=nothing)
     params[:mean] = f
     params[:μ]    = (b + a) / 2
     params[:σ]    = √(var(d) + (b - a)^2/12)
-    return run_raw(sched, T, prng, gen, P, N, h, params)
+    return run_raw(sched, T, prng, gen, P, N, h, params), log
 end
 
 function bench8(prng, sched, params; transform=nothing)
     # Biased distribution, Square, low iteration count
-
     T = 512
     N = 2^10
     P = 128
@@ -340,24 +334,18 @@ function bench8(prng, sched, params; transform=nothing)
     b = 5
     d = TruncatedNormal(0.0, σ, 0.0, Inf)
     function gen(prng, i, N)
-        w = begin
-            if(i & (1 << 7) != 0)
-                rand(prng, d) + a
-            else
-                rand(prng, d) + b
-            end
+        if(i & (1 << 7) != 0)
+            return rand(prng, d) + a
+        else
+            return rand(prng, d) + b
         end
-        return w
     end
     function f(x)
-        w = begin
-            if(x & (1 << 10) != 0)
-                a
-            else
-                b
-            end
+        if(x & (1 << 10) != 0)
+            return a
+        else
+            return b
         end
-        return w
     end
     if(sched <: BOSchedule)
         function bo_f(θ)
@@ -366,7 +354,7 @@ function bench8(prng, sched, params; transform=nothing)
                 BO_FSS, prng, gen, P, N, h, locparams)
             return time / (N / P)
         end
-        log, best_θ = ibbo_bayesched(prng, bo_f, 32)
+        log, best_θ = ibbo_bayesched(prng, bo_f, 64)
         params[:param] = transform(best_θ)
     end
     params[:K_first] = N/(2*P)
@@ -376,7 +364,7 @@ function bench8(prng, sched, params; transform=nothing)
     params[:mean] = f
     params[:μ]    = (b + a) / 2
     params[:σ]    = √(var(d) + (b - a)^2/4)
-    return run_raw(sched, T, prng, gen, P, N, h, params)
+    return run_raw(sched, T, prng, gen, P, N, h, params), log
 end
 
 function bench9(prng, sched, params; transform=nothing)
@@ -391,16 +379,10 @@ function bench9(prng, sched, params; transform=nothing)
     b = 5
     d = TruncatedNormal(0.0, σ, 0.0, Inf)
     function gen(prng, i, N)
-        w = begin
-            return (i*(b-a)/N + a) + rand(prng, d)
-        end
-        return w
+        return (i*(b-a)/N + a) + rand(prng, d)
     end
     function f(x)
-        w = begin
-            return (x*(b-a)/N + a)
-        end
-        return w
+        return (x*(b-a)/N + a)
     end
     if(sched <: BOSchedule)
         function bo_f(θ)
@@ -409,7 +391,7 @@ function bench9(prng, sched, params; transform=nothing)
                 BO_FSS, prng, gen, P, N, h, locparams)
             return time / (N / P)
         end
-        log, best_θ = ibbo_bayesched(prng, bo_f, 32)
+        log, best_θ = ibbo_bayesched(prng, bo_f, 64)
         params[:param] = transform(best_θ)
     end
     params[:K_first] = N/(2*P)
@@ -419,7 +401,7 @@ function bench9(prng, sched, params; transform=nothing)
     params[:mean] = f
     params[:μ]    = (b + a) / 2
     params[:σ]    = √(var(d) + (b - a)^2/12)
-    return run_raw(sched, T, prng, gen, P, N, h, params)
+    return run_raw(sched, T, prng, gen, P, N, h, params), log
 end
 
 function bench10(prng, sched, params; transform=nothing)
@@ -434,16 +416,10 @@ function bench10(prng, sched, params; transform=nothing)
     b = 5
     d = TruncatedNormal(0.0, σ, 0.0, Inf)
     function gen(prng, i, N)
-        w = begin
-            return (b - i*(b-a)/N) + rand(prng, d)
-        end
-        return w
+        return (b - i*(b-a)/N) + rand(prng, d)
     end
     function f(x)
-        w = begin
-            return (b - x*(b-a)/N)
-        end
-        return w
+        return (b - x*(b-a)/N)
     end
     if(sched <: BOSchedule)
         function bo_f(θ)
@@ -452,7 +428,7 @@ function bench10(prng, sched, params; transform=nothing)
                 BO_FSS, prng, gen, P, N, h, locparams)
             return time / (N / P)
         end
-        log, best_θ = ibbo_bayesched(prng, bo_f, 32)
+        log, best_θ = ibbo_bayesched(prng, bo_f, 64)
         params[:param] = transform(best_θ)
     end
     params[:K_first] = N/(2*P)
@@ -462,7 +438,7 @@ function bench10(prng, sched, params; transform=nothing)
     params[:mean] = f
     params[:μ]    = (b + a) / 2
     params[:σ]    = √(var(d) + (b - a)^2/12)
-    return run_raw(sched, T, prng, gen, P, N, h, params)
+    return run_raw(sched, T, prng, gen, P, N, h, params), log
 end
 
 function run_all(prng, path="")
@@ -472,16 +448,16 @@ function run_all(prng, path="")
     #     d     = Dict()
     #     sched = FSS
 
-    #     d["b1"]  = bench1(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b2"]  = bench2(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b3"]  = bench3(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b4"]  = bench4(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b5"]  = bench5(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b6"]  = bench6(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b7"]  = bench7(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b8"]  = bench8(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b9"]  = bench9(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b10"] = bench10(prng, sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b1"]  = bench1(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b2"]  = bench2(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b3"]  = bench3(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b4"]  = bench4(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b5"]  = bench5(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b6"]  = bench6(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b7"]  = bench7(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b8"]  = bench8(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b9"]  = bench9(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b10"] = bench10(prng, sched, Dict{Symbol, Any}(), transform=nothing)[1]
     #     save(joinpath(path, "FSS.jld"), d)
     # end
 
@@ -490,16 +466,16 @@ function run_all(prng, path="")
     #     d     = Dict()
     #     sched = FAC2
 
-    #     d["b1"]  = bench1(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b2"]  = bench2(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b3"]  = bench3(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b4"]  = bench4(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b5"]  = bench5(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b6"]  = bench6(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b7"]  = bench7(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b8"]  = bench8(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b9"]  = bench9(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b10"] = bench10(prng, sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b1"]  = bench1(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b2"]  = bench2(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b3"]  = bench3(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b4"]  = bench4(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b5"]  = bench5(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b6"]  = bench6(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b7"]  = bench7(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b8"]  = bench8(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b9"]  = bench9(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b10"] = bench10(prng, sched, Dict{Symbol, Any}(), transform=nothing)[1]
     #     save(joinpath(path, "FAC2.jld"), d)
     # end
 
@@ -508,32 +484,32 @@ function run_all(prng, path="")
     #     d     = Dict()
     #     sched = CSS
 
-    #     d["b1"]  = bench1(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b2"]  = bench2(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b3"]  = bench3(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b4"]  = bench4(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b5"]  = bench5(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b6"]  = bench6(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b7"]  = bench7(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b8"]  = bench8(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b9"]  = bench9(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b10"] = bench10(prng, sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b1"]  = bench1(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b2"]  = bench2(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b3"]  = bench3(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b4"]  = bench4(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b5"]  = bench5(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b6"]  = bench6(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b7"]  = bench7(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b8"]  = bench8(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b9"]  = bench9(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b10"] = bench10(prng, sched, Dict{Symbol, Any}(), transform=nothing)[1]
     #     save(joinpath(path, "CSS.jld"), d)
     # end
 
     # begin
     #     d     = Dict()
     #     sched = TSS
-    #     d["b1"]  = bench1(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b2"]  = bench2(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b3"]  = bench3(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b4"]  = bench4(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b5"]  = bench5(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b6"]  = bench6(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b7"]  = bench7(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b8"]  = bench8(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b9"]  = bench9(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b10"] = bench10(prng, sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b1"]  = bench1(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b2"]  = bench2(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b3"]  = bench3(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b4"]  = bench4(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b5"]  = bench5(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b6"]  = bench6(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b7"]  = bench7(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b8"]  = bench8(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b9"]  = bench9(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b10"] = bench10(prng, sched, Dict{Symbol, Any}(), transform=nothing)[1]
     #     save(joinpath(path, "TSS.jld"), d)
     # end
 
@@ -541,16 +517,16 @@ function run_all(prng, path="")
     #     println("------- TAPER -------")
     #     d     = Dict()
     #     sched = TAPER
-    #     d["b1"]  = bench1(prng,  sched, Dict{Symbol, Any}(:α=>1.3), transform=nothing)
-    #     d["b2"]  = bench2(prng,  sched, Dict{Symbol, Any}(:α=>1.3), transform=nothing)
-    #     d["b3"]  = bench3(prng,  sched, Dict{Symbol, Any}(:α=>1.3), transform=nothing)
-    #     d["b4"]  = bench4(prng,  sched, Dict{Symbol, Any}(:α=>1.3), transform=nothing)
-    #     d["b5"]  = bench5(prng,  sched, Dict{Symbol, Any}(:α=>1.3), transform=nothing)
-    #     d["b6"]  = bench6(prng,  sched, Dict{Symbol, Any}(:α=>1.3), transform=nothing)
-    #     d["b7"]  = bench7(prng,  sched, Dict{Symbol, Any}(:α=>1.3), transform=nothing)
-    #     d["b8"]  = bench8(prng,  sched, Dict{Symbol, Any}(:α=>1.3), transform=nothing)
-    #     d["b9"]  = bench9(prng,  sched, Dict{Symbol, Any}(:α=>1.3), transform=nothing)
-    #     d["b10"] = bench10(prng, sched, Dict{Symbol, Any}(:α=>1.3), transform=nothing)
+    #     d["b1"]  = bench1(prng,  sched, Dict{Symbol, Any}(:α=>1.3), transform=nothing)[1]
+    #     d["b2"]  = bench2(prng,  sched, Dict{Symbol, Any}(:α=>1.3), transform=nothing)[1]
+    #     d["b3"]  = bench3(prng,  sched, Dict{Symbol, Any}(:α=>1.3), transform=nothing)[1]
+    #     d["b4"]  = bench4(prng,  sched, Dict{Symbol, Any}(:α=>1.3), transform=nothing)[1]
+    #     d["b5"]  = bench5(prng,  sched, Dict{Symbol, Any}(:α=>1.3), transform=nothing)[1]
+    #     d["b6"]  = bench6(prng,  sched, Dict{Symbol, Any}(:α=>1.3), transform=nothing)[1]
+    #     d["b7"]  = bench7(prng,  sched, Dict{Symbol, Any}(:α=>1.3), transform=nothing)[1]
+    #     d["b8"]  = bench8(prng,  sched, Dict{Symbol, Any}(:α=>1.3), transform=nothing)[1]
+    #     d["b9"]  = bench9(prng,  sched, Dict{Symbol, Any}(:α=>1.3), transform=nothing)[1]
+    #     d["b10"] = bench10(prng, sched, Dict{Symbol, Any}(:α=>1.3), transform=nothing)[1]
     #     save(joinpath(path, "TAPER.jld"), d)
     # end
 
@@ -558,16 +534,16 @@ function run_all(prng, path="")
     #     println("------- TAPER3 -------")
     #     d     = Dict()
     #     sched = TAPER3
-    #     d["b1"]  = bench1(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b2"]  = bench2(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b3"]  = bench3(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b4"]  = bench4(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b5"]  = bench5(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b6"]  = bench6(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b7"]  = bench7(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b8"]  = bench8(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b9"]  = bench9(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b10"] = bench10(prng, sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b1"]  = bench1(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b2"]  = bench2(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b3"]  = bench3(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b4"]  = bench4(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b5"]  = bench5(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b6"]  = bench6(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b7"]  = bench7(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b8"]  = bench8(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b9"]  = bench9(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b10"] = bench10(prng, sched, Dict{Symbol, Any}(), transform=nothing)[1]
     #     save(joinpath(path, "TAPER3.jld"), d)
     # end
 
@@ -575,16 +551,16 @@ function run_all(prng, path="")
     #     println("------- AFAC -------")
     #     d     = Dict()
     #     sched = AFAC
-    #     d["b1"]  = bench1(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b2"]  = bench2(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b3"]  = bench3(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b4"]  = bench4(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b5"]  = bench5(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b6"]  = bench6(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b7"]  = bench7(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b8"]  = bench8(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b9"]  = bench9(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b10"] = bench10(prng, sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b1"]  = bench1(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b2"]  = bench2(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b3"]  = bench3(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b4"]  = bench4(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b5"]  = bench5(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b6"]  = bench6(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b7"]  = bench7(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b8"]  = bench8(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b9"]  = bench9(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b10"] = bench10(prng, sched, Dict{Symbol, Any}(), transform=nothing)[1]
     #     save(joinpath(path, "AFAC.jld"), d)
     # end
 
@@ -592,16 +568,16 @@ function run_all(prng, path="")
     #     println("------- HSS -------")
     #     d     = Dict()
     #     sched = HSS
-    #     d["b1"]  = bench1(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b2"]  = bench2(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b3"]  = bench3(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b4"]  = bench4(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b5"]  = bench5(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b6"]  = bench6(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b7"]  = bench7(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b8"]  = bench8(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b9"]  = bench9(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b10"] = bench10(prng, sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b1"]  = bench1(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b2"]  = bench2(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b3"]  = bench3(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b4"]  = bench4(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b5"]  = bench5(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b6"]  = bench6(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b7"]  = bench7(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b8"]  = bench8(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b9"]  = bench9(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b10"] = bench10(prng, sched, Dict{Symbol, Any}(), transform=nothing)[1]
     #     save(joinpath(path, "HSS.jld"), d)
     # end
 
@@ -609,16 +585,16 @@ function run_all(prng, path="")
     #     println("------- BinLPT -------")
     #     d     = Dict()
     #     sched = BinLPT
-    #     d["b1"]  = bench1(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b2"]  = bench2(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b3"]  = bench3(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b4"]  = bench4(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b5"]  = bench5(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b6"]  = bench6(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b7"]  = bench7(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b8"]  = bench8(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b9"]  = bench9(prng,  sched, Dict{Symbol, Any}(), transform=nothing)
-    #     d["b10"] = bench10(prng, sched, Dict{Symbol, Any}(), transform=nothing)
+    #     d["b1"]  = bench1(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b2"]  = bench2(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b3"]  = bench3(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b4"]  = bench4(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b5"]  = bench5(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b6"]  = bench6(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b7"]  = bench7(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b8"]  = bench8(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b9"]  = bench9(prng,  sched, Dict{Symbol, Any}(), transform=nothing)[1]
+    #     d["b10"] = bench10(prng, sched, Dict{Symbol, Any}(), transform=nothing)[1]
     #     save(joinpath(path, "BinLPT.jld"), d)
     # end
 
@@ -627,16 +603,38 @@ function run_all(prng, path="")
         d      = Dict()
         sched  = BO_FSS
         transf = bo_fss_transform
-        d["b1"]  = vcat([bench1(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]...)
-        d["b2"]  = vcat([bench2(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]...)
-        d["b3"]  = vcat([bench3(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]...)
-        d["b4"]  = vcat([bench4(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]...)
-        d["b5"]  = vcat([bench5(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]...)
-        d["b6"]  = vcat([bench6(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]...)
-        d["b7"]  = vcat([bench7(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]...)
-        d["b8"]  = vcat([bench8(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]...)
-        d["b9"]  = vcat([bench9(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]...)
-        d["b10"] = vcat([bench10(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]...)
+        b1  = [bench1(prng,   sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]
+        b2  = [bench2(prng,   sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]
+        b3  = [bench3(prng,   sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]
+        b4  = [bench4(prng,   sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]
+        b5  = [bench5(prng,   sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]
+        b6  = [bench6(prng,   sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]
+        b7  = [bench7(prng,   sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]
+        b8  = [bench8(prng,   sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]
+        b9  = [bench9(prng,   sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]
+        b10 = [bench10(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]
+        d["b1"]      = vcat([i[1] for i in b1]...)
+        d["b1_log"]  = [i[2] for i in b1]
+        d["b2"]      = vcat([i[1] for i in b2]...)
+        d["b2_log"]  = [i[2] for i in b2]
+        d["b3"]      = vcat([i[1] for i in b3]...)
+        d["b3_log"]  = [i[2] for i in b3]
+        d["b4"]      = vcat([i[1] for i in b4]...)
+        d["b4_log"]  = [i[2] for i in b4]
+        d["b4"]      = vcat([i[1] for i in b4]...)
+        d["b4_log"]  = [i[2] for i in b4]
+        d["b5"]      = vcat([i[1] for i in b5]...)
+        d["b5_log"]  = [i[2] for i in b5]
+        d["b6"]      = vcat([i[1] for i in b6]...)
+        d["b6_log"]  = [i[2] for i in b6]
+        d["b7"]      = vcat([i[1] for i in b7]...)
+        d["b7_log"]  = [i[2] for i in b7]
+        d["b8"]      = vcat([i[1] for i in b8]...)
+        d["b8_log"]  = [i[2] for i in b8]
+        d["b9"]      = vcat([i[1] for i in b9]...)
+        d["b9_log"]  = [i[2] for i in b9]
+        d["b10"]     = vcat([i[1] for i in b10]...)
+        d["b10_log"] = [i[2] for i in b10]
         save(joinpath(path, "BO_FSS.jld"), d)
     end
 
@@ -646,16 +644,38 @@ function run_all(prng, path="")
         d      = Dict()
         sched  = BO_FAC
         transf = bo_fac_transform
-        d["b1"]  = vcat([bench1(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]...)
-        d["b2"]  = vcat([bench2(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]...)
-        d["b3"]  = vcat([bench3(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]...)
-        d["b4"]  = vcat([bench4(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]...)
-        d["b5"]  = vcat([bench5(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]...)
-        d["b6"]  = vcat([bench6(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]...)
-        d["b7"]  = vcat([bench7(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]...)
-        d["b8"]  = vcat([bench8(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]...)
-        d["b9"]  = vcat([bench9(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]...)
-        d["b10"] = vcat([bench10(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]...)
+        b1  = [bench1(prng,   sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]
+        b2  = [bench2(prng,   sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]
+        b3  = [bench3(prng,   sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]
+        b4  = [bench4(prng,   sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]
+        b5  = [bench5(prng,   sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]
+        b6  = [bench6(prng,   sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]
+        b7  = [bench7(prng,   sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]
+        b8  = [bench8(prng,   sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]
+        b9  = [bench9(prng,   sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]
+        b10 = [bench10(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]
+        d["b1"]      = vcat([i[1] for i in b1]...)
+        d["b1_log"]  = [i[2] for i in b1]
+        d["b2"]      = vcat([i[1] for i in b2]...)
+        d["b2_log"]  = [i[2] for i in b2]
+        d["b3"]      = vcat([i[1] for i in b3]...)
+        d["b3_log"]  = [i[2] for i in b3]
+        d["b4"]      = vcat([i[1] for i in b4]...)
+        d["b4_log"]  = [i[2] for i in b4]
+        d["b4"]      = vcat([i[1] for i in b4]...)
+        d["b4_log"]  = [i[2] for i in b4]
+        d["b5"]      = vcat([i[1] for i in b5]...)
+        d["b5_log"]  = [i[2] for i in b5]
+        d["b6"]      = vcat([i[1] for i in b6]...)
+        d["b6_log"]  = [i[2] for i in b6]
+        d["b7"]      = vcat([i[1] for i in b7]...)
+        d["b7_log"]  = [i[2] for i in b7]
+        d["b8"]      = vcat([i[1] for i in b8]...)
+        d["b8_log"]  = [i[2] for i in b8]
+        d["b9"]      = vcat([i[1] for i in b9]...)
+        d["b9_log"]  = [i[2] for i in b9]
+        d["b10"]     = vcat([i[1] for i in b10]...)
+        d["b10_log"] = [i[2] for i in b10]
         save(joinpath(path, "BO_FAC.jld"), d)
     end
 
@@ -664,16 +684,38 @@ function run_all(prng, path="")
         d      = Dict()
         sched  = BO_TSS
         transf = x->x #bo_tss_transform
-        d["b1"]  = vcat([bench1(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]...)
-        d["b2"]  = vcat([bench2(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]...)
-        d["b3"]  = vcat([bench3(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]...)
-        d["b4"]  = vcat([bench4(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]...)
-        d["b5"]  = vcat([bench5(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]...)
-        d["b6"]  = vcat([bench6(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]...)
-        d["b7"]  = vcat([bench7(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]...)
-        d["b8"]  = vcat([bench8(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]...)
-        d["b9"]  = vcat([bench9(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]...)
-        d["b10"] = vcat([bench10(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]...)
+        b1  = [bench1(prng,   sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]
+        b2  = [bench2(prng,   sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]
+        b3  = [bench3(prng,   sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]
+        b4  = [bench4(prng,   sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]
+        b5  = [bench5(prng,   sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]
+        b6  = [bench6(prng,   sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]
+        b7  = [bench7(prng,   sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]
+        b8  = [bench8(prng,   sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]
+        b9  = [bench9(prng,   sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]
+        b10 = [bench10(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]
+        d["b1"]      = vcat([i[1] for i in b1]...)
+        d["b1_log"]  = [i[2] for i in b1]
+        d["b2"]      = vcat([i[1] for i in b2]...)
+        d["b2_log"]  = [i[2] for i in b2]
+        d["b3"]      = vcat([i[1] for i in b3]...)
+        d["b3_log"]  = [i[2] for i in b3]
+        d["b4"]      = vcat([i[1] for i in b4]...)
+        d["b4_log"]  = [i[2] for i in b4]
+        d["b4"]      = vcat([i[1] for i in b4]...)
+        d["b4_log"]  = [i[2] for i in b4]
+        d["b5"]      = vcat([i[1] for i in b5]...)
+        d["b5_log"]  = [i[2] for i in b5]
+        d["b6"]      = vcat([i[1] for i in b6]...)
+        d["b6_log"]  = [i[2] for i in b6]
+        d["b7"]      = vcat([i[1] for i in b7]...)
+        d["b7_log"]  = [i[2] for i in b7]
+        d["b8"]      = vcat([i[1] for i in b8]...)
+        d["b8_log"]  = [i[2] for i in b8]
+        d["b9"]      = vcat([i[1] for i in b9]...)
+        d["b9_log"]  = [i[2] for i in b9]
+        d["b10"]     = vcat([i[1] for i in b10]...)
+        d["b10_log"] = [i[2] for i in b10]
         save(joinpath(path, "BO_TSS.jld"), d)
     end
 
@@ -682,16 +724,38 @@ function run_all(prng, path="")
         d      = Dict()
         sched  = BO_CSS
         transf = bo_css_transform
-        d["b1"]  = vcat([bench1(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]...)
-        d["b2"]  = vcat([bench2(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]...)
-        d["b3"]  = vcat([bench3(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]...)
-        d["b4"]  = vcat([bench4(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]...)
-        d["b5"]  = vcat([bench5(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]...)
-        d["b6"]  = vcat([bench6(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]...)
-        d["b7"]  = vcat([bench7(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]...)
-        d["b8"]  = vcat([bench8(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]...)
-        d["b9"]  = vcat([bench9(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]...)
-        d["b10"] = vcat([bench10(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]...)
+        b1  = [bench1(prng,   sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]
+        b2  = [bench2(prng,   sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]
+        b3  = [bench3(prng,   sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]
+        b4  = [bench4(prng,   sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]
+        b5  = [bench5(prng,   sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]
+        b6  = [bench6(prng,   sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]
+        b7  = [bench7(prng,   sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]
+        b8  = [bench8(prng,   sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]
+        b9  = [bench9(prng,   sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]
+        b10 = [bench10(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]
+        d["b1"]      = vcat([i[1] for i in b1]...)
+        d["b1_log"]  = [i[2] for i in b1]
+        d["b2"]      = vcat([i[1] for i in b2]...)
+        d["b2_log"]  = [i[2] for i in b2]
+        d["b3"]      = vcat([i[1] for i in b3]...)
+        d["b3_log"]  = [i[2] for i in b3]
+        d["b4"]      = vcat([i[1] for i in b4]...)
+        d["b4_log"]  = [i[2] for i in b4]
+        d["b4"]      = vcat([i[1] for i in b4]...)
+        d["b4_log"]  = [i[2] for i in b4]
+        d["b5"]      = vcat([i[1] for i in b5]...)
+        d["b5_log"]  = [i[2] for i in b5]
+        d["b6"]      = vcat([i[1] for i in b6]...)
+        d["b6_log"]  = [i[2] for i in b6]
+        d["b7"]      = vcat([i[1] for i in b7]...)
+        d["b7_log"]  = [i[2] for i in b7]
+        d["b8"]      = vcat([i[1] for i in b8]...)
+        d["b8_log"]  = [i[2] for i in b8]
+        d["b9"]      = vcat([i[1] for i in b9]...)
+        d["b9_log"]  = [i[2] for i in b9]
+        d["b10"]     = vcat([i[1] for i in b10]...)
+        d["b10_log"] = [i[2] for i in b10]
         save(joinpath(path, "BO_CSS.jld"), d)
     end
 
@@ -700,16 +764,38 @@ function run_all(prng, path="")
         d      = Dict()
         sched  = BO_TAPER
         transf = bo_taper_transform
-        d["b1"]  = vcat([bench1(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]...)
-        d["b2"]  = vcat([bench2(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]...)
-        d["b3"]  = vcat([bench3(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]...)
-        d["b4"]  = vcat([bench4(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]...)
-        d["b5"]  = vcat([bench5(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]...)
-        d["b6"]  = vcat([bench6(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]...)
-        d["b7"]  = vcat([bench7(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]...)
-        d["b8"]  = vcat([bench8(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]...)
-        d["b9"]  = vcat([bench9(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]...)
-        d["b10"] = vcat([bench10(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]...)
+        b1  = [bench1(prng,   sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]
+        b2  = [bench2(prng,   sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]
+        b3  = [bench3(prng,   sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]
+        b4  = [bench4(prng,   sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]
+        b5  = [bench5(prng,   sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]
+        b6  = [bench6(prng,   sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]
+        b7  = [bench7(prng,   sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]
+        b8  = [bench8(prng,   sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]
+        b9  = [bench9(prng,   sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]
+        b10 = [bench10(prng,  sched, Dict{Symbol, Any}(), transform=transf) for i = 1:32]
+        d["b1"]      = vcat([i[1] for i in b1]...)
+        d["b1_log"]  = [i[2] for i in b1]
+        d["b2"]      = vcat([i[1] for i in b2]...)
+        d["b2_log"]  = [i[2] for i in b2]
+        d["b3"]      = vcat([i[1] for i in b3]...)
+        d["b3_log"]  = [i[2] for i in b3]
+        d["b4"]      = vcat([i[1] for i in b4]...)
+        d["b4_log"]  = [i[2] for i in b4]
+        d["b4"]      = vcat([i[1] for i in b4]...)
+        d["b4_log"]  = [i[2] for i in b4]
+        d["b5"]      = vcat([i[1] for i in b5]...)
+        d["b5_log"]  = [i[2] for i in b5]
+        d["b6"]      = vcat([i[1] for i in b6]...)
+        d["b6_log"]  = [i[2] for i in b6]
+        d["b7"]      = vcat([i[1] for i in b7]...)
+        d["b7_log"]  = [i[2] for i in b7]
+        d["b8"]      = vcat([i[1] for i in b8]...)
+        d["b8_log"]  = [i[2] for i in b8]
+        d["b9"]      = vcat([i[1] for i in b9]...)
+        d["b9_log"]  = [i[2] for i in b9]
+        d["b10"]     = vcat([i[1] for i in b10]...)
+        d["b10_log"] = [i[2] for i in b10]
         save(joinpath(path, "BO_TAPER.jld"), d)
     end
 end
