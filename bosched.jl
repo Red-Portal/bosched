@@ -92,7 +92,10 @@ function stretch(arr, lo, hi)
 end
 
 function classic_mode(workload_profile, loop_states, h, P)
+    println(loop_states)
     for loop in loop_states
+        println(loop)
+        println(loop["id"])
         arr = read(workload_profile, loop["id"])
         μ   = mean(arr)
         σ   = stdm(arr, μ)
@@ -217,12 +220,14 @@ function main(args)
         f-> filter(x->occursin(args["name"], x), f) |>
         f-> fs.joinpath.(path, f)
     bostate_fname = bostate_fname[1]
+    println("-- found $bostate_fname")
 
     bostate = open(bostate_fname) do file
         str   = read(file, String)
         loops = JSON.parse(str)
         loops
     end
+    println("-- $bostate_fname contains $(bostate["num_loops"]) loops")
 
     if(!(args["mode"] == "classic"
          || args["mode"] == "bosched"
@@ -235,6 +240,7 @@ function main(args)
             f-> filter(x->occursin(args["name"], x), f) |>
             f-> fs.joinpath.(path, f)
         workload_fname = workload_fname[1]
+        println("-- found $workload_fname")
 
         bostate = h5open(workload_fname) do file
             bostate["loops"] = classic_mode(file, bostate["loops"],
@@ -259,6 +265,6 @@ Base.@ccallable function julia_main(ARGS::Vector{String})::Cint
     return 0
 end
 
-# if get(ENV, "COMPILE_STATIC", "false") == "false"
-#     julia_main(ARGS)
-# end
+if get(ENV, "COMPILE_STATIC", "false") == "false"
+    julia_main(ARGS)
+end
