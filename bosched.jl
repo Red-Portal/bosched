@@ -11,6 +11,7 @@ using Plots
 using Statistics
 using TerminalMenus
 using UnicodePlots
+using Base.Iterators
 
 const fs  = Base.Filesystem
 
@@ -152,8 +153,12 @@ function bosched_mode(loop_states, subsize, P)
 
         println("----- $(loop["id"]) bosched mode -----")
         w, μ, σ, H, best_θ, best_y = ibbo(x, -y, true, false)
+        hist_x = collect(flatten(loop["hist_x"]))
+        hist_y = collect(flatten(loop["hist_y"]))
+        minidx = findmin(hist_y)
+
         gmm = Dict()
-        gmm["eval_param"] = best_θ
+        gmm["eval_param"] = hist_x[minidx] #best_θ
         gmm["gmm_weight"] = w
         gmm["gmm_mean"]   = μ
         gmm["gmm_stddev"] = σ
