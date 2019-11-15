@@ -148,7 +148,7 @@ function bosched_mode(loop_states, subsize, P)
     for loop in loop_states
         loop = update_dataset(loop)
         x, y = bo_subsample(loop["hist_x"], loop["hist_y"], subsize)
-        y   /= (N / P)
+        y   /= (loop["N"] / P)
         @assert length(x) == length(y)
 
         println("----- $(loop["id"]) bosched mode -----")
