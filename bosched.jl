@@ -152,7 +152,8 @@ function bosched_mode(loop_states, subsize, P)
         @assert length(x) == length(y)
 
         println("----- $(loop["id"]) bosched mode -----")
-        w, μ, σ, H, best_θ, best_y = ibbo(x, -y, true, false)
+        w, μ, σ, H, best_θ, best_y = ibbo(x, -log.(y), true, false)
+
         hist_x = collect(flatten(loop["hist_x"]))
         hist_y = collect(flatten(loop["hist_y"]))
         minidx = findmin(hist_y)
@@ -184,13 +185,13 @@ function visualize_gp(loop_states, subsize)
 
         @assert length(x) == length(y)
         w, μ, σ, H, αx, αy, gpx, gpμ, gpσ², samples, best_θ, best_y =
-            ibbo_log(x, -y, true, true)
+            ibbo_log(x, -log.(y), true, true)
         gpμ *= -1
 
         if(uimodes[uichoice] == "GUI")
             p1 = Plots.plot(gpx, gpμ, grid=false, ribbon=sqrt.(gpσ²)*1.96,
                             fillalpha=.5, label="GP (95%)", xlims=(0.0,1.0))
-            Plots.scatter!(p1, x, whitening(y), label="data points", xlims=(0.0,1.0))
+            Plots.scatter!(p1, x, whitening(log.(y)), label="data points", xlims=(0.0,1.0))
             p2 = Plots.plot(αx, αy, label="acquisition", xlims=(0.0,1.0))
             display(plot(p1, p2, layout=(2,1)))
         else
