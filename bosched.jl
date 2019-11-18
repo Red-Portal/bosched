@@ -109,7 +109,7 @@ function classic_mode(workload_profile, loop_states, h, P)
         d["hss"]    = stretch(prof, 0, 255)
         loop["params"] = d
 
-        println("----- $loop classic mode -----")
+        println("----- $(loop["id"]) classic mode -----")
         println(" μ   = $μ")
         println(" σ   = $σ")
         println(" css = $(d["css"])")
