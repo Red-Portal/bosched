@@ -94,8 +94,6 @@ end
 
 function classic_mode(workload_profile, loop_states, h, P)
     for loop in loop_states
-        println(loop)
-        println(loop["id"])
         arr = read(workload_profile, string(loop["id"]))
         μ   = mean(arr)
         σ   = stdm(arr, μ)
