@@ -25,7 +25,12 @@ namespace bosched
 	    if(!state.warming_up)
 	    {
 		auto& gmm = l["gmm"];
-		state.eval_param = gmm["eval_param"];
+
+		if(getenv("EVAL"))
+		    state.eval_param = gmm["eval_param1"];
+		else
+		    state.eval_param = gmm["eval_param2"];
+
 		auto& gmm_weight_json = gmm["gmm_weight"];
 		state.gmm_weight = std::vector<double>(gmm_weight_json.begin(),
 						       gmm_weight_json.end());

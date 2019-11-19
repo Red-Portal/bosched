@@ -157,7 +157,8 @@ function bosched_mode(loop_states, subsize, P)
         minidx = findmin(hist_y)
 
         gmm = Dict()
-        gmm["eval_param"] = hist_x[minidx[2]] #best_θ
+        gmm["eval_param1"] = hist_x[minidx[2]]
+        gmm["eval_param2"] = best_θ
         gmm["gmm_weight"] = w
         gmm["gmm_mean"]   = μ
         gmm["gmm_stddev"] = σ
