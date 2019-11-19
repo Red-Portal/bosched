@@ -128,10 +128,12 @@ gomp_loop_init (struct gomp_work_share *ws, long start, long end, long incr,
 	  if (sched == BO_FSS)
 	    {
 	      ws->param = fss_transform_range (ws->param);
+	      
 	    }
 	  else if (sched == FS_FSS)
 	    {
 	      ws->param = bo_fss_parameter (region_id);
+	      printf("%lf\n", ws->param);
 	    }
 
 	  double temp = nthreads / 2.0 * ws->param;

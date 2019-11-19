@@ -107,104 +107,104 @@ parse_schedule (void)
         return;
 
     while (isspace ((unsigned char) *env))
-        ++env;
+      ++env;
     if (strncasecmp (env, "static", 6) == 0)
-    {
-        gomp_global_icv.run_sched_var = GFS_STATIC;
-        env += 6;
-    }
+      {
+	gomp_global_icv.run_sched_var = GFS_STATIC;
+	env += 6;
+      }
     else if (strncasecmp (env, "dynamic", 7) == 0)
-    {
-        gomp_global_icv.run_sched_var = GFS_DYNAMIC;
-        env += 7;
-    }
+      {
+	gomp_global_icv.run_sched_var = GFS_DYNAMIC;
+	env += 7;
+      }
     else if (strncasecmp (env, "guided", 6) == 0)
-    {
-        gomp_global_icv.run_sched_var = GFS_GUIDED;
-        env += 6;
-    }
+      {
+	gomp_global_icv.run_sched_var = GFS_GUIDED;
+	env += 6;
+      }
     else if (strncasecmp (env, "auto", 4) == 0)
-    {
-        gomp_global_icv.run_sched_var = GFS_AUTO;
-        env += 4;
-    }
+      {
+	gomp_global_icv.run_sched_var = GFS_AUTO;
+	env += 4;
+      }
     else if (strncasecmp (env, "afac", 4) == 0)
-	  {
-        gomp_global_icv.run_sched_var = FS_AFAC;
-        env += 4;
-	  }
+      {
+	gomp_global_icv.run_sched_var = FS_AFAC;
+	env += 4;
+      }
     else if (strncasecmp (env, "binlpt", 6) == 0)
-	  {
-        gomp_global_icv.run_sched_var = FS_BINLPT;
-        env += 6;
-	  }
+      {
+	gomp_global_icv.run_sched_var = FS_BINLPT;
+	env += 6;
+      }
     else if (strncasecmp (env, "hss", 3) == 0)
-	  {
-        gomp_global_icv.run_sched_var = FS_HSS;
-        env += 3;
-	  }
+      {
+	gomp_global_icv.run_sched_var = FS_HSS;
+	env += 3;
+      }
     else if (strncasecmp (env, "fac2", 4) == 0)
-    {
-        gomp_global_icv.run_sched_var = FS_FAC2;
-        env += 4;
-    }
+      {
+	gomp_global_icv.run_sched_var = FS_FAC2;
+	env += 4;
+      }
     else if (strncasecmp (env, "fss", 3) == 0)
-    {
-        gomp_global_icv.run_sched_var = FS_FSS;
-        env += 3;
-    }
+      {
+	gomp_global_icv.run_sched_var = FS_FSS;
+	env += 3;
+      }
     else if (strncasecmp (env, "tss", 3) == 0)
-    {
-        gomp_global_icv.run_sched_var = FS_TSS;
-        env += 3;
-    }
+      {
+	gomp_global_icv.run_sched_var = FS_TSS;
+	env += 3;
+      }
     else if (strncasecmp (env, "trap1", 5) == 0)
-	{
-	    gomp_global_icv.run_sched_var = FS_TRAP1;
-	    env += 5;
-	}
+      {
+	gomp_global_icv.run_sched_var = FS_TRAP1;
+	env += 5;
+      }
     else if (strncasecmp (env, "css", 3) == 0)
-	{
-	    gomp_global_icv.run_sched_var = FS_CSS;
-	    env += 3;
-	}
+      {
+	gomp_global_icv.run_sched_var = FS_CSS;
+	env += 3;
+      }
     else if (strncasecmp (env, "taper", 5) == 0)
-	{
-	    gomp_global_icv.run_sched_var = FS_TAPE;
-	    env += 4;
-	}
+      {
+	gomp_global_icv.run_sched_var = FS_TAPE;
+	env += 4;
+      }
     else if (strncasecmp (env, "tape3", 5) == 0)
-	{
-	    gomp_global_icv.run_sched_var = FS_TAPE3;
-	    env += 5;
-	}
+      {
+	gomp_global_icv.run_sched_var = FS_TAPE3;
+	env += 5;
+      }
     else if (strncasecmp (env, "bo_tape", 7) == 0)
-	{
-	    gomp_global_icv.run_sched_var = BO_TAPE;
-	    env += 7;
-	}
+      {
+	gomp_global_icv.run_sched_var = BO_TAPE;
+	env += 7;
+      }
     else if (strncasecmp (env, "bo_css", 6) == 0)
-	{
-	    gomp_global_icv.run_sched_var = BO_CSS;
-	    env += 6;
-	}
+      {
+	gomp_global_icv.run_sched_var = BO_CSS;
+	env += 6;
+      }
     else if (strncasecmp (env, "bo_fss", 6) == 0)
-    {
+      {
 	gomp_global_icv.run_sched_var = BO_FSS;
 	env += 6;
-    }
+      }
     else if (strncasecmp (env, "bo_fac", 6) == 0)
-    {
+      {
 	gomp_global_icv.run_sched_var = BO_FAC;
 	env += 6;
-    }
+      }
     else if (strncasecmp (env, "bo_tss", 6) == 0)
-    {
-        gomp_global_icv.run_sched_var = BO_TSS;
-        env += 6;
-    }
+      {
+	gomp_global_icv.run_sched_var = BO_TSS;
+	env += 6;
+      }
     else
-        goto unknown;
+      goto unknown;
 
     while (isspace ((unsigned char) *env))
         ++env;
