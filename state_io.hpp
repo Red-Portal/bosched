@@ -26,7 +26,7 @@ namespace bosched
 	    {
 		auto& gmm = l["gmm"];
 
-		if(getenv("EVAL"))
+		if(getenv("HIST"))
 		    state.eval_param = gmm["eval_param1"];
 		else
 		    state.eval_param = gmm["eval_param2"];
