@@ -59,7 +59,7 @@ namespace bosched
 	do 
 	{
 	    param = dist(_rng);
-	} while(param < 0 && param > 1.0);
+	} while(param < 0 || param > 1.0);
 	return param;
     }
 }
