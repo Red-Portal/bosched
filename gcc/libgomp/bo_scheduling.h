@@ -35,14 +35,14 @@ extern double bo_fac_parameter(unsigned long long region_id);
 extern double bo_css_parameter(unsigned long long region_id);
 
 extern void bo_save_data(char const* progname,
-						 size_t sched_id);
+			 size_t sched_id);
 
 extern double bo_schedule_parameter(unsigned long long region_id,
-									int is_bo);
+				    int is_bo);
 
 extern void bo_schedule_begin(unsigned long long region_id,
-							  unsigned long long N,
-							  long num_tasks );
+			      unsigned long long N,
+			      long num_tasks );
 
 extern void bo_schedule_end(unsigned long long region_id);
 
