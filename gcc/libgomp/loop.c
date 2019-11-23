@@ -88,17 +88,11 @@ gomp_loop_init (struct gomp_work_share *ws, long start, long end, long incr,
       case BO_TAPE:
 	{
 	  if (sched == BO_TAPE)
-	    {
 	      ws->param = tape_transform_range (ws->param);
-	    }
 	  else if (sched == FS_TAPE)
-	    {
 	      ws->param = bo_tape_parameter (region_id);
-	    }
 	  else
-	    {
 	      ws->param = 3.0;
-	    }
 	  break;
 	}
 
@@ -126,13 +120,9 @@ gomp_loop_init (struct gomp_work_share *ws, long start, long end, long incr,
       case BO_FSS:
 	{
 	  if (sched == BO_FSS)
-	    {
 	      ws->param = fss_transform_range (ws->param);
-	    }
 	  else if (sched == FS_FSS)
-	    {
 	      ws->param = bo_fss_parameter (region_id);
-	    }
 
 	  double temp = nthreads / 2.0 * ws->param;
 	  double b2 = (1.0 / num_tasks) * temp * temp;
@@ -191,15 +181,10 @@ gomp_loop_init (struct gomp_work_share *ws, long start, long end, long incr,
       case BO_CSS:
 	{
 	  if (sched == BO_CSS)
-	    {
 	      ws->param = css_transform_range (ws->param);
-	      ws->chunk_size = css_chunk_size (ws->param, num_tasks, nthreads);
-	    }
 	  else if (sched == FS_CSS)
-	    {
 	      ws->param = bo_css_parameter (region_id);
-	      ws->chunk_size = css_chunk_size (ws->param, num_tasks, nthreads);
-	    }
+	  ws->chunk_size = css_chunk_size (ws->param, num_tasks, nthreads);
 	  ws->chunk_size *= incr;
 
 #ifdef HAVE_SYNC_BUILTINS

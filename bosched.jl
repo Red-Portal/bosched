@@ -16,7 +16,7 @@ using Base.Iterators
 const fs  = Base.Filesystem
 
 function bo_fss_transform(x)
-    return 2^(11*x - 7)
+    return 2^(15*x - 8)
 end
 
 function bo_fac_transform(x)
@@ -32,7 +32,7 @@ function bo_taper_transform(x)
 end
 
 function bo_css_transform(x)
-    return 2^(10*x - 5)
+    return 2^(19*x - 13)
 end
 
 function cmd_args(args, show)

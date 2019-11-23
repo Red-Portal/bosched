@@ -303,7 +303,7 @@ extern "C"
         if(__builtin_expect (_is_debug, false))
         {
             std::cout << "-- loop " << region_id
-                      << " requested schedule parameter " << param
+                      << " requested boched schedule parameter " << param
                       << std::endl;
         }
         return param;
