@@ -116,14 +116,26 @@ function classic_mode(workload_profile, loop_states, h, P)
     return loop_states
 end
 
-function bo_subsample(obs_x, obs_y, subsample)
+function bo_subsample(hist_x, hist_y, subsample)
     res_x = Float64[]
     res_y = Float64[]
-    for i = 1:length(obs_x)
-        x = convert(Array{Float64}, obs_x[i])
-        y = convert(Array{Float64}, obs_y[i])
-        append!(res_x, x[1:min(length(x), subsample)])
-        append!(res_y, y[1:min(length(y), subsample)])
+    for i = 1:length(hist_x)
+        count      = 0
+        runs       = length(hist_x[i])
+        batch_size = floor(Int64, subsample / runs)
+        for j = 1:runs
+            x = convert(Array{Float64}, hist_x[i][j])
+            y = convert(Array{Float64}, hist_y[i][j])
+
+            # Take from the back
+            if(length(x) == 1)
+                append!(res_x, x[1])
+                append!(res_y, y[1])
+            else
+                append!(res_x, x[end-min(length(x), batch_size):end])
+                append!(res_y, y[end-min(length(y), batch_size):end])
+            end
+        end
     end
     return vcat(res_x...), vcat(res_y...)
 end

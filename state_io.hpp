@@ -42,11 +42,6 @@ namespace bosched
 						       gmm_stddev_json.end());
 	    }
 
-	    auto& obs_x = l["obs_x"];
-	    auto& obs_y = l["obs_y"];
-	    state.obs_x  = std::vector<double>(obs_x.cbegin(), obs_x.cend());
-	    state.obs_y  = std::vector<double>(obs_y.cbegin(), obs_y.cend());
-
             if(getenv("DEBUG"))
             {
 		size_t entry_count = 0;
@@ -77,8 +72,10 @@ namespace bosched
             serialized_state["id"]     = loop_id;
             serialized_state["warmup"] = loop_state.warming_up;
 	    serialized_state["N"]      = loop_state.num_tasks;
-	    serialized_state["obs_x"]  = nlohmann::json(std::move(loop_state.obs_x));
-	    serialized_state["obs_y"]  = nlohmann::json(std::move(loop_state.obs_y));
+	    serialized_state["obs_x"].push_back(
+		nlohmann::json(std::move(loop_state.obs_x)));
+	    serialized_state["obs_y"].push_back(
+		nlohmann::json(std::move(loop_state.obs_y)));
 
 	    if(getenv("DEBUG"))
             {
