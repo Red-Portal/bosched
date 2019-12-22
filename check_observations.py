@@ -11,7 +11,7 @@ def main():
             if not("obs_x" in i):
                 exit(1)
             else:
-                if np.array(i["obs_x"]).flatten().shape[0] < 64:
+                if np.array(i["obs_x"]).flatten().shape[0] < 128:
                     exit(1)
     exit(0)
 
