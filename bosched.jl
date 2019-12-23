@@ -122,7 +122,7 @@ function bo_subsample(hist_x, hist_y, subsample)
     for i = 1:length(hist_x)
         count      = 0
         runs       = length(hist_x[i])
-        batch_size = floor(Int64, subsample / runs)
+        batch_size = ceil(Int64, subsample / runs)
         for j = 1:runs
             x = convert(Array{Float64}, hist_x[i][j])
             y = convert(Array{Float64}, hist_y[i][j])
@@ -134,6 +134,10 @@ function bo_subsample(hist_x, hist_y, subsample)
             else
                 append!(res_x, x[end-min(length(x), batch_size):end])
                 append!(res_y, y[end-min(length(y), batch_size):end])
+            end
+
+            if(length(res_x) > subsample)
+                break
             end
         end
     end
