@@ -3,7 +3,7 @@ abstract type AbstractParticleGP <: GPBase end
 
 mutable struct ParticleGP <: AbstractParticleGP
     gp::Array{GPBase}
-    particles::Matrix{Float64}
+    η::Vector{Float64}
     weights::Vector{Float64}
     dim::Int64
     num_gpparam::Int64
@@ -23,8 +23,13 @@ mutable struct ParticleGP <: AbstractParticleGP
             push!(models, GaussianProcesses.update_mll!(local_model))
         end
         nparam = GaussianProcesses.num_params(gp, domean=false)
-        return new(models, particles, weights, gp.dim, nparam, kwargs)
+        return new(models, [], weights, gp.dim, nparam, kwargs)
     end
+end
+
+mutable struct TimeMarginalizedGP <: AbstractParticleGP
+    non_marg_gp::GPBase
+    time_max::Int64
 end
 
 function ParticleGP(gp::GPBase,
@@ -46,15 +51,16 @@ function GaussianProcesses.predict_y(gp::ParticleGP, x::AbstractArray)
     return μ, σ²
 end
 
-function predict_marg_y(gp::GPBase, x::AbstractArray, max_t::Int64)
-    t   = collect(1:max_t)
-    μs  = zeros(length(x))
-    σ²s = zeros(length(x))
-    xt  = zeros(2, max_t)
+function GaussianProcesses.predict_y(gp::TimeMarginalizedGP, x::AbstractArray)
+    max_t = gp.time_max
+    t     = collect(1:max_t)
+    μs    = zeros(length(x))
+    σ²s   = zeros(length(x))
+    xt    = zeros(2, max_t)
     for i = 1:length(x)
-        xt[1,:] .= x[i]
-        xt[2,:] .= t
-        μ, σ² = predict_y(gp, xt)
+        xt[1,:] .= t
+        xt[2,:] .= x[i] 
+        μ, σ² = predict_y(gp.non_marg_gp, xt)
         μ  = sum(μ)
         σ² = sum(σ²)
 
@@ -63,4 +69,3 @@ function predict_marg_y(gp::GPBase, x::AbstractArray, max_t::Int64)
     end
     return μs, σ²s
 end
-

@@ -1,19 +1,22 @@
 
+module LABO
+
 using AdvancedHMC
+using Base.Threads
 using Distributions
 using GaussianProcesses
 using JSON
 using LineSearches
 using LinearAlgebra
 using MCMCDiagnostics
+using NLopt
 using Optim
+using Plots
 using Random
 using Roots
 using SpecialFunctions
-using StatsBase
 using Statistics
-using Plots
-using Base.Threads
+using StatsBase
 
 include("particle_gp.jl")
 include("acquisition.jl")
@@ -22,7 +25,7 @@ include("expmean.jl")
 include("mcmc.jl")
 include("plot_gp.jl")
 
-function optimize_acquisition(gp, verbose)
+function optimize_acquisition(gp, verbose::Bool=true)
     ϵ        = 1e-10
     dim      = 1
 
@@ -30,8 +33,8 @@ function optimize_acquisition(gp, verbose)
 
     opt = NLopt.Opt(:GN_DIRECT, dim)
 
-    opt.lower_bounds  = [0]
-    opt.upper_bounds  = [1]
+    opt.lower_bounds  = [0.0]
+    opt.upper_bounds  = [1.0]
     opt.ftol_abs      = 1e-20
     opt.xtol_abs      = 1e-20
     opt.maxeval       = 1024
@@ -47,15 +50,15 @@ function optimize_acquisition(gp, verbose)
     return opt_x[1], opt_y
 end
 
-function optimize_mean(gp, verbose)
+function optimize_mean(gp, verbose::Bool=true)
     ϵ        = 1e-10
     dim      = 1
 
     f(x, g) = GaussianProcesses.predict_y(gp, x[:,:])[1][1]
 
     opt = NLopt.Opt(:GN_DIRECT, dim)
-    opt.lower_bounds  = [0]
-    opt.upper_bounds  = [1]
+    opt.lower_bounds  = [0.0]
+    opt.upper_bounds  = [1.0]
     opt.ftol_abs      = 1e-20
     opt.xtol_abs      = 1e-20
     opt.maxeval       = 1024
@@ -114,18 +117,20 @@ end
 
 function build_gp(data_x, data_y, verbose::Bool=true)
     tmax = maximum(@view data_x[:,1])
-    σ1   = log(2)
-    m    = MeanExp(1.0, 1.0, 1.0, [Normal(0.0, σ1),
-                                   Normal(0.0, σ1),
-                                   Normal(0.0, σ1)])
-    k  = SEArd([1.0, 1.0], 1.0, [Normal(0.0, max(log(tmax), σ1)),
-                                 Normal(0.0, σ1),
-                                 Normal(0.0, σ1)])
+    m    = MeanExp(1.0, 1.0, 1.0, [Normal(0.0, 2.0),
+                                   Normal(0.0, 2.0),
+                                   Normal(0.0, 2.0)])
+    k  = SEArd([1.0, 1.0], 1.0, [Normal(0.0, max(log(tmax), 2.0)),
+                                 Normal(-1.0, 2.0),
+                                 Normal(0.0, 2.0)])
     ϵ  = -1.0
     gp = GP(data_x, data_y, m, k, ϵ)
-    set_priors!(gp.logNoise, [Normal(0.0, σ1)])
+    set_priors!(gp.logNoise, [Normal(-1.0, 2.0)])
 
-    gp = ess(gp, num_samples=1000, num_adapts=200, thinning=5, verbose=verbose)
+    gp = ess(gp, num_samples=500, num_adapts=200,
+             thinning=5, verbose=verbose)
+    # gp = mala(gp, num_samples=1024, num_adapts=1024,
+    #           thinning=8, verbose=verbose)
 end
 
 function filter_outliers(gp::AbstractParticleGP,
@@ -242,34 +247,57 @@ function debug_bo()
     raw_x = loop["hist_x"]
     raw_y = loop["hist_y"]
 
-    a, b, c = LABO(raw_x, raw_y, 16, 256)
-    return a, b, c
+    d = Dict()
+    a, b = LABO(raw_x, -raw_y, 16, 512, logdict=d)
+    return a, b, d
 end
 
-function LABO(data_x, data_y, max_t, subsample, verbose=true)
+function LABO(data_x, data_y, max_t, subsample;
+              verbose::Bool=true, logdict=nothing)
     data_x, data_y = data_preprocess(data_x, data_y, verbose)
     gp             = fit_gp(data_x, data_y, subsample, verbose)
-    println(size(gp.gp[1].x))
+    gp             = TimeMarginalizedGP(gp, max_t)
 
     if(verbose)
         println("- sampling y*")
     end
     η         = maximum(data_y)
-    P         = length(gp.weights)
-    num_ystar = 32
-    num_gridx = 256
-    ystar = Matrix{Float64}(undef, P, num_ystar)
-    Threads.@threads for i = 1:P
-        ystar[i,:] = marg_sample_ystar(i, η, num_ystar, num_gridx, gp, max_t)
-    end
-    gp.particles = vcat(gp.particles, ystar')
+    P         = length(gp.non_marg_gp.weights)
+    num_ystar = 16
+    num_gridx = 512
+    gp.non_marg_gp.η = sample_ystar(η, num_ystar, num_gridx, gp)
     if(verbose)
         println("- sampling y* - done")
     end
 
-    logα(x) = log(marg_acquisition(x, gp, max_t))
-    x = 0.0:0.01:1.0
-    y = exp.(logα.(x))
-    #optimize_acquisition(gp, verbose)
-    return gp, x, y
+    if(verbose)
+        println("- optimize acquisition")
+    end
+    θ_next = optimize_acquisition(gp, verbose)
+    if(verbose)
+        println("- optimize acquisition - done")
+    end
+
+    if(verbose)
+        println("- optimize mean")
+    end
+    θ_opt = optimize_mean(gp, verbose)
+    if(verbose)
+        println("- optimize mean - done")
+    end
+
+    if(logdict != nothing)
+        logα(x) = log(acquisition(x, gp))
+        αx = 0.0:0.01:1.0
+        αy = exp.(logα.(αx))
+        logdict[:data_x]     = data_x
+        logdict[:data_y]     = data_y
+        logdict[:acq_x]      = αx
+        logdict[:acq_y]      = αy
+        logdict[:param_next] = θ_next
+        logdict[:param_opt]  = θ_opt
+        logdict[:gp]         = gp
+    end
+    return θ_next, θ_opt
 end
+end 

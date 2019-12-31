@@ -27,7 +27,7 @@ end
 
 function GaussianProcesses.mean(mExp::MeanExp, x::AbstractVector)
     length(x) == 2 || throw(ArgumentError("Observations and mean function have inconsistent dimensions"))
-    return exp(-mExp.α*x[1] + mExp.β) + mExp.μ
+    return -exp(-mExp.α*x[1] + mExp.β) + mExp.μ
 end
 
 
@@ -45,8 +45,8 @@ end
 
 function GaussianProcesses.grad_mean(mExp::MeanExp, x::AbstractVector)
     fx = mean(mExp, x)
-    dα = -x[1]*fx
-    dβ = fx
+    dα = x[1]*fx
+    dβ = -fx
     dμ = 1
     return [dα dβ dμ]
 end

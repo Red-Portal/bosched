@@ -1,30 +1,7 @@
 
-function effective_sample_size(X::AbstractMatrix)
-    function compute_ess(ρ_scalar)
-        τ_inv = 1 + 2 * ρ_scalar[1]
-        K = 2
-        for k = 2:2:N-2
-            Δ = ρ_scalar[k] + ρ_scalar[k + 1]
-            if all(Δ < 0)
-                break
-            else
-                τ_inv += 2*Δ
-            end
-        end
-        return min(1 / τ_inv, one(τ_inv))
-    end
-
-    N = size(X, 1)
-    lags = collect(1:N-1)
-    ρ    = zeros(length(lags), size(X, 2))
-    StatsBase.autocor!(ρ, X, lags)
-    return [compute_ess(ρ[:,i]) for i = 1:size(X,2)] .* N 
-end
-
-
 function nuts(gp; num_samples=100, num_adapts=100, thinning=1, verbose=false)
     params_kwargs = GaussianProcesses.get_params_kwargs(
-        gp; domean=false, kern=true, noise=true, lik=true)
+        gp; domean=true, kern=true, noise=true, lik=true)
     function logp∂logp(θ::AbstractVector)
         try
             GaussianProcesses.set_params!(gp, θ; params_kwargs...)
@@ -40,7 +17,8 @@ function nuts(gp; num_samples=100, num_adapts=100, thinning=1, verbose=false)
     end
 
     θ_init  = GaussianProcesses.get_params(gp; params_kwargs...)
-    metric  = DenseEuclideanMetric(length(θ_init))
+    #metric  = DenseEuclideanMetric(length(θ_init))
+    metric  = DiagEuclideanMetric(length(θ_init))
     h       = Hamiltonian(metric, logp, logp∂logp)
     prop    = NUTS(Leapfrog(find_good_eps(h, θ_init)))
     adaptor = StanHMCAdaptor(num_adapts,
@@ -69,10 +47,8 @@ Journal of Machine Learning Research 9 (2010): 541-548.
 Requires hyperparameter priors to be Gaussian.
 """
 function ess(gp; num_samples=100, num_adapts=100, thinning=1, verbose::Bool=true)
-    params_kwargs = GaussianProcesses.get_params_kwargs(gp; domean=false,
-                                                        kern=true,
-                                                        noise=true,
-                                                        lik=true)
+    params_kwargs = GaussianProcesses.get_params_kwargs(
+        gp; domean=true, kern=true, noise=true, lik=true)
     count = 0
     function calc_target!(θ::AbstractVector)
         count += 1
@@ -126,10 +102,10 @@ function ess(gp; num_samples=100, num_adapts=100, thinning=1, verbose::Bool=true
     post = post[num_adapts:thinning:end,:]
     samples = post'
     if(verbose)
-        println("ESS = ", effective_sample_size(post))
         println("Number of function calls: ", count)
         println("Acceptance rate: $(num_samples / count) \n")
     end
     return ParticleGP(gp, samples)
 end
+
 
