@@ -29,6 +29,7 @@ end
 
 mutable struct TimeMarginalizedGP <: AbstractParticleGP
     non_marg_gp::GPBase
+    time_min::Int64
     time_max::Int64
 end
 
@@ -52,11 +53,11 @@ function GaussianProcesses.predict_y(gp::ParticleGP, x::AbstractArray)
 end
 
 function GaussianProcesses.predict_y(gp::TimeMarginalizedGP, x::AbstractArray)
-    max_t = gp.time_max
-    t     = collect(1:max_t)
+    Δt    = gp.time_max - gp.time_min + 1
+    t     = collect(gp.time_min:gp.time_max)
     μs    = zeros(length(x))
     σ²s   = zeros(length(x))
-    xt    = zeros(2, max_t)
+    xt    = zeros(2, Δt)
     for i = 1:length(x)
         xt[1,:] .= t
         xt[2,:] .= x[i] 

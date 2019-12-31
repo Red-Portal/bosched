@@ -153,41 +153,56 @@ function filter_outliers(gp::AbstractParticleGP,
     gp
 end
 
-function data_preprocess(data_x, data_y, verbose::Bool=true)
+function data_preprocess(data_x, data_y, time_total, time_min, time_max;
+                         verbose::Bool=true, legacy::Bool=false)
     if(verbose)
         println("- data preprocess")
     end
-    data_x = vcat(data_x...)
-    data_y = vcat(data_y...)
-    trans_x = [] 
 
-    for i in 1:length(data_x)
-        batch  = convert(Vector{Float64}, data_x[i])
-        zipped = hcat(collect(1:length(batch)), batch)
-        push!(trans_x, zipped)
+    if(legacy)
+        data_x = vcat(data_x...)
+        data_y = vcat(data_y...)
+
+        data_x = hcat(data_x...)
+        data_y = hcat(data_y...)
+
+        data_x = convert(Array{Float64}, data_x)
+        data_y = convert(Array{Float64}, data_y)
     end
-    data_x = vcat(trans_x...)
+
+    data_x = data_x[time_min:time_max, :]
+    data_y = data_y[time_min:time_max, :]
+    data_x = vcat(data_x...)'
     data_y = vcat(data_y...)
 
-    data_x = convert(Array{Float64, 2}, data_x)
-    data_y = convert(Array{Float64, 1}, data_y)
+    @assert size(data_x, 2) % (time_max - time_min + 1) == 0
+    num_data = floor(Int64, size(data_x, 2) / (time_max - time_min + 1))
+    iter_axe = collect(time_min:time_max)
+    iter_axe = vcat(repeat(iter_axe, num_data))
+    data_x   = hcat(data_x[1,:], iter_axe)
+
     data_y = whiten(data_y)
     data_x = Array(data_x')
+
+    #println(size(data_x))
+    #println(size(data_y))
     if(verbose)
         println("- data preprocess - done")
     end
     return data_x, data_y
 end
 
-function fit_gp(data_x, data_y, subsample, verbose=true)
-    iters = length(data_x[1])
+function fit_gp(data_x, data_y, max_t, subsample, verbose=true)
+    iters = max_t
     idx   = zeros(subsample)
 
-    StatsBase.knuths_sample!(1:size(data_x,2), idx)
-    idx = convert(Array{Int64}, idx)
+    if(size(data_x, 2) > subsample)
+        StatsBase.knuths_sample!(1:size(data_x,2), idx)
+        idx = convert(Array{Int64}, idx)
 
-    data_x = data_x[:,idx]
-    data_y = data_y[idx]
+        data_x = data_x[:,idx]
+        data_y = data_y[idx]
+    end
 
     if(verbose)
         println("- fit gp")
@@ -206,19 +221,6 @@ function fit_gp(data_x, data_y, subsample, verbose=true)
     end
     gp
     #return gp, data_x, data_y
-    # μs = Float64[]
-    # σs = Float64[]
-    # θs = collect(0.0:0.01:1.0)
-    # for θ = θs
-    #     x = hcat(1.0:1.0:iters, ones(iters)*θ)
-    #     μ, σ² = predict_y(gp, x')
-    #     μ  = # μ[end]
-    #     mean(μ)
-    #     σ² = # σ²[end]
-    #     mean(σ²)
-    #     push!(μs, μ)
-    #     push!(σs, sqrt(σ²))
-    # end
     # return θs, μs, σs
 end
 
@@ -243,25 +245,37 @@ function debug_bo()
         loops = JSON.parse(str)
         loops
     end
-    loop   = bostate["loops"][1]
+    loop  = bostate["loops"][1]
     raw_x = loop["hist_x"]
     raw_y = loop["hist_y"]
 
     d = Dict()
-    a, b = LABO(raw_x, -raw_y, 16, 512, logdict=d)
+    a, b = labo(raw_x, -raw_y, 16, 512, logdict=d, legacy=true)
     return a, b, d
 end
 
-function LABO(data_x, data_y, max_t, subsample;
-              verbose::Bool=true, logdict=nothing)
-    data_x, data_y = data_preprocess(data_x, data_y, verbose)
-    gp             = fit_gp(data_x, data_y, subsample, verbose)
-    gp             = TimeMarginalizedGP(gp, max_t)
+function labo(data_x, data_y, max_t, subsample;
+              verbose::Bool=true, legacy::Bool=false, logdict=nothing)
+    η = maximum(data_y)
+
+    time_min = 1
+    time_max = max_t
+
+    if(max_t > 16 && max_t <= 32)
+        time_max = 16
+    elseif(max_t > 32)
+        time_min = max_t - 1
+    end
+
+    data_x, data_y = data_preprocess(data_x, data_y,
+                                     max_t, time_min, time_max,
+                                     verbose=true, legacy=legacy)
+    gp = fit_gp(data_x, data_y, max_t, subsample, verbose)
+    gp = TimeMarginalizedGP(gp, time_min, time_max)
 
     if(verbose)
         println("- sampling y*")
     end
-    η         = maximum(data_y)
     P         = length(gp.non_marg_gp.weights)
     num_ystar = 16
     num_gridx = 512
@@ -273,7 +287,7 @@ function LABO(data_x, data_y, max_t, subsample;
     if(verbose)
         println("- optimize acquisition")
     end
-    θ_next = optimize_acquisition(gp, verbose)
+    θ_next, acq_opt = optimize_acquisition(gp, verbose)
     if(verbose)
         println("- optimize acquisition - done")
     end
@@ -281,7 +295,7 @@ function LABO(data_x, data_y, max_t, subsample;
     if(verbose)
         println("- optimize mean")
     end
-    θ_opt = optimize_mean(gp, verbose)
+    θ_mean, mean_opt = optimize_mean(gp, verbose)
     if(verbose)
         println("- optimize mean - done")
     end
@@ -295,9 +309,20 @@ function LABO(data_x, data_y, max_t, subsample;
         logdict[:acq_x]      = αx
         logdict[:acq_y]      = αy
         logdict[:param_next] = θ_next
-        logdict[:param_opt]  = θ_opt
+        logdict[:acq_next]   = acq_opt
+        logdict[:mean_opt]   = mean_opt
         logdict[:gp]         = gp
+
+        μs = Float64[]
+        σs = Float64[]
+        θ  = collect(0.0:0.01:1.0)
+
+        x     = collect(0.0:0.01:1.0)
+        μ, σ² = GaussianProcesses.predict_y(gp, x[:,:])
+        logdict[:gp_x]    = x
+        logdict[:gp_mean] = μ
+        logdict[:gp_std]  = sqrt.(σ²)
     end
-    return θ_next, θ_opt
+    return θ_next, θ_mean, acq_opt, mean_opt
 end
-end 
+end
