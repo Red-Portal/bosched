@@ -142,7 +142,7 @@ function bosched_mode(loop_states, time_samples, subsize, P)
         x, y  = loop["hist_x"], loop["hist_y"]
 
         lens = [length(i) for i in x]
-        lmax = maximum(lens)
+        lmax = minimum(lens)
         x    = [i[1:lmax] for i in x]
         y    = [i[1:lmax] for i in y]
 
