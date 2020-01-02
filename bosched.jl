@@ -1,11 +1,11 @@
 
 include("simulation/binlpt_utils.jl")
-include("IBBO/IBBO.jl")
+include("LABO/LABO.jl")
 
 import ArgParse
 import Base.Filesystem
 import JSON
-using .IBBO
+using .LABO
 using HDF5
 using Plots
 using Statistics
@@ -63,7 +63,12 @@ function cmd_args(args, show)
         arg_type = Int64
         help     = "Bayesian optimization subsample size"
         metavar  = "<size>"
-        default  = 32 
+        default  = 256
+        "--time_samples"
+        arg_type = Int64
+        help     = "Locality axis sample numbers"
+        metavar  = "<size>"
+        default  = 4
         "name"
         arg_type = String
         help     = "Name of workload executable."
@@ -116,112 +121,92 @@ function classic_mode(workload_profile, loop_states, h, P)
     return loop_states
 end
 
-function bo_subsample(hist_x, hist_y, subsample)
-    res_x = Float64[]
-    res_y = Float64[]
-    for i = 1:length(hist_x)
-        count      = 0
-        runs       = length(hist_x[i])
-        batch_size = ceil(Int64, subsample / runs)
-        for j = 1:runs
-            x = convert(Array{Float64}, hist_x[i][j])
-            y = convert(Array{Float64}, hist_y[i][j])
-
-            # Take from the back
-            if(length(x) == 1)
-                append!(res_x, x[1])
-                append!(res_y, y[1])
-            else
-                append!(res_x, x[end-min(length(x), batch_size):end])
-                append!(res_y, y[end-min(length(y), batch_size):end])
-            end
-
-            if(length(res_x) > subsample)
-                break
-            end
-        end
-    end
-    return vcat(res_x...), vcat(res_y...)
-end
-
 function update_dataset(loop_state)
     if(!haskey(loop_state, "hist_x") || loop_state["hist_x"] == nothing)
         loop_state["hist_x"] = []
         loop_state["hist_y"] = []
     end
     if(!isempty(loop_state["obs_x"]))
-        push!(loop_state["hist_x"], loop_state["obs_x"]) 
-        push!(loop_state["hist_y"], loop_state["obs_y"]) 
-        loop_state["obs_x"] = empty(loop_state["obs_x"])
-        loop_state["obs_y"] = empty(loop_state["obs_y"])
+        push!(loop_state["hist_x"], loop_state["obs_x"]...) 
+        push!(loop_state["hist_y"], loop_state["obs_y"]...) 
+        loop_state["obs_x"] = []
+        loop_state["obs_y"] = []
     end
     return loop_state
 end
 
-function bosched_mode(loop_states, subsize, P)
+function bosched_mode(loop_states, time_samples, subsize, P)
     for loop in loop_states
-        loop = update_dataset(loop)
-        x, y = bo_subsample(loop["hist_x"], loop["hist_y"], subsize)
-        y   /= (loop["N"] / P)
-        @assert length(x) == length(y)
-
         println("----- $(loop["id"]) bosched mode -----")
-        w, μ, σ, H, best_θ, best_y = ibbo(x, -log.(y), true, false)
+        loop  = update_dataset(loop)
+        x, y  = loop["hist_x"], loop["hist_y"]
 
-        hist_x = collect(flatten(loop["hist_x"]))
-        hist_y = collect(flatten(loop["hist_y"]))
-        minidx = findmin(hist_y)
+        x  = hcat(x...)
+        y  = hcat(y...)
+        x  = convert(Array{Float64}, x)
+        y  = convert(Array{Float64}, y)
+        y /= (loop["N"] / P)
+        @assert size(x) == size(y)
 
-        gmm = Dict()
-        gmm["eval_param1"] = hist_x[minidx[2]]
-        gmm["eval_param2"] = best_θ
-        gmm["gmm_weight"] = w
-        gmm["gmm_mean"]   = μ
-        gmm["gmm_stddev"] = σ
-        loop["gmm"]       = gmm
-        loop["warmup"]    = false
+        θ_next, θ_mean, acq_opt, mean_opt = LABO.labo(
+            x, -y, length(x[1]), time_samples, subsize, verbose=true)
 
-        println(" num components  = $(length(w))")
-        println(" mixture entropy = $H")
-        println(" observations    = $(length(x))")
+        hist_x   = collect(flatten(loop["hist_x"]))
+        hist_y   = collect(flatten(loop["hist_y"]))
+        hist_min = findmin(hist_y)
+        θ_hist   = hist_min[1]
+
+        loop["eval_param1"] = θ_hist
+        loop["eval_param2"] = θ_mean
+        loop["param"]       = θ_next
+        loop["warmup"]      = false
+
+        println(" best param until now = $(θ_hist)")
+        println(" predicted optimum    = $(θ_mean), optimum mean = $(mean_opt)")
+        println(" next query point     = $(θ_next), acquisition  = $(acq_opt)")
+        println(" number of data point = $(size(x, 2))")
     end
     return loop_states
 end
 
-function visualize_gp(loop_states, subsize)
-    uimodes  = ["GUI", "CUI"]
-    uimenu   = RadioMenu(uimodes, pagesize=2)
-    uichoice = request("choose interface:", uimenu)
+function visualize_gp(loop_states, time_samples, subsize, P)
+    #uimodes  = ["GUI", "CUI"]
+    #uimenu   = RadioMenu(uimodes, pagesize=2)
+    #uichoice = request("choose interface:", uimenu)
 
     options = ["continue", "export", "exit"]
     menu    = RadioMenu(options, pagesize=3)
     for loop in loop_states
-        x, y = bo_subsample(loop["hist_x"], loop["hist_y"], subsize)
+        x, y  = loop["hist_x"], loop["hist_y"]
+        max_t = 
 
-        @assert length(x) == length(y)
-        w, μ, σ, H, αx, αy, gpx, gpμ, gpσ², samples, best_θ, best_y =
-            ibbo_log(x, -log.(y), true, true)
+        x  = hcat(x...)
+        y  = hcat(y...)
+        x  = convert(Array{Float64}, x)
+        y  = convert(Array{Float64}, y)
+        y /= (loop["N"] / P)
+        @assert size(x) == size(y)
+
+        d = Dict()
+        θ_next, θ_mean, acq_opt, mean_opt = LABO.labo(
+            x, -y, length(x[1]), time_samples, subsize, verbose=true, logdict=d)
+
+        αx   = d[:acq_x]
+        αy   = d[:acq_y]
+        gpx  = d[:gp_x]
+        gpσ  = d[:gp_std]
+        gpμ  = d[:gp_mean]
         gpμ *= -1
 
-        if(uimodes[uichoice] == "GUI")
-            p1 = Plots.plot(gpx, gpμ, grid=false, ribbon=sqrt.(gpσ²)*1.96,
-                            fillalpha=.5, label="GP (95%)", xlims=(0.0,1.0))
-            Plots.scatter!(p1, x, whitening(log.(y)), label="data points", xlims=(0.0,1.0))
-            p2 = Plots.plot(αx, αy, label="acquisition", xlims=(0.0,1.0))
-            display(plot(p1, p2, layout=(2,1)))
-        else
-            conf = sqrt.(gpσ²)*1.96
-            p1 = lineplot(gpx, gpμ, color=:blue, name="μ", xlim=[0.0,1.0]) 
-            #lineplot!(p1, gpx, gpμ+conf, color=:green, name="95%") 
-            #lineplot!(p1, gpx, gpμ-conf, color=:green) 
-            scatterplot!(p1, x, whitening(y), color=:red) 
-
-            p2 = lineplot(αx, αy, name="acquisition", xlim=[0.0,1.0]) 
-            io = IOContext(stdout, :color => true)
-            println(io, p1)
-            println(io, p2)
-        end
-
+        p1   = Plots.plot(gpx, gpμ, grid=false, ribbon=gpσ*1.96,
+                          fillalpha=.5, label="GP (95%)", xlims=(0.0,1.0))
+        flat_x = collect(flatten(x))
+        flat_y = collect(flatten(y))
+        Plots.scatter!(p1, flat_x, LABO.whiten(flat_y),
+                       label="data points", xlims=(0.0,1.0))
+        p2 = Plots.plot(αx, αy, label="acquisition", xlims=(0.0,1.0))
+        display(plot(p1, p2, layout=(2,1)))
+        
         choice = request("choose action:", menu)
         if(options[choice] == "export")
             
@@ -235,7 +220,6 @@ function main(args)
     args  = cmd_args(args, true)
     path  = args["path"]
     files = readdir(path)
-    
 
     bostate_fname = filter(x->occursin(".bostate", x), files) |>
         f-> filter(x->occursin(args["name"], x), f) |>
@@ -264,16 +248,24 @@ function main(args)
         println("-- found $workload_fname")
 
         bostate = h5open(workload_fname) do file
-            bostate["loops"] = classic_mode(file, bostate["loops"],
-                                            args["h"], args["P"])
+            bostate["loops"] = classic_mode(file,
+                                            bostate["loops"],
+                                            args["h"],
+                                            args["P"])
             bostate
         end
     end
     if(args["mode"] == "bosched" || args["mode"] == "both")
-        bostate["loops"]  = bosched_mode(bostate["loops"], args["subsize"], args["P"])
+        bostate["loops"]  = bosched_mode(bostate["loops"],
+                                         args["time_samples"],
+                                         args["subsize"],
+                                         args["P"])
     end
     if(args["mode"] == "visualize")
-        visualize_gp(bostate["loops"], args["subsize"])
+        visualize_gp(bostate["loops"],
+                     args["time_samples"],
+                     args["subsize"],
+                     args["P"])
     end
 
     open(bostate_fname, "w") do file

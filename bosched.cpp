@@ -46,22 +46,22 @@ namespace bosched
         return next;
     }
 
-    inline double
-    generate_parameter(std::vector<double> const& weight,
-		       std::vector<double> const& mu,
-		       std::vector<double> const& sigma)
-    {
-	auto mixdist = std::discrete_distribution<size_t>(weight.begin(),
-							  weight.end());
-	auto mixidx  = mixdist(_rng);
-	auto dist    = std::normal_distribution(mu[mixidx], sigma[mixidx]);
-	double param = 0.0;
-	do 
-	{
-	    param = dist(_rng);
-	} while(param < 0 || param > 1.0);
-	return param;
-    }
+    // inline double
+    // generate_parameter(std::vector<double> const& weight,
+    // 		       std::vector<double> const& mu,
+    // 		       std::vector<double> const& sigma)
+    // {
+    // 	auto mixdist = std::discrete_distribution<size_t>(weight.begin(),
+    // 							  weight.end());
+    // 	auto mixidx  = mixdist(_rng);
+    // 	auto dist    = std::normal_distribution(mu[mixidx], sigma[mixidx]);
+    // 	double param = 0.0;
+    // 	do 
+    // 	{
+    // 	    param = dist(_rng);
+    // 	} while(param < 0 || param > 1.0);
+    // 	return param;
+    // }
 }
 
 extern "C"
@@ -290,13 +290,13 @@ extern "C"
 	    {
 		loop_state.param = bosched::warmup_next_param();
 	    }
-	    else
-	    {
-		loop_state.param = bosched::generate_parameter(
-		    loop_state.gmm_weight,
-		    loop_state.gmm_mean,
-		    loop_state.gmm_stddev);
-	    }
+	    //else
+	    //{
+		// loop_state.param = bosched::generate_parameter(
+		//     loop_state.gmm_weight,
+		//     loop_state.gmm_mean,
+		//     loop_state.gmm_stddev);
+	    //}
 	}
 	double param = loop_state.param;
 

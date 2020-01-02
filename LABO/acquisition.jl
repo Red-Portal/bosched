@@ -84,17 +84,14 @@ function acquisition(x, gp::AbstractParticleGP)
 end
 
 function acquisition(x, gp::TimeMarginalizedGP)
-    nmgp     = gp.non_marg_gp
-    time_min = gp.time_min
-    time_max = gp.time_max
-
+    nmgp  = gp.non_marg_gp
     P     = length(nmgp.weights)
     w     = nmgp.weights
     η     = nmgp.η
     α_res = zeros(P)
+    t     = gp.time_idx
     for i = 1:P
-        xt       = zeros(2, time_max - time_min + 1)
-        t        = collect(time_min:time_max)
+        xt       = zeros(2, length(t))
         xt[1,:]  = t
         xt[2,:] .= x
 

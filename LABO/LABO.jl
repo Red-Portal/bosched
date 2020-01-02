@@ -115,20 +115,19 @@ function whiten(y)
     return y
 end
 
-function build_gp(data_x, data_y, verbose::Bool=true)
-    tmax = maximum(@view data_x[:,1])
+function build_gp(data_x, data_y, time_idx, verbose::Bool=true)
+    tmax = time_idx[end]
     m    = MeanExp(1.0, 1.0, 1.0, [Normal(0.0, 2.0),
                                    Normal(0.0, 2.0),
                                    Normal(0.0, 2.0)])
-    k  = SEArd([1.0, 1.0], 1.0, [Normal(0.0, max(log(tmax), 2.0)),
-                                 Normal(-1.0, 2.0),
-                                 Normal(0.0, 2.0)])
-    ϵ  = -1.0
-    gp = GP(data_x, data_y, m, k, ϵ)
+    k    = SEArd([1.0, 1.0], 1.0, [Normal(-1.0, max(log(tmax), 2.0)),
+                                   Normal(-1.0, 2.0),
+                                   Normal(0.0, 2.0)])
+    ϵ    = -1.0
+    gp   = GP(data_x, data_y, m, k, ϵ)
     set_priors!(gp.logNoise, [Normal(-1.0, 2.0)])
-
-    gp = ess(gp, num_samples=500, num_adapts=200,
-             thinning=5, verbose=verbose)
+    gp   = ess(gp, num_samples=500, num_adapts=200,
+               thinning=5, verbose=verbose)
     # gp = mala(gp, num_samples=1024, num_adapts=1024,
     #           thinning=8, verbose=verbose)
 end
@@ -136,6 +135,7 @@ end
 function filter_outliers(gp::AbstractParticleGP,
                          data_x,
                          data_y,
+                         time_idx,
                          verbose::Bool=true)
     α = log(0.01)
     μ, σ² = predict_y(gp, data_x)
@@ -145,7 +145,7 @@ function filter_outliers(gp::AbstractParticleGP,
     if(!all(idx))
         data_x = data_x[:, .!idx]
         data_y = data_y[.!idx]
-        gp = build_gp(data_x, data_y, verbose)
+        gp = build_gp(data_x, data_y, time_idx, verbose)
     end
     if(verbose)
         println("- filtered $(count(idx)) outliers")
@@ -153,8 +153,10 @@ function filter_outliers(gp::AbstractParticleGP,
     gp
 end
 
-function data_preprocess(data_x, data_y, time_total, time_min, time_max;
-                         verbose::Bool=true, legacy::Bool=false)
+function data_preprocess(data_x, data_y, time_idx;
+                         verbose::Bool=true,
+                         legacy::Bool=false,
+                         samples::Int64=4)
     if(verbose)
         println("- data preprocess")
     end
@@ -170,44 +172,43 @@ function data_preprocess(data_x, data_y, time_total, time_min, time_max;
         data_y = convert(Array{Float64}, data_y)
     end
 
-    data_x = data_x[time_min:time_max, :]
-    data_y = data_y[time_min:time_max, :]
+    data_x = data_x[time_idx, :]
+    data_y = data_y[time_idx, :]
     data_x = vcat(data_x...)'
     data_y = vcat(data_y...)
 
-    @assert size(data_x, 2) % (time_max - time_min + 1) == 0
-    num_data = floor(Int64, size(data_x, 2) / (time_max - time_min + 1))
-    iter_axe = collect(time_min:time_max)
-    iter_axe = vcat(repeat(iter_axe, num_data))
-    data_x   = hcat(data_x[1,:], iter_axe)
+    @assert size(data_x, 2) % length(time_idx) == 0
+    num_data = floor(Int64, size(data_x, 2) / length(time_idx))
+    iter_axe = vcat(repeat(time_idx, num_data))
+    data_x   = hcat(iter_axe, data_x[1,:])
 
     data_y = whiten(data_y)
     data_x = Array(data_x')
 
-    #println(size(data_x))
-    #println(size(data_y))
     if(verbose)
         println("- data preprocess - done")
     end
     return data_x, data_y
 end
 
-function fit_gp(data_x, data_y, max_t, subsample, verbose=true)
-    iters = max_t
+function fit_surrogate(data_x, data_y, time_idx, subsample, verbose=true)
+    iters = length(time_idx)
     idx   = zeros(subsample)
 
-    if(size(data_x, 2) > subsample)
-        StatsBase.knuths_sample!(1:size(data_x,2), idx)
+    ndata = size(data_x,2)
+    if(ndata > subsample)
+        StatsBase.knuths_sample!(1:ndata, idx)
         idx = convert(Array{Int64}, idx)
 
         data_x = data_x[:,idx]
         data_y = data_y[idx]
+        println("- subsampling $(subsample) samples from $(ndata) samples")
     end
 
     if(verbose)
         println("- fit gp")
     end
-    gp = build_gp(data_x, data_y, verbose)
+    gp = build_gp(data_x, data_y, time_idx, verbose)
     if(verbose)
         println("- fit gp - done")
     end
@@ -215,13 +216,11 @@ function fit_gp(data_x, data_y, max_t, subsample, verbose=true)
     if(verbose)
         println("- filter outliers")
     end
-    gp = filter_outliers(gp, data_x, data_y, verbose)
+    gp = filter_outliers(gp, data_x, data_y, time_idx, verbose)
     if(verbose)
         println("- filter outliers - done")
     end
     gp
-    #return gp, data_x, data_y
-    # return θs, μs, σs
 end
 
 function debug_gp()
@@ -254,24 +253,23 @@ function debug_bo()
     return a, b, d
 end
 
-function labo(data_x, data_y, max_t, subsample;
+function labo(data_x, data_y, time_max, time_samples, subsample;
               verbose::Bool=true, legacy::Bool=false, logdict=nothing)
     η = maximum(data_y)
 
-    time_min = 1
-    time_max = max_t
-
-    if(max_t > 16 && max_t <= 32)
-        time_max = 16
-    elseif(max_t > 32)
-        time_min = max_t - 1
+    time_idx = begin
+        if(time_max <= time_samples)
+            time_idx = collect(1:time_max)
+        else
+            time_idx = range(1, stop=time_max, length=time_samples)
+            time_idx = round(time_idx, RoundNearest)
+        end
     end
 
-    data_x, data_y = data_preprocess(data_x, data_y,
-                                     max_t, time_min, time_max,
+    data_x, data_y = data_preprocess(data_x, data_y, time_idx,
                                      verbose=true, legacy=legacy)
-    gp = fit_gp(data_x, data_y, max_t, subsample, verbose)
-    gp = TimeMarginalizedGP(gp, time_min, time_max)
+    gp = fit_surrogate(data_x, data_y, time_idx, subsample, verbose)
+    gp = TimeMarginalizedGP(gp, time_idx)
 
     if(verbose)
         println("- sampling y*")
