@@ -96,8 +96,8 @@ function acquisition(x, gp::TimeMarginalizedGP)
         xt[2,:] .= x
 
         μ, σ² = predict_y(nmgp.gp[i], xt)
-        μ     = sum(μ)
-        σ²    = sum(σ²)
+        μ     = dot(μ, gp.time_w)
+        σ²    = dot(σ², gp.time_w)
 
         α_res[i] = α(μ, σ², η)
     end

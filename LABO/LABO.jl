@@ -252,23 +252,52 @@ function debug_bo()
     return a, b, d
 end
 
-function labo(data_x, data_y, time_max, time_samples, subsample;
-              verbose::Bool=true, legacy::Bool=false, logdict=nothing)
-    η = maximum(data_y)
-
-    time_idx = begin
-        if(time_max <= time_samples)
-            time_idx = collect(1:time_max)
-        else
-            time_idx = range(1, stop=time_max, length=time_samples)
-            time_idx = round(time_idx, RoundNearest)
-        end
+function time_quantization(time_max::Int64,
+                           time_samples::Int64,
+                           uniform_quant::Bool)
+    time_idx = []
+    time_w   = []
+    if(time_max <= time_samples)
+        time_idx = collect(1:time_max)
+        N        = length(time_idx)
+        time_w   = ones(N) / N
+        return time_idx, time_w
     end
 
+    if(uniform_quant)
+        time_idx = range(1, stop=time_max, length=time_samples)
+    else
+        time_idx = range(0, stop=log(time_max), length=time_samples)
+        time_idx = exp.(time_idx)
+    end
+    time_idx = round.(Int64, time_idx, RoundNearest)
+    N        = length(time_idx)
+
+    if(uniform_quant)
+        time_w = ones(N) / N
+    else
+        time_w    = zeros(N)
+        time_w[1] = 1
+        for i = 2:N
+            time_w[i] = time_idx[i] - time_idx[i-1]
+            @assert time_w[i] > 0.0
+        end
+        time_w /= N
+    end
+    time_idx, time_w
+end
+
+function labo(data_x, data_y, time_max, time_samples, subsample;
+              verbose::Bool=true,
+              legacy::Bool=false,
+              uniform_quant::Bool=false,
+              logdict=nothing)
+    η = maximum(data_y)
+    time_idx, time_w = time_quantization(time_max, time_samples, uniform_quant)
     data_x, data_y = data_preprocess(data_x, data_y, time_idx,
                                      verbose=true, legacy=legacy)
     gp = fit_surrogate(data_x, data_y, time_idx, subsample, verbose)
-    gp = TimeMarginalizedGP(gp, time_idx)
+    gp = TimeMarginalizedGP(gp, time_idx, time_w)
 
     if(verbose)
         println("- sampling y*")
