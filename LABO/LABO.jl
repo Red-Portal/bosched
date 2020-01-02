@@ -20,7 +20,6 @@ using StatsBase
 
 include("particle_gp.jl")
 include("acquisition.jl")
-include("expkernel.jl")
 include("expmean.jl")
 include("mcmc.jl")
 include("plot_gp.jl")
