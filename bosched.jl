@@ -141,6 +141,11 @@ function bosched_mode(loop_states, time_samples, subsize, P)
         loop  = update_dataset(loop)
         x, y  = loop["hist_x"], loop["hist_y"]
 
+        lens = [length(i) for i in x]
+        lmax = maximum(lens)
+        x    = [i[1:lmax] for i in x]
+        y    = [i[1:lmax] for i in y]
+
         x  = hcat(x...)
         y  = hcat(y...)
         x  = convert(Array{Float64}, x)
