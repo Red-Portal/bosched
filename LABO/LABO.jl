@@ -125,7 +125,7 @@ function build_gp(data_x, data_y, time_idx, verbose::Bool=true)
     ϵ    = -1.0
     gp   = GP(data_x, data_y, m, k, ϵ)
     set_priors!(gp.logNoise, [Normal(-1.0, 2.0)])
-    gp   = ess(gp, num_samples=500, num_adapts=200,
+    gp   = ess(gp, num_samples=1000, num_adapts=200,
                thinning=5, verbose=verbose)
     # gp = mala(gp, num_samples=1024, num_adapts=1024,
     #           thinning=8, verbose=verbose)
@@ -274,7 +274,7 @@ function time_quantization(time_max::Int64,
     N        = length(time_idx)
 
     if(uniform_quant)
-        time_w = ones(N) / N
+        time_w = ones(N) * time_max / N
     else
         time_w    = zeros(N)
         time_w[1] = 1
@@ -282,7 +282,6 @@ function time_quantization(time_max::Int64,
             time_w[i] = time_idx[i] - time_idx[i-1]
             @assert time_w[i] > 0.0
         end
-        time_w /= N
     end
     time_idx, time_w
 end
@@ -290,7 +289,7 @@ end
 function labo(data_x, data_y, time_max, time_samples, subsample;
               verbose::Bool=true,
               legacy::Bool=false,
-              uniform_quant::Bool=false,
+              uniform_quant::Bool=true,
               logdict=nothing)
     η = maximum(data_y)
     time_idx, time_w = time_quantization(time_max, time_samples, uniform_quant)
@@ -345,9 +344,22 @@ function labo(data_x, data_y, time_max, time_samples, subsample;
 
         x     = collect(0.0:0.01:1.0)
         μ, σ² = GaussianProcesses.predict_y(gp, x[:,:])
+        logdict[:tmgp_x]    = x
+        logdict[:tmgp_mean] = μ
+        logdict[:tmgp_std]  = sqrt.(σ²)
+
+        x     = range(0.0, stop=1.0, length=50)
+        t     = range(1.0, stop=time_max, length=50)
+        xgrid = repeat(x', 50, 1)
+        tgrid = repeat(t, 1, 50)
+        tx    = vcat(vec(tgrid)', vec(xgrid)')
+        
+        μ, Σ  = predict_y(gp.non_marg_gp, tx)
+
         logdict[:gp_x]    = x
+        logdict[:gp_t]    = t
         logdict[:gp_mean] = μ
-        logdict[:gp_std]  = sqrt.(σ²)
+        logdict[:gp_std]  = Σ
     end
     return θ_next, θ_mean, acq_opt, mean_opt
 end

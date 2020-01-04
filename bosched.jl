@@ -69,6 +69,9 @@ function cmd_args(args, show)
         help     = "Locality axis sample numbers"
         metavar  = "<size>"
         default  = 4
+        "--uniform_quant"
+        help     = "Uniformly quantize the time axis"
+        action   = :store_true 
         "name"
         arg_type = String
         help     = "Name of workload executable."
@@ -135,7 +138,7 @@ function update_dataset(loop_state)
     return loop_state
 end
 
-function bosched_mode(loop_states, time_samples, subsize, P)
+function bosched_mode(loop_states, time_samples, subsize, P, quant)
     for loop in loop_states
         println("----- $(loop["id"]) bosched mode -----")
         loop  = update_dataset(loop)
@@ -154,7 +157,8 @@ function bosched_mode(loop_states, time_samples, subsize, P)
         @assert size(x) == size(y)
 
         θ_next, θ_mean, acq_opt, mean_opt = LABO.labo(
-            x, -y, length(x[1]), time_samples, subsize, verbose=true)
+            x, -y, length(x[1]), time_samples,
+            subsize, verbose=true, uniform_quant=quant)
 
         hist_x   = collect(flatten(loop["hist_x"]))
         hist_y   = collect(flatten(loop["hist_y"]))
@@ -174,10 +178,14 @@ function bosched_mode(loop_states, time_samples, subsize, P)
     return loop_states
 end
 
-function visualize_gp(loop_states, time_samples, subsize, P)
+function visualize_gp(loop_states, time_samples, subsize, P, quant)
+    pyplot()
     #uimodes  = ["GUI", "CUI"]
     #uimenu   = RadioMenu(uimodes, pagesize=2)
     #uichoice = request("choose interface:", uimenu)
+
+    gpmodes = ["marginalized", "plain"]
+    gpmenu  = RadioMenu(gpmodes, pagesize=2)
 
     options = ["continue", "export", "exit"]
     menu    = RadioMenu(options, pagesize=3)
@@ -194,23 +202,37 @@ function visualize_gp(loop_states, time_samples, subsize, P)
 
         d = Dict()
         θ_next, θ_mean, acq_opt, mean_opt = LABO.labo(
-            x, -y, length(x[1]), time_samples, subsize, verbose=true, logdict=d)
+            x, -y,
+            size(x, 1), time_samples,
+            subsize, verbose=true, logdict=d, uniform_quant=quant)
 
-        αx   = d[:acq_x]
-        αy   = d[:acq_y]
-        gpx  = d[:gp_x]
-        gpσ  = d[:gp_std]
-        gpμ  = d[:gp_mean]
-        gpμ *= -1
+        vischoice = request("choose GP visualization mode:", gpmenu)
+        if(gpmodes[vischoice] == "marginalized")
+            αx   = d[:acq_x]
+            αy   = d[:acq_y]
+            gpx  = d[:tmgp_x]
+            gpσ  = d[:tmgp_std]
+            gpμ  = d[:tmgp_mean]
+            p1   = Plots.plot(gpx, gpμ, grid=false, ribbon=gpσ*1.96,
+                              fillalpha=.5, label="GP (95%)", xlims=(0.0,1.0))
+            p2 = Plots.plot(αx, αy, label="acquisition", xlims=(0.0,1.0))
+            display(plot(p1, p2, layout=(2,1)))
+        else
+            gpx    = d[:gp_x]
+            gpt    = d[:gp_t]
+            gpμ    = d[:gp_mean]
+            data_x = d[:data_x]
+            data_y = d[:data_y]
 
-        p1   = Plots.plot(gpx, gpμ, grid=false, ribbon=gpσ*1.96,
-                          fillalpha=.5, label="GP (95%)", xlims=(0.0,1.0))
-        flat_x = collect(flatten(x))
-        flat_y = collect(flatten(y))
-        Plots.scatter!(p1, flat_x, LABO.whiten(flat_y),
-                       label="data points", xlims=(0.0,1.0))
-        p2 = Plots.plot(αx, αy, label="acquisition", xlims=(0.0,1.0))
-        display(plot(p1, p2, layout=(2,1)))
+
+            len  = length(gpx)
+            gpμ  = reshape(gpμ, (len, len))
+            gpμ  = gpμ'
+            p1   = Plots.surface(gpt, gpx, -gpμ, label="gp μ")
+            Plots.scatter!(p1, data_x[1,:], data_x[2,:], -data_y,
+                           label="data points")
+            display(p1)
+        end
         
         choice = request("choose action:", menu)
         if(options[choice] == "export")
@@ -264,13 +286,15 @@ function main(args)
         bostate["loops"]  = bosched_mode(bostate["loops"],
                                          args["time_samples"],
                                          args["subsize"],
-                                         args["P"])
+                                         args["P"],
+                                         args["uniform_quant"])
     end
     if(args["mode"] == "visualize")
         visualize_gp(bostate["loops"],
                      args["time_samples"],
                      args["subsize"],
-                     args["P"])
+                     args["P"],
+                     args["uniform_quant"])
     end
 
     open(bostate_fname, "w") do file
