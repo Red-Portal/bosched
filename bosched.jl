@@ -63,7 +63,7 @@ function cmd_args(args, show)
         arg_type = Int64
         help     = "Bayesian optimization subsample size"
         metavar  = "<size>"
-        default  = 256
+        default  = 512 
         "--time_samples"
         arg_type = Int64
         help     = "Locality axis sample numbers"
@@ -162,8 +162,8 @@ function bosched_mode(loop_states, time_samples, subsize, P, quant)
 
         hist_x   = collect(flatten(loop["hist_x"]))
         hist_y   = collect(flatten(loop["hist_y"]))
-        hist_min = findmin(hist_y)
-        θ_hist   = hist_min[1]
+        _, min_idx = findmin(hist_y)
+        θ_hist   = hist_x[min_idx]
 
         loop["eval_param1"] = θ_hist
         loop["eval_param2"] = θ_mean
@@ -191,7 +191,11 @@ function visualize_gp(loop_states, time_samples, subsize, P, quant)
     menu    = RadioMenu(options, pagesize=3)
     for loop in loop_states
         x, y  = loop["hist_x"], loop["hist_y"]
-        max_t = 
+
+        lens = [length(i) for i in x]
+        lmax = minimum(lens)
+        x    = [i[1:lmax] for i in x]
+        y    = [i[1:lmax] for i in y]
 
         x  = hcat(x...)
         y  = hcat(y...)

@@ -21,6 +21,7 @@ using StatsBase
 include("particle_gp.jl")
 include("acquisition.jl")
 include("expmean.jl")
+include("expkernel.jl")
 include("mcmc.jl")
 include("plot_gp.jl")
 
@@ -116,19 +117,28 @@ end
 
 function build_gp(data_x, data_y, time_idx, verbose::Bool=true)
     tmax = time_idx[end]
-    m    = MeanExp(1.0, 1.0, 1.0, [Normal(0.0, 2.0),
-                                   Normal(0.0, 2.0),
-                                   Normal(0.0, 2.0)])
-    k    = SEArd([1.0, 1.0], 1.0, [Normal(-1.0, max(log(tmax), 2.0)),
-                                   Normal(-1.0, 2.0),
-                                   Normal(0.0, 2.0)])
+    # m    = MeanExp(1.0, 1.0, 1.0, [Normal(0.0, 2.0),
+    #                                Normal(0.0, 2.0),
+    #                                Normal(0.0, 2.0)])
+    m    = MeanZero()
+    k_x = SEIso(1.0, 1.0, [Normal(-1.0, 2.0),
+                           Normal(0.0, 2.0)])
+    k_x = Masked(k_x, [2])
+    k_t = Exp(1.0, 1.0, 1.0, [Normal(0.0, 2.0),
+                              Normal(0.0, 2.0),
+                              Normal(0.0, 2.0)])
+    k_t = Masked(k_t, [1])
+    k   = k_x * k_t
+
     ϵ    = -1.0
     gp   = GP(data_x, data_y, m, k, ϵ)
     set_priors!(gp.logNoise, [Normal(-1.0, 2.0)])
-    gp   = ess(gp, num_samples=1000, num_adapts=200,
-               thinning=5, verbose=verbose)
-    # gp = mala(gp, num_samples=1024, num_adapts=1024,
-    #           thinning=8, verbose=verbose)
+    # gp   = ess(gp, num_samples=500, num_adapts=200,
+    #            thinning=5, verbose=verbose)
+    # gp   = nuts(gp, num_samples=500, num_adapts=200,
+    #             thinning=5, verbose=verbose)
+    gp   = slice(gp, num_samples=500, num_adapts=200,
+                 thinning=5, width=4.0, verbose=verbose)
 end
 
 function filter_outliers(gp::AbstractParticleGP,
@@ -267,8 +277,9 @@ function time_quantization(time_max::Int64,
     if(uniform_quant)
         time_idx = range(1, stop=time_max, length=time_samples)
     else
-        time_idx = range(0, stop=log(time_max), length=time_samples)
-        time_idx = exp.(time_idx)
+        time_idx = range(1, stop=log2(time_max), length=time_samples)
+        time_idx = 2.0.^time_idx
+        time_idx[1] = 1.0
     end
     time_idx = round.(Int64, time_idx, RoundNearest)
     N        = length(time_idx)

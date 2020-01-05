@@ -1,4 +1,62 @@
 
+function slice(gp; num_samples=100, num_adapts=100, thinning=1, verbose=false,
+               width=2.0)
+    params_kwargs = GaussianProcesses.get_params_kwargs(
+        gp; domean=true, kern=true, noise=true, lik=true)
+    θ_cur = GaussianProcesses.get_params(gp; params_kwargs...)
+    count = 0
+    function targetlogp(θ::AbstractVector)
+        count += 1
+        try
+            GaussianProcesses.set_params!(gp, θ; params_kwargs...)
+            GaussianProcesses.update_target!(gp; params_kwargs...)
+        catch
+            return -Inf
+        end
+        return gp.target
+    end
+
+    function sample!(θ::AbstractArray, w::Float64, logp)
+        p0 = logp(θ) + log(rand())
+        n  = length(θ)
+
+        lower = θ - w .* rand(n)
+        upper = lower .+ w
+
+        x = w .* rand(n) + lower
+        while logp(x) < p0
+            for i in 1:n
+                value = x[i]
+                if value < θ[i]
+                    lower[i] = value
+                else
+                    upper[i] = value
+                end
+                x[i] = rand(Uniform(lower[i], upper[i]))
+            end
+        end
+        x
+    end
+
+    samples = zeros(Float64, length(θ_cur), num_samples)
+    for i = 1:num_adapts
+        θ_cur = sample!(θ_cur, width, targetlogp)
+    end
+
+    for i = 1:num_samples
+        θ_cur        = sample!(θ_cur, width, targetlogp)
+        samples[:,i] = θ_cur
+    end
+    # ESS = [MCMCDiagnostics.effective_sample_size(samples[i,:])
+    #        for i = 1:size(samples,1)]
+    # println("ESS = $(ESS)")
+    if(verbose)
+        println("Number of function calls: ", count)
+    end
+    return ParticleGP(gp, samples)
+end
+
+
 function nuts(gp; num_samples=100, num_adapts=100, thinning=1, verbose=false)
     params_kwargs = GaussianProcesses.get_params_kwargs(
         gp; domean=true, kern=true, noise=true, lik=true)
