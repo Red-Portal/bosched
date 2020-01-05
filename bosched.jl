@@ -160,10 +160,10 @@ function bosched_mode(loop_states, time_samples, subsize, P, quant)
             x, -y, length(x[1]), time_samples,
             subsize, verbose=true, uniform_quant=quant)
 
-        hist_x   = collect(flatten(loop["hist_x"]))
-        hist_y   = collect(flatten(loop["hist_y"]))
-        _, min_idx = findmin(hist_y)
-        θ_hist   = hist_x[min_idx]
+        hist_x  = collect(flatten(loop["hist_x"]))
+        hist_y  = collect(flatten(loop["hist_y"]))
+        min_idx = argmin(hist_y)
+        θ_hist  = hist_x[min_idx]
 
         loop["eval_param1"] = θ_hist
         loop["eval_param2"] = θ_mean
