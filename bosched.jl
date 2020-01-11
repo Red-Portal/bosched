@@ -184,8 +184,8 @@ function visualize_gp(loop_states, time_samples, subsize, P, quant)
     #uimenu   = RadioMenu(uimodes, pagesize=2)
     #uichoice = request("choose interface:", uimenu)
 
-    gpmodes = ["marginalized", "plain"]
-    gpmenu  = RadioMenu(gpmodes, pagesize=2)
+    #gpmodes = ["marginalized", "plain"]
+    #gpmenu  = RadioMenu(gpmodes, pagesize=2)
 
     options = ["continue", "export", "exit"]
     menu    = RadioMenu(options, pagesize=3)
@@ -210,34 +210,32 @@ function visualize_gp(loop_states, time_samples, subsize, P, quant)
             size(x, 1), time_samples,
             subsize, verbose=true, logdict=d, uniform_quant=quant)
 
-        vischoice = request("choose GP visualization mode:", gpmenu)
-        if(gpmodes[vischoice] == "marginalized")
-            αx   = d[:acq_x]
-            αy   = d[:acq_y]
-            gpx  = d[:tmgp_x]
-            gpσ  = d[:tmgp_std]
-            gpμ  = d[:tmgp_mean]
-            p1   = Plots.plot(gpx, gpμ, grid=false, ribbon=gpσ*1.96,
-                              fillalpha=.5, label="GP (95%)", xlims=(0.0,1.0))
-            p2 = Plots.plot(αx, αy, label="acquisition", xlims=(0.0,1.0))
-            display(plot(p1, p2, layout=(2,1)))
-        else
-            gpx    = d[:gp_x]
-            gpt    = d[:gp_t]
-            gpμ    = d[:gp_mean]
-            data_x = d[:data_x]
-            data_y = d[:data_y]
+        #vischoice = request("choose GP visualization mode:", gpmenu)
+        αx   = d[:acq_x]
+        αy   = d[:acq_y]
+        gpx  = d[:tmgp_x]
+        gpσ  = d[:tmgp_std]
+        gpμ  = d[:tmgp_mean]
+        p1   = Plots.plot(gpx, gpμ, grid=false, ribbon=gpσ*1.96,
+                          fillalpha=.5, label="GP (95%)", xlims=(0.0,1.0))
+        p2 = Plots.plot(αx, αy, label="acquisition", xlims=(0.0,1.0))
 
+        gpx    = d[:gp_x]
+        gpt    = d[:gp_t]
+        gpμ    = d[:gp_mean]
+        data_x = d[:data_x]
+        data_y = d[:data_y]
 
-            len  = length(gpx)
-            gpμ  = reshape(gpμ, (len, len))
-            gpμ  = gpμ'
-            p1   = Plots.surface(gpt, gpx, -gpμ, label="gp μ")
-            Plots.scatter!(p1, data_x[1,:], data_x[2,:], -data_y,
-                           label="data points")
-            display(p1)
-        end
-        
+        #len  = length(gpx)
+        #gpμ  = reshape(gpμ, (len, len))
+        #gpμ  = gpμ'
+
+        println(data_x)
+        p3   = Plots.surface(gpt, gpx, -gpμ, label="gp μ")
+        Plots.scatter!(p3, data_x[1,:], data_x[2,:], -data_y,
+                       label="data points")
+        display(plot(p1, p2, p3, layout=(3,1)))
+
         choice = request("choose action:", menu)
         if(options[choice] == "export")
             

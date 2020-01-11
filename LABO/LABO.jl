@@ -232,8 +232,8 @@ function fit_surrogate(data_x, data_y, time_idx, subsample, verbose=true)
     gp
 end
 
-function debug_gp()
-    bostate = open(".bostate.nn.json") do file
+function debug_gp(;uniform_quant=false, time_samples=4)
+    bostate = open(".bostate.sc_omp.json") do file
         str   = read(file, String)
         loops = JSON.parse(str)
         loops
@@ -242,13 +242,22 @@ function debug_gp()
     raw_x = loop["hist_x"]
     raw_y = loop["hist_y"]
 
-    data_x, data_y = data_preprocess(raw_x, raw_y)
-    gp = fit_gp(data_x, data_y, 256)
+    raw_x = hcat(raw_x...)
+    raw_y = hcat(raw_y...)
+
+    data_x = convert(Array{Float64}, raw_x)
+    data_y = convert(Array{Float64}, raw_y)
+
+    time_max = size(raw_x, 1)
+    time_idx, time_w = time_quantization(time_max, time_samples, uniform_quant)
+    data_x, data_y = data_preprocess(data_x, data_y, time_idx, verbose=true)
+    gp = fit_surrogate(data_x, data_y, time_idx, 128, true)
+    gp = TimeMarginalizedGP(gp, time_idx, time_w)
     return gp
 end
 
-function debug_bo()
-    bostate = open(".bostate.nn.json") do file
+function debug_bo(time_points::Int64=4)
+    bostate = open(".bostate.sc_omp.json") do file
         str   = read(file, String)
         loops = JSON.parse(str)
         loops
@@ -257,10 +266,47 @@ function debug_bo()
     raw_x = loop["hist_x"]
     raw_y = loop["hist_y"]
 
+    raw_x = hcat(raw_x...)
+    raw_y = hcat(raw_y...)
+    raw_x = raw_x[:, 1:2:end]
+    raw_y = raw_y[:, 1:2:end]
+
+    data_x = convert(Array{Float64}, raw_x)
+    data_y = convert(Array{Float64}, raw_y)
+
+    data_x = data_x[1:32,:]
+    data_y = data_y[1:32,:]
+    time_max = size(data_x, 1)
+    println(time_points)
+    println(time_max)
+    println(size(data_x))
+    println(size(data_y))
     d = Dict()
-    a, b = labo(raw_x, -raw_y, 16, 512, logdict=d, legacy=true)
+    a, b = labo(data_x, -data_y, time_max, time_points, 512; logdict=d)
     return a, b, d
 end
+
+# using HDF5
+# function test()
+#     for i in [2, 4, 8, 16, 32]
+#         _, _, log = LABO.debug_bo(i)
+#         h5open("quant_$(i).h5", "w") do file
+#             write(file, "data_x", log[:data_x])
+#             write(file, "data_y", log[:data_y])
+#             write(file, "acq_x", log[:acq_x])
+#             write(file, "acq_y", log[:acq_y])
+
+#             write(file, "tmgp_x", log[:tmgp_x])
+#             write(file, "tmgp_mean", log[:tmgp_mean])
+#             write(file, "tmgp_std", log[:tmgp_std])
+
+#             write(file, "gp_x", log[:gp_x])
+#             write(file, "gp_t", log[:gp_t])
+#             write(file, "gp_mean", log[:gp_mean])
+#             write(file, "gp_std", log[:gp_std])
+#         end
+#     end
+# end
 
 function time_quantization(time_max::Int64,
                            time_samples::Int64,
@@ -338,7 +384,7 @@ function labo(data_x, data_y, time_max, time_samples, subsample;
 
     if(logdict != nothing)
         logα(x) = log(acquisition(x, gp))
-        αx = 0.0:0.01:1.0
+        αx = collect(0.0:0.01:1.0)
         αy = exp.(logα.(αx))
         logdict[:data_x]     = data_x
         logdict[:data_y]     = data_y
@@ -367,8 +413,13 @@ function labo(data_x, data_y, time_max, time_samples, subsample;
         
         μ, Σ  = predict_y(gp.non_marg_gp, tx)
 
-        logdict[:gp_x]    = x
-        logdict[:gp_t]    = t
+        μ = reshape(μ, 50, 50)
+        Σ = reshape(Σ, 50, 50)
+        μ = Array(μ')
+        Σ = Array(Σ')
+
+        logdict[:gp_x]    = collect(x)
+        logdict[:gp_t]    = collect(t)
         logdict[:gp_mean] = μ
         logdict[:gp_std]  = Σ
     end
