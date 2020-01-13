@@ -116,23 +116,28 @@ function whiten(y)
 end
 
 function build_gp(data_x, data_y, time_idx, verbose::Bool=true)
-    tmax = time_idx[end]
-    # m    = MeanExp(1.0, 1.0, 1.0, [Normal(0.0, 2.0),
-    #                                Normal(0.0, 2.0),
-    #                                Normal(0.0, 2.0)])
-    m    = MeanZero()
-    k_x = SEIso(1.0, 1.0, [Normal(-1.0, 2.0),
-                           Normal(0.0, 2.0)])
-    k_x = Masked(k_x, [2])
-    k_t = Exp(1.0, 1.0, 1.0, [Normal(0.0, 2.0),
-                              Normal(0.0, 2.0),
-                              Normal(0.0, 2.0)])
-    k_t = Masked(k_t, [1])
-    k   = k_x * k_t
+    k = begin
+        if(time_idx[end] == 1)
+            k_x = SEIso(1.0, 1.0, [Normal(-1.0, 3.0), Normal(0.0, 3.0)])
+            k   = Masked(k_x, [2])
+        else
+            k_x = SEIso(1.0, 1.0, [Normal(-1.0, 3.0), Normal(-1.0, 3.0)])
+            k_x = Masked(k_x, [2])
+            k_t = Exp(1.0, 1.0, 1.0, [Normal(-1.0, 3.0),
+                                      Normal(-1.0, 3.0),
+                                      Normal(-1.0, 3.0)])
+            k_t = Masked(k_t, [1])
+            k   = k_x + k_t
+        end
+    end
 
+    m    = MeanZero()
     ϵ    = -1.0
     gp   = GP(data_x, data_y, m, k, ϵ)
     set_priors!(gp.logNoise, [Normal(-1.0, 2.0)])
+    # m    = MeanExp(1.0, 1.0, 1.0, [Normal(0.0, 2.0),
+    #                                Normal(0.0, 2.0),
+    #                                Normal(0.0, 2.0)])
     # gp   = ess(gp, num_samples=500, num_adapts=200,
     #            thinning=5, verbose=verbose)
     # gp   = nuts(gp, num_samples=500, num_adapts=200,
@@ -314,6 +319,7 @@ function time_quantization(time_max::Int64,
     time_idx = []
     time_w   = []
     if(time_max <= time_samples)
+        print(time_max)
         time_idx = collect(1:time_max)
         N        = length(time_idx)
         time_w   = ones(N) / N

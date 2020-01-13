@@ -179,7 +179,7 @@ function bosched_mode(loop_states, time_samples, subsize, P, quant)
 end
 
 function visualize_gp(loop_states, time_samples, subsize, P, quant)
-    pyplot()
+    #pyplot()
     #uimodes  = ["GUI", "CUI"]
     #uimenu   = RadioMenu(uimodes, pagesize=2)
     #uichoice = request("choose interface:", uimenu)
@@ -203,11 +203,12 @@ function visualize_gp(loop_states, time_samples, subsize, P, quant)
         y  = convert(Array{Float64}, y)
         y /= (loop["N"] / P)
         @assert size(x) == size(y)
+        time_max = size(x, 1)
 
         d = Dict()
         θ_next, θ_mean, acq_opt, mean_opt = LABO.labo(
             x, -y,
-            size(x, 1), time_samples,
+            time_max, time_samples,
             subsize, verbose=true, logdict=d, uniform_quant=quant)
 
         #vischoice = request("choose GP visualization mode:", gpmenu)
@@ -229,12 +230,19 @@ function visualize_gp(loop_states, time_samples, subsize, P, quant)
         #len  = length(gpx)
         #gpμ  = reshape(gpμ, (len, len))
         #gpμ  = gpμ'
+        println(size(gpμ))
+        println(size(data_x))
 
-        println(data_x)
-        p3   = Plots.surface(gpt, gpx, -gpμ, label="gp μ")
-        Plots.scatter!(p3, data_x[1,:], data_x[2,:], -data_y,
-                       label="data points")
-        display(plot(p1, p2, p3, layout=(3,1)))
+        if(time_max == 1)
+            p3   = Plots.plot(gpx, -gpμ[1,:], label="gp μ")
+            Plots.scatter!(p3, data_x[2,:], -data_y, label="data points")
+            display(plot(p1, p2, p3, layout=(3,1)))
+        else
+            p3   = Plots.surface(gpt, gpx, -gpμ, label="gp μ")
+            Plots.scatter!(p3, data_x[1,:], data_x[2,:], -data_y,
+                           label="data points")
+            display(plot(p1, p2, p3, layout=(3,1)))
+        end
 
         choice = request("choose action:", menu)
         if(options[choice] == "export")
