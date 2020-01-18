@@ -274,6 +274,8 @@ extern "C"
     bo_schedule_parameter(unsigned long long region_id,
                           int is_bo_schedule)
     {
+	auto start = bosched::clock::now();
+
         auto& loop_state = _loop_states[region_id];
         _is_bo_schedule = static_cast<bool>(is_bo_schedule);
 
@@ -306,6 +308,10 @@ extern "C"
                       << " requested boched schedule parameter " << param
                       << std::endl;
         }
+
+	using time_scale_t = bosched::microsecond;
+	auto dur = std::chrono::duration_cast<time_scale_t>(bosched::clock::now() - start);
+	std::cout << " schedule = " << dur.count() << " us\n";
         return param;
     }
     
@@ -313,7 +319,6 @@ extern "C"
                            unsigned long long N,
                            long procs)
     {
-	auto start = bosched::clock::now();
 	auto& loop = _loop_states[region_id];
         if(_is_bo_schedule || _show_loop_stat)
         {
@@ -337,16 +342,10 @@ extern "C"
                       << " iterations: " << N
                       << std::endl;
         }
-
-	using time_scale_t = bosched::microsecond;
-	auto dur = std::chrono::duration_cast<time_scale_t>(bosched::clock::now() - start);
-	std::cout << " begin = " << dur.count() << " ms\n";
     }
 
     void bo_schedule_end(unsigned long long region_id)
     {
-	auto start = bosched::clock::now();
-
         if(_is_bo_schedule || _show_loop_stat)
         {
             using time_scale_t = bosched::microsecond;
@@ -399,10 +398,6 @@ extern "C"
         {
             std::cout << "-- loop " << region_id << " ending execution" << std::endl;
         }
-
-	using time_scale_t = bosched::microsecond;
-	auto dur = std::chrono::duration_cast<time_scale_t>(bosched::clock::now() - start);
-	std::cout << " end = " << dur.count() << " ms\n";
     }
 }
 
