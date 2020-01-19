@@ -187,7 +187,7 @@ depcomp = $(SHELL) $(top_srcdir)/../depcomp
 am__depfiles_maybe = depfiles
 am__mv = mv -f
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
-	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
+	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -L../../ -l:libbosched.a 
 LTCOMPILE = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
 	--mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) \
 	$(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
@@ -408,8 +408,8 @@ search_path = $(addprefix $(top_srcdir)/config/, $(config_path)) $(top_srcdir) \
 
 fincludedir = $(libdir)/gcc/$(target_alias)/$(gcc_version)$(MULTISUBDIR)/finclude
 libsubincludedir = $(libdir)/gcc/$(target_alias)/$(gcc_version)/include
-AM_CPPFLAGS = $(addprefix -I, $(search_path))
-AM_CFLAGS = $(XCFLAGS)
+AM_CPPFLAGS = $(addprefix -I, $(search_path)) 
+AM_CFLAGS = $(XCFLAGS) 
 AM_LDFLAGS = $(XLDFLAGS) $(SECTION_LDFLAGS) $(OPT_LDFLAGS)
 toolexeclib_LTLIBRARIES = libgomp.la $(am__append_1) $(am__append_2)
 nodist_toolexeclib_HEADERS = libgomp.spec
@@ -426,6 +426,7 @@ nodist_toolexeclib_HEADERS = libgomp.spec
 libgomp_version_info = -version-info $(libtool_VERSION)
 libgomp_la_LDFLAGS = $(libgomp_version_info) $(libgomp_version_script) \
         $(lt_host_flags)
+libgomp_la_LDFLAGS +=  -L$(top_srcdir)/../../ -L$(top_srcdir)/../../build -lbosched
 
 libgomp_la_DEPENDENCIES = $(libgomp_version_dep)
 libgomp_la_LINK = $(LINK) $(libgomp_la_LDFLAGS)
