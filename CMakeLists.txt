@@ -40,11 +40,13 @@ foreach(SOURCE_FILE ${SOURCE_FILES})
     message(STATUS "${SOURCE_FILE}")
 endforeach()
 
-add_library(${PROJECT_NAME} STATIC ${SOURCE_FILES})
+add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES})
 
 # Build options
 set(BUILD_FLAGS
-    "${CMAKE_CXX_FLAGS} -O3 -g -fPIC -Wall -Wextra -march=native -pthread")
+    "${CMAKE_CXX_FLAGS} -flto -O3 -g -fPIC -Wall -Wextra -march=native -pthread")
+# set(BUILD_FLAGS
+#     "${CMAKE_CXX_FLAGS} -g -fPIC -Wall -Wextra -march=native")
 
 message("C++ flags = ${BUILD_FLAGS}")
 
