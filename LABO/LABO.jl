@@ -142,8 +142,8 @@ function build_gp(data_x, data_y, time_idx, verbose::Bool=true)
     #            thinning=5, verbose=verbose)
     # gp   = nuts(gp, num_samples=500, num_adapts=200,
     #             thinning=5, verbose=verbose)
-    gp   = slice(gp, num_samples=1000, num_adapts=200,
-                 thinning=5, width=6.0, verbose=verbose)
+    gp   = slice(gp, num_samples=1000, num_adapts=500,
+                 thinning=2, width=6.0, verbose=verbose)
 end
 
 function filter_outliers(gp::AbstractParticleGP,
