@@ -227,13 +227,13 @@ function fit_surrogate(data_x, data_y, time_idx, subsample, verbose=true)
         println("- fit gp - done")
     end
 
-    if(verbose)
-        println("- filter outliers")
-    end
-    gp = filter_outliers(gp, data_x, data_y, time_idx, verbose)
-    if(verbose)
-        println("- filter outliers - done")
-    end
+    # if(verbose)
+    #     println("- filter outliers")
+    # end
+    # gp = filter_outliers(gp, data_x, data_y, time_idx, verbose)
+    # if(verbose)
+    #     println("- filter outliers - done")
+    # end
     gp
 end
 
