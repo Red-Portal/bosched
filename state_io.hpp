@@ -20,6 +20,10 @@ namespace bosched
         {
             loop_state_t state;
             auto loop_id     = l["id"];
+
+	    if(loop_id == 0)
+		continue;
+
             state.warming_up = l["warmup"];
 
 	    if(!state.warming_up)
@@ -28,8 +32,7 @@ namespace bosched
 		state.param = l["param"];
 		if(getenv("HIST"))
 		    state.eval_param = l["eval_param1"];
-		else
-		    state.eval_param = l["eval_param2"];
+		
 
 		// auto& gmm_weight_json = gmm["gmm_weight"];
 		// state.gmm_weight = std::vector<double>(gmm_weight_json.begin(),

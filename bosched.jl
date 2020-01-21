@@ -140,6 +140,10 @@ end
 
 function bosched_mode(loop_states, time_samples, subsize, P, quant)
     for loop in loop_states
+        if(loop["id"] == 0)
+            continue
+        end
+
         println("----- $(loop["id"]) bosched mode -----")
         loop  = update_dataset(loop)
         x, y  = loop["hist_x"], loop["hist_y"]
@@ -201,6 +205,8 @@ function visualize_gp(loop_states, time_samples, subsize, P, quant)
         y  = hcat(y...)
         x  = convert(Array{Float64}, x)
         y  = convert(Array{Float64}, y)
+        println(size(x))
+        println(size(y))
         y /= (loop["N"] / P)
         @assert size(x) == size(y)
         time_max = size(x, 1)
