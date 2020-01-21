@@ -143,29 +143,48 @@ function build_gp(data_x, data_y, time_idx, verbose::Bool=true)
     # gp   = nuts(gp, num_samples=500, num_adapts=200,
     #             thinning=5, verbose=verbose)
     gp   = slice(gp, num_samples=1000, num_adapts=500,
-                 thinning=2, width=6.0, verbose=verbose)
+                 thinning=2, width=2.0, verbose=verbose)
 end
 
-function filter_outliers(gp::AbstractParticleGP,
-                         data_x,
-                         data_y,
-                         time_idx,
-                         verbose::Bool=true)
-    α = log(0.01)
-    μ, σ² = predict_y(gp, data_x)
-    dists = Normal.(μ, σ²)
-    probs = logpdf.(dists, data_y)
-    idx   = probs .< α
-    if(!all(idx))
-        data_x = data_x[:, .!idx]
-        data_y = data_y[.!idx]
-        gp = build_gp(data_x, data_y, time_idx, verbose)
-    end
-    if(verbose)
-        println("- filtered $(count(idx)) outliers")
-    end
-    gp
-end
+# function filter_outliers(data_x,
+#                          data_y,
+#                          time_idx,
+#                          verbose::Bool=true)
+#     α   = log(0.01)
+#     k   = begin
+#         if(time_idx[end] == 1)
+#             k_x = SEIso(1.0, 1.0, [Normal(-1.0, 3.0), Normal(0.0, 3.0)])
+#             k   = Masked(k_x, [2])
+#         else
+#             k_x = SEIso(1.0, 1.0, [Normal(-1.0, 3.0), Normal(-1.0, 3.0)])
+#             k_x = Masked(k_x, [2])
+#             k_t = Exp(1.0, 1.0, 1.0, [Normal(-1.0, 3.0),
+#                                       Normal(-1.0, 3.0),
+#                                       Normal(-1.0, 3.0)])
+#             k_t = Masked(k_t, [1])
+#             k   = k_x + k_t
+#         end
+#     end
+#     l   = StuTLik(3,0.1)
+#     gpa = GPA(data_x, data_y, MeanZero(), k, l)
+#     set_priors!(gpa.lik, [Normal(-2.0,4.0)])
+#     gpa = slice(gpa, num_samples=1000, num_adapts=500,
+#                 thinning=2, width=2.0, verbose=verbose)
+
+#     μ, σ² = predict_y(gp, data_x)
+#     dists = Normal.(μ, σ²)
+#     probs = logpdf.(dists, data_y)
+#     idx   = probs .< α
+#     if(!all(idx))
+#         data_x = data_x[:, .!idx]
+#         data_y = data_y[.!idx]
+#         gp = build_gp(data_x, data_y, time_idx, verbose)
+#     end
+#     if(verbose)
+#         println("- filtered $(count(idx)) outliers")
+#     end
+#     gp
+# end
 
 function data_preprocess(data_x, data_y, time_idx;
                          verbose::Bool=true,
@@ -358,14 +377,23 @@ function labo(data_x, data_y, time_max, time_samples, subsample;
     time_idx, time_w = time_quantization(time_max, time_samples, uniform_quant)
     data_x, data_y = data_preprocess(data_x, data_y, time_idx,
                                      verbose=true, legacy=legacy)
-    gp = fit_surrogate(data_x, data_y, time_idx, subsample, verbose)
+
+    # if(verbose)
+    #     println("- filtering outliers")
+    # end
+    # data_x, data_y = filter_outliers(data_x, data_y, time_idx, subsample, verbose)
+    # if(verbose)
+    #     println("- filtering outliers - done")
+    # end
+
+    gp = fit_surrogate(data_x, data_y, time_idx, verbose)
     gp = TimeMarginalizedGP(gp, time_idx, time_w)
 
     if(verbose)
         println("- sampling y*")
     end
     P         = length(gp.non_marg_gp.weights)
-    num_ystar = 16
+    num_ystar = 32
     num_gridx = 1024
     gp.non_marg_gp.η = sample_ystar(η, num_ystar, num_gridx, gp)
     if(verbose)
