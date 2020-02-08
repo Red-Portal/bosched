@@ -1,4 +1,22 @@
 
+function get_means(gp::GaussianProcesses.GPE; noise::Bool=true,
+                   domean::Bool=true, kern::Bool=true)
+    params = Float64[]
+    if noise && GaussianProcesses.num_params(gp.logNoise) != 0
+        noise_sample = mean(Product(GaussianProcesses.get_priors(gp.logNoise)))
+        append!(params, noise_sample)
+    end
+    if domean && GaussianProcesses.num_params(gp.mean) != 0
+        mean_sample = mean(Product(GaussianProcesses.get_priors(gp.mean)))
+        append!(params, mean_sample)
+    end
+    if kern && GaussianProcesses.num_params(gp.kernel) != 0
+        kernel_sample = mean(Product(GaussianProcesses.get_priors(gp.kernel)))
+        append!(params, kernel_sample)
+    end
+    return params
+end
+
 function slice(gp; num_samples=100, num_adapts=100, thinning=1, verbose=false,
                width=2.0)
     params_kwargs = GaussianProcesses.get_params_kwargs(
@@ -38,18 +56,22 @@ function slice(gp; num_samples=100, num_adapts=100, thinning=1, verbose=false,
         x
     end
 
+    p = Progress(num_samples + num_adapts, 1)
     samples = zeros(Float64, length(θ_cur), num_samples)
     for i = 1:num_adapts
         θ_cur = sample!(θ_cur, width, targetlogp)
+        next!(p)
     end
 
     for i = 1:num_samples
         θ_cur        = sample!(θ_cur, width, targetlogp)
         samples[:,i] = θ_cur
+        next!(p)
     end
-    # ESS = [MCMCDiagnostics.effective_sample_size(samples[i,:])
-    #        for i = 1:size(samples,1)]
-    # println("ESS = $(ESS)")
+    samples = samples[:,1:thinning:end]
+    ESS = [MCMCDiagnostics.effective_sample_size(samples[i,:])
+           for i = 1:size(samples,1)]
+    println("ESS = $(ESS)")
     if(verbose)
         println("Number of function calls: ", count)
     end
@@ -91,8 +113,9 @@ function nuts(gp; num_samples=100, num_adapts=100, thinning=1, verbose=false)
         num_adapts; progress=verbose)
     samples = hcat(samples...)
     samples = samples[:,1:thinning:end]
-    ESS = [MCMCDiagnostics.effective_sample_size(samples[i,:])
-           for i = 1:size(samples,1)]
+    ESS     = [MCMCDiagnostics.effective_sample_size(samples[i,:])
+               for i = 1:size(samples,1)]
+    display(mean(samples, dims=2)[:,1])
     println("ESS = $(ESS)")
     return ParticleGP(gp, samples)
 end
@@ -108,6 +131,7 @@ function ess(gp; num_samples=100, num_adapts=100, thinning=1, verbose::Bool=true
     params_kwargs = GaussianProcesses.get_params_kwargs(
         gp; domean=true, kern=true, noise=true, lik=true)
     count = 0
+    means = get_means(gp; params_kwargs...)
     function calc_target!(θ::AbstractVector)
         count += 1
         try
@@ -125,17 +149,18 @@ function ess(gp; num_samples=100, num_adapts=100, thinning=1, verbose::Bool=true
         end
     end
 
-    function sample!(f::AbstractVector)
-        v     = GaussianProcesses.sample_params(gp; params_kwargs...)
+    function sample!(f::AbstractArray{Float64, 1})
+        v_biased = GaussianProcesses.sample_params(gp; params_kwargs...) 
+        v        = v_biased - means
+        f        = f - means
+
         u     = rand()
-        logy  = calc_target!(f) + log(u);
+        logy  = calc_target!(f + means) + log(u);
         θ     = rand()*2*π;
         θ_min = θ - 2*π;
         θ_max = θ;
         f_prime = f * cos(θ) + v * sin(θ);
-        props = 1
-        while calc_target!(f_prime) <= logy
-            props += 1
+        while  calc_target!(f_prime + means) <= logy
             if θ < 0
                 θ_min = θ;
             else
@@ -144,7 +169,7 @@ function ess(gp; num_samples=100, num_adapts=100, thinning=1, verbose::Bool=true
             θ = rand() * (θ_max - θ_min) + θ_min;
             f_prime = f * cos(θ) + v * sin(θ);
         end
-        return f_prime, props
+        return f_prime + get_means(gp; params_kwargs...)
     end
 
     total_proposals = 0
@@ -152,18 +177,18 @@ function ess(gp; num_samples=100, num_adapts=100, thinning=1, verbose::Bool=true
     D = length(θ_cur)
     post = Array{Float64}(undef, num_samples+num_adapts, D)
 
-    for i = 1:num_samples+num_adapts
-        θ_cur, num_proposals = sample!(θ_cur)
+    ProgressMeter.@showprogress for i = 1:num_samples+num_adapts
+        θ_cur     = sample!(θ_cur)
         post[i,:] = θ_cur
-        total_proposals += num_proposals
     end
     post = post[num_adapts:thinning:end,:]
     samples = post'
     if(verbose)
+        ESS = [MCMCDiagnostics.effective_sample_size(samples[i,:])
+               for i = 1:size(samples,1)]
         println("Number of function calls: ", count)
-        println("Acceptance rate: $(num_samples / count) \n")
+#        println("Acceptance rate: $(num_samples / count) \n")
+        println("ESS: $(ESS)")
     end
     return ParticleGP(gp, samples)
 end
-
-

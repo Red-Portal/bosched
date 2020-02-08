@@ -12,6 +12,7 @@ using MCMCDiagnostics
 using NLopt
 using Optim
 using Plots
+using ProgressMeter
 using Random
 using Roots
 using SpecialFunctions
@@ -118,16 +119,14 @@ end
 function build_gp(data_x, data_y, time_idx, verbose::Bool=true)
     k = begin
         if(time_idx[end] == 1)
-            k_x = SEIso(1.0, 1.0, [Normal(-1.0, 3.0), Normal(0.0, 3.0)])
+            k_x = SEIso(exp(-1.0), exp(1.0), [Normal(-1.0, 2.0), Normal(0.0, 2.0)])
             k   = Masked(k_x, [2])
         else
-            k_x = SEIso(1.0, 1.0, [Normal(-1.0, 3.0), Normal(-1.0, 3.0)])
+            k_x = SEIso(exp(-1.0), exp(0.0), [Normal(-1.0, 2.0), Normal(0.0, 2.0)])
             k_x = Masked(k_x, [2])
-            k_t = Exp(1.0, 1.0, 1.0, [Normal(-1.0, 3.0),
-                                      Normal(-1.0, 3.0),
-                                      Normal(-1.0, 3.0)])
+            k_t = Exp(exp(-2.0), exp(0.0), [Normal(-2.0, 2.0), Normal(0.0, 2.0)])
             k_t = Masked(k_t, [1])
-            k   = k_x + k_t
+            k   = k_x * k_t
         end
     end
 
@@ -135,56 +134,14 @@ function build_gp(data_x, data_y, time_idx, verbose::Bool=true)
     ϵ    = -1.0
     gp   = GP(data_x, data_y, m, k, ϵ)
     set_priors!(gp.logNoise, [Normal(-1.0, 2.0)])
-    # m    = MeanExp(1.0, 1.0, 1.0, [Normal(0.0, 2.0),
-    #                                Normal(0.0, 2.0),
-    #                                Normal(0.0, 2.0)])
-    # gp   = ess(gp, num_samples=500, num_adapts=200,
-    #            thinning=5, verbose=verbose)
-    # gp   = nuts(gp, num_samples=500, num_adapts=200,
-    #             thinning=5, verbose=verbose)
-    gp   = slice(gp, num_samples=1000, num_adapts=500,
-                 thinning=2, width=2.0, verbose=verbose)
+    gp   = ess(gp, num_samples=1024, num_adapts=1024, thinning=4, verbose=verbose)
+    # gp   = nuts(gp, num_samples=1024, num_adapts=1024,
+    #             thinning=4, verbose=verbose)
+    #GaussianProcesses.optimize!(gp)
+    #println(gp)
+    # gp   = slice(gp, num_samples=1024, num_adapts=512,
+    #              thinning=4, width=4.0, verbose=verbose)
 end
-
-# function filter_outliers(data_x,
-#                          data_y,
-#                          time_idx,
-#                          verbose::Bool=true)
-#     α   = log(0.01)
-#     k   = begin
-#         if(time_idx[end] == 1)
-#             k_x = SEIso(1.0, 1.0, [Normal(-1.0, 3.0), Normal(0.0, 3.0)])
-#             k   = Masked(k_x, [2])
-#         else
-#             k_x = SEIso(1.0, 1.0, [Normal(-1.0, 3.0), Normal(-1.0, 3.0)])
-#             k_x = Masked(k_x, [2])
-#             k_t = Exp(1.0, 1.0, 1.0, [Normal(-1.0, 3.0),
-#                                       Normal(-1.0, 3.0),
-#                                       Normal(-1.0, 3.0)])
-#             k_t = Masked(k_t, [1])
-#             k   = k_x + k_t
-#         end
-#     end
-#     l   = StuTLik(3,0.1)
-#     gpa = GPA(data_x, data_y, MeanZero(), k, l)
-#     set_priors!(gpa.lik, [Normal(-2.0,4.0)])
-#     gpa = slice(gpa, num_samples=1000, num_adapts=500,
-#                 thinning=2, width=2.0, verbose=verbose)
-
-#     μ, σ² = predict_y(gp, data_x)
-#     dists = Normal.(μ, σ²)
-#     probs = logpdf.(dists, data_y)
-#     idx   = probs .< α
-#     if(!all(idx))
-#         data_x = data_x[:, .!idx]
-#         data_y = data_y[.!idx]
-#         gp = build_gp(data_x, data_y, time_idx, verbose)
-#     end
-#     if(verbose)
-#         println("- filtered $(count(idx)) outliers")
-#     end
-#     gp
-# end
 
 function data_preprocess(data_x, data_y, time_idx;
                          verbose::Bool=true,
@@ -245,14 +202,6 @@ function fit_surrogate(data_x, data_y, time_idx, subsample, verbose=true)
     if(verbose)
         println("- fit gp - done")
     end
-
-    # if(verbose)
-    #     println("- filter outliers")
-    # end
-    # gp = filter_outliers(gp, data_x, data_y, time_idx, verbose)
-    # if(verbose)
-    #     println("- filter outliers - done")
-    # end
     gp
 end
 
@@ -301,36 +250,10 @@ function debug_bo(time_points::Int64=4)
     data_x = data_x[1:32,:]
     data_y = data_y[1:32,:]
     time_max = size(data_x, 1)
-    println(time_points)
-    println(time_max)
-    println(size(data_x))
-    println(size(data_y))
     d = Dict()
     a, b = labo(data_x, -data_y, time_max, time_points, 512; logdict=d)
     return a, b, d
 end
-
-# using HDF5
-# function test()
-#     for i in [2, 4, 8, 16, 32]
-#         _, _, log = LABO.debug_bo(i)
-#         h5open("quant_$(i).h5", "w") do file
-#             write(file, "data_x", log[:data_x])
-#             write(file, "data_y", log[:data_y])
-#             write(file, "acq_x", log[:acq_x])
-#             write(file, "acq_y", log[:acq_y])
-
-#             write(file, "tmgp_x", log[:tmgp_x])
-#             write(file, "tmgp_mean", log[:tmgp_mean])
-#             write(file, "tmgp_std", log[:tmgp_std])
-
-#             write(file, "gp_x", log[:gp_x])
-#             write(file, "gp_t", log[:gp_t])
-#             write(file, "gp_mean", log[:gp_mean])
-#             write(file, "gp_std", log[:gp_std])
-#         end
-#     end
-# end
 
 function time_quantization(time_max::Int64,
                            time_samples::Int64,
@@ -338,7 +261,6 @@ function time_quantization(time_max::Int64,
     time_idx = []
     time_w   = []
     if(time_max <= time_samples)
-        print(time_max)
         time_idx = collect(1:time_max)
         N        = length(time_idx)
         time_w   = ones(N) / N
@@ -378,15 +300,7 @@ function labo(data_x, data_y, time_max, time_samples, subsample;
     data_x, data_y = data_preprocess(data_x, data_y, time_idx,
                                      verbose=true, legacy=legacy)
 
-    # if(verbose)
-    #     println("- filtering outliers")
-    # end
-    # data_x, data_y = filter_outliers(data_x, data_y, time_idx, subsample, verbose)
-    # if(verbose)
-    #     println("- filtering outliers - done")
-    # end
-
-    gp = fit_surrogate(data_x, data_y, time_idx, verbose)
+    gp = fit_surrogate(data_x, data_y, time_idx, subsample, verbose)
     gp = TimeMarginalizedGP(gp, time_idx, time_w)
 
     if(verbose)
@@ -395,7 +309,11 @@ function labo(data_x, data_y, time_max, time_samples, subsample;
     P         = length(gp.non_marg_gp.weights)
     num_ystar = 32
     num_gridx = 1024
-    gp.non_marg_gp.η = sample_ystar(η, num_ystar, num_gridx, gp)
+    ηs        = zeros(32, P)
+    for i in P
+        ηs[:,i] = sample_ystar(η, num_ystar, num_gridx, gp.non_marg_gp.gp[i])
+    end
+    gp.non_marg_gp.η = ηs
     if(verbose)
         println("- sampling y* - done")
     end

@@ -3,7 +3,7 @@ abstract type AbstractParticleGP <: GPBase end
 
 mutable struct ParticleGP <: AbstractParticleGP
     gp::Array{GPBase}
-    η::Vector{Float64}
+    η::Matrix{Float64}
     weights::Vector{Float64}
     dim::Int64
     num_gpparam::Int64
@@ -23,7 +23,7 @@ mutable struct ParticleGP <: AbstractParticleGP
             push!(models, GaussianProcesses.update_mll!(local_model))
         end
         nparam = GaussianProcesses.num_params(gp, domean=false)
-        return new(models, [], weights, gp.dim, nparam, kwargs)
+        return new(models, Matrix{Float64}(undef,0,0), weights, gp.dim, nparam, kwargs)
     end
 end
 
@@ -43,12 +43,17 @@ function ParticleGP(gp::GPBase,
 end
 
 function GaussianProcesses.predict_y(gp::ParticleGP, x::AbstractArray)
-    bundle = GaussianProcesses.predict_y.(gp.gp, Ref(x))
-    μ      = [elem[1] for elem in bundle]
-    σ²     = [elem[2] for elem in bundle]
-
-    μ  = hcat(μ...) * gp.weights
-    σ² = hcat(σ²...) * gp.weights
+    P  = length(gp.gp)
+    N  = size(x, 2)
+    μ  = zeros(N, P)
+    σ² = zeros(N, P)
+    Threads.@threads for i = 1:P
+        bundle   = GaussianProcesses.predict_y(gp.gp[i], x)
+        μ[:, i]  = bundle[1]
+        σ²[:, i] = bundle[2]
+    end
+    μ  = μ  * gp.weights
+    σ² = σ² * gp.weights
     return μ, σ²
 end
 

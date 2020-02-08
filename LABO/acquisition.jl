@@ -37,12 +37,12 @@ normal_cdf(μ, σ²) = 1/2 * (1 + erf(μ/√(2σ²)))
 function sample_ystar(η::Float64,
                       num_samples::Int64,
                       num_grid_points::Int64,
-                      gp::TimeMarginalizedGP) 
-    xgrid = rand(1, num_grid_points)
+                      gp::GaussianProcesses.GPBase) 
+    xgrid = rand(gp.dim, num_grid_points)
     μ, σ² = predict_y(gp, xgrid)
-    σe    = maximum([GaussianProcesses.get_params(i, kern=true, noise=false, domean=false)[end]
-                     for i in gp.non_marg_gp.gp])
+    σe    = exp.(gp.logNoise.value)
     σ     = sqrt.(σ²)
+    σ    .= max.(σ, σe)
     ystar = Vector{Float64}(undef, num_samples)
     left  = η
 
@@ -72,9 +72,9 @@ function acquisition(x, gp::AbstractParticleGP)
     w  = gp.weights
     η  = gp.particles
     α_res = Matrix{eltype(x)}(undef, N, P)
-    for i = 1:P
+    Threads.@threads for i = 1:P
         μ, σ²       = predict_y(gp.gp[i], [x])
-        α_res[:,i] .= α.(μ, σ², Ref(η))
+        α_res[:,i] .= α.(μ, σ², η[:,i])
     end
     res = α_res * w 
     if(N == 1)
@@ -90,7 +90,7 @@ function acquisition(x, gp::TimeMarginalizedGP)
     η     = nmgp.η
     α_res = zeros(P)
     t     = gp.time_idx
-    for i = 1:P
+    Threads.@threads for i = 1:P
         xt       = zeros(2, length(t))
         xt[1,:]  = t
         xt[2,:] .= x
@@ -99,7 +99,7 @@ function acquisition(x, gp::TimeMarginalizedGP)
         μ     = dot(μ, gp.time_w)
         σ²    = dot(σ², gp.time_w)
 
-        α_res[i] = α(μ, σ², η)
+        α_res[i] = α(μ, σ², η[:,i])
     end
     res = α_res'w 
     return res
