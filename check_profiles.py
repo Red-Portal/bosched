@@ -10,7 +10,7 @@ def main():
             if i == "0":
                 continue
 
-            elif f[i].shape[1] == os.environ["OMP_NUM_THREADS"]:
+            elif f[i].shape[1] == int(os.environ["OMP_NUM_THREADS"]):
                 continue
 
             if (f[i].shape[0]) < 64:
