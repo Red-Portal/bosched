@@ -25,12 +25,15 @@ namespace bosched
 		continue;
 
             state.warming_up = l["warmup"];
+
 	    if(!state.warming_up)
 	    {
 		// auto& gmm = l["gmm"];
-		state.param = l["eval_param2"];
+		state.param = l["param"];
 		if(getenv("HIST"))
 		    state.eval_param = l["eval_param1"];
+		else
+		    state.eval_param = l["eval_param2"];
 
 		// auto& gmm_weight_json = gmm["gmm_weight"];
 		// state.gmm_weight = std::vector<double>(gmm_weight_json.begin(),

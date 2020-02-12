@@ -290,13 +290,6 @@ extern "C"
 	    {
 		loop_state.param = bosched::warmup_next_param();
 	    }
-	    //else
-	    //{
-		// loop_state.param = bosched::generate_parameter(
-		//     loop_state.gmm_weight,
-		//     loop_state.gmm_mean,
-		//     loop_state.gmm_stddev);
-	    //}
 	}
 	double param = loop_state.param;
 
