@@ -68,24 +68,11 @@ namespace bosched
 
 void prefetch_page(size_t prealloc_len)
 {
-    char* addr = (char*)mmap(NULL, prealloc_len, PROT_READ | PROT_WRITE,
-			     MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+    char* addr = (char*)mmap(NULL, prealloc_len,
+			     PROT_READ | PROT_WRITE,
+			     MAP_ANONYMOUS | MAP_PRIVATE | MAP_LOCKED, -1, 0);
     if(addr == MAP_FAILED)
 	throw std::runtime_error("mmap failed");
-	
-    if(int err = mlock(addr, prealloc_len); err != 0)
-    {
-	if(ENOMEM == err)
-	    throw std::runtime_error("mlock failed: ENOMEM");
-	else if(EPERM == err)
-	    throw std::runtime_error("mlock failed: EPERM");
-	else if(EAGAIN == err)
-	    throw std::runtime_error("mlock failed: EAGAIN");
-	else if(EINVAL == err)
-	    throw std::runtime_error("mlock failed: EINVAL");
-	else
-	    throw std::runtime_error("mlock failed: unknown");
-    }
 }
 
 extern "C"
