@@ -89,7 +89,7 @@ extern "C"
 				 PROT_READ | PROT_WRITE | PROT_EXEC,
 				 MAP_ANONYMOUS, -1, 0);
 	if(addr == MAP_FAILED)
-	    throw "mmap failed";
+	    throw std::runtime_error("mmap failed");
 
         if(getenv("PROFILE"))
         {
