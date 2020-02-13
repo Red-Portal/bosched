@@ -86,9 +86,11 @@ extern "C"
 
 	size_t dummy_len = 1024 * 1024 * 512;
 	char* addr = (char*)mmap(NULL, dummy_len, PROT_READ | PROT_WRITE,
-				 MAP_ANONYMOUS, -1, 0);
+				 MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
 	if(addr == MAP_FAILED)
+	{
 	    throw std::runtime_error("mmap failed");
+	}
 
         if(getenv("PROFILE"))
         {
