@@ -89,8 +89,9 @@ extern "C"
 				 MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
 	if(addr == MAP_FAILED)
 	    throw std::runtime_error("mmap failed");
-	else
-	    mlock(addr, prealloc_len);
+	
+	if(mlock(addr, prealloc_len) != 0)
+	    throw std::runtime_error("mlock failed");
 
         if(getenv("PROFILE"))
         {
