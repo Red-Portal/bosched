@@ -11,6 +11,7 @@
 #include <iostream>
 #include <unistd.h>
 #include <sys/mman.h>
+#include <sys/resource.h>
 #include <highfive/H5File.hpp>
 
 #include <atomic>
@@ -47,30 +48,20 @@ namespace bosched
         double next = dist(_rng);
         return next;
     }
-
-    // inline double
-    // generate_parameter(std::vector<double> const& weight,
-    // 		       std::vector<double> const& mu,
-    // 		       std::vector<double> const& sigma)
-    // {
-    // 	auto mixdist = std::discrete_distribution<size_t>(weight.begin(),
-    // 							  weight.end());
-    // 	auto mixidx  = mixdist(_rng);
-    // 	auto dist    = std::normal_distribution(mu[mixidx], sigma[mixidx]);
-    // 	double param = 0.0;
-    // 	do 
-    // 	{
-    // 	    param = dist(_rng);
-    // 	} while(param < 0 || param > 1.0);
-    // 	return param;
-    // }
 }
 
 void prefetch_page(size_t prealloc_len)
 {
+    struct rlimit limits;
+    //struct rlimit newp*;
+
     char* addr = (char*)mmap(NULL, prealloc_len,
 			     PROT_READ | PROT_WRITE,
 			     MAP_ANONYMOUS | MAP_PRIVATE | MAP_LOCKED, -1, 0);
+
+    getrlimit(RLIMIT_AS, &limits);
+    printf("limits: soft=%lld; hard=%lld\n", (long long)limits.rlim_cur, (long long)limits.rlim_max);
+
     if(addr == MAP_FAILED)
     {
 	perror("mmap");
@@ -97,7 +88,7 @@ extern "C"
         }
 
 	size_t pages = getpagesize();
-	prefetch_page(pages * 1024 * 32);
+	prefetch_page(pages * 32);
 
         if(getenv("PROFILE"))
         {
