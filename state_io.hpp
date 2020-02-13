@@ -6,6 +6,7 @@
 #include "utils.hpp"
 
 #include <cstddef>
+#include <iostream>
 #include <nlohmann/json.hpp>
 #include <string>
 #include <string_view>

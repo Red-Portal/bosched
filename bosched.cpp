@@ -1,8 +1,4 @@
 
-#include <iostream>
-#include <unistd.h>
-#include <highfive/H5File.hpp>
-
 #include "loop_state.hpp"
 #include "metrics.hpp"
 #include "state_io.hpp"
@@ -11,6 +7,11 @@
 #include "performance.hpp"
 #include "profile.hpp"
 #include "param.hpp"
+
+#include <iostream>
+#include <unistd.h>
+#include <sys/mman.h>
+#include <highfive/H5File.hpp>
 
 #include <atomic>
 #include <blaze/Blaze.h>
@@ -83,6 +84,12 @@ extern "C"
             _is_debug = true;
         }
 
+	size_t dummy_len = 1024 * 1024 * 512;
+	char* addr = (char*)mmap(NULL, dummy_len,
+				 PROT_READ | PROT_WRITE | PROT_EXEC,
+				 MAP_ANONYMOUS, -1, 0);
+	if(addr == MAP_FAILED)
+	    throw "mmap failed";
 
         if(getenv("PROFILE"))
         {
