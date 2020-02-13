@@ -154,8 +154,11 @@ extern "C"
             stat_stream.close();
 	}
 
-	auto cmd = "cat /proc/"s + std::to_string(getpid()) + "/status"s;
-	system(cmd.c_str());
+	if(_is_debug)
+	{
+	    auto cmd = "cat /proc/"s + std::to_string(getpid()) + "/status"s;
+	    system(cmd.c_str());
+	}
 
 	if(getenv("EVAL"))
 	{
