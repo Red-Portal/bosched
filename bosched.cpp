@@ -52,46 +52,51 @@ namespace bosched
 
 void prefetch_page(size_t prealloc_len)
 {
-    using namespace std::literals::string_literals;
+    auto buf = std::vector<char>(prealloc_len);
+    for(size_t i = 0; i < prealloc_len; i += 1024 * 4)
+	buf[i] = 'a';
+    asm volatile("" : : "r,m"(buf) : "memory");
+
+    // using namespace std::literals::string_literals;
 	
-    struct rlimit limits;
-    if(getrlimit(RLIMIT_MEMLOCK, &limits) != 0)
-	throw std::runtime_error("getrlimit failed");
+    // struct rlimit limits;
+    // if(getrlimit(RLIMIT_MEMLOCK, &limits) != 0)
+    // 	throw std::runtime_error("getrlimit failed");
 
-    if(_is_debug)
-	std::cout << "-- Queried locked memory limits \n"
-		  << "  soft limit = " << limits.rlim_cur << '\n'
-		  << "  hard limit = " << limits.rlim_max << std::endl;
+    // if(_is_debug)
+    // 	std::cout << "-- Queried locked memory limits \n"
+    // 		  << "  soft limit = " << limits.rlim_cur << '\n'
+    // 		  << "  hard limit = " << limits.rlim_max << std::endl;
 
-    if(limits.rlim_max < prealloc_len)
-    {
-	throw std::runtime_error("memlock hard limit is lower than "s
-				 + std::to_string(prealloc_len) + " bytes"s);
-    }
+    // if(limits.rlim_max < prealloc_len)
+    // {
+    // 	throw std::runtime_error("memlock hard limit is lower than "s
+    // 				 + std::to_string(prealloc_len) + " bytes"s);
+    // }
 
-    if(limits.rlim_cur < prealloc_len)
-    {
-	if(_is_debug)
-	    std::cout << "-- memlock soft limit too low. Raising limit\n";
-	limits.rlim_cur = prealloc_len + 1;
-	if(setrlimit(RLIMIT_MEMLOCK, &limits) != 0)
-	{
-	    perror("setrlimit");
-	    throw std::runtime_error("strlimit failed");
-	}
-    }
+    // if(limits.rlim_cur < prealloc_len)
+    // {
+    // 	if(_is_debug)
+    // 	    std::cout << "-- memlock soft limit too low. Raising limit\n";
+    // 	limits.rlim_cur = prealloc_len + 1;
+    // 	if(setrlimit(RLIMIT_MEMLOCK, &limits) != 0)
+    // 	{
+    // 	    perror("setrlimit");
+    // 	    throw std::runtime_error("strlimit failed");
+    // 	}
+    // }
 
-    char* addr = (char*)mmap(NULL, prealloc_len,
-			     PROT_READ | PROT_WRITE,
-			     MAP_ANONYMOUS | MAP_PRIVATE | MAP_LOCKED, -1, 0);
-    if(_is_debug)
-	std::cout << "-- preallocating " << prealloc_len / 1024 << " kB\n";
+    // char* addr = (char*)mmap(NULL, prealloc_len,
+    // 			     PROT_READ | PROT_WRITE,
+    // 			     MAP_ANONYMOUS | MAP_PRIVATE | MAP_LOCKED, -1, 0);
+    // if(_is_debug)
+    // 	std::cout << "-- preallocating " << prealloc_len / 1024 << " kB\n";
 
-    if(addr == MAP_FAILED)
-    {
-	perror("mmap");
-	throw std::runtime_error("mmap failed");
-    }
+    // if(addr == MAP_FAILED)
+    // {
+    // 	perror("mmap");
+    // 	throw std::runtime_error("mmap failed");
+    // }
 }
 
 extern "C"
