@@ -66,6 +66,28 @@ namespace bosched
     // }
 }
 
+void prefetch_page(size_t prealloc_len)
+{
+    char* addr = (char*)mmap(NULL, prealloc_len, PROT_READ | PROT_WRITE,
+			     MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+    if(addr == MAP_FAILED)
+	throw std::runtime_error("mmap failed");
+	
+    if(int err = mlock(addr, prealloc_len); err != 0)
+    {
+	if(ENOMEM == err)
+	    throw std::runtime_error("mlock failed: ENOMEM");
+	else if(EPERM == err)
+	    throw std::runtime_error("mlock failed: EPERM");
+	else if(EAGAIN == err)
+	    throw std::runtime_error("mlock failed: EAGAIN");
+	else if(EINVAL == err)
+	    throw std::runtime_error("mlock failed: EINVAL");
+	else
+	    throw std::runtime_error("mlock failed: unknown");
+    }
+}
+
 extern "C"
 {
     void __attribute__ ((constructor(65535)))
@@ -84,14 +106,7 @@ extern "C"
             _is_debug = true;
         }
 
-	size_t prealloc_len = 1024 * 1024 * 512;
-	char* addr = (char*)mmap(NULL, prealloc_len, PROT_READ | PROT_WRITE,
-				 MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
-	if(addr == MAP_FAILED)
-	    throw std::runtime_error("mmap failed");
-	
-	if(mlock(addr, prealloc_len) != 0)
-	    throw std::runtime_error("mlock failed");
+	prefetch_page(1024*1024*512);
 
         if(getenv("PROFILE"))
         {
