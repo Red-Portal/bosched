@@ -52,6 +52,8 @@ namespace bosched
 
 void prefetch_page(size_t prealloc_len)
 {
+    using namespace std::literals::string_literals;
+	
     struct rlimit limits;
     if(getrlimit(RLIMIT_MEMLOCK, &limits) != 0)
 	throw std::runtime_error("getrlimit failed");
@@ -59,16 +61,19 @@ void prefetch_page(size_t prealloc_len)
     if(_is_debug)
 	std::cout << "-- Queried locked memory limits \n"
 		  << "  soft limit = " << limits.rlim_cur << '\n'
-		  << "  hard limit = " << limits.rlim_max << '\n';
+		  << "  hard limit = " << limits.rlim_max << std::endl;
 
-    if(limits.rlim_cur < prealloc_len
-       || limits.rlim_max < prealloc_len)
+    if(limits.rlim_max < prealloc_len)
+    {
+	throw std::runtime_error("memlock hard limit is lower than "s
+				 + std::to_string(prealloc_len) + " bytes"s);
+    }
+
+    if(limits.rlim_cur < prealloc_len)
     {
 	if(_is_debug)
-	    std::cout << "-- Resource limit too low. Raising limit\n";
-
+	    std::cout << "-- memlock soft limit too low. Raising limit\n";
 	limits.rlim_cur = prealloc_len + 1;
-	limits.rlim_max = prealloc_len + 1;
 	if(setrlimit(RLIMIT_MEMLOCK, &limits) != 0)
 	{
 	    perror("setrlimit");
