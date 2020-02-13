@@ -16,9 +16,6 @@ namespace bosched
         double param;
         size_t num_tasks;
         double eval_param;
-        std::vector<double> gmm_weight;
-        std::vector<double> gmm_mean;
-        std::vector<double> gmm_stddev;
         std::vector<double> obs_x;
         std::vector<double> obs_y;
         //std::atomic<double> mean_us;

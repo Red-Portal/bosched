@@ -28,22 +28,11 @@ namespace bosched
 
 	    if(!state.warming_up)
 	    {
-		// auto& gmm = l["gmm"];
 		state.param = l["param"];
 		if(getenv("HIST"))
 		    state.eval_param = l["eval_param1"];
 		else
 		    state.eval_param = l["eval_param2"];
-
-		// auto& gmm_weight_json = gmm["gmm_weight"];
-		// state.gmm_weight = std::vector<double>(gmm_weight_json.begin(),
-		// 				       gmm_weight_json.end());
-		// auto& gmm_mean_json = gmm["gmm_mean"];
-		// state.gmm_mean = std::vector<double>(gmm_mean_json.begin(),
-		// 				     gmm_mean_json.end());
-		// auto& gmm_stddev_json = gmm["gmm_stddev"];
-		// state.gmm_stddev = std::vector<double>(gmm_stddev_json.begin(),
-		// 				       gmm_stddev_json.end());
 	    }
 
             if(getenv("DEBUG"))
@@ -76,10 +65,8 @@ namespace bosched
             serialized_state["id"]     = loop_id;
             serialized_state["warmup"] = loop_state.warming_up;
 	    serialized_state["N"]      = loop_state.num_tasks;
-	    serialized_state["obs_x"].emplace_back(
-		std::move(loop_state.obs_x));
-	    serialized_state["obs_y"].emplace_back(
-		std::move(loop_state.obs_y));
+	    serialized_state["obs_x"].emplace_back(std::move(loop_state.obs_x));
+	    serialized_state["obs_y"].emplace_back(std::move(loop_state.obs_y));
 
 	    if(getenv("DEBUG"))
             {

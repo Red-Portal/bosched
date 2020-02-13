@@ -1,5 +1,6 @@
 
 #include <iostream>
+#include <unistd.h>
 #include <highfive/H5File.hpp>
 
 #include "loop_state.hpp"
@@ -116,6 +117,9 @@ extern "C"
                 stat_stream >> _stats; 
             stat_stream.close();
 	}
+
+	auto cmd = "cat /proc/"s + std::to_string(getpid()) + "/status"s;
+	system(cmd.c_str());
 
 	if(getenv("EVAL"))
 	{
