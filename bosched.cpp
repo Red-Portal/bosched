@@ -59,7 +59,11 @@ void prefetch_page(size_t prealloc_len)
 			     PROT_READ | PROT_WRITE,
 			     MAP_ANONYMOUS | MAP_PRIVATE | MAP_LOCKED, -1, 0);
 
-    getrlimit(RLIMIT_AS, &limits);
+    if(getrlimit(RLIMIT_AS, &limits) != 0)
+    {
+	perror("getrlimit");
+	throw std::runtime_error("getrlimit failed");
+    }
     printf("limits: soft=%lld; hard=%lld\n", (long long)limits.rlim_cur, (long long)limits.rlim_max);
 
     if(addr == MAP_FAILED)
