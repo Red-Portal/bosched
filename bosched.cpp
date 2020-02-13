@@ -53,18 +53,34 @@ namespace bosched
 void prefetch_page(size_t prealloc_len)
 {
     struct rlimit limits;
-    //struct rlimit newp*;
+    if(getrlimit(RLIMIT_MEMLOCK, &limits) != 0)
+	throw std::runtime_error("getrlimit failed");
+
+    if(_is_debug)
+	std::cout << "-- Queried locked memory limits \n"
+		  << "  soft limit = " << limits.rlim_cur << '\n'
+		  << "  hard limit = " << limits.rlim_max << '\n';
+
+    if(limits.rlim_cur < prealloc_len
+       || limits.rlim_max < prealloc_len)
+    {
+	if(_is_debug)
+	    std::cout << "-- Resource limit too low. Raising limit\n";
+
+	limits.rlim_cur = prealloc_len + 1;
+	limits.rlim_max = prealloc_len + 1;
+	if(setrlimit(RLIMIT_MEMLOCK, &limits) != 0)
+	{
+	    perror("setrlimit");
+	    throw std::runtime_error("strlimit failed");
+	}
+    }
 
     char* addr = (char*)mmap(NULL, prealloc_len,
 			     PROT_READ | PROT_WRITE,
 			     MAP_ANONYMOUS | MAP_PRIVATE | MAP_LOCKED, -1, 0);
-
-    if(getrlimit(RLIMIT_MEMLOCK, &limits) != 0)
-    {
-	perror("getrlimit");
-	throw std::runtime_error("getrlimit failed");
-    }
-    printf("limits: soft=%lld; hard=%lld\n", (long long)limits.rlim_cur, (long long)limits.rlim_max);
+    if(_is_debug)
+	std::cout << "-- preallocating " << prealloc_len / 1024 << " kB\n";
 
     if(addr == MAP_FAILED)
     {
