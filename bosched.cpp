@@ -93,7 +93,8 @@ extern "C"
             _is_debug = true;
         }
 
-	prefetch_page(1024*1024*512);
+	size_t pages = getpagesize();
+	prefetch_page(pages * 1024 * 32);
 
         if(getenv("PROFILE"))
         {
