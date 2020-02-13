@@ -113,7 +113,7 @@ extern "C"
         }
 
 	size_t pages = getpagesize();
-	prefetch_page(pages * 32);
+	prefetch_page(pages * 1024 * 128);
 
         if(getenv("PROFILE"))
         {
