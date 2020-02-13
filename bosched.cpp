@@ -72,7 +72,10 @@ void prefetch_page(size_t prealloc_len)
 			     PROT_READ | PROT_WRITE,
 			     MAP_ANONYMOUS | MAP_PRIVATE | MAP_LOCKED, -1, 0);
     if(addr == MAP_FAILED)
+    {
+	perror("mmap");
 	throw std::runtime_error("mmap failed");
+    }
 }
 
 extern "C"
