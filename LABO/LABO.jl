@@ -37,8 +37,8 @@ function optimize_acquisition(gp, verbose::Bool=true)
     opt.lower_bounds  = [0.0]
     opt.upper_bounds  = [1.0]
     #opt.ftol_abs      = 1e-7
-    opt.xtol_abs      = 1e-5
-    opt.maxeval       = 2^16
+    opt.xtol_abs      = 1e-3
+    opt.maxeval       = 2^14
     opt.max_objective = f
     opt_y, opt_x, ret = NLopt.optimize(opt, rand(dim))
 
@@ -61,8 +61,8 @@ function optimize_mean(gp, verbose::Bool=true)
     opt.lower_bounds  = [0.0]
     opt.upper_bounds  = [1.0]
     #opt.ftol_abs      = 1e-20
-    opt.xtol_abs      = 1e-5
-    opt.maxeval       = 2^16
+    opt.xtol_abs      = 1e-3
+    opt.maxeval       = 2^14
     opt.max_objective = f
     opt_y, opt_x, ret = NLopt.optimize(opt, rand(dim))
     if(verbose)
