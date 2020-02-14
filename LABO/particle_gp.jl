@@ -47,6 +47,7 @@ function GaussianProcesses.predict_y(gp::ParticleGP, x::AbstractArray)
     N  = size(x, 2)
     μ  = zeros(N, P)
     σ² = zeros(N, P)
+
     Threads.@threads for i = 1:P
         bundle   = GaussianProcesses.predict_y(gp.gp[i], x)
         μ[:, i]  = bundle[1]
@@ -65,12 +66,11 @@ function GaussianProcesses.predict_y(gp::TimeMarginalizedGP, x::AbstractArray)
     for i = 1:length(x)
         xt[1,:] .= t
         xt[2,:] .= x[i] 
-        μ, σ² = predict_y(gp.non_marg_gp, xt)
-        μ     = dot(μ, gp.time_w)
-        σ²    = dot(σ², gp.time_w)
 
-        μs[i]  = μ
-        σ²s[i] = σ²
+        μ, σ² = predict_y(gp.non_marg_gp, xt)
+
+        μs[i]  = dot(μ, gp.time_w)
+        σ²s[i] = dot(σ², gp.time_w)
     end
     return μs, σ²s
 end

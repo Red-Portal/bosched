@@ -119,10 +119,10 @@ end
 function build_gp(data_x, data_y, time_idx, verbose::Bool=true)
     k = begin
         if(time_idx[end] == 1)
-            k_x = SEIso(exp(-1.0), exp(1.0), [Normal(-1.0, 2.0), Normal(0.0, 2.0)])
+            k_x = Mat52Iso(exp(-2.0), exp(1.0), [Normal(-2.0, 2.0), Normal(0.0, 2.0)])
             k   = Masked(k_x, [2])
         else
-            k_x = SEIso(exp(-1.0), exp(0.0), [Normal(-1.0, 2.0), Normal(0.0, 2.0)])
+            k_x = Mat52Iso(exp(-2.0), exp(0.0), [Normal(-2.0, 2.0), Normal(0.0, 2.0)])
             k_x = Masked(k_x, [2])
             k_t = Exp(exp(-2.0), exp(0.0), [Normal(-2.0, 2.0), Normal(0.0, 2.0)])
             k_t = Masked(k_t, [1])

@@ -243,8 +243,6 @@ function visualize_gp(loop_states, time_samples, subsize, P, quant)
         #len  = length(gpx)
         #gpμ  = reshape(gpμ, (len, len))
         #gpμ  = gpμ'
-        println(size(gpμ))
-        println(size(data_x))
 
         if(time_max == 1)
             p3   = Plots.plot(gpx, -gpμ[1,:], label="gp μ")
