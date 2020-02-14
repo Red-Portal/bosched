@@ -164,7 +164,7 @@ function bosched_mode(loop_states, time_samples, subsize, P, quant)
         @assert size(x) == size(y)
 
         θ_next, θ_mean, acq_opt, mean_opt = LABO.labo(
-            x, -y, length(x[1]), time_samples,
+            x, -y, size(x, 1), time_samples,
             subsize, verbose=true, uniform_quant=quant)
 
         hist_x  = collect(flatten(loop["hist_x"]))
@@ -197,6 +197,10 @@ function visualize_gp(loop_states, time_samples, subsize, P, quant)
     options = ["continue", "export", "exit"]
     menu    = RadioMenu(options, pagesize=3)
     for loop in loop_states
+        if(loop["id"] == 0)
+            continue
+        end
+
         x, y  = loop["hist_x"], loop["hist_y"]
 
         lens = [length(i) for i in x]
