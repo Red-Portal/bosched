@@ -102,7 +102,7 @@ end
 
 function classic_mode(workload_profile, loop_states, h, P)
     for loop in loop_states
-        if(loop["id"] == 0)
+        if(loop["id"] == 0 || loop["N"] == 0) 
             continue
         end
         arr = read(workload_profile, string(loop["id"]))
@@ -143,7 +143,7 @@ end
 
 function bosched_mode(loop_states, time_samples, subsize, P, quant)
     for loop in loop_states
-        if(loop["id"] == 0)
+        if(loop["id"] == 0 || loop["N"] == 0) 
             continue
         end
 
