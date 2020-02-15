@@ -22,7 +22,7 @@ namespace bosched
             loop_state_t state;
             auto loop_id     = l["id"];
 
-	    if(loop_id == 0)
+	    if(loop_id == 0 || l["N"] == 0)
 		continue;
 
             state.warming_up = l["warmup"];
@@ -61,6 +61,9 @@ namespace bosched
         {
             auto loop_id = l.first;
             auto& loop_state = l.second;
+
+	    if(loop_state.num_tasks == 0)
+		continue;
 
             auto serialized_state      = loop_state.loop_json;
             serialized_state["id"]     = loop_id;
