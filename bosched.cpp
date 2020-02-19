@@ -108,7 +108,10 @@ extern "C"
 	    else
 	    {
 		for(auto& [key, val] : _loop_states )
-		    val.param = bosched::warmup_next_param();
+		{
+		    if(val.warming_up)
+			val.param = bosched::warmup_next_param();
+		}
 	    }
 	}
 
