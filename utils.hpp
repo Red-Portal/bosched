@@ -20,7 +20,6 @@ namespace bosched
         strftime(buffer,sizeof(buffer),"%d-%m-%Y %H:%M:%S",timeinfo);
         return std::string(buffer);
     }
-
 }
 
 #endif

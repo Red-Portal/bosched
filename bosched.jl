@@ -164,11 +164,23 @@ function bosched_mode(loop_states, time_samples, subsize, P, quant, extra)
         y  = hcat(y...)
         x  = convert(Array{Float64}, x)
         y  = convert(Array{Float64}, y)
-        y /= (loop["N"] / P)
+
+        println(size(x))
+        println(size(y))
         @assert size(x) == size(y)
 
+        y       /= (loop["N"] / P)
+
+        if(extra < 0)
+            x        = x[1:1, :]
+            y        = sum(y, dims=1)
+        else
+        end
+
+        time_max = size(x, 1)
+
         θ_next, θ_mean, acq_opt, mean_opt = LABO.labo(
-            x, -y, size(x, 1), time_samples,
+            x, -y, time_max, time_samples,
             subsize, verbose=true, uniform_quant=quant)
 
         hist_x  = collect(flatten(loop["hist_x"]))

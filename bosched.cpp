@@ -32,6 +32,7 @@ bool _is_bo_schedule = false;
 bool _is_new_file    = false;
 bool _profile_loop   = false;
 bool _is_eval        = false;
+bool _random_extrplt = false;
 std::mt19937   _rng __attribute__((init_priority(101)));
 nlohmann::json _stats       __attribute__((init_priority(101)));
 std::unordered_map<size_t, bosched::loop_state_t>    _loop_states __attribute__((init_priority(101)));
@@ -56,47 +57,6 @@ void prefetch_page(size_t prealloc_len)
     for(size_t i = 0; i < prealloc_len; i += 1024 * 4)
 	buf[i] = 'a';
     asm volatile("" : : "r,m"(buf) : "memory");
-
-    // using namespace std::literals::string_literals;
-	
-    // struct rlimit limits;
-    // if(getrlimit(RLIMIT_MEMLOCK, &limits) != 0)
-    // 	throw std::runtime_error("getrlimit failed");
-
-    // if(_is_debug)
-    // 	std::cout << "-- Queried locked memory limits \n"
-    // 		  << "  soft limit = " << limits.rlim_cur << '\n'
-    // 		  << "  hard limit = " << limits.rlim_max << std::endl;
-
-    // if(limits.rlim_max < prealloc_len)
-    // {
-    // 	throw std::runtime_error("memlock hard limit is lower than "s
-    // 				 + std::to_string(prealloc_len) + " bytes"s);
-    // }
-
-    // if(limits.rlim_cur < prealloc_len)
-    // {
-    // 	if(_is_debug)
-    // 	    std::cout << "-- memlock soft limit too low. Raising limit\n";
-    // 	limits.rlim_cur = prealloc_len + 1;
-    // 	if(setrlimit(RLIMIT_MEMLOCK, &limits) != 0)
-    // 	{
-    // 	    perror("setrlimit");
-    // 	    throw std::runtime_error("strlimit failed");
-    // 	}
-    // }
-
-    // char* addr = (char*)mmap(NULL, prealloc_len,
-    // 			     PROT_READ | PROT_WRITE,
-    // 			     MAP_ANONYMOUS | MAP_PRIVATE | MAP_LOCKED, -1, 0);
-    // if(_is_debug)
-    // 	std::cout << "-- preallocating " << prealloc_len / 1024 << " kB\n";
-
-    // if(addr == MAP_FAILED)
-    // {
-    // 	perror("mmap");
-    // 	throw std::runtime_error("mmap failed");
-    // }
 }
 
 extern "C"
@@ -113,9 +73,7 @@ extern "C"
         _rng = std::mt19937(seed());
 
         if(getenv("DEBUG"))
-        {
             _is_debug = true;
-        }
 
 	size_t pages = getpagesize();
 	prefetch_page(pages * 1024 * 512);
@@ -142,6 +100,16 @@ extern "C"
 		_is_new_file = true;
 	    }
 	    stream.close();
+
+	    if(getenv("EXTRA"))
+	    {
+		_random_extrplt = true;
+	    }
+	    else
+	    {
+		for(auto& [key, val] : _loop_states )
+		    val.param = bosched::warmup_next_param();
+	    }
 	}
 
         if(getenv("LOOPSTAT"))
@@ -329,7 +297,7 @@ extern "C"
 	    {
 		loop_state.param = loop_state.eval_param;
 	    }
-	    else if(loop_state.warming_up)
+	    else if(loop_state.warming_up && _random_extrplt)
 	    {
 		loop_state.param = bosched::warmup_next_param();
 	    }
