@@ -2,38 +2,6 @@
 normal_pdf(μ, σ²) = 1/√(2π*σ²) * exp(-μ^2/(2*σ²))
 normal_cdf(μ, σ²) = 1/2 * (1 + erf(μ/√(2σ²)))
 
-# function sample_ystar(η::Float64,
-#                       num_samples::Int64,
-#                       num_grid_points::Int64,
-#                       gp::AbstractParticleGP) 
-#     D     = gp.dim
-#     xgrid = rand(D, num_grid_points)
-#     μ, σ² = predict_y(gp, xgrid)
-#     σe    = exp.(gp.particles[1,idx])
-#     σ     = sqrt.(σ²)
-#     ystar = Vector{Float64}(undef, num_samples)
-#     left  = η
-
-#     probf(x) = prod(cdf.(Normal.(μ, sqrt.(σ²)), x))
-#     if(probf(left) < 0.25)
-#         right = maximum(μ .+ 5*σ)
-#         while(probf(right) < 0.75)
-#             right += right - left
-#         end
-#         md = find_zero(x->(probf(x) - 0.5), (left, right), atol=0.01, order=0)
-#         q1 = find_zero(x->(probf(x) - 0.25), (left, md), atol=0.01, order=0)
-#         q2 = find_zero(x->(probf(x) - 0.75), (md, right), atol=0.01, order=0)
-#         Gθ = (q1 - q2) / (log(log(4/3)) - log(log(4)))
-#         Gμ = md + Gθ*log(log(2))
-#         @assert Gθ > 0
-#         ystar .= rand(Gumbel(Gμ, Gθ), num_samples)
-#         ystar .= max.(ystar, left .+ 5*σe)
-#     else
-#         ystar .= left + 5*σe
-#     end
-#     return ystar
-# end
-
 function sample_ystar(η::Float64,
                       num_samples::Int64,
                       num_grid_points::Int64,
@@ -104,6 +72,22 @@ function acquisition(x, gp::TimeMarginalizedGP)
     res = α_res'w 
     return res
 end
+
+# @inline function α(μ, σ², η)
+# """
+#  "Upper Confidence Bound"
+#  Niranjan Srinivas, Andreas Krause, Sham Kakade, and Matthias Seeger. 2010.
+#  Gaussian process optimization in the bandit setting: no regret and
+#  experimental design. ICML'10
+#  Srinivas, Niranjan, et al. "Information-theoretic regret bounds for
+#  gaussian process optimization in the bandit setting." IEEE Transactions
+#  on Information Theory 58.5 (2012)
+# """
+# t = 30
+#     δ = 0.1 # Tunable parameter refer to original paper
+#     β = 2 * log((t * π)^2 / (6 * δ))
+#     return μ + sqrt(β * σ²)
+# end
 
 @inline function α(μ, σ², η)
 """

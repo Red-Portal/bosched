@@ -97,15 +97,14 @@ function multistart_optimize!(gp::GaussianProcesses.GPBase, restarts::Int64)
         θ_init = rand(dist, nparam)
         GaussianProcesses.set_params!(gp, θ_init)
         GaussianProcesses.update_target_and_dtarget!(gp)
-        optimize!(gp, method=Optim.LBFGS(linesearch=LineSearches.BackTracking()))
-        if(!isnan(gp.ll))
+        GaussianProcesses.optimize!(gp, method=Optim.LBFGS(linesearch=LineSearches.BackTracking()))
+        if(!isnan(gp.target))
             push!(params, GaussianProcesses.get_params(gp))
-            push!(like, gp.ll)
+            push!(like, gp.target)
         end
     end
     idx = argmax(like)
-    GaussianProcesses.set_params!(gp, params[idx])
-    gp
+    ParticleGP(gp, hcat([params[idx]]...))
 end
 
 function whiten(y)
@@ -122,25 +121,53 @@ function build_gp(data_x, data_y, time_idx, verbose::Bool=true)
             k_x = Mat52Iso(exp(-2.0), exp(1.0), [Normal(-2.0, 2.0), Normal(0.0, 2.0)])
             k   = Masked(k_x, [2])
         else
-            k_x = Mat52Iso(exp(-2.0), exp(0.0), [Normal(-2.0, 2.0), Normal(0.0, 2.0)])
+            # Sum Kernel
+            # k_x = Mat52Iso(exp(-2.0), exp(0.0),
+            #                [Normal(-2.0, 2.0), Normal(0.0, 2.0)])
+            # k_x = Masked(k_x, [2])
+
+            # k_t1 = Exp(exp(-2.0), exp(0.0), exp(0.0),
+            #             [Normal(-2.0, 2.0), Normal(0.0, 2.0), Normal(0.0, 2.0)])
+            # k_t2 = Mat52Iso(√(time_idx[2]), exp(0.0),
+            #                 [Normal(log(time_idx[end]/4), log(time_idx[end]/2)),
+            #                  Normal(0.0, 2.0)])
+            # k_t  = k_t1 + k_t2
+            # k_t  = Masked(k_t, [1])
+            # k    = (k_x + k_t)
+
+            # Product Kernel
+            k_x = Mat52Iso(exp(-2.0), exp(0.0),
+                           [Normal(-2.0, 2.0), Normal(0.0, 2.0)])
+            k_x = fix(k_x, :lσ)
             k_x = Masked(k_x, [2])
-            k_t = Exp(exp(-2.0), exp(0.0), [Normal(-2.0, 2.0), Normal(0.0, 2.0)])
-            k_t = Masked(k_t, [1])
-            k   = k_x * k_t
+
+            k_t1 = Exp(exp(-2.0), exp(0.0), exp(0.0),
+                        [Normal(-2.0, 2.0),Normal(0.0, 2.0), Normal(0.0, 2.0)])
+            k_t1 = fix(k_t1, :lσ)
+
+            k_t2 = Mat52Iso(exp(1.0), exp(0.0),
+                            [Normal(log(time_idx[end]/2), log(time_idx[end]/2)),
+                             Normal(0.0, 2.0)])
+            k_t2 = fix(k_t2, :lσ)
+            k_t  = k_t1 + k_t2
+            k_t  = Masked(k_t, [1])
+            k    = (k_x * k_t) * Const(exp(0.0), [Normal(0.0, 2.0)])
         end
     end
 
     m    = MeanZero()
     ϵ    = -1.0
     gp   = GP(data_x, data_y, m, k, ϵ)
-    set_priors!(gp.logNoise, [Normal(-1.0, 2.0)])
-    gp   = ess(gp, num_samples=1024, num_adapts=1024, thinning=4, verbose=verbose)
-    # gp   = nuts(gp, num_samples=1024, num_adapts=1024,
-    #             thinning=4, verbose=verbose)
+    set_priors!(gp.logNoise, [Normal(-2.0, 2.0)])
+    #gp   = ess(gp, num_samples=2^10, num_adapts=2^10, thinning=2^2, verbose=verbose)
+
+    # gp   = multistart_optimize!(gp, 32)
+    gp   = nuts(gp, num_samples=512, num_adapts=512,
+                thinning=2, verbose=verbose)
     #GaussianProcesses.optimize!(gp)
     #println(gp)
-    # gp   = slice(gp, num_samples=1024, num_adapts=512,
-    #              thinning=4, width=4.0, verbose=verbose)
+    #gp   = slice(gp, num_samples=1024, num_adapts=512,
+    #             thinning=4, width=4.0, verbose=verbose)
 end
 
 function data_preprocess(data_x, data_y, time_idx;

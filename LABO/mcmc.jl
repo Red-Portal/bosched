@@ -86,31 +86,36 @@ function nuts(gp; num_samples=100, num_adapts=100, thinning=1, verbose=false)
         try
             GaussianProcesses.set_params!(gp, θ; params_kwargs...)
             GaussianProcesses.update_target_and_dtarget!(gp; params_kwargs...)
+            return (gp.target, gp.dtarget)
         catch
-            return (-Inf, zeros(length(θ)))
+            return (-Inf, zeros(length(gp.dtarget)))
         end
-        return (gp.target, gp.dtarget)
     end
 
     function logp(θ::AbstractVector)
-        return gp.mll
+        try
+            GaussianProcesses.set_params!(gp, θ; params_kwargs...)
+            GaussianProcesses.update_target!(gp; params_kwargs...)
+            return gp.target
+        catch
+            return -Inf
+        end
     end
 
     θ_init  = GaussianProcesses.get_params(gp; params_kwargs...)
-    #metric  = DenseEuclideanMetric(length(θ_init))
-    metric  = DiagEuclideanMetric(length(θ_init))
+    metric  = DenseEuclideanMetric(length(θ_init))
+    #metric  = DiagEuclideanMetric(length(θ_init))
     h       = Hamiltonian(metric, logp, logp∂logp)
     prop    = NUTS(Leapfrog(find_good_eps(h, θ_init)))
-    adaptor = StanHMCAdaptor(num_adapts,
-                             Preconditioner(metric),
+    adaptor = StanHMCAdaptor(Preconditioner(metric),
                              NesterovDualAveraging(0.65, prop.integrator.ϵ))
 
     # Draw samples via simulating Hamiltonian dynamics
     # - `samples` will store the samples
     # - `stats` will store statistics for each sample
     samples, stats = AdvancedHMC.sample(
-        h, prop, θ_init, num_samples, adaptor,
-        num_adapts; progress=verbose)
+        h, prop, θ_init, num_samples + num_adapts, adaptor,
+        num_adapts; progress=verbose, drop_warmup=true)
     samples = hcat(samples...)
     samples = samples[:,1:thinning:end]
     ESS     = [MCMCDiagnostics.effective_sample_size(samples[i,:])

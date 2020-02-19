@@ -72,6 +72,10 @@ function cmd_args(args, show)
         "--uniform_quant"
         help     = "Uniformly quantize the time axis"
         action   = :store_true 
+        "--extrapolate"
+        help     = "Extrapolate loop executions"
+        arg_type = Int64
+        default  = -1
         "name"
         arg_type = String
         help     = "Name of workload executable."
@@ -141,7 +145,7 @@ function update_dataset(loop_state)
     return loop_state
 end
 
-function bosched_mode(loop_states, time_samples, subsize, P, quant)
+function bosched_mode(loop_states, time_samples, subsize, P, quant, extra)
     for loop in loop_states
         if(loop["id"] == 0 || loop["N"] == 0) 
             continue
@@ -185,7 +189,7 @@ function bosched_mode(loop_states, time_samples, subsize, P, quant)
     return loop_states
 end
 
-function visualize_gp(loop_states, time_samples, subsize, P, quant)
+function visualize_gp(loop_states, time_samples, subsize, P, quant, extra)
     #pyplot()
     #uimodes  = ["GUI", "CUI"]
     #uimenu   = RadioMenu(uimodes, pagesize=2)
@@ -212,11 +216,20 @@ function visualize_gp(loop_states, time_samples, subsize, P, quant)
         y  = hcat(y...)
         x  = convert(Array{Float64}, x)
         y  = convert(Array{Float64}, y)
+
         println(size(x))
         println(size(y))
-        y /= (loop["N"] / P)
         @assert size(x) == size(y)
+
+        y       /= (loop["N"] / P)
         time_max = size(x, 1)
+
+        if(extra < 0)
+            x        = x[1:1, :]
+            y        = sum(y, dims=1)
+            time_max = size(x, 1)
+        else
+        end
 
         d = Dict()
         θ_next, θ_mean, acq_opt, mean_opt = LABO.labo(
@@ -237,6 +250,7 @@ function visualize_gp(loop_states, time_samples, subsize, P, quant)
         gpx    = d[:gp_x]
         gpt    = d[:gp_t]
         gpμ    = d[:gp_mean]
+        gpσ    = d[:gp_std]
         data_x = d[:data_x]
         data_y = d[:data_y]
 
@@ -257,7 +271,23 @@ function visualize_gp(loop_states, time_samples, subsize, P, quant)
 
         choice = request("choose action:", menu)
         if(options[choice] == "export")
-            
+            println("enter filename: ")
+            str = readline()
+            if(str == "n")
+                continue
+            end
+            h5open(str, "w") do io
+                write(io, "gp_x",      d[:gp_x])
+                write(io, "gp_t",      d[:gp_t])
+                write(io, "gp_mean",   d[:gp_mean])
+                write(io, "data_x",    d[:data_x])
+                write(io, "data_y",    d[:data_y])
+                write(io, "acq_x",     d[:acq_x])
+                write(io, "acq_y",     d[:acq_y])
+                write(io, "tmgp_x",    d[:tmgp_x])
+                write(io, "tmgp_mean", d[:tmgp_mean])
+                write(io, "tmgp_err",  d[:tmgp_std] * 1.96)
+            end
         elseif(options[choice] == "exit")
             exit()
         end
@@ -308,14 +338,16 @@ function main(args)
                                          args["time_samples"],
                                          args["subsize"],
                                          args["P"],
-                                         args["uniform_quant"])
+                                         args["uniform_quant"],
+                                         args["extrapolate"])
     end
     if(args["mode"] == "visualize")
         visualize_gp(bostate["loops"],
                      args["time_samples"],
                      args["subsize"],
                      args["P"],
-                     args["uniform_quant"])
+                     args["uniform_quant"],
+                     args["extrapolate"])
     end
 
     open(bostate_fname, "w") do file
