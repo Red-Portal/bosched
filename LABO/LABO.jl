@@ -162,8 +162,8 @@ function build_gp(data_x, data_y, time_idx, verbose::Bool=true)
     #gp   = ess(gp, num_samples=2^10, num_adapts=2^10, thinning=2^2, verbose=verbose)
 
     # gp   = multistart_optimize!(gp, 32)
-    gp   = nuts(gp, num_samples=512, num_adapts=512,
-                thinning=2, verbose=verbose)
+    gp   = nuts(gp, num_samples=1024, num_adapts=1024,
+                thinning=4, verbose=verbose)
     #GaussianProcesses.optimize!(gp)
     #println(gp)
     #gp   = slice(gp, num_samples=1024, num_adapts=512,
