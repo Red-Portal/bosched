@@ -334,7 +334,7 @@ function labo(data_x, data_y, time_max, time_samples, subsample;
         println("- sampling y*")
     end
     P         = length(gp.non_marg_gp.weights)
-    num_ystar = 32
+    num_ystar = 128
     num_gridx = 1024
     ηs        = zeros(num_ystar, P)
     for i in P
