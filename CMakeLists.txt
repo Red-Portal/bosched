@@ -56,7 +56,7 @@ set_target_properties(${PROJECT_NAME}
     CXX_STANDARD 17)
 
 ## Thread library dependency
-find_package(BLAZE REQUIRED)
+#find_package(BLAZE REQUIRED)
 
 set(BLA_STATIC ON)
 find_package(BLAS REQUIRED)
