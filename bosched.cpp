@@ -15,7 +15,6 @@
 #include <highfive/H5File.hpp>
 
 #include <atomic>
-#include <blaze/Blaze.h>
 #include <chrono>
 #include <cstdlib>
 #include <fstream>
@@ -128,7 +127,7 @@ extern "C"
 	if(_is_debug)
 	{
 	    auto cmd = "cat /proc/"s + std::to_string(getpid()) + "/status"s;
-	    system(cmd.c_str());
+	    (void)system(cmd.c_str());
 	}
 
 	if(getenv("EVAL"))
