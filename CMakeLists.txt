@@ -59,7 +59,7 @@ set_target_properties(${PROJECT_NAME}
 #find_package(BLAZE REQUIRED)
 
 set(BLA_STATIC ON)
-find_package(BLAS REQUIRED)
+#find_package(BLAS REQUIRED)
 find_package(LAPACK REQUIRED)
 
 set(Boost_USE_STATIC_LIBS ON)
