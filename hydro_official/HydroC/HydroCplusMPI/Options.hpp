@@ -45,12 +45,12 @@
 
 #ifdef __MIC__
 #ifndef SCHEDDEF
-#define SCHEDDEF 1
+#define SCHEDDEF 5
 #endif
 #endif
 
 #ifndef SCHEDDEF
-#define SCHEDDEF 1
+#define SCHEDDEF 5
 #endif
 
 #if SCHEDDEF == 0
