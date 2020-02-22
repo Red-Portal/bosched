@@ -1,0 +1,80 @@
+# C compiler
+#------------------
+CC = icc
+
+# Cuda compiler
+#------------------
+NVCC = 
+
+# Fortran compilers
+#------------------
+F90 = 
+
+# MPI C compiler
+#------------------
+MPICC = 
+
+# MPI Fortran compilers
+#------------------
+MPIF90 = 
+
+# C compilation options
+#-----------------------------
+ifeq ($(MMACH),)
+CFLAGS = -O3 -xHost -vec-report1 -openmp-report1
+endif
+
+ifeq ($(MMACH),NVC)
+CFLAGS = -O3 -no-vec
+endif
+ifeq ($(MMACH),SE4)
+CFLAGS = -O3 -msse4
+endif
+ifeq ($(MMACH),AVX)
+CFLAGS = -O3 -mavx
+endif
+ifeq ($(MMACH),AV2)
+CFLAGS = -O3 -march=core-avx2
+endif
+ifeq ($(MMACH),AVI)
+CFLAGS = -O3 -march=core-avx-i
+endif
+
+# Fortran compilation options
+#-----------------------------
+FFLAGS = -O3
+
+# Linker options
+#---------------
+LDFLAGS = -O3
+
+# OpenMP C compilation options
+#---------------------------
+CFLAGS_OMP = -openmp
+
+# Cuda compilation options
+#---------------------------
+NVCFLAGS_OMP = 
+
+# OpenMP Fortran compilation options
+#---------------------------
+FFLAGS_OMP = -fopenmp
+
+# MPI C compilation options
+#---------------------------
+MPIROOT=
+CFLAGS_MPI =
+NVCFLAGS_MPI =
+
+
+# MPI Fortran compilation options
+#---------------------------
+FFLAGS_MPI =
+
+# OpenMP link options
+#--------------------
+LDFLAGS_OMP = -openmp -lm
+
+# MPI link options
+#--------------------
+LDFLAGS_MPI = -lnuma

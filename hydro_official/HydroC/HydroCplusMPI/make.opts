@@ -1,0 +1,70 @@
+ifeq ($(PNG),O)
+   DEFS+=-DWITHPNG=1
+endif
+
+ifeq ($(CXX),icpc)
+# OPTIM+=-mkl
+  ifeq ($(OPENMP),O)
+     OPTIM+=-qopenmp
+  endif
+  OPTIM+=-ansi-alias 
+  ifeq ($(PG),O)
+     OPTIM+=-pg
+  endif
+  ifeq ($(XHOST),O)
+     OPTIM+=-xHost 
+  endif
+  ifeq ($(VERB),O)
+     # OPTIM+=-vec-report6
+     # for compiler >= 15
+     OPTIM+=-qopt-report=5
+  endif
+
+  # OPTIM+=-openmp-report1 
+  ifeq ($(NOVEC),O)
+     OPTIM+=-no-vec -no-simd -qno-openmp-simd
+   else
+     OPTIM+=-simd -qopenmp-simd
+   endif
+   ifeq ($(DIVOPTS),)
+      # OPTIM+=-qopt-zmm-usage=high
+      # OPTIM+=-mCG_use_zeroupper=0
+      # OPTIM+=-mP1OPT_max_rec_copy_size=128
+      OPTIM+=-fma
+   endif
+endif
+
+ifeq ($(CXX),g++)
+  ifeq ($(PG),O)
+     OPTIM+=-pg
+  endif
+  ifeq ($(OPENMP),O)
+     OPTIM+=-fopenmp
+  endif
+  ifeq ($(NOVEC),O)
+     OPTIM+=-fno-tree-vectorize -fno-openmp-simd
+  else
+     ifneq ($(DBG),O)
+        OPTIM+=-ftree-vectorize -fopenmp-simd
+     endif
+  endif	
+  ifeq ($(DBG),O)
+     OPTIM+=-g
+  else
+     OPTIM+=-O3
+  endif
+  ifeq ($(VERB),O)
+     OPTIM+=-ftree-vectorizer-verbose=2 -fopt-info
+  endif
+endif
+
+ifeq ($(CXX),clang++)
+  ifeq ($(NOVEC),O)
+     OPTIM+=-fno-vectorize
+  else
+     OPTIM+=-mllvm -force-vector-width=2
+  endif
+  ifeq ($(NOVEC),O)
+     OPTIM+=-Rpass=loop-vectorize -Rpass-analysis=loop-vectorize 
+  endif
+endif

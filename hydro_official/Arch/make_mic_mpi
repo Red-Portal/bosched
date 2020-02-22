@@ -1,0 +1,71 @@
+# C compiler
+#------------------
+# -mP2OPT_hlo_loop_intrinsic=F -mP2OPT_hlo_use_const_pref_dist=64 -mP2OPT_hlo_use_const_second_pref_dist=8 -mP2OPT_hlo_enable_all_mem_refs_prefetch2=T -mGLOB_default_function_attrs="knc_stream_store_controls=2; clevict_level=3"
+
+CC = icc -mmic -restrict  -ansi-alias -I/usr/include
+
+# Cuda compiler
+#------------------
+NVCC = 
+
+# Fortran compilers
+#------------------
+F90 = ifort
+
+# MPI C compiler
+#------------------
+MPICC = mpicc
+
+# MPI Fortran compilers
+#------------------
+MPIF90 = mpif90
+
+# C compilation options
+#-----------------------------
+# PROF=-pg
+CFLAGS = -O3 $(PROF) 
+# -vec-report1 -fimf-domain-exclusion=8 
+#-no-prec-div -fimf-precision=high:/ 
+#-no-prec-sqrt
+#-no-vec 
+
+# Fortran compilation options
+#-----------------------------
+FFLAGS = -O3
+
+# Linker options
+#---------------
+LDFLAGS = -O3 $(PROF)
+
+# OpenMP C compilation options
+#---------------------------
+CFLAGS_OMP = -qopenmp -qopt-report-phase=par
+
+# Cuda compilation options
+#---------------------------
+NVCFLAGS_OMP = 
+
+# OpenMP Fortran compilation options
+#---------------------------
+FFLAGS_OMP = -qopenmp
+
+# MPI C compilation options
+#---------------------------
+MPIROOT=/opt/intel/impi/4.1.0.018/mic
+MPIROOT=/usr/local/Intel_compilers/impi/4.1.0.018/mic/
+MPIROOT=$(I_MPI_ROOT)/mic
+CFLAGS_MPI = -DMPI -I$(MPIROOT)/include
+NVCFLAGS_MPI = -I$(MPIROOT)/include
+
+
+# MPI Fortran compilation options
+#---------------------------
+FFLAGS_MPI =
+
+# OpenMP link options
+#--------------------
+LDFLAGS_OMP = -openmp
+
+# MPI link options
+#--------------------
+LDFLAGS_MPI = -L$(MPIROOT)/lib -lmpi
