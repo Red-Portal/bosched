@@ -1581,7 +1581,7 @@ void CalcLagrangeElements(Domain& domain)
       CalcKinematicsForElems(domain, deltatime, numElem) ;
 
       // element loop to do some stuff not included in the elemlib function.
-#pragma omp parallel for firstprivate(numElem) schedule(runtime)
+#pragma omp parallel for firstprivate(numElem)
       for ( Index_t k=0 ; k<numElem ; ++k )
       {
          // calc strain rate and apply as constraint (only done in FB element)
@@ -2239,7 +2239,7 @@ void EvalEOSForElems(Domain& domain, Real_t *vnewc,
       /* compress data, minimal set */
 #pragma omp parallel
       {
-#pragma omp for nowait firstprivate(numElemReg) schedule(runtime)
+#pragma omp for nowait firstprivate(numElemReg)
          for (Index_t i=0; i<numElemReg; ++i) {
             Index_t ielem = regElemList[i];
             e_old[i] = domain.e(ielem) ;
@@ -2250,7 +2250,7 @@ void EvalEOSForElems(Domain& domain, Real_t *vnewc,
             ql_old[i] = domain.ql(ielem) ;
          }
 
-#pragma omp for firstprivate(numElemReg) schedule(runtime)
+#pragma omp for firstprivate(numElemReg)
          for (Index_t i = 0; i < numElemReg ; ++i) {
             Index_t ielem = regElemList[i];
             Real_t vchalf ;
@@ -2261,7 +2261,7 @@ void EvalEOSForElems(Domain& domain, Real_t *vnewc,
 
       /* Check for v > eosvmax or v < eosvmin */
          if ( eosvmin != Real_t(0.) ) {
-#pragma omp for nowait firstprivate(numElemReg, eosvmin) schedule(runtime)
+#pragma omp for nowait firstprivate(numElemReg, eosvmin)
             for(Index_t i=0 ; i<numElemReg ; ++i) {
                Index_t ielem = regElemList[i];
                if (vnewc[ielem] <= eosvmin) { /* impossible due to calling func? */
@@ -2270,7 +2270,7 @@ void EvalEOSForElems(Domain& domain, Real_t *vnewc,
             }
          }
          if ( eosvmax != Real_t(0.) ) {
-#pragma omp for nowait firstprivate(numElemReg, eosvmax) schedule(runtime)
+#pragma omp for nowait firstprivate(numElemReg, eosvmax)
             for(Index_t i=0 ; i<numElemReg ; ++i) {
                Index_t ielem = regElemList[i];
                if (vnewc[ielem] >= eosvmax) { /* impossible due to calling func? */
@@ -2281,7 +2281,7 @@ void EvalEOSForElems(Domain& domain, Real_t *vnewc,
             }
          }
 
-#pragma omp for nowait firstprivate(numElemReg) schedule(runtime)
+#pragma omp for nowait firstprivate(numElemReg)
          for (Index_t i = 0 ; i < numElemReg ; ++i) {
             work[i] = Real_t(0.) ; 
          }
@@ -2294,7 +2294,7 @@ void EvalEOSForElems(Domain& domain, Real_t *vnewc,
                          numElemReg, regElemList);
    }
 
-#pragma omp parallel for firstprivate(numElemReg) schedule(runtime)
+#pragma omp parallel for firstprivate(numElemReg)
    for (Index_t i=0; i<numElemReg; ++i) {
       Index_t ielem = regElemList[i];
       domain.p(ielem) = p_new[i] ;
@@ -2471,7 +2471,7 @@ void CalcCourantConstraintForElems(Domain &domain, Index_t length,
       Index_t thread_num = 0;
 #endif      
 
-#pragma omp for  schedule(runtime)
+#pragma omp for schedule(runtime)
       for (Index_t i = 0 ; i < length ; ++i) {
          Index_t indx = regElemlist[i] ;
          Real_t dtf = domain.ss(indx) * domain.ss(indx) ;
