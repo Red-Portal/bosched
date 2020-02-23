@@ -226,7 +226,7 @@ c-------------------------------------------------------------------*/
 /*--------------------------------------------------------------------
 c  Normalize z to obtain x
 c-------------------------------------------------------------------*/
-#pragma omp parallel for default(shared) private(j)
+#pragma omp parallel for default(shared) private(j) schedule(runtime)
 	for (j = 1; j <= lastcol-firstcol+1; j++) {
             x[j] = norm_temp12*z[j];
 	}
@@ -268,7 +268,7 @@ c-------------------------------------------------------------------*/
 	norm_temp11 = 0.0;
 	norm_temp12 = 0.0;
 
-#pragma omp parallel for default(shared) private(j) reduction(+:norm_temp11,norm_temp12)
+#pragma omp parallel for default(shared) private(j) reduction(+:norm_temp11,norm_temp12) schedule(runtime)
 	for (j = 1; j <= lastcol-firstcol+1; j++) {
             norm_temp11 = norm_temp11 + x[j]*z[j];
             norm_temp12 = norm_temp12 + z[j]*z[j];
@@ -286,7 +286,7 @@ c-------------------------------------------------------------------*/
 /*--------------------------------------------------------------------
 c  Normalize z to obtain x
 c-------------------------------------------------------------------*/
-#pragma omp parallel for default(shared) private(j)
+#pragma omp parallel for default(shared) private(j) schedule(runtime)
 	for (j = 1; j <= lastcol-firstcol+1; j++) {
             x[j] = norm_temp12*z[j];
 	}
@@ -388,7 +388,7 @@ c-------------------------------------------------------------------*/
 c  rho = r.r
 c  Now, obtain the norm of r: First, sum squares of r elements locally...
 c-------------------------------------------------------------------*/
-#pragma omp for reduction(+:rho)
+#pragma omp for reduction(+:rho) schedule(runtime)
     for (j = 1; j <= lastcol-firstcol+1; j++) {
 	rho = rho + r[j]*r[j];
     }
@@ -419,7 +419,7 @@ C        on the Cray t3d - overall speed of code is 1.5 times faster.
 */
 
 /* rolled version */    
-#pragma omp for 
+#pragma omp for schedule(runtime)
 	for (j = 1; j <= lastrow-firstrow+1; j++) {
             sum = 0.0;
 	    for (k = rowstr[j]; k < rowstr[j+1]; k++) {
@@ -487,7 +487,7 @@ c-------------------------------------------------------------------*/
 /*--------------------------------------------------------------------
 c  Obtain p.q
 c-------------------------------------------------------------------*/
-#pragma omp for reduction(+:d)
+#pragma omp for reduction(+:d) schedule(runtime)
 	for (j = 1; j <= lastcol-firstcol+1; j++) {
             d = d + p[j]*q[j];
 	}
@@ -507,7 +507,7 @@ c-------------------------------------------------------------------*/
 c  Obtain z = z + alpha*p
 c  and    r = r - alpha*q
 c---------------------------------------------------------------------*/
-#pragma omp for reduction(+:rho)	
+#pragma omp for reduction(+:rho) schedule(runtime) 
 	for (j = 1; j <= lastcol-firstcol+1; j++) {
             z[j] = z[j] + alpha*p[j];
             r[j] = r[j] - alpha*q[j];
@@ -550,7 +550,7 @@ c---------------------------------------------------------------------*/
     
 #pragma omp parallel default(shared) private(j,d) shared(sum)
 {
-#pragma omp for //private(d, k)
+#pragma omp for schedule(runtime)  //private(d, k)
     for (j = 1; j <= lastrow-firstrow+1; j++) {
 	d = 0.0;
 	for (k = rowstr[j]; k <= rowstr[j+1]-1; k++) {
@@ -562,7 +562,7 @@ c---------------------------------------------------------------------*/
 /*--------------------------------------------------------------------
 c  At this point, r contains A.z
 c-------------------------------------------------------------------*/
-#pragma omp for reduction(+:sum)
+#pragma omp for reduction(+:sum) schedule(runtime) 
     for (j = 1; j <= lastcol-firstcol+1; j++) {
 	d = x[j] - r[j];
 	sum = sum + d*d;
@@ -632,7 +632,7 @@ c-------------------------------------------------------------------*/
 c  Initialize colidx(n+1 .. 2n) to zero.
 c  Used by sprnvc to mark nonzero positions
 c---------------------------------------------------------------------*/
-#pragma omp parallel for default(shared) private(i)
+#pragma omp parallel for default(shared) private(i) 
     for (i = 1; i <= n; i++) {
 	colidx[n+i] = 0;
     }

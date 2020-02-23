@@ -451,7 +451,7 @@ c-------------------------------------------------------------------*/
 
     int i3, i2, i1;
     double r1[M], r2[M];
-#pragma omp parallel for default(shared) private(i1,i2,i3,r1,r2)   
+#pragma omp parallel for default(shared) private(i1,i2,i3,r1,r2) schedule(runtime) collapse(2)
     for (i3 = 1; i3 < n3-1; i3++) {
 	for (i2 = 1; i2 < n2-1; i2++) {
             for (i1 = 0; i1 < n1; i1++) {
@@ -513,7 +513,7 @@ c-------------------------------------------------------------------*/
 
     int i3, i2, i1;
     double u1[M], u2[M];
-#pragma omp parallel for default(shared) private(i1,i2,i3,u1,u2)
+#pragma omp parallel for default(shared) private(i1,i2,i3,u1,u2) schedule(runtime) collapse(2)
     for (i3 = 1; i3 < n3-1; i3++) {
 	for (i2 = 1; i2 < n2-1; i2++) {
             for (i1 = 0; i1 < n1; i1++) {
@@ -592,7 +592,7 @@ c-------------------------------------------------------------------*/
     } else {
         d3 = 1;
     }
-#pragma omp parallel for default(shared) private(j1,j2,j3,i1,i2,i3,x1,y1,x2,y2)
+#pragma omp parallel for default(shared) private(j1,j2,j3,i1,i2,i3,x1,y1,x2,y2) schedule(runtime)
     for (j3 = 1; j3 < m3j-1; j3++) {
 	i3 = 2*j3-d3;
 /*C        i3 = 2*j3-1*/
@@ -666,7 +666,7 @@ c      parameter( m=535 )
     double z1[M], z2[M], z3[M];
 
     if ( n1 != 3 && n2 != 3 && n3 != 3 ) {
-#pragma omp parallel for default(shared) private(i1,i2,i3,z1,z2,z3)
+#pragma omp parallel for default(shared) private(i1,i2,i3,z1,z2,z3) schedule(runtime) collapse(2)
 	for (i3 = 0; i3 < mm3-1; i3++) {
             for (i2 = 0; i2 < mm2-1; i2++) {
 		for (i1 = 0; i1 < mm1; i1++) {
@@ -727,7 +727,7 @@ c      parameter( m=535 )
          
 #pragma omp parallel default(shared) private(i1,i2,i3)
     {
-#pragma omp for
+#pragma omp for schedule(runtime) 
 	for ( i3 = d3; i3 <= mm3-1; i3++) {
             for ( i2 = d2; i2 <= mm2-1; i2++) {
 		for ( i1 = d1; i1 <= mm1-1; i1++) {
@@ -755,7 +755,7 @@ c      parameter( m=535 )
 		}
 	    }
 	}
-#pragma omp for nowait
+#pragma omp for nowait schedule(runtime) 
 	for ( i3 = 1; i3 <= mm3-1; i3++) {
             for ( i2 = d2; i2 <= mm2-1; i2++) {
 		for ( i1 = d1; i1 <= mm1-1; i1++) {
@@ -823,7 +823,7 @@ c-------------------------------------------------------------------*/
 
     n = nx*ny*nz;
 
-#pragma omp parallel for default(shared) private(i1,i2,i3,a) reduction(+:s) reduction(max:tmp)
+#pragma omp parallel for default(shared) private(i1,i2,i3,a) reduction(+:s) reduction(max:tmp) schedule(runtime) collapse(2)
     for (i3 = 1; i3 < n3-1; i3++) {
 	for (i2 = 1; i2 < n2-1; i2++) {
             for (i1 = 1; i1 < n1-1; i1++) {
@@ -875,7 +875,7 @@ c-------------------------------------------------------------------*/
     /* axis = 1 */
 #pragma omp parallel default(shared) private(i1,i2,i3)
 {
-#pragma omp for
+#pragma omp for 
     for ( i3 = 1; i3 < n3-1; i3++) {
 	for ( i2 = 1; i2 < n2-1; i2++) {
 	    u[i3][i2][n1-1] = u[i3][i2][1];

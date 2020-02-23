@@ -518,7 +518,7 @@ c-------------------------------------------------------------------*/
 dcomplex y0[NX][FFTBLOCKPAD];
 dcomplex y1[NX][FFTBLOCKPAD];
 
-#pragma omp for 	
+#pragma omp for schedule(runtime)
     for (k = 0; k < d[2]; k++) {
 	for (jj = 0; jj <= d[1] - fftblock; jj+=fftblock) {
 /*          if (TIMERS_ENABLED == TRUE) timer_start(T_FFTCOPY); */
@@ -572,7 +572,7 @@ c-------------------------------------------------------------------*/
 dcomplex y0[NX][FFTBLOCKPAD];
 dcomplex y1[NX][FFTBLOCKPAD];
 
-#pragma omp for 	
+#pragma omp for schedule(runtime)	 
     for (k = 0; k < d[2]; k++) {
         for (ii = 0; ii <= d[0] - fftblock; ii+=fftblock) {
 /*	    if (TIMERS_ENABLED == TRUE) timer_start(T_FFTCOPY); */
@@ -622,7 +622,7 @@ c-------------------------------------------------------------------*/
 dcomplex y0[NX][FFTBLOCKPAD];
 dcomplex y1[NX][FFTBLOCKPAD];
 
-#pragma omp for 	
+#pragma omp for schedule(runtime)
     for (j = 0; j < d[1]; j++) {
         for (ii = 0; ii <= d[0] - fftblock; ii+=fftblock) {
 /*	    if (TIMERS_ENABLED == TRUE) timer_start(T_FFTCOPY); */

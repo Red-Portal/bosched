@@ -206,7 +206,7 @@ c  local variables
   double tmp, tmp1;
   double tmat[5][5];
 
-#pragma omp for nowait schedule(static)
+#pragma omp for nowait schedule(runtime) collapse(2)
   for (i = ist; i <= iend; i++) {
     for (j = jst; j <= jend; j++) {
       for (m = 0; m < 5; m++) {
@@ -731,7 +731,7 @@ c  local variables
 
   dsspm = dssp;
 
-#pragma omp for
+#pragma omp for 
   for (i = 0; i < nx; i++) {
     for (j = 0; j < ny; j++) {
       for (k = 0; k < nz; k++) {
@@ -742,7 +742,7 @@ c  local variables
     }
   }
 
-#pragma omp for
+#pragma omp for schedule(runtime)
   for (i = 0; i < nx; i++) {
     iglob = i;
     xi = ( (double)(iglob) ) / ( nx0 - 1 );
@@ -777,7 +777,7 @@ c   xi-direction flux differences
   L1 = 0;
   L2 = nx-1;
 
-#pragma omp for
+#pragma omp for schedule(runtime) collapse(3)
   for (i = L1; i <= L2; i++) {
     for (j = jst; j <= jend; j++) {
       for (k = 1; k < nz - 1; k++) {
@@ -796,7 +796,7 @@ c   xi-direction flux differences
     }
   }
 
-#pragma omp for
+#pragma omp for schedule(runtime) collapse(2)
   for (j = jst; j <= jend; j++) {
     for (k = 1; k <= nz - 2; k++) {
       for (i = ist; i <= iend; i++) {
@@ -908,7 +908,7 @@ c   eta-direction flux differences
   L1 = 0;
   L2 = ny-1;
 
-#pragma omp for
+#pragma omp for schedule(runtime) collapse(2)
   for (i = ist; i <= iend; i++) {
     for (j = L1; j <= L2; j++) {
       for (k = 1; k <= nz - 2; k++) {
@@ -927,7 +927,7 @@ c   eta-direction flux differences
     }
   }
 
-#pragma omp for
+#pragma omp for schedule(runtime) 
   for (i = ist; i <= iend; i++) {
     for (k = 1; k <= nz - 2; k++) {
       for (j = jst; j <= jend; j++) {
@@ -1037,7 +1037,7 @@ c   fourth-order dissipation
 /*--------------------------------------------------------------------
 c   zeta-direction flux differences
 --------------------------------------------------------------------*/
-#pragma omp for
+#pragma omp for schedule(runtime) collapse(2)
   for (i = ist; i <= iend; i++) {
     for (j = jst; j <= jend; j++) {
       for (k = 0; k <= nz-1; k++) {
@@ -1257,7 +1257,7 @@ c  local variables
   c1345 = C1 * C3 * C4 * C5;
   c34 = C3 * C4;
 
-#pragma omp for nowait schedule(static)
+#pragma omp for nowait schedule(runtime) collapse(2)
   for (i = ist; i <= iend; i++) {
     for (j = jst; j <= jend; j++) {
 
@@ -1625,7 +1625,7 @@ c  local variables
   c1345 = C1 * C3 * C4 * C5;
   c34 = C3 * C4;
 
-#pragma omp for nowait schedule(static)
+#pragma omp for nowait schedule(runtime) collapse(2)
 #if defined(_OPENMP)  
   for (i = iend; i >= ist; i--) {
       for (j = jend; j >= jst; j--) {
@@ -2006,7 +2006,7 @@ c  local variables
     sum[m] = 0.0;
   }
 
-#pragma omp for nowait
+#pragma omp for nowait schedule(runtime) collapse(3)
   for (i = ist; i <= iend; i++) {
     for (j = jst; j <= jend; j++) {
       for (k = 1; k <= nz0-2; k++) {
@@ -2352,7 +2352,7 @@ c  local variables
   double  u21jm1, u31jm1, u41jm1, u51jm1;
   double  u21km1, u31km1, u41km1, u51km1;
 
-#pragma omp for  
+#pragma omp for schedule(runtime) collapse(3)
   for (i = 0; i <= nx-1; i++) {
     for (j = 0; j <= ny-1; j++) {
       for (k = 0; k <= nz-1; k++) {
@@ -2370,7 +2370,7 @@ c   xi-direction flux differences
   L1 = 0;
   L2 = nx-1;
 
-#pragma omp for  
+#pragma omp for  schedule(runtime) collapse(3) 
   for (i = L1; i <= L2; i++) {
     for (j = jst; j <= jend; j++) {
       for (k = 1; k <= nz - 2; k++) {
@@ -2391,7 +2391,7 @@ c   xi-direction flux differences
     } 
   } 
 
-#pragma omp for  
+#pragma omp for schedule(runtime) collapse(2)
   for (j = jst; j <= jend; j++) {
     for (k = 1; k <= nz - 2; k++) {
       for (i = ist; i <= iend; i++) {
@@ -2507,7 +2507,7 @@ c   eta-direction flux differences
   L1 = 0;
   L2 = ny-1;
 
-#pragma omp for  
+#pragma omp for schedule(runtime) collapse(3) 
   for (i = ist; i <= iend; i++) {
     for (j = L1; j <= L2; j++) {
       for (k = 1; k <= nz - 2; k++) {
@@ -2527,7 +2527,7 @@ c   eta-direction flux differences
     }
   }
 
-#pragma omp for  
+#pragma omp for  schedule(runtime) collapse(2)
   for (i = ist; i <= iend; i++) {
     for (k = 1; k <= nz - 2; k++) {
       for (j = jst; j <= jend; j++) {
@@ -2641,7 +2641,7 @@ c   fourth-order dissipation
 /*--------------------------------------------------------------------
 c   zeta-direction flux differences
 --------------------------------------------------------------------*/
-#pragma omp for  
+#pragma omp for schedule(runtime) collapse(2)
   for (i = ist; i <= iend; i++) {
     for (j = jst; j <= jend; j++) {
       for (k = 0; k <= nz-1; k++) {
@@ -2783,7 +2783,7 @@ c   local variables
 /*--------------------------------------------------------------------
 c   set the dependent variable values along the top and bottom faces
 --------------------------------------------------------------------*/
-#pragma omp for
+#pragma omp for schedule(runtime) 
   for (i = 0; i < nx; i++) {
     iglob = i;
     for (j = 0; j < ny; j++) {
@@ -2796,7 +2796,7 @@ c   set the dependent variable values along the top and bottom faces
 /*--------------------------------------------------------------------
 c   set the dependent variable values along north and south faces
 --------------------------------------------------------------------*/
-#pragma omp for
+#pragma omp for schedule(runtime) 
   for (i = 0; i < nx; i++) {
     iglob = i;
     for (k = 0; k < nz; k++) {
@@ -2804,7 +2804,7 @@ c   set the dependent variable values along north and south faces
     }
   }
 
-#pragma omp for
+#pragma omp for schedule(runtime) 
   for (i = 0; i < nx; i++) {
     iglob = i;
     for (k = 0; k < nz; k++) {
@@ -2815,7 +2815,7 @@ c   set the dependent variable values along north and south faces
 /*--------------------------------------------------------------------
 c   set the dependent variable values along east and west faces
 --------------------------------------------------------------------*/
-#pragma omp for
+#pragma omp for schedule(runtime) 
   for (j = 0; j < ny; j++) {
     jglob = j;
     for (k = 0; k < nz; k++) {
@@ -2823,7 +2823,7 @@ c   set the dependent variable values along east and west faces
     }
   }
 
-#pragma omp for
+#pragma omp for schedule(runtime) 
   for (j = 0; j < ny; j++) {
     jglob = j;
     for (k = 0; k < nz; k++) {
@@ -3002,7 +3002,7 @@ c  local variables
   double  ue_1jk[5],ue_nx0jk[5],ue_i1k[5],
     ue_iny0k[5],ue_ij1[5],ue_ijnz[5];
 
-#pragma omp for
+#pragma omp for schedule(runtime) 
   for (j = 0; j < ny; j++) {
     jglob = j;
     for (k = 1; k < nz - 1; k++) {
@@ -3115,7 +3115,7 @@ c   the timestep loop
 /*--------------------------------------------------------------------
 c   perform SSOR iteration
 --------------------------------------------------------------------*/
-#pragma omp for    
+#pragma omp for schedule(runtime) collapse(3)   
     for (i = ist; i <= iend; i++) {
       for (j = jst; j <= jend; j++) {
 	for (k = 1; k <= nz - 2; k++) {
@@ -3167,7 +3167,7 @@ c   perform the upper triangular solution
 c   update the variables
 --------------------------------------------------------------------*/
 
-#pragma omp for
+#pragma omp for schedule(runtime) collapse(3)
     for (i = ist; i <= iend; i++) {
       for (j = jst; j <= jend; j++) {
 	for (k = 1; k <= nz-2; k++) {
