@@ -171,13 +171,13 @@ function bosched_mode(loop_states, time_samples, subsize, P, quant, extra)
 
         y       /= (loop["N"] / P)
 
+        time_max = 1
         if(extra < 0)
             x        = x[1:1, :]
             y        = sum(y, dims=1)
         else
+            time_max = extra
         end
-
-        time_max = size(x, 1)
 
         θ_next, θ_mean, acq_opt, mean_opt = LABO.labo(
             x, -y, time_max, time_samples,
@@ -236,11 +236,12 @@ function visualize_gp(loop_states, time_samples, subsize, P, quant, extra)
         y       /= (loop["N"] / P)
         time_max = size(x, 1)
 
+        time_max = 1
         if(extra < 0)
             x        = x[1:1, :]
             y        = sum(y, dims=1)
-            time_max = size(x, 1)
         else
+            time_max = extra
         end
 
         d = Dict()
@@ -303,6 +304,7 @@ function visualize_gp(loop_states, time_samples, subsize, P, quant, extra)
         elseif(options[choice] == "exit")
             exit()
         end
+        #return d[:gp]
     end
 end
 

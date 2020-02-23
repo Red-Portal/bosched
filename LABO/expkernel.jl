@@ -57,7 +57,7 @@ end
         γ = (β / (t + β))
         return kern.σ2 * α * γ^α * (1 - γ)
     elseif p==3
-        return @views 2*cov(kern, X1[1,i] + X2[1,j])
+        return @views 2*cov(kern, X1[1:1,i], X2[1:1,j])
     else
     end
 end

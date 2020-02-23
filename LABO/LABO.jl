@@ -60,7 +60,6 @@ function optimize_mean(gp, verbose::Bool=true)
     opt = NLopt.Opt(:GN_DIRECT, dim)
     opt.lower_bounds  = [0.0]
     opt.upper_bounds  = [1.0]
-    #opt.ftol_abs      = 1e-20
     opt.xtol_abs      = 1e-3
     opt.maxeval       = 2^11
     opt.max_objective = f
@@ -121,53 +120,78 @@ function build_gp(data_x, data_y, time_idx, verbose::Bool=true)
             k_x = Mat52Iso(exp(-2.0), exp(1.0), [Normal(-2.0, 2.0), Normal(0.0, 2.0)])
             k   = Masked(k_x, [2])
         else
-            # Sum Kernel
+            # # Sum Kernel
             # k_x = Mat52Iso(exp(-2.0), exp(0.0),
             #                [Normal(-2.0, 2.0), Normal(0.0, 2.0)])
             # k_x = Masked(k_x, [2])
 
+            # k_t = Exp(exp(-2.0), exp(0.0), exp(0.0),
+            #             [Normal(-2.0, 2.0),Normal(0.0, 2.0), Normal(-2.0, 2.0)])
+            # k_t = Masked(k_t, [1])
+            # k   = (k_x + k_t)
+
+            # # Product Kernel
+            # k_x = Mat52Iso(exp(-2.0), exp(0.0),
+            #                [Normal(-2.0, 2.0), Normal(0.0, 2.0)])
+            # k_x = fix(k_x, :lσ)
+            # k_x = Masked(k_x, [2])
+
             # k_t1 = Exp(exp(-2.0), exp(0.0), exp(0.0),
-            #             [Normal(-2.0, 2.0), Normal(0.0, 2.0), Normal(0.0, 2.0)])
-            # k_t2 = Mat52Iso(√(time_idx[2]), exp(0.0),
-            #                 [Normal(log(time_idx[end]/4), log(time_idx[end]/2)),
-            #                  Normal(0.0, 2.0)])
+            #             [Normal(-2.0, 2.0),Normal(0.0, 2.0), Normal(0.0, 2.0)])
+            # k_t1 = fix(k_t1, :lσ)
+
+            # k_t2 = Mat52Iso(exp(1.0), exp(0.0),
+            #                [Normal(log(time_idx[end]/2), log(time_idx[end]/2)),
+            #                 Normal(0.0, 2.0)])
             # k_t  = k_t1 + k_t2
             # k_t  = Masked(k_t, [1])
-            # k    = (k_x + k_t)
+            # k    = (k_x * k_t) * Const(exp(0.0), [Normal(0.0, 2.0)])
 
             # Product Kernel
-            k_x = Mat52Iso(exp(-2.0), exp(0.0),
-                           [Normal(-2.0, 2.0), Normal(0.0, 2.0)])
-            k_x = fix(k_x, :lσ)
-            k_x = Masked(k_x, [2])
+            # k   = Mat52Ard([exp(log(time_idx[end]/2)), exp(0.0)], exp(0.0),
+            #                [Normal(log(time_idx[end]/2), log(time_idx[end]/2)),
+            #                 Normal(-2.0, 2.0),
+            #                 Normal(0.0, 2.0)])
+            # k_t = Exp(exp(-2.0), exp(0.0), exp(0.0),
+            #           [Normal(-2.0, 2.0),Normal(0.0, 2.0), Normal(0.0, 2.0)])
+            # k_t = fix(k_t, :lσ)
+            # k   = (k * k_t)
 
-            k_t1 = Exp(exp(-2.0), exp(0.0), exp(0.0),
-                        [Normal(-2.0, 2.0),Normal(0.0, 2.0), Normal(0.0, 2.0)])
-            k_t1 = fix(k_t1, :lσ)
+            # Sum Kernel
+            k   = Mat52Ard([exp(log(time_idx[end]/2)), exp(0.0)], exp(0.0),
+                           [Normal(log(time_idx[end]/2), log(time_idx[end]/2)),
+                            Normal(-2.0, 2.0),
+                            Normal(0.0, 2.0)])
+            k_t = Exp(exp(-2.0), exp(0.0), exp(0.0),
+                      [Normal(-2.0, 2.0),Normal(0.0, 2.0), Normal(0.0, 2.0)])
+            k_t = Masked(k_t, [1])
+            k   = k + k_t
 
-            k_t2 = Mat52Iso(exp(1.0), exp(0.0),
-                            [Normal(log(time_idx[end]/2), log(time_idx[end]/2)),
-                             Normal(0.0, 2.0)])
-            k_t2 = fix(k_t2, :lσ)
-            k_t  = k_t1 + k_t2
-            k_t  = Masked(k_t, [1])
-            k    = (k_x * k_t) * Const(exp(0.0), [Normal(0.0, 2.0)])
+            # # Sum Kernel
+            # k   = Mat52Ard([exp(log(time_idx[end]/2)), exp(0.0)], exp(0.0),
+            #                [Normal(log(time_idx[end]/2), log(time_idx[end]/2)),
+            #                 Normal(-2.0, 2.0),
+            #                 Normal(0.0, 2.0)])
+            # k_t = Exp(exp(-2.0), exp(0.0), exp(0.0),
+            #           [Normal(-2.0, 2.0),Normal(0.0, 2.0), Normal(0.0, 2.0)])
+            # k_t = Masked(k_t, [1])
+            # k   = k + k_t
         end
     end
-
+    println(size(data_x))
     m    = MeanZero()
     ϵ    = -1.0
     gp   = GP(data_x, data_y, m, k, ϵ)
     set_priors!(gp.logNoise, [Normal(-2.0, 2.0)])
     #gp   = ess(gp, num_samples=2^10, num_adapts=2^10, thinning=2^2, verbose=verbose)
 
-    # gp   = multistart_optimize!(gp, 32)
-    gp   = nuts(gp, num_samples=1024, num_adapts=1024,
-                thinning=4, verbose=verbose)
+    gp   = multistart_optimize!(gp, 32)
+    # gp   = nuts(gp, num_samples=1024, num_adapts=1024,
+    #             thinning=4, verbose=verbose)
     #GaussianProcesses.optimize!(gp)
     #println(gp)
-    #gp   = slice(gp, num_samples=1024, num_adapts=512,
-    #             thinning=4, width=4.0, verbose=verbose)
+    # gp   = slice(gp, num_samples=1024, num_adapts=512,
+    #              thinning=4, width=4.0, verbose=verbose)
 end
 
 function data_preprocess(data_x, data_y, time_idx;
@@ -189,14 +213,15 @@ function data_preprocess(data_x, data_y, time_idx;
         data_y = convert(Array{Float64}, data_y)
     end
 
-    data_x = data_x[time_idx, :]
-    data_y = data_y[time_idx, :]
+    data_x = data_x[time_idx[1:end-1], :]
+    data_y = data_y[time_idx[1:end-1], :]
     data_x = vcat(data_x...)'
     data_y = vcat(data_y...)
 
-    @assert size(data_x, 2) % length(time_idx) == 0
-    num_data = floor(Int64, size(data_x, 2) / length(time_idx))
-    iter_axe = vcat(repeat(time_idx, num_data))
+    present_idx = time_idx[1:end-1]
+    @assert size(data_x, 2) % length(present_idx) == 0
+    num_data = floor(Int64, size(data_x, 2) / length(present_idx))
+    iter_axe = vcat(repeat(present_idx, num_data))
     data_x   = hcat(iter_axe, data_x[1,:])
 
     data_y = whiten(data_y)
@@ -282,16 +307,14 @@ function debug_bo(time_points::Int64=4)
     return a, b, d
 end
 
-function time_quantization(time_max::Int64,
+function time_quantization(extrapol_idx::Int64,
+                           time_max::Int64,
                            time_samples::Int64,
                            uniform_quant::Bool)
     time_idx = []
     time_w   = []
     if(time_max <= time_samples)
         time_idx = collect(1:time_max)
-        N        = length(time_idx)
-        time_w   = ones(N) / N
-        return time_idx, time_w
     end
 
     if(uniform_quant)
@@ -299,31 +322,29 @@ function time_quantization(time_max::Int64,
     else
         time_idx = range(1, stop=log2(time_max), length=time_samples)
         time_idx = 2.0.^time_idx
+        time_idx = round.(Int64, time_idx, RoundNearest)
         time_idx[1] = 1.0
     end
-    time_idx = round.(Int64, time_idx, RoundNearest)
+    time_idx = vcat(time_idx, extrapol_idx)
     N        = length(time_idx)
 
-    if(uniform_quant)
-        time_w = ones(N) * time_max / N
-    else
-        time_w    = zeros(N)
-        time_w[1] = 1
-        for i = 2:N
-            time_w[i] = time_idx[i] - time_idx[i-1]
-            @assert time_w[i] > 0.0
-        end
+    time_w    = zeros(N)
+    time_w[1] = 1
+    for i = 2:N
+        time_w[i] = time_idx[i] - time_idx[i-1]
+        @assert time_w[i] > 0.0
     end
     time_idx, time_w
 end
 
-function labo(data_x, data_y, time_max, time_samples, subsample;
+function labo(data_x, data_y, extra, time_samples, subsample;
               verbose::Bool=true,
               legacy::Bool=false,
               uniform_quant::Bool=true,
               logdict=nothing)
     η = maximum(data_y)
-    time_idx, time_w = time_quantization(time_max, time_samples, uniform_quant)
+    time_idx, time_w = time_quantization(extra, size(data_y, 1),
+                                         time_samples, uniform_quant)
     data_x, data_y = data_preprocess(data_x, data_y, time_idx,
                                      verbose=true, legacy=legacy)
 
@@ -334,7 +355,7 @@ function labo(data_x, data_y, time_max, time_samples, subsample;
         println("- sampling y*")
     end
     P         = length(gp.non_marg_gp.weights)
-    num_ystar = 128
+    num_ystar = 32
     num_gridx = 1024
     ηs        = zeros(num_ystar, P)
     for i in P
@@ -385,7 +406,7 @@ function labo(data_x, data_y, time_max, time_samples, subsample;
         logdict[:tmgp_std]  = sqrt.(σ²)
 
         x     = range(0.0, stop=1.0, length=50)
-        t     = range(1.0, stop=time_max, length=50)
+        t     = range(1.0, stop=extra, length=50)
         xgrid = repeat(x', 50, 1)
         tgrid = repeat(t, 1, 50)
         tx    = vcat(vec(tgrid)', vec(xgrid)')
