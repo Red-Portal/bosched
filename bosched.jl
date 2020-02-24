@@ -172,7 +172,7 @@ function bosched_mode(loop_states, time_samples, subsize, P, quant, extra)
         y       /= (loop["N"] / P)
 
         time_max = 1
-        if(extra < 0)
+        if(extra < 0 || size(y, 1) < time_samples)
             x        = x[1:1, :]
             y        = sum(y, dims=1)
         else
@@ -237,7 +237,7 @@ function visualize_gp(loop_states, time_samples, subsize, P, quant, extra)
         time_max = size(x, 1)
 
         time_max = 1
-        if(extra < 0)
+        if(extra < 0 || size(y, 1) < time_samples)
             x        = x[1:1, :]
             y        = sum(y, dims=1)
         else
