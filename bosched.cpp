@@ -22,6 +22,7 @@
 #include <random>
 #include <thread>
 #include <unordered_map>
+#include <mpi.h>
 
 extern char const* __progname;
 
@@ -31,7 +32,7 @@ bool _is_bo_schedule = false;
 bool _is_new_file    = false;
 bool _profile_loop   = false;
 bool _is_eval        = false;
-bool _random_extrplt = false;
+//bool _random_extrplt = false;
 std::mt19937   _rng __attribute__((init_priority(101)));
 nlohmann::json _stats       __attribute__((init_priority(101)));
 std::unordered_map<size_t, bosched::loop_state_t>    _loop_states __attribute__((init_priority(101)));
@@ -100,17 +101,10 @@ extern "C"
 	    }
 	    stream.close();
 
-	    if(getenv("EXTRA"))
+	    for(auto& [key, val] : _loop_states )
 	    {
-		_random_extrplt = true;
-	    }
-	    else
-	    {
-		for(auto& [key, val] : _loop_states )
-		{
-		    if(val.warming_up)
-			val.param = bosched::warmup_next_param();
-		}
+		if(val.warming_up)
+		    val.param = bosched::warmup_next_param();
 	    }
 	}
 
@@ -152,6 +146,15 @@ extern "C"
 
         if(_is_eval)
             return;
+
+	// int mpi_init = 0;
+	// MPI_Initialized(&mpi_init);
+	// if(static_cast<bool>(mpi_init)) 
+	// {
+	//     MPI_Comm_rank(comm)
+	//     if()
+	// 	return;
+	// }
 
         if(_profile_loop)
         {
@@ -299,10 +302,10 @@ extern "C"
 	    {
 		loop_state.param = loop_state.eval_param;
 	    }
-	    else if(loop_state.warming_up && _random_extrplt)
-	    {
-		loop_state.param = bosched::warmup_next_param();
-	    }
+	    // else if(loop_state.warming_up && _random_extrplt)
+	    // {
+	    // 	loop_state.param = bosched::warmup_next_param();
+	    // }
 	}
 	double param = loop_state.param;
 
