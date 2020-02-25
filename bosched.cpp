@@ -22,7 +22,7 @@
 #include <random>
 #include <thread>
 #include <unordered_map>
-#include <mpi.h>
+//#include <mpi.h>
 
 extern char const* __progname;
 
