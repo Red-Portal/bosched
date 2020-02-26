@@ -23,22 +23,27 @@ end
 GaussianProcesses.num_params(kern::Exp) = 3
 
 function GaussianProcesses.cov(kern::Exp, x::AbstractVector, y::AbstractVector)
-    β  = kern.β
-    α  = kern.α
-    σ2 = kern.σ2
-    return σ2*(β ./ (x[1] + y[1] .+ β)).^α
+    β    = kern.β
+    α    = kern.α
+    σ2   = kern.σ2
+    k    = σ2*(β ./ (x[1] + y[1] .+ β)).^α
+    k
 end
 
-function GaussianProcesses.cov(kern::Exp,
-                               X::AbstractMatrix,
-                               Y::AbstractMatrix,
-                               data::GaussianProcesses.KernelData)
-    β  = kern.β
-    α  = kern.α
-    σ2 = kern.σ2
-    @views K_t = σ2 * (β ./ (X[1,:] .+ Y[1,:]' .+ β)).^α
-    K_t
-end
+# function GaussianProcesses.cov(kern::Exp,
+#                                X::AbstractMatrix,
+#                                Y::AbstractMatrix,
+#                                data::GaussianProcesses.KernelData)
+#     β  = kern.β
+#     α  = kern.α
+#     σ2 = kern.σ2
+#     @views T    = X[1,:] .+ Y[1,:]'
+#     @views mask = Int64.(X[2:end,:] == Y[2:end,:])
+#     mask = mask .* mask'
+#     K_t  = σ2 * (β ./ (T .+ β)).^α
+#     K_t .* mask
+#     @info K_t mask
+# end
 
 @inline function GaussianProcesses.dKij_dθp(kern::Exp,
                                             X1::AbstractMatrix,

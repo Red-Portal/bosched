@@ -172,8 +172,8 @@ function data_preprocess(data_x, data_y, time_idx;
 
     if(extrapolating)
         time_idx = time_idx[1:end-1]
-        data_x = data_x[time_idx[1:end-1], :]
-        data_y = data_y[time_idx[1:end-1], :]
+        data_x = data_x[time_idx, :]
+        data_y = data_y[time_idx, :]
     end
 
     data_x = vcat(data_x...)'
