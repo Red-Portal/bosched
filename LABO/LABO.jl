@@ -43,10 +43,10 @@ function optimize_acquisition(gp, verbose::Bool=true)
     opt_y, opt_x, ret = NLopt.optimize(opt, rand(dim))
 
     if(verbose)
-        println("----------------------------------")
-        println("Acquisition optimizer = ", opt_x)
-        println("Acquisition optimum   = ", opt_y)
-        println("Result                = ", ret)
+        @info("Acquisition optimization result",
+              acquisition_optimizer = opt_x,
+              acquisition_optimum = opt_y,
+              status = ret)
     end
     return opt_x[1], opt_y
 end
@@ -65,10 +65,10 @@ function optimize_mean(gp, verbose::Bool=true)
     opt.max_objective = f
     opt_y, opt_x, ret = NLopt.optimize(opt, rand(dim))
     if(verbose)
-        println("----------------------------------")
-        println("Mean optimizer = ", opt_x)
-        println("Mean optimum   = ", opt_y)
-        println("Result         = ", ret)
+        @info("Mean optimization result",
+              mean_optimizer=opt_x,
+              mean_optimum = opt_y,
+              status = ret)
     end
     return opt_x[1], opt_y
 end
@@ -120,78 +120,44 @@ function build_gp(data_x, data_y, time_idx, verbose::Bool=true)
             k_x = Mat52Iso(exp(-2.0), exp(1.0), [Normal(-2.0, 2.0), Normal(0.0, 2.0)])
             k   = Masked(k_x, [2])
         else
-            # # Sum Kernel
-            # k_x = Mat52Iso(exp(-2.0), exp(0.0),
-            #                [Normal(-2.0, 2.0), Normal(0.0, 2.0)])
-            # k_x = Masked(k_x, [2])
-
-            # k_t = Exp(exp(-2.0), exp(0.0), exp(0.0),
-            #             [Normal(-2.0, 2.0),Normal(0.0, 2.0), Normal(-2.0, 2.0)])
-            # k_t = Masked(k_t, [1])
-            # k   = (k_x + k_t)
-
-            # # Product Kernel
-            # k_x = Mat52Iso(exp(-2.0), exp(0.0),
-            #                [Normal(-2.0, 2.0), Normal(0.0, 2.0)])
-            # k_x = fix(k_x, :lσ)
-            # k_x = Masked(k_x, [2])
-
-            # k_t1 = Exp(exp(-2.0), exp(0.0), exp(0.0),
-            #             [Normal(-2.0, 2.0),Normal(0.0, 2.0), Normal(0.0, 2.0)])
-            # k_t1 = fix(k_t1, :lσ)
-
-            # k_t2 = Mat52Iso(exp(1.0), exp(0.0),
-            #                [Normal(log(time_idx[end]/2), log(time_idx[end]/2)),
-            #                 Normal(0.0, 2.0)])
-            # k_t  = k_t1 + k_t2
-            # k_t  = Masked(k_t, [1])
-            # k    = (k_x * k_t) * Const(exp(0.0), [Normal(0.0, 2.0)])
-
-            # Product Kernel
-            # k   = Mat52Ard([exp(log(time_idx[end]/2)), exp(0.0)], exp(0.0),
-            #                [Normal(log(time_idx[end]/2), log(time_idx[end]/2)),
-            #                 Normal(-2.0, 2.0),
-            #                 Normal(0.0, 2.0)])
-            # k_t = Exp(exp(-2.0), exp(0.0), exp(0.0),
-            #           [Normal(-2.0, 2.0),Normal(0.0, 2.0), Normal(0.0, 2.0)])
-            # k_t = fix(k_t, :lσ)
-            # k   = (k * k_t)
-
             # Sum Kernel
-            k   = Mat52Ard([exp(log(time_idx[end]/2)), exp(0.0)], exp(0.0),
-                           [Normal(log(time_idx[end]/2), log(time_idx[end]/2)),
-                            Normal(-2.0, 2.0),
-                            Normal(0.0, 2.0)])
+            # k = Mat52Ard([exp(1.0), exp(-2.0)], exp(0.0),
+            #              [Normal(4.0, 16.0), Normal(-2.0, 2.0), Normal(0.0, 2.0)])
+
+            k_x = Mat52Iso(exp(-2.0), exp(0.0),
+                           [Normal(-2.0, 2.0), Normal(0.0, 2.0)])
+            k_x = Masked(k_x, [2])
+
             k_t = Exp(exp(-2.0), exp(0.0), exp(0.0),
                       [Normal(-2.0, 2.0),Normal(0.0, 2.0), Normal(0.0, 2.0)])
+            k_t = fix(k_t, :lσ)
             k_t = Masked(k_t, [1])
-            k   = k + k_t
 
-            # # Sum Kernel
-            # k   = Mat52Ard([exp(log(time_idx[end]/2)), exp(0.0)], exp(0.0),
-            #                [Normal(log(time_idx[end]/2), log(time_idx[end]/2)),
-            #                 Normal(-2.0, 2.0),
-            #                 Normal(0.0, 2.0)])
-            # k_t = Exp(exp(-2.0), exp(0.0), exp(0.0),
-            #           [Normal(-2.0, 2.0),Normal(0.0, 2.0), Normal(0.0, 2.0)])
-            # k_t = Masked(k_t, [1])
-            # k   = k + k_t
+            # α   = Const(log.(4.0) / 2, [Normal(0.0, 2.0)])
+            # α   = fix(α, :lσ)
+            # k   = (α*k_x + k_t)
+
+            k = k_x + k_t
         end
     end
     println(size(data_x))
-    m    = MeanZero()
-    ϵ    = -1.0
+    println(size(data_y))
+    m    = MeanConst(0.0)
+    ϵ    = -2.0
     gp   = GP(data_x, data_y, m, k, ϵ)
     set_priors!(gp.logNoise, [Normal(-2.0, 2.0)])
-    #gp   = ess(gp, num_samples=2^10, num_adapts=2^10, thinning=2^2, verbose=verbose)
 
-    gp   = multistart_optimize!(gp, 32)
-    # gp   = nuts(gp, num_samples=1024, num_adapts=1024,
-    #             thinning=4, verbose=verbose)
+    #gp   = ess(gp, num_samples=2^10, num_adapts=2^10, thinning=2^2, verbose=verbose)
+    gp = nuts(gp, num_samples=512, num_adapts=512,
+                thinning=2, verbose=verbose)
+    K  = mean([g.cK.mat for g in gp.gp])
+    display(Plots.heatmap(K))
+
     #GaussianProcesses.optimize!(gp)
     #println(gp)
     # gp   = slice(gp, num_samples=1024, num_adapts=512,
     #              thinning=4, width=4.0, verbose=verbose)
+    return gp
 end
 
 function data_preprocess(data_x, data_y, time_idx;
@@ -199,44 +165,31 @@ function data_preprocess(data_x, data_y, time_idx;
                          legacy::Bool=false,
                          samples::Int64=4)
     if(verbose)
-        println("- data preprocess")
+        @info "Preprocessing data"
     end
 
-    if(legacy)
-        data_x = vcat(data_x...)
-        data_y = vcat(data_y...)
+    extrapolating = size(data_x, 1) < time_idx[end]
 
-        data_x = hcat(data_x...)
-        data_y = hcat(data_y...)
-
-        data_x = convert(Array{Float64}, data_x)
-        data_y = convert(Array{Float64}, data_y)
+    if(extrapolating)
+        time_idx = time_idx[1:end-1]
+        data_x = data_x[time_idx[1:end-1], :]
+        data_y = data_y[time_idx[1:end-1], :]
     end
 
-    data_x = data_x[time_idx[1:end-1], :]
-    data_y = data_y[time_idx[1:end-1], :]
     data_x = vcat(data_x...)'
     data_y = vcat(data_y...)
 
-    present_idx = time_idx[1:end-1]
-    @assert size(data_x, 2) % length(present_idx) == 0
-    num_data = floor(Int64, size(data_x, 2) / length(present_idx))
-    iter_axe = vcat(repeat(present_idx, num_data))
+    num_data = floor(Int64, size(data_x, 2) / length(time_idx))
+    iter_axe = vcat(repeat(time_idx, num_data))
     data_x   = hcat(iter_axe, data_x[1,:])
 
     data_y = whiten(data_y)
     data_x = Array(data_x')
-
-    if(verbose)
-        println("- data preprocess - done")
-    end
     return data_x, data_y
 end
 
 function fit_surrogate(data_x, data_y, time_idx, subsample, verbose=true)
-    iters = length(time_idx)
     idx   = zeros(subsample)
-
     ndata = size(data_x,2)
     if(ndata > subsample)
         StatsBase.knuths_sample!(1:ndata, idx)
@@ -244,17 +197,13 @@ function fit_surrogate(data_x, data_y, time_idx, subsample, verbose=true)
 
         data_x = data_x[:,idx]
         data_y = data_y[idx]
-        println("- subsampling $(subsample) samples from $(ndata) samples")
+        @info "subsampling $(subsample) samples from $(ndata) samples"
     end
 
     if(verbose)
-        println("- fit gp")
+        @info "Fitting gaussian process"
     end
     gp = build_gp(data_x, data_y, time_idx, verbose)
-    if(verbose)
-        println("- fit gp - done")
-    end
-    gp
 end
 
 function debug_gp(;uniform_quant=false, time_samples=4)
@@ -315,13 +264,15 @@ function time_quantization(extrapol_idx::Int64,
     time_w   = []
     if(time_max <= time_samples)
         time_idx = collect(1:time_max)
+        N = length(time_idx)
+        return time_idx, ones(N) / N
     end
 
     if(uniform_quant)
         time_idx = range(1, stop=time_max, length=time_samples)
     else
-        time_idx = range(1, stop=log2(time_max), length=time_samples)
-        time_idx = 2.0.^time_idx
+        time_idx = range(1, stop=log(time_max), length=time_samples)
+        time_idx = ℯ.^time_idx
         time_idx = round.(Int64, time_idx, RoundNearest)
         time_idx[1] = 1.0
     end
@@ -352,7 +303,7 @@ function labo(data_x, data_y, extra, time_samples, subsample;
     gp = TimeMarginalizedGP(gp, time_idx, time_w)
 
     if(verbose)
-        println("- sampling y*")
+        @info "Sampling y*"
     end
     P         = length(gp.non_marg_gp.weights)
     num_ystar = 32
@@ -362,25 +313,16 @@ function labo(data_x, data_y, extra, time_samples, subsample;
         ηs[:,i] = sample_ystar(η, num_ystar, num_gridx, gp.non_marg_gp.gp[i])
     end
     gp.non_marg_gp.η = ηs
-    if(verbose)
-        println("- sampling y* - done")
-    end
 
     if(verbose)
-        println("- optimize acquisition")
+        @info "Optimizing acquisition"
     end
     θ_next, acq_opt = optimize_acquisition(gp, verbose)
-    if(verbose)
-        println("- optimize acquisition - done")
-    end
 
     if(verbose)
-        println("- optimize mean")
+        @info "Optimizing mean"
     end
     θ_mean, mean_opt = optimize_mean(gp, verbose)
-    if(verbose)
-        println("- optimize mean - done")
-    end
 
     if(logdict != nothing)
         logα(x) = log(acquisition(x, gp))

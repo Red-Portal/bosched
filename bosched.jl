@@ -76,6 +76,10 @@ function cmd_args(args, show)
         help     = "Extrapolate loop executions"
         arg_type = Int64
         default  = -1
+        "--threshold"
+        help     = "Extrapolation threshold"
+        arg_type = Int64
+        default  = -1
         "name"
         arg_type = String
         help     = "Name of workload executable."
@@ -115,18 +119,13 @@ function classic_mode(workload_profile, loop_states, h, P)
 
         d    = Dict()
         prof = compute_workload_profile(arr)
-        #println(prof)
         d["css"]    = h / σ
         d["fss"]    = μ / σ
         d["binlpt"] = binlpt_balance(prof, P, 2 * P)
         d["hss"]    = stretch(prof, 0, 255)
         loop["params"] = d
 
-        println("----- $(loop["id"]) classic mode -----")
-        println(" μ   = $μ")
-        println(" σ   = $σ")
-        println(" css = $(d["css"])")
-        println(" fss = $(d["fss"])\n")
+        @info "$(loop["id"]) classic mode " μ σ css=d["css"] fss=d["fss"]
     end
     return loop_states
 end
@@ -145,13 +144,13 @@ function update_dataset(loop_state)
     return loop_state
 end
 
-function bosched_mode(loop_states, time_samples, subsize, P, quant, extra)
+function bosched_mode(loop_states, time_samples, subsize, P, quant, extra, thres)
     for loop in loop_states
         if(loop["id"] == 0 || loop["N"] == 0) 
             continue
         end
 
-        println("----- $(loop["id"]) bosched mode -----")
+        @info "Processing loop $(loop["id"]) bosched mode"
         loop  = update_dataset(loop)
         x, y  = loop["hist_x"], loop["hist_y"]
 
@@ -164,19 +163,22 @@ function bosched_mode(loop_states, time_samples, subsize, P, quant, extra)
         y  = hcat(y...)
         x  = convert(Array{Float64}, x)
         y  = convert(Array{Float64}, y)
-
-        println(size(x))
-        println(size(y))
         @assert size(x) == size(y)
 
         y       /= (loop["N"] / P)
 
         time_max = 1
-        if(extra < 0 || size(y, 1) < time_samples)
+        if(extra < 0 || size(y, 1) < thres)
             x        = x[1:1, :]
             y        = sum(y, dims=1)
+            @info "No extrapolation"
+        elseif(size(y, 1) > thres)
+            factor   = size(y, 1) / thres
+            time_max = ceil(Int64, factor*extra)
+            @info "Extrapolating $(size(y, 1)) × $factor → $time_max"
         else
             time_max = extra
+            @info "Extrapolating $(size(y, 1)) → $time_max"
         end
 
         θ_next, θ_mean, acq_opt, mean_opt = LABO.labo(
@@ -193,15 +195,16 @@ function bosched_mode(loop_states, time_samples, subsize, P, quant, extra)
         loop["param"]       = θ_next
         loop["warmup"]      = false
 
-        println(" best param until now = $(θ_hist)")
-        println(" predicted optimum    = $(θ_mean), optimum mean = $(mean_opt)")
-        println(" next query point     = $(θ_next), acquisition  = $(acq_opt)")
-        println(" number of data point = $(size(x, 2))")
+        @info best_param_until_now = θ_hist \
+            predicted_optimum = θ_mean \
+            optimum_mean = mean_opt  \
+            next_query_point = θ_next acquisition=acq_opt \
+            number_of_data_points = size(x, 2)
     end
     return loop_states
 end
 
-function visualize_gp(loop_states, time_samples, subsize, P, quant, extra)
+function visualize_gp(loop_states, time_samples, subsize, P, quant, extra, thres)
     #pyplot()
     #uimodes  = ["GUI", "CUI"]
     #uimenu   = RadioMenu(uimodes, pagesize=2)
@@ -237,11 +240,17 @@ function visualize_gp(loop_states, time_samples, subsize, P, quant, extra)
         time_max = size(x, 1)
 
         time_max = 1
-        if(extra < 0 || size(y, 1) < time_samples)
+        if(extra < 0 || size(y, 1) < thres)
             x        = x[1:1, :]
             y        = sum(y, dims=1)
+            @info "No extrapolation"
+        elseif(size(y, 1) > thres)
+            factor   = size(y, 1) / thres
+            time_max = ceil(Int64, factor*extra)
+            @info "Extrapolating $(size(y, 1)) → $(extra) × $factor = $time_max"
         else
             time_max = extra
+            @info "Extrapolating $(size(y, 1)) → $time_max"
         end
 
         d = Dict()
@@ -249,6 +258,11 @@ function visualize_gp(loop_states, time_samples, subsize, P, quant, extra)
             x, -y,
             time_max, time_samples,
             subsize, verbose=true, logdict=d, uniform_quant=quant)
+        # gp = LABO.labo(
+        #     x, -y, time_max, time_samples,
+        #     subsize, verbose=true, uniform_quant=quant)
+        # return gp
+
 
         #vischoice = request("choose GP visualization mode:", gpmenu)
         αx   = d[:acq_x]
@@ -302,7 +316,7 @@ function visualize_gp(loop_states, time_samples, subsize, P, quant, extra)
                 write(io, "tmgp_err",  d[:tmgp_std] * 1.96)
             end
         elseif(options[choice] == "exit")
-            exit()
+            throw
         end
         #return d[:gp]
     end
@@ -317,14 +331,14 @@ function main(args)
         f-> filter(x->occursin(args["name"], x), f) |>
         f-> fs.joinpath.(path, f)
     bostate_fname = bostate_fname[1]
-    println("-- found $bostate_fname")
+    @info "Found $bostate_fname"
 
     bostate = open(bostate_fname) do file
         str   = read(file, String)
         loops = JSON.parse(str)
         loops
     end
-    println("-- $bostate_fname contains $(bostate["num_loops"]) loops")
+    @info "$bostate_fname contains $(bostate["num_loops"]) loops"
 
     if(!(args["mode"] == "classic"
          || args["mode"] == "bosched"
@@ -353,15 +367,18 @@ function main(args)
                                          args["subsize"],
                                          args["P"],
                                          args["uniform_quant"],
-                                         args["extrapolate"])
+                                         args["extrapolate"],
+                                         args["threshold"])
     end
     if(args["mode"] == "visualize")
-        visualize_gp(bostate["loops"],
+        gp = visualize_gp(bostate["loops"],
                      args["time_samples"],
                      args["subsize"],
                      args["P"],
                      args["uniform_quant"],
-                     args["extrapolate"])
+                     args["extrapolate"],
+                     args["threshold"])
+        return gp
     end
 
     open(bostate_fname, "w") do file
