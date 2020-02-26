@@ -8,11 +8,12 @@
 #include "profile.hpp"
 #include "param.hpp"
 
+#include <highfive/H5File.hpp>
 #include <iostream>
-#include <unistd.h>
+#include <linux/getcpu.h>
 #include <sys/mman.h>
 #include <sys/resource.h>
-#include <highfive/H5File.hpp>
+#include <unistd.h>
 
 #include <atomic>
 #include <chrono>
@@ -84,7 +85,21 @@ extern "C"
         }
 	else
 	{
-	    auto file_name = ".bostate."s + progname;
+	    auto file_name =
+		[&progname]{
+		    if(getenv("NUMA"))
+		    {
+			unsigned cpu = 0;
+			nodestruct dummy;
+			if(getcpu(&cpu, &dummy) != 0)
+			    throw std::runtime_error("get_cpu failed.");
+			return ".bostate."s + std::to_string(cpu) + "."s + progname;
+		    }
+		    else
+		    {
+			return ".bostate."s + progname;
+		    }
+		}();
 	    std::ifstream stream(file_name + ".json"s);
 
 	    if(stream)
@@ -136,6 +151,7 @@ extern "C"
         using namespace std::literals::string_literals;
 
         auto progname = std::string(__progname);
+
         if(_show_loop_stat)
         {
             auto stat_file_name = ".stat."s + progname;
@@ -163,9 +179,23 @@ extern "C"
         }
 	else if(_loop_states.size() > 0)
 	{
-	    auto next = bosched::write_loops(std::move(_loop_states));
+	    auto next      = bosched::write_loops(std::move(_loop_states));
+	    auto file_name =
+		[&progname]{
+		    if(getenv("NUMA"))
+		    {
+			unsigned cpu = 0;
+			nodestruct dummy;
+			if(getcpu(&cpu, &dummy) != 0)
+			    throw std::runtime_error("get_cpu failed.");
+			return ".bostate."s + std::to_string(cpu) + "."s + progname;
+		    }
+		    else
+		    {
+			return ".bostate."s + progname;
+		    }
+		}();
 
-	    auto file_name = ".bostate."s + progname;
 	    auto stream = std::ofstream(file_name + ".json"s);
 	    stream << next.dump(2); 
 	    stream.close();

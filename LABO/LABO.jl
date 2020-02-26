@@ -151,7 +151,7 @@ function build_gp(data_x, data_y, time_idx, verbose::Bool=true)
     gp = nuts(gp, num_samples=512, num_adapts=512,
                 thinning=2, verbose=verbose)
     K  = mean([g.cK.mat for g in gp.gp])
-    display(Plots.heatmap(K))
+    #display(Plots.heatmap(K))
 
     #GaussianProcesses.optimize!(gp)
     #println(gp)
