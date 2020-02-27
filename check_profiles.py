@@ -9,7 +9,6 @@ def main():
         for i in f.keys():
             if i == "0":
                 continue
-
             elif f[i].shape[1] == int(os.environ["OMP_NUM_THREADS"]):
                 continue
 
