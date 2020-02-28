@@ -44,10 +44,11 @@ long _procs;
 namespace bosched
 {
     inline double
-    warmup_next_param()
+    warmup_next_param(double seed = 0.0)
     {
         static std::uniform_real_distribution<double> dist(0.0, 1.0);
-        double next = dist(_rng);
+	static std::mt19937 rng(seed);
+        double next = dist(rng);
         return next;
     }
 
@@ -86,9 +87,6 @@ extern "C"
 
         using namespace std::literals::string_literals;
         auto progname = std::string(__progname);
-
-        std::random_device seed;
-        _rng = std::mt19937(seed());
 
         if(getenv("DEBUG"))
             _is_debug = true;
@@ -134,7 +132,7 @@ extern "C"
 	    {
 		(void)key;
 		if(val.warming_up)
-		    val.param = bosched::warmup_next_param();
+		    val.param = bosched::warmup_next_param(val.param);
 	    }
 	}
 
