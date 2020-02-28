@@ -10,9 +10,9 @@
 
 #include <highfive/H5File.hpp>
 #include <iostream>
-#include <linux/getcpu.h>
 #include <sys/mman.h>
 #include <sys/resource.h>
+#include <sys/syscall.h>
 #include <unistd.h>
 
 #include <atomic>
@@ -50,6 +50,23 @@ namespace bosched
         double next = dist(_rng);
         return next;
     }
+
+    int cpuid()
+    {
+        using namespace std::literals::string_literals;
+#ifdef SYS_getcpu
+	int cpu;
+	if(int status = syscall(SYS_getcpu, &cpu, NULL, NULL);
+	    status == -1)
+	{
+	    throw std::runtime_error("syscall getcpu failed with status "s
+				     + std::to_string(status));
+	}
+	return cpu;
+#else
+	throw std::error_code("syscall getcpu unvailable");
+#endif
+    }
 }
 
 void prefetch_page(size_t prealloc_len)
@@ -86,20 +103,15 @@ extern "C"
 	else
 	{
 	    auto file_name =
-		[&progname]{
+		[](std::string const& name){
 		    if(getenv("NUMA"))
 		    {
-			unsigned cpu = 0;
-			nodestruct dummy;
-			if(getcpu(&cpu, &dummy) != 0)
-			    throw std::runtime_error("get_cpu failed.");
-			return ".bostate."s + std::to_string(cpu) + "."s + progname;
+			auto id = std::to_string( bosched::cpuid() );
+			return ".bostate."s + id + "."s + name;
 		    }
 		    else
-		    {
-			return ".bostate."s + progname;
-		    }
-		}();
+		    { return ".bostate."s + name; }
+		}(progname);
 	    std::ifstream stream(file_name + ".json"s);
 
 	    if(stream)
@@ -181,20 +193,15 @@ extern "C"
 	{
 	    auto next      = bosched::write_loops(std::move(_loop_states));
 	    auto file_name =
-		[&progname]{
+		[](std::string const& name){
 		    if(getenv("NUMA"))
 		    {
-			unsigned cpu = 0;
-			nodestruct dummy;
-			if(getcpu(&cpu, &dummy) != 0)
-			    throw std::runtime_error("get_cpu failed.");
-			return ".bostate."s + std::to_string(cpu) + "."s + progname;
+			auto id = std::to_string( bosched::cpuid() );
+			return ".bostate."s + id + "."s + name;
 		    }
 		    else
-		    {
-			return ".bostate."s + progname;
-		    }
-		}();
+		    { return ".bostate."s + name; }
+		}(progname);
 
 	    auto stream = std::ofstream(file_name + ".json"s);
 	    stream << next.dump(2); 

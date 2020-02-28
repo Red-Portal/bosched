@@ -137,7 +137,11 @@ function build_gp(data_x, data_y, time_idx, verbose::Bool=true)
             # α   = fix(α, :lσ)
             # k   = (α*k_x + k_t)
 
-            k = k_x + k_t
+            # k_xt = Mat52Ard([exp(log(time_idx[end]/2)), exp(0.0)], exp(0.0),
+            #                [Normal(log(time_idx[end]/2), log(time_idx[end]/2)),
+            #                 Normal(-2.0, 2.0),
+            #                 Normal(0.0, 2.0)])
+            k = k_x + k_t# + k_xt
         end
     end
     println(size(data_x))
