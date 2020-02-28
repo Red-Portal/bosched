@@ -51,18 +51,18 @@ namespace bosched
         return next;
     }
 
-    int cpuid()
+    std::pair<int, int> process_binding()
     {
         using namespace std::literals::string_literals;
 #ifdef SYS_getcpu
-	int cpu;
-	if(int status = syscall(SYS_getcpu, &cpu, NULL, NULL);
+	int cpu, node;
+	if(int status = syscall(SYS_getcpu, &cpu, &node, NULL);
 	    status == -1)
 	{
 	    throw std::runtime_error("syscall getcpu failed with status "s
 				     + std::to_string(status));
 	}
-	return cpu;
+	return {cpu, node};
 #else
 	throw std::error_code("syscall getcpu unvailable");
 #endif
@@ -106,7 +106,8 @@ extern "C"
 		[](std::string const& name){
 		    if(getenv("NUMA"))
 		    {
-			auto id = std::to_string( bosched::cpuid() );
+			auto [cpuid, nodeid] = bosched::process_binding();
+			auto id = std::to_string( nodeid );
 			return ".bostate."s + id + "."s + name;
 		    }
 		    else
@@ -196,7 +197,8 @@ extern "C"
 		[](std::string const& name){
 		    if(getenv("NUMA"))
 		    {
-			auto id = std::to_string( bosched::cpuid() );
+			auto [cpuid, nodeid] = bosched::process_binding();
+			auto id = std::to_string( nodeid );
 			return ".bostate."s + id + "."s + name;
 		    }
 		    else
