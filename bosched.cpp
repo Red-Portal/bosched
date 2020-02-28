@@ -107,6 +107,7 @@ extern "C"
 		    if(getenv("NUMA"))
 		    {
 			auto [cpuid, nodeid] = bosched::process_binding();
+			(void)cpuid;
 			auto id = std::to_string( nodeid );
 			return ".bostate."s + id + "."s + name;
 		    }
@@ -131,6 +132,7 @@ extern "C"
 
 	    for(auto& [key, val] : _loop_states )
 	    {
+		(void)key;
 		if(val.warming_up)
 		    val.param = bosched::warmup_next_param();
 	    }
@@ -149,7 +151,8 @@ extern "C"
 	if(_is_debug)
 	{
 	    auto cmd = "cat /proc/"s + std::to_string(getpid()) + "/status"s;
-	    (void)system(cmd.c_str());
+	    auto ret = system(cmd.c_str());
+	    (void)ret;
 	}
 
 	if(getenv("EVAL"))
@@ -198,6 +201,7 @@ extern "C"
 		    if(getenv("NUMA"))
 		    {
 			auto [cpuid, nodeid] = bosched::process_binding();
+			(void)cpuid;
 			auto id = std::to_string( nodeid );
 			return ".bostate."s + id + "."s + name;
 		    }
