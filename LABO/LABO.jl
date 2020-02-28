@@ -38,7 +38,7 @@ function optimize_acquisition(gp, verbose::Bool=true)
     opt.upper_bounds  = [1.0]
     #opt.ftol_abs      = 1e-7
     opt.xtol_abs      = 1e-3
-    opt.maxeval       = 2^11
+    opt.maxeval       = 2^10
     opt.max_objective = f
     opt_y, opt_x, ret = NLopt.optimize(opt, rand(dim))
 
@@ -61,7 +61,7 @@ function optimize_mean(gp, verbose::Bool=true)
     opt.lower_bounds  = [0.0]
     opt.upper_bounds  = [1.0]
     opt.xtol_abs      = 1e-3
-    opt.maxeval       = 2^11
+    opt.maxeval       = 2^10
     opt.max_objective = f
     opt_y, opt_x, ret = NLopt.optimize(opt, rand(dim))
     if(verbose)
@@ -153,7 +153,7 @@ function build_gp(data_x, data_y, time_idx, verbose::Bool=true)
 
     #gp   = ess(gp, num_samples=2^10, num_adapts=2^10, thinning=2^2, verbose=verbose)
     gp = nuts(gp, num_samples=512, num_adapts=512,
-                thinning=2, verbose=verbose)
+              thinning=4, verbose=verbose)
     K  = mean([g.cK.mat for g in gp.gp])
     #display(Plots.heatmap(K))
 
