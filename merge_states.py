@@ -25,22 +25,22 @@ def main(argv):
         for loop in candidate["loops"]:
             loopid  = loop["id"]
             loopidx = baseids.index(loopid)
-            sum_arr = np.array(base["loops"][loopidx]["hist_y"])
-            add_arr = np.array(loop["hist_y"])
+            sum_arr = np.array(base["loops"][loopidx]["obs_y"])
+            add_arr = np.array(loop["obs_y"])
 
             if(sum_arr.shape != add_arr.shape):
                 print("Different shape: ", sum_arr.shape, " ", add_arr.shape)
                 exit(1)
 
-            base["loops"][loopidx]["hist_y"] = (sum_arr + add_arr).tolist()
+            base["loops"][loopidx]["obs_y"] = (sum_arr + add_arr).tolist()
             datacnt[loopidx] += 1
 
     for loop in base["loops"]:
         loopid  = loop["id"]
         loopidx = baseids.index(loopid)
-        data    = np.array(base["loops"][loopidx]["hist_y"])
+        data    = np.array(base["loops"][loopidx]["obs_y"])
         data   /= datacnt[loopidx]
-        base["loops"][loopidx]["hist_y"] = data.tolist()
+        base["loops"][loopidx]["obs_y"] = data.tolist()
 
     print("loop merge counts = ", datacnt)
     print("baseids = ", baseids)
