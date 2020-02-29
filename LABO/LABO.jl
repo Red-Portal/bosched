@@ -40,13 +40,18 @@ function optimize_acquisition(gp, verbose::Bool=true)
     opt.xtol_abs      = 1e-3
     opt.maxeval       = 2^10
     opt.max_objective = f
-    opt_y, opt_x, ret = NLopt.optimize(opt, rand(dim))
+
+    val, time, _, _, _ = @timed begin
+        opt_y, opt_x, ret = NLopt.optimize(opt, rand(dim))
+    end
+    opt_y, opt_x = val
 
     if(verbose)
         @info("Acquisition optimization result",
               acquisition_optimizer = opt_x,
               acquisition_optimum = opt_y,
-              status = ret)
+              status = ret,
+              elapsed = time)
     end
     return opt_x[1], opt_y
 end
@@ -58,17 +63,23 @@ function optimize_mean(gp, verbose::Bool=true)
     f(x, g) = GaussianProcesses.predict_y(gp, x[:,:])[1][1]
 
     opt = NLopt.Opt(:GN_DIRECT, dim)
-    opt.lower_bounds  = [0.0]
-    opt.upper_bounds  = [1.0]
-    opt.xtol_abs      = 1e-3
-    opt.maxeval       = 2^10
-    opt.max_objective = f
-    opt_y, opt_x, ret = NLopt.optimize(opt, rand(dim))
+    opt.lower_bounds   = [0.0]
+    opt.upper_bounds   = [1.0]
+    opt.xtol_abs       = 1e-3
+    opt.maxeval        = 2^10
+    opt.max_objective  = f
+
+    val, time, _, _, _ = @timed begin
+        opt_y, opt_x, ret = NLopt.optimize(opt, rand(dim))
+    end
+    opt_y, opt_x = val
+
     if(verbose)
         @info("Mean optimization result",
               mean_optimizer=opt_x,
               mean_optimum = opt_y,
-              status = ret)
+              status = ret,
+              elapsed = time)
     end
     return opt_x[1], opt_y
 end
