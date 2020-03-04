@@ -155,9 +155,9 @@ function build_gp(data_x, data_y, time_idx, verbose::Bool=true)
             k = k_x + k_t# + k_xt
         end
     end
-    println(size(data_x))
-    println(size(data_y))
-    m    = MeanConst(0.0)
+    #println(size(data_x))
+    #println(size(data_y))
+    m    = MeanZero() #MeanConst(0.0)
     ϵ    = -2.0
     gp   = GP(data_x, data_y, m, k, ϵ)
     set_priors!(gp.logNoise, [Normal(-2.0, 2.0)])
