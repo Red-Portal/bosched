@@ -63,7 +63,7 @@ css_transform_range(double param)
 inline double
 fss_transform_range(double param)
 {
-    return pow(2, 15*param - 8);
+    return pow(2, 17*param - 10);
 }
 
 inline double
