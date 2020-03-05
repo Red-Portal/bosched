@@ -461,8 +461,8 @@ GOMP_loop_runtime_start (long start, long end, long incr, long *istart,
 {
   struct gomp_task_icv *icv = gomp_icv (false);
   bool valid;
-  bool is_bo = is_bo_schedule (sched);
 
+  bool is_bo = is_bo_schedule (icv->run_sched_var);
   if (bo_fallback_static (region_id, (int) is_bo))
     {
       valid = gomp_loop_static_start (start, end, incr,
