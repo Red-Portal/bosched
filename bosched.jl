@@ -165,7 +165,7 @@ function bosched_mode(loop_states, time_samples, subsize, P, quant, extra, thres
         y  = convert(Array{Float64}, y)
         @assert size(x) == size(y)
 
-        y       /= (loop["N"] / P)
+        #y       /= (loop["N"] / P)
 
         time_max = 1
         if(extra < 0 || size(y, 1) < thres)
@@ -236,7 +236,7 @@ function visualize_gp(loop_states, time_samples, subsize, P, quant, extra, thres
         println(size(y))
         @assert size(x) == size(y)
 
-        y       /= (loop["N"] / P)
+        #y       /= (loop["N"] / P)
         time_max = size(x, 1)
 
         time_max = 1

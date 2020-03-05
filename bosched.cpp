@@ -397,8 +397,9 @@ extern "C"
             auto duration = loop_state.loop_stop<time_scale_t>();
             if(_is_bo_schedule)
             {
+		double exec_time = duration.count();
 		loop_state.obs_x.push_back(loop_state.param);
-		loop_state.obs_y.push_back(duration.count());
+		loop_state.obs_y.push_back(exec_time * _procs / loop_state.num_tasks);
 	    }
 
 	    if(__builtin_expect (_show_loop_stat, false))
