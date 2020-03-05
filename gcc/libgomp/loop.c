@@ -242,8 +242,6 @@ gomp_loop_static_start (long start, long end, long incr, long chunk_size,
   thr->ts.static_trip = 0;
   if (gomp_work_share_start (false))
     {
-
-      // printf("starting omp runtime region!\n");
       gomp_loop_init (thr->ts.work_share, start, end, incr, GFS_STATIC,
 		      chunk_size, region_id);
       gomp_work_share_init_done ();
@@ -463,6 +461,16 @@ GOMP_loop_runtime_start (long start, long end, long incr, long *istart,
 {
   struct gomp_task_icv *icv = gomp_icv (false);
   bool valid;
+  bool is_bo = is_bo_schedule (sched);
+
+  if (bo_fallback_static (region_id, (int) is_bo))
+    {
+      valid = gomp_loop_static_start (start, end, incr,
+				      icv->run_sched_chunk_size,
+				      istart, iend, region_id);
+      return valid;
+    }
+
   switch (icv->run_sched_var)
     {
     case GFS_STATIC:

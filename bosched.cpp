@@ -33,6 +33,7 @@ bool _is_bo_schedule = false;
 bool _is_new_file    = false;
 bool _profile_loop   = false;
 bool _is_eval        = false;
+bool _fallback       = false;
 //bool _random_extrplt = false;
 std::mt19937   _rng __attribute__((init_priority(101)));
 nlohmann::json _stats       __attribute__((init_priority(101)));
@@ -90,6 +91,9 @@ extern "C"
 
         if(getenv("DEBUG"))
             _is_debug = true;
+
+        if(getenv("FALLBACK"))
+            _fallback = true;
 
 	size_t pages = getpagesize();
 	prefetch_page(pages * 1024 * 512);
@@ -357,6 +361,16 @@ extern "C"
                       << std::endl;
         }
 	return param;
+    }
+
+    int bo_fallback_static (unsigned long long region_id, int is_bo)
+    {
+        auto _is_bo = static_cast<bool>(is_bo);
+	if(_fallback && _is_eval && _is_bo)
+	{
+	    auto& loop_state = _loop_states[region_id];
+	    return (int)(loop_state.param < 1e-5);
+	}
     }
     
     void bo_schedule_begin(unsigned long long region_id,

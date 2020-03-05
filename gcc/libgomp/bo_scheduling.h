@@ -46,6 +46,8 @@ extern void bo_schedule_begin(unsigned long long region_id,
 
 extern void bo_schedule_end(unsigned long long region_id);
 
+extern int bo_fallback_static (unsigned long long region_id, int is_bo);
+
 inline static bool is_bo_schedule(enum gomp_schedule_type sched)
 {
   return sched == BO_FSS
