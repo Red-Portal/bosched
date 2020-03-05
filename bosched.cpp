@@ -371,6 +371,7 @@ extern "C"
 	    auto& loop_state = _loop_states[region_id];
 	    return (int)(loop_state.param < 1e-5);
 	}
+	return 0;
     }
     
     void bo_schedule_begin(unsigned long long region_id,
