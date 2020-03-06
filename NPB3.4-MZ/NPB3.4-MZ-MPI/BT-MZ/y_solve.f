@@ -48,7 +48,7 @@ c---------------------------------------------------------------------
 c     Compute the indices for storing the tri-diagonal matrix;
 c     determine a (labeled f) and n jacobians for cell c
 c---------------------------------------------------------------------
-!$OMP DO SCHEDULE(static) COLLAPSE(2)
+!$OMP DO SCHEDULE(runtime) COLLAPSE(2)
       do k = 1, nz-2
          do i = 1, nx-2
             do j = 0, jsize

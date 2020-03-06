@@ -32,7 +32,7 @@ c---------------------------------------------------------------------
 
        if (timeron) call timer_start(t_ysolve)
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(fac2,m,fac1,j2,j1,ru1,j,i,k)
-!$OMP&  SCHEDULE(STATIC) COLLAPSE(2)
+!$OMP&  SCHEDULE(runtime) COLLAPSE(2)
        do  k = 1, nz-2
           do  i = 1, nx-2
 

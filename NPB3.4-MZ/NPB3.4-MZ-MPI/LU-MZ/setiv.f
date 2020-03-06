@@ -34,7 +34,7 @@ c---------------------------------------------------------------------
 !$OMP& ue_ij1,ue_iny0k,ue_i1k,ue_nx0jk,ue_1jk,xi,i,eta,j,zeta,k,ig)
       do k = 2, nz - 1
          zeta = ( dble (k-1) ) / (nz-1)
-!$OMP DO SCHEDULE(STATIC)
+!$OMP DO SCHEDULE(runtime)
          do j = 2, ny - 1
             eta = ( dble (j-1) ) / (ny-1)
             do i = 1, nx

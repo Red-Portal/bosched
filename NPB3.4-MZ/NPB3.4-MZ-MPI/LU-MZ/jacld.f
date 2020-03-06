@@ -35,7 +35,7 @@ c---------------------------------------------------------------------
       c1345 = c1 * c3 * c4 * c5
       c34 = c3 * c4
 
-!$OMP DO SCHEDULE(STATIC)
+!$OMP DO SCHEDULE(runtime)
          do j = 2, ny-1
             do i = ist, iend
 

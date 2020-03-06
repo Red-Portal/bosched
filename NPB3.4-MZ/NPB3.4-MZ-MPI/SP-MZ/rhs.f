@@ -34,7 +34,7 @@ c      compute the reciprocal of density, and the kinetic energy,
 c      and the speed of sound. 
 c---------------------------------------------------------------------
 
-!$OMP DO SCHEDULE(STATIC) COLLAPSE(2)
+!$OMP DO SCHEDULE(runtime) COLLAPSE(2)
        do    k = 0, nz-1
           do    j = 0, ny-1
              do    i = 0, nx-1
@@ -82,7 +82,7 @@ c---------------------------------------------------------------------
 !$OMP MASTER
        if (timeron) call timer_start(t_rhsx)
 !$OMP END MASTER
-!$OMP DO SCHEDULE(STATIC) COLLAPSE(2)
+!$OMP DO SCHEDULE(runtime) COLLAPSE(2)
        do    k = 1, nz-2
           do    j = 1, ny-2
              do    i = 1, nx-2
@@ -188,7 +188,7 @@ c      compute eta-direction fluxes
 c---------------------------------------------------------------------
        if (timeron) call timer_start(t_rhsy)
 !$OMP END MASTER
-!$OMP DO SCHEDULE(STATIC) COLLAPSE(2)
+!$OMP DO SCHEDULE(runtime) COLLAPSE(2)
        do     k = 1, nz-2
           do     j = 1, ny-2
              do     i = 1, nx-2
@@ -300,7 +300,7 @@ c      compute zeta-direction fluxes
 c---------------------------------------------------------------------
        if (timeron) call timer_start(t_rhsz)
 !$OMP END MASTER
-!$OMP DO SCHEDULE(STATIC) COLLAPSE(2)
+!$OMP DO SCHEDULE(runtime) COLLAPSE(2)
        do    k = 1, nz-2
           do     j = 1, ny-2
              do     i = 1, nx-2

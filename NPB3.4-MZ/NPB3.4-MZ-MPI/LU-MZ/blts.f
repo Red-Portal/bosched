@@ -35,7 +35,7 @@ c---------------------------------------------------------------------
       double precision  tmp, tmp1, tmat(5,5), tv(5)
 
 
-!$OMP DO SCHEDULE(STATIC)
+!$OMP DO SCHEDULE(runtime)
       do j = 2, ny-1
          do i = ist, iend
             do m = 1, 5
@@ -52,7 +52,7 @@ c---------------------------------------------------------------------
       end do
 !$OMP END DO nowait
 
-!$OMP DO SCHEDULE(STATIC)
+!$OMP DO SCHEDULE(runtime)
       do j = 2, ny-1
          do i = ist, iend
             do m = 1, 5

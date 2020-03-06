@@ -30,7 +30,7 @@ c---------------------------------------------------------------------
 
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(t3,t2,t1,btuz,uzik1,r5,r4,r3,
 !$OMP& r2,r1,ac2u,ac,zvel,yvel,xvel,i,j,k)
-!$OMP&  SCHEDULE(STATIC) COLLAPSE(2)
+!$OMP&  SCHEDULE(runtime) COLLAPSE(2)
        do    k = 1, nz-2
           do    j = 1, ny-2
              do    i = 1, nx-2

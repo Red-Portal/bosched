@@ -38,7 +38,7 @@ c---------------------------------------------------------------------
        if (timeron) call timer_start(t_zsolve)
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(fac2,m,fac1,k2,k1,ru1,k,
 !$OMP& i,j)
-!$OMP&  SCHEDULE(STATIC) COLLAPSE(2)
+!$OMP&  SCHEDULE(runtime) COLLAPSE(2)
        do   j = 1, ny-2
           do  i = 1, nx-2
 

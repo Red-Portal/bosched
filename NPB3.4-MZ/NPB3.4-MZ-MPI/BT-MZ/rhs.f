@@ -31,7 +31,7 @@ c---------------------------------------------------------------------
 c---------------------------------------------------------------------
 c     compute the reciprocal of density and the kinetic energy, 
 c---------------------------------------------------------------------
-!$OMP DO SCHEDULE(STATIC) COLLAPSE(2)
+!$OMP DO SCHEDULE(runtime) COLLAPSE(2)
       do k = 0, nz-1
          do j = 0, ny-1
             do i = 0, nx-1
@@ -56,7 +56,7 @@ c this forcing term is known, we can store it on the whole zone
 c including the boundary                   
 c---------------------------------------------------------------------
 
-!$OMP DO SCHEDULE(STATIC) COLLAPSE(2)
+!$OMP DO SCHEDULE(runtime) COLLAPSE(2)
       do k = 0, nz-1
          do j = 0, ny-1
             do i = 0, nx-1
@@ -74,7 +74,7 @@ c---------------------------------------------------------------------
 c---------------------------------------------------------------------
 c     compute xi-direction fluxes 
 c---------------------------------------------------------------------
-!$OMP DO SCHEDULE(STATIC) COLLAPSE(2)
+!$OMP DO SCHEDULE(runtime) COLLAPSE(2)
       do k = 1, nz-2
          do j = 1, ny-2
             do i = 1, nx-2
@@ -179,7 +179,7 @@ c---------------------------------------------------------------------
 c---------------------------------------------------------------------
 c     compute eta-direction fluxes 
 c---------------------------------------------------------------------
-!$OMP DO SCHEDULE(STATIC) COLLAPSE(2)
+!$OMP DO SCHEDULE(runtime) COLLAPSE(2)
       do k = 1, nz-2
          do j = 1, ny-2
             do i = 1, nx-2
@@ -289,7 +289,7 @@ c---------------------------------------------------------------------
 c---------------------------------------------------------------------
 c     compute zeta-direction fluxes 
 c---------------------------------------------------------------------
-!$OMP DO SCHEDULE(STATIC) COLLAPSE(2)
+!$OMP DO SCHEDULE(runtime) COLLAPSE(2)
       do k = 1, nz-2
          do j = 1, ny-2
             do i = 1, nx-2

@@ -85,7 +85,7 @@ c   xi-direction flux differences
 c---------------------------------------------------------------------
 
       do k = 2, nz - 1
-!$OMP DO SCHEDULE(STATIC)
+!$OMP DO SCHEDULE(runtime)
          do j = 2, ny-1
             do i = L1, L2
                flux(1,i) = u(2,i,j,k)
@@ -215,7 +215,7 @@ c---------------------------------------------------------------------
 c---------------------------------------------------------------------
 c   eta-direction flux differences
 c---------------------------------------------------------------------
-!$OMP DO SCHEDULE(STATIC)
+!$OMP DO SCHEDULE(runtime)
       do k = 2, nz - 1
          do i = ist, iend
             do j = 1, ny
@@ -353,7 +353,7 @@ c---------------------------------------------------------------------
 c---------------------------------------------------------------------
 c   zeta-direction flux differences
 c---------------------------------------------------------------------
-!$OMP DO SCHEDULE(STATIC)
+!$OMP DO SCHEDULE(runtime)
       do j = 2, ny-1
          do i = ist, iend
             do k = 1, nz

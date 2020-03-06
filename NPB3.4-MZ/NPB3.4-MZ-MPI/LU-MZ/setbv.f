@@ -27,7 +27,7 @@ c---------------------------------------------------------------------
 c---------------------------------------------------------------------
 c   set the dependent variable values along the top and bottom faces
 c---------------------------------------------------------------------
-!$OMP DO SCHEDULE(STATIC)
+!$OMP DO SCHEDULE(runtime)
       do j = 1, ny
          do i = 1, nx
             call exact( i+ipt, j, 1, temp1, nx0, ny, nz )
@@ -43,7 +43,7 @@ c---------------------------------------------------------------------
 c---------------------------------------------------------------------
 c   set the dependent variable values along north and south faces
 c---------------------------------------------------------------------
-!$OMP DO SCHEDULE(STATIC)
+!$OMP DO SCHEDULE(runtime)
       do k = 1, nz
          do i = 1, nx
             call exact( i+ipt, 1, k, temp1, nx0, ny, nz )
@@ -60,7 +60,7 @@ c---------------------------------------------------------------------
 c   set the dependent variable values along east and west faces
 c---------------------------------------------------------------------
       do k = 1, nz
-!$OMP DO SCHEDULE(STATIC)
+!$OMP DO SCHEDULE(runtime)
          do j = 1, ny
             if (north.eq.-1) then
             call exact( 1+ipt, j, k, temp1, nx0, ny, nz )

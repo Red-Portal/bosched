@@ -48,7 +48,7 @@ c---------------------------------------------------------------------
 c     Compute the indices for storing the block-diagonal matrix;
 c     determine c (labeled f) and s jacobians
 c---------------------------------------------------------------------
-!$OMP DO SCHEDULE(static) COLLAPSE(2)
+!$OMP DO SCHEDULE(runtime) COLLAPSE(2)
       do j = 1, ny-2
          do i = 1, nx-2
             do k = 0, ksize

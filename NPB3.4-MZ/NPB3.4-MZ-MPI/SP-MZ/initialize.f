@@ -46,7 +46,7 @@ c---------------------------------------------------------------------
 c---------------------------------------------------------------------
 c first store the "interpolated" values everywhere on the zone    
 c---------------------------------------------------------------------
-!$OMP DO SCHEDULE(STATIC) COLLAPSE(2)
+!$OMP DO SCHEDULE(runtime) COLLAPSE(2)
           do  k = 0, nz-1
              do  j = 0, ny-1
                 zeta = dble(k) * dnzm1
@@ -101,7 +101,7 @@ c---------------------------------------------------------------------
 
        xi = 0.0d0
        i  = 0
-!$OMP DO SCHEDULE(STATIC) COLLAPSE(2)
+!$OMP DO SCHEDULE(runtime) COLLAPSE(2)
        do  k = 0, nz-1
           do   j = 0, ny-1
              zeta = dble(k) * dnzm1
@@ -120,7 +120,7 @@ c---------------------------------------------------------------------
 
        xi = 1.0d0
        i  = nx-1
-!$OMP DO SCHEDULE(STATIC) COLLAPSE(2)
+!$OMP DO SCHEDULE(runtime) COLLAPSE(2)
        do   k = 0, nz-1
           do   j = 0, ny-1
              zeta = dble(k) * dnzm1
@@ -139,7 +139,7 @@ c---------------------------------------------------------------------
 
        eta = 0.0d0
        j   = 0
-!$OMP DO SCHEDULE(STATIC)
+!$OMP DO SCHEDULE(runtime)
        do  k = 0, nz-1
           zeta = dble(k) * dnzm1
           do   i = 0, nx-1
@@ -159,7 +159,7 @@ c---------------------------------------------------------------------
 
        eta = 1.0d0
        j   = ny-1
-!$OMP DO SCHEDULE(STATIC)
+!$OMP DO SCHEDULE(runtime)
        do   k = 0, nz-1
           zeta = dble(k) * dnzm1
           do   i = 0, nx-1
@@ -178,7 +178,7 @@ c---------------------------------------------------------------------
 
        zeta = 0.0d0
        k    = 0
-!$OMP DO SCHEDULE(STATIC)
+!$OMP DO SCHEDULE(runtime)
        do   j = 0, ny-1
           eta = dble(j) * dnym1
           do   i =0, nx-1
@@ -197,7 +197,7 @@ c---------------------------------------------------------------------
 
        zeta = 1.0d0
        k    = nz-1
-!$OMP DO SCHEDULE(STATIC)
+!$OMP DO SCHEDULE(runtime)
        do   j = 0, ny-1
           eta = dble(j) * dnym1
           do   i =0, nx-1

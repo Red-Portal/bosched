@@ -32,7 +32,7 @@ c---------------------------------------------------------------------
        do m=1,5
           rms_loc(m)=0.0d0
        enddo
-!$OMP DO SCHEDULE(STATIC) COLLAPSE(2)
+!$OMP DO SCHEDULE(runtime) COLLAPSE(2)
        do   k = 0, nz-1
           do   j = 0, ny-1
              zeta = dble(k) * dnzm1
