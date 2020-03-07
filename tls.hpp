@@ -7,7 +7,7 @@
 
 #include "metrics.hpp"
 
-namespace stat
+namespace statistic
 {
     void init_tls();
 

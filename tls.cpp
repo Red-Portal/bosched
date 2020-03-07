@@ -15,7 +15,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace stat
+namespace statistic
 {
     std::atomic<size_t> _total_runtime;
     std::vector<bosched::clock::time_point> _timestamp;

@@ -243,14 +243,14 @@ extern "C"
     {
         if(__builtin_expect (_show_loop_stat == false, 1))
             return;
-        stat::iteration_start_record();
+        statistic::iteration_start_record();
     }
 
     void bo_record_iteration_stop()
     {
         if(__builtin_expect (_show_loop_stat == false, 1))
             return;
-        stat::iteration_stop_record();
+        statistic::iteration_stop_record();
     }
 
     void bo_binlpt_load_loop(unsigned long long region_id,
@@ -403,7 +403,7 @@ extern "C"
 
         if(__builtin_expect (_show_loop_stat, false))
         {
-            stat::init_tls();
+            statistic::init_tls();
         }
         if(__builtin_expect (_is_debug, false))
         {
@@ -430,11 +430,11 @@ extern "C"
 	    if(__builtin_expect (_show_loop_stat, false))
             {
                 auto work_time = std::chrono::duration_cast<time_scale_t>(
-                    stat::total_work()).count();
+                    statistic::total_work()).count();
 
                 auto parallel_time = duration.count();
 
-                auto work_per_processor = stat::work_per_processor();
+                auto work_per_processor = statistic::work_per_processor();
                 auto performance        = work_time / parallel_time;
                 auto cost               = parallel_time * _procs;
                 auto effectiveness      = performance / cost;
