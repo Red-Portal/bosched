@@ -132,11 +132,16 @@ extern "C"
 	    }
 	    stream.close();
 
+	    std::random_device rng;
+	    auto dist = std::uniform_real_distribution<double>();
 	    for(auto& [key, val] : _loop_states )
 	    {
 		(void)key;
 		if(val.warming_up)
-		    val.param = bosched::warmup_next_param(val.param);
+		{
+		    val.param = bosched::warmup_next_param(
+			val.loop_json["obs_x"].size() > 0 ? val.param : dist(rng));
+		}
 	    }
 	}
 
