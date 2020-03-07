@@ -9,7 +9,8 @@
 #include "param.hpp"
 
 #include <highfive/H5File.hpp>
-#include <iostream>
+#include <nlohmann/json.hpp>
+#include <sys/file.h>
 #include <sys/mman.h>
 #include <sys/resource.h>
 #include <sys/syscall.h>
@@ -17,9 +18,10 @@
 
 #include <atomic>
 #include <chrono>
+#include <cstdio>
 #include <cstdlib>
 #include <fstream>
-#include <nlohmann/json.hpp>
+#include <iostream>
 #include <random>
 #include <thread>
 #include <unordered_map>
@@ -118,7 +120,7 @@ extern "C"
 		}(progname);
 	    std::ifstream stream(file_name + ".json"s);
 
-	    if(stream && !stream.is_open())
+	    if(stream)
 	    {
 		_is_new_file = false;
 		auto data = nlohmann::json();
@@ -211,11 +213,16 @@ extern "C"
 		    { return ".bostate."s + name; }
 		}(progname);
 
-	    auto stream = std::ofstream(file_name + ".json"s);
-	    if(stream)
+	    auto fptr = fopen((file_name + ".json"s).c_str(), "w");
+	    if(fptr)
 	    {
-		stream << next.dump(2); 
-		stream.close();
+		if(auto fdsc = fileno(fptr);
+		   flock(fdsc, LOCK_EX))
+		{
+		    auto dump = next.dump(2);
+		    fputs(dump.c_str(), fptr);
+		    flock(fdsc, LOCK_UN);
+		}
 	    }
 	}
     }
