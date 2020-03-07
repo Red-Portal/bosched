@@ -212,8 +212,11 @@ extern "C"
 		}(progname);
 
 	    auto stream = std::ofstream(file_name + ".json"s);
-	    stream << next.dump(2); 
-	    stream.close();
+	    if(stream)
+	    {
+		stream << next.dump(2); 
+		stream.close();
+	    }
 	}
     }
 
