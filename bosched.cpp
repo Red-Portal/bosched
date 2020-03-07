@@ -10,7 +10,6 @@
 
 #include <highfive/H5File.hpp>
 #include <nlohmann/json.hpp>
-#include <sys/file.h>
 #include <sys/mman.h>
 #include <sys/resource.h>
 #include <sys/syscall.h>
@@ -213,16 +212,18 @@ extern "C"
 		    { return ".bostate."s + name; }
 		}(progname);
 
-	    auto fptr = fopen((file_name + ".json"s).c_str(), "w");
-	    if(fptr)
+	    auto lckname = file_name + ".lock"s;
+	    auto lckptr  = fopen(lckname.c_str(), "wx");
+	    if(lckptr)
 	    {
-		if(auto fdsc = fileno(fptr);
-		   flock(fdsc, LOCK_EX) == 0)
+		auto stream = std::ofstream(file_name + ".json"s);
+		if(stream)
 		{
-		    auto dump = next.dump(2);
-		    fputs(dump.c_str(), fptr);
-		    flock(fdsc, LOCK_UN);
+		    stream << next.dump(2);
+		    stream.close();
 		}
+		fclose(lckptr);
+		remove(lckname.c_str());
 	    }
 	}
     }
