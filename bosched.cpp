@@ -118,7 +118,7 @@ extern "C"
 		}(progname);
 	    std::ifstream stream(file_name + ".json"s);
 
-	    if(stream)
+	    if(stream && !stream.is_open())
 	    {
 		_is_new_file = false;
 		auto data = nlohmann::json();
