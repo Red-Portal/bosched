@@ -217,7 +217,7 @@ extern "C"
 	    if(fptr)
 	    {
 		if(auto fdsc = fileno(fptr);
-		   flock(fdsc, LOCK_EX))
+		   flock(fdsc, LOCK_EX) == 0)
 		{
 		    auto dump = next.dump(2);
 		    fputs(dump.c_str(), fptr);
