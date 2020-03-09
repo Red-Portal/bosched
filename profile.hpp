@@ -24,8 +24,11 @@ namespace prof
 	{
 	    if(_data.size() > 0)
 	    {
-		printf("%d %d\n", _data.back().size(), data.size());
-		assert(_data.back().size() == data.size());
+		if(_data.back().size() == data.size())
+		{
+		    _data.clear();
+		    printf("-- wrong data!\n");
+		}
 	    }
 	    _data.push_back(std::move(data));
 	}
