@@ -32,7 +32,7 @@ namespace prof
 			[&data](auto const& elem)
 			{ return elem.size() != data.size(); }), _data.end());
 		auto size_after = _data.size();
-		auto delta      = size_after - size_before;
+		auto delta      =  size_before - size_after;
 		if(delta > 0)
 		    std::cout << "-- removed " << delta << " elements\n";
 	    }
