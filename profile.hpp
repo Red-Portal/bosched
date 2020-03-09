@@ -5,6 +5,7 @@
 #include <cassert>
 #include <cstdlib>
 #include <highfive/H5File.hpp>
+#include <iostream>
 #include <type_traits>
 #include <unordered_map>
 #include <vector>
@@ -24,11 +25,16 @@ namespace prof
 	{
 	    if(_data.size() > 0)
 	    {
-		if(_data.back().size() == data.size())
-		{
-		    _data.clear();
-		    printf("-- wrong data!\n");
-		}
+		auto size_before = _data.size();
+		_data.erase(
+		    std::remove_if(
+			_data.begin(), _data.end(),
+			[&data](auto const& elem)
+			{ return elem.size() != data.size(); }), _data.end());
+		auto size_after = _data.size();
+		auto delta      = size_after - size_before;
+		if(delta > 0)
+		    std::cout << "-- removed " << delta << " elements\n";
 	    }
 	    _data.push_back(std::move(data));
 	}
