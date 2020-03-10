@@ -37,7 +37,8 @@ namespace bosched
 	    }
 	    else
 	    {
-		state.param = l["obs_x"][0][0];
+		state.param = l["obs_x"].back()[0];
+		printf("%f\n", state.param);
 	    }
 
             if(getenv("DEBUG"))
