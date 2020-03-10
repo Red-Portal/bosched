@@ -51,6 +51,7 @@ namespace bosched
         static std::uniform_real_distribution<double> dist(0.0, 1.0);
 	static std::mt19937 rng(seed);
         double next = dist(rng);
+	printf("%f %f\n", seed, next);
         return next;
     }
 
