@@ -137,7 +137,8 @@ extern "C"
 		(void)key;
 		if(val.warming_up)
 		{
-		    auto rng = std::mt19937(*reinterpret_cast<uint64_t*>(&val.param));
+		    auto seeder = std::mt19937(*reinterpret_cast<uint64_t*>(&val.param));
+		    auto rng    = std::mt19937(seeder());
 		    val.param = bosched::warmup_next_param(rng);
 		}
 	    }
