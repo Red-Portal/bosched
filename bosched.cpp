@@ -50,7 +50,6 @@ namespace bosched
     {
         static std::uniform_real_distribution<double> dist(0.0, 1.0);
         double next = dist(rng);
-	printf("%f\n", next);
         return next;
     }
 
@@ -138,7 +137,7 @@ extern "C"
 		(void)key;
 		if(val.warming_up)
 		{
-		    auto rng = std::mt19937(val.param);
+		    auto rng = std::mt19937(*reinterpret_cast<uint64_t*>(&val.param));
 		    val.param = bosched::warmup_next_param(rng);
 		}
 	    }
