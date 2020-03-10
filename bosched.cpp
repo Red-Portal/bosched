@@ -46,12 +46,11 @@ long _procs;
 namespace bosched
 {
     inline double
-    warmup_next_param(double seed = 0.0)
+    warmup_next_param(std::mt19937& rng)
     {
         static std::uniform_real_distribution<double> dist(0.0, 1.0);
-	static std::mt19937 rng(seed + 1);
         double next = dist(rng);
-	printf("%f %f\n", seed, next);
+	printf("%f\n", next);
         return next;
     }
 
@@ -138,7 +137,10 @@ extern "C"
 	    {
 		(void)key;
 		if(val.warming_up)
-		    val.param = bosched::warmup_next_param(val.param);
+		{
+		    auto rng = std::mt19937(val.param);
+		    val.param = bosched::warmup_next_param(rng);
+		}
 	    }
 	}
 

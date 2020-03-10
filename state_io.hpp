@@ -36,10 +36,7 @@ namespace bosched
 		    state.eval_param = l["eval_param2"];
 	    }
 	    else
-	    {
 		state.param = l["obs_x"].back()[0];
-		printf("%f\n", state.param);
-	    }
 
             if(getenv("DEBUG"))
             {
