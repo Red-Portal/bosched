@@ -35,6 +35,10 @@ namespace bosched
 		else
 		    state.eval_param = l["eval_param2"];
 	    }
+	    else
+	    {
+		state.param = l["obs_x"].back();
+	    }
 
             if(getenv("DEBUG"))
             {
