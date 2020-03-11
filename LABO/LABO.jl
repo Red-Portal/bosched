@@ -122,14 +122,17 @@ function whiten(y)
     σ  = stdm(y, μ) 
     y .-= μ
     y ./= σ
+    @info("whitened data", data_μ = μ, data_σ = σ)
     return y
 end
 
 function build_gp(data_x, data_y, time_idx, verbose::Bool=true)
-    k = begin
+    m, k = begin
         if(time_idx[end] == 1)
             k_x = Mat52Iso(exp(-2.0), exp(1.0), [Normal(-2.0, 2.0), Normal(0.0, 2.0)])
             k   = Masked(k_x, [2])
+            m   = MeanConst(0.0)
+            m, k
         else
             # Sum Kernel
             # k = Mat52Ard([exp(1.0), exp(-2.0)], exp(0.0),
@@ -152,26 +155,25 @@ function build_gp(data_x, data_y, time_idx, verbose::Bool=true)
             #                [Normal(log(time_idx[end]/2), log(time_idx[end]/2)),
             #                 Normal(-2.0, 2.0),
             #                 Normal(0.0, 2.0)])
-            k = k_x + k_t# + k_xt
+            k = k_x + k_t
+            m = MeanZero()
+            m, k
         end
     end
-    #println(size(data_x))
-    #println(size(data_y))
-    m    = MeanZero() #MeanConst(0.0)
     ϵ    = -2.0
     gp   = GP(data_x, data_y, m, k, ϵ)
     set_priors!(gp.logNoise, [Normal(-2.0, 2.0)])
 
     #gp = ess(gp, num_samples=2^10, num_adapts=2^10, thinning=2^3, verbose=verbose)
-    #gp = nuts(gp, num_samples=512, num_adapts=512,
-    #          thinning=4, verbose=verbose)
+    gp = nuts(gp, num_samples=1024, num_adapts=1024,
+              thinning=4, verbose=verbose)
     #K  = mean([g.cK.mat for g in gp.gp])
     #display(Plots.heatmap(K))
 
     #GaussianProcesses.optimize!(gp)
     #println(gp)
-    gp   = slice(gp, num_samples=1024, num_adapts=1024,
-                 thinning=8, width=4.0, verbose=verbose)
+    #gp   = slice(gp, num_samples=1024, num_adapts=1024,
+    #             thinning=8, width=4.0, verbose=verbose)
     return gp
 end
 
