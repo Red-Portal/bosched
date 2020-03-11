@@ -156,7 +156,7 @@ function build_gp(data_x, data_y, time_idx, verbose::Bool=true)
             #                 Normal(-2.0, 2.0),
             #                 Normal(0.0, 2.0)])
             k = k_x + k_t
-            m = MeanZero()
+            m = MeanConst(0.0)
             m, k
         end
     end
