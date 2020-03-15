@@ -8,6 +8,8 @@
 #include "profile.hpp"
 #include "param.hpp"
 
+#include <boost/random/sobol.hpp>
+#include <boost/random/uniform_01.hpp>
 #include <highfive/H5File.hpp>
 #include <nlohmann/json.hpp>
 #include <sys/mman.h>
@@ -36,8 +38,9 @@ bool _profile_loop   = false;
 bool _is_eval        = false;
 bool _fallback       = false;
 //bool _random_extrplt = false;
-std::mt19937   _rng __attribute__((init_priority(101)));
-nlohmann::json _stats       __attribute__((init_priority(101)));
+//std::mt19937   _rng __attribute__((init_priority(101)));
+boost::random::sobol  _qrng   __attribute__((init_priority(101))) (1);
+nlohmann::json        _stats   __attribute__((init_priority(101)));
 std::unordered_map<size_t, bosched::loop_state_t>    _loop_states __attribute__((init_priority(101)));
 std::unordered_map<size_t, prof::profiles>           _profiles    __attribute__((init_priority(101)));
 std::unordered_map<size_t, bosched::workload_params> _params      __attribute__((init_priority(101)));
@@ -46,10 +49,10 @@ long _procs;
 namespace bosched
 {
     inline double
-    warmup_next_param(std::mt19937& rng)
+    warmup_next_param(boost::random::sobol& qrng)
     {
-        static std::uniform_real_distribution<double> dist(0.0, 1.0);
-        double next = dist(rng);
+        static boost::random::uniform_01<double> dist{};
+        double next = dist(qrng);
         return next;
     }
 
@@ -77,6 +80,33 @@ void prefetch_page(size_t prealloc_len)
     for(size_t i = 0; i < prealloc_len; i += 1024 * 4)
 	buf[i] = 'a';
     asm volatile("" : : "r,m"(buf) : "memory");
+}
+
+inline void
+seed_qrng(std::string const& seed)
+{
+    auto seedstream = std::istringstream(seed);
+    seedstream >> _qrng;
+}
+
+inline std::string
+unseed_qrng()
+{
+    auto seedstream = std::ostringstream();
+    seedstream << _qrng;
+    auto seedstr = seedstream.str();
+    return seedstr;
+}
+
+inline void
+generate_random_warmup()
+{
+    for(auto& [key, val] : _loop_states)
+    {
+	(void)key;
+	if(val.warming_up)
+	    val.param = bosched::warmup_next_param(_qrng);
+    }
 }
 
 extern "C"
@@ -118,11 +148,13 @@ extern "C"
 		}(progname);
 	    std::ifstream stream(file_name + ".json"s);
 
+	    auto qrng = boost::random::sobol(1);
 	    if(stream)
 	    {
 		_is_new_file = false;
 		auto data = nlohmann::json();
 		stream >> data;
+		seed_qrng(data["qrng"]);
 		_loop_states = bosched::read_loops(data);
 		_params      = bosched::load_workload_params(data);
 	    }
@@ -132,16 +164,7 @@ extern "C"
 	    }
 	    stream.close();
 
-	    for(auto& [key, val] : _loop_states )
-	    {
-		(void)key;
-		if(val.warming_up)
-		{
-		    auto seeder = std::mt19937(*reinterpret_cast<uint64_t*>(&val.param));
-		    auto rng    = std::mt19937(seeder());
-		    val.param = bosched::warmup_next_param(rng);
-		}
-	    }
+	    generate_random_warmup();
 	}
 
         if(getenv("LOOPSTAT"))
@@ -201,7 +224,9 @@ extern "C"
         }
 	else if(_loop_states.size() > 0)
 	{
-	    auto next      = bosched::write_loops(std::move(_loop_states));
+	    auto next    = bosched::write_loops(std::move(_loop_states));
+	    next["qrng"] = unseed_qrng();
+
 	    auto file_name =
 		[](std::string const& name){
 		    if(getenv("NUMA"))
