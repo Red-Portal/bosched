@@ -34,8 +34,11 @@ const float kDamp = 0.85;
 
 Graph* global_graph;
 
-extern void bo_register_workload(
-    void (*provide_workload_profile)(unsigned* tasks), long ntasks);
+extern "C"
+{
+    void bo_register_workload(
+	void (*provide_workload_profile)(unsigned* tasks), long ntasks);
+}
 
 void workload_profile(unsigned* tasks)
 {

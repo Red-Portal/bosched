@@ -38,8 +38,11 @@ which restructures and extends the Shiloach-Vishkin algorithm [2].
 
 using namespace std;
 
-extern void bo_register_workload(
-    void (*provide_workload_profile)(unsigned* tasks), long ntasks);
+extern "C"
+{
+    void bo_register_workload(
+	void (*provide_workload_profile)(unsigned* tasks), long ntasks);
+}
 
 Graph* global_graph;
 

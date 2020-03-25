@@ -42,8 +42,11 @@ them in parent array as negative numbers. Thus the encoding of parent is:
 */
 
 
-extern void bo_register_workload(
-    void (*provide_workload_profile)(unsigned* tasks), long ntasks);
+extern "C"
+{
+    void bo_register_workload(
+	void (*provide_workload_profile)(unsigned* tasks), long ntasks);
+}
 
 using namespace std;
 
