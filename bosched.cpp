@@ -17,6 +17,7 @@
 #include <sys/syscall.h>
 #include <unistd.h>
 
+#include <omp.h>
 #include <atomic>
 #include <chrono>
 #include <cstdio>
@@ -256,6 +257,29 @@ extern "C"
 	}
     }
 
+    void bo_register_workload(void (*provide_workload_profile)(unsigned* tasks),
+			      long ntasks)
+    {
+	/* Assuming we only have one loop per workload, 
+	 * we're trying to find the id of the non-trivial loop
+	 */
+	size_t region_id = 0;
+	for(auto& [key, val] : _loop_states)
+	{
+	    if(val.num_tasks > 32)
+	    {
+		region_id = key;
+		break;
+	    }
+	}
+
+	std::cout << "region_id = " << region_id << std::endl;
+
+	auto& loop = _params[region_id];
+	loop.hss.resize(ntasks);
+	provide_workload_profile(loop.hss.data());
+    }
+
     void bo_workload_profile_start(long iteration)
     {
         if(_profile_loop)
@@ -285,12 +309,21 @@ extern "C"
     void bo_binlpt_load_loop(unsigned long long region_id,
                              unsigned** task_map)
     {
-        auto& profile = _params[region_id].binlpt;
-        *task_map = profile.data();
+	auto& loop = _params[region_id];
+	if(loop.binlpt.size() == 0)
+	{
+	    size_t ntasks = loop.hss.size();
+	    assert(ntasks > 0);
+	    unsigned P = omp_get_max_threads();
+	    loop.binlpt.resize(ntasks);
+	    bosched::binlpt_balance(loop.hss.data(), loop.hss.size(),
+				    P, P*2, loop.binlpt.data());
+	}
+	*task_map = loop.binlpt.data();
         if(__builtin_expect (_is_debug, false))
         {
             std::cout << "-- loop " << region_id << '\n'
-		      << " workload size = " << profile.size() << '\n'
+		      << " workload size = " << loop.binlpt.size() << '\n'
                       << " requested workload binlpt profile"
                       << std::endl;
         }

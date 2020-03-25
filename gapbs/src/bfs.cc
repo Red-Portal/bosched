@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <vector>
+#include <cstring>
 
 #include "benchmark.h"
 #include "bitmap.h"
@@ -41,13 +42,39 @@ them in parent array as negative numbers. Thus the encoding of parent is:
 */
 
 
+extern void bo_register_workload(
+    void (*provide_workload_profile)(unsigned* tasks), long ntasks);
+
 using namespace std;
+
+Graph* global_graph;
+
+void workload_profile(unsigned* tasks)
+{
+    NodeID ntasks = global_graph->num_nodes();
+    float* tasks_raw = (float*)malloc(sizeof(float)*ntasks);
+    float maximum_load = 0.0;
+#pragma omp parallel for reduction(max:maximum_load)
+    for(NodeID i = 0; i < ntasks; ++i)
+    {
+	float load = global_graph->in_degree(i);
+	tasks_raw[i] = load;
+	maximum_load = std::max(load, maximum_load);
+    }
+
+#pragma omp parallel for
+    for(int i = 0; i < (int)ntasks; ++i)
+    {
+	tasks[i] = (unsigned)((tasks_raw[i] / maximum_load)*255) ;
+    }
+    free(tasks_raw);
+}
 
 int64_t BUStep(const Graph &g, pvector<NodeID> &parent, Bitmap &front,
                Bitmap &next) {
   int64_t awake_count = 0;
   next.reset();
-  #pragma omp parallel for reduction(+ : awake_count) schedule(dynamic, 1024)
+  #pragma omp parallel for reduction(+ : awake_count) schedule(runtime)
   for (NodeID u=0; u < g.num_nodes(); u++) {
     if (parent[u] < 0) {
       for (NodeID v : g.in_neigh(u)) {
@@ -137,6 +164,18 @@ pvector<NodeID> DOBFS(const Graph &g, NodeID source, int alpha = 15,
   front.reset();
   int64_t edges_to_check = g.num_edges_directed();
   int64_t scout_count = g.out_degree(source);
+
+  if(strncmp(getenv("OMP_SCHEDULE"), "BINLPT", 6) == 0 ||
+     strncmp(getenv("OMP_SCHEDULE"), "HSS", 3) == 0)
+  {
+      Timer prof;
+      prof.Start();
+      long ntasks = (long)global_graph->num_nodes();
+      bo_register_workload(&workload_profile, ntasks);
+      prof.Stop();
+      PrintStep("workload", prof.Seconds());
+  }
+
   while (!queue.empty()) {
     if (scout_count > edges_to_check / alpha) {
       int64_t awake_count, old_awake_count;
@@ -247,6 +286,7 @@ int main(int argc, char* argv[]) {
     return -1;
   Builder b(cli);
   Graph g = b.MakeGraph();
+  global_graph = &g;
   SourcePicker<Graph> sp(g, cli.start_vertex());
   auto BFSBound = [&sp] (const Graph &g) { return DOBFS(g, sp.PickNext()); };
   SourcePicker<Graph> vsp(g, cli.start_vertex());

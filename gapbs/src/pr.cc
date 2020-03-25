@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <iostream>
 #include <vector>
+#include <cstring>
 
 #include "benchmark.h"
 #include "builder.h"
@@ -31,8 +32,45 @@ using namespace std;
 typedef float ScoreT;
 const float kDamp = 0.85;
 
+Graph* global_graph;
+
+extern void bo_register_workload(
+    void (*provide_workload_profile)(unsigned* tasks), long ntasks);
+
+void workload_profile(unsigned* tasks)
+{
+    NodeID ntasks = global_graph->num_nodes();
+    float* tasks_raw = (float*)malloc(sizeof(float)*ntasks);
+    float maximum_load = 0.0;
+#pragma omp parallel for reduction(max:maximum_load)
+    for(NodeID i = 0; i < ntasks; ++i)
+    {
+	float load = global_graph->in_degree(i);
+	tasks_raw[i] = load;
+	maximum_load = std::max(load, maximum_load);
+    }
+
+#pragma omp parallel for
+    for(int i = 0; i < (int)ntasks; ++i)
+    {
+	tasks[i] = (unsigned)((tasks_raw[i] / maximum_load)*255) ;
+    }
+    free(tasks_raw);
+}
+
 pvector<ScoreT> PageRankPull(const Graph &g, int max_iters,
                              double epsilon = 0) {
+  if(strncmp(getenv("OMP_SCHEDULE"), "BINLPT", 6) == 0 ||
+     strncmp(getenv("OMP_SCHEDULE"), "HSS", 3) == 0)
+  {
+      Timer prof;
+      prof.Start();
+      long ntasks = (long)global_graph->num_nodes();
+      bo_register_workload(&workload_profile, ntasks);
+      prof.Stop();
+      PrintStep("workload", prof.Seconds());
+  }
+
   const ScoreT init_score = 1.0f / g.num_nodes();
   const ScoreT base_score = (1.0f - kDamp) / g.num_nodes();
   pvector<ScoreT> scores(g.num_nodes(), init_score);
@@ -42,7 +80,8 @@ pvector<ScoreT> PageRankPull(const Graph &g, int max_iters,
     #pragma omp parallel for
     for (NodeID n=0; n < g.num_nodes(); n++)
       outgoing_contrib[n] = scores[n] / g.out_degree(n);
-    #pragma omp parallel for reduction(+ : error) schedule(dynamic, 64)
+
+    #pragma omp parallel for reduction(+ : error) schedule(runtime)
     for (NodeID u=0; u < g.num_nodes(); u++) {
       ScoreT incoming_total = 0;
       for (NodeID v : g.in_neigh(u))
@@ -99,6 +138,7 @@ int main(int argc, char* argv[]) {
     return -1;
   Builder b(cli);
   Graph g = b.MakeGraph();
+  global_graph = &g;
   auto PRBound = [&cli] (const Graph &g) {
     return PageRankPull(g, cli.max_iters(), cli.tolerance());
   };

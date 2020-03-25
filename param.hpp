@@ -28,9 +28,12 @@ namespace bosched
         result.reserve(loops_json["num_loops"]);
         for(auto& loop : loops_json["loops"])
         {
-            auto param_bundle = workload_params();
+            auto param_bundle  = workload_params();
 	    if(loop.count("params") == 0)
+	    {
+		result[loop["id"]] = std::move(param_bundle);
 		continue;
+	    }
 
 	    auto params       = loop["params"];
             double css_param  = params["css"];

@@ -6,6 +6,7 @@
 #include <iostream>
 #include <unordered_map>
 #include <vector>
+#include <cstring>
 
 #include "benchmark.h"
 #include "bitmap.h"
@@ -37,6 +38,31 @@ which restructures and extends the Shiloach-Vishkin algorithm [2].
 
 using namespace std;
 
+extern void bo_register_workload(
+    void (*provide_workload_profile)(unsigned* tasks), long ntasks);
+
+Graph* global_graph;
+
+void workload_profile(unsigned* tasks)
+{
+    NodeID ntasks = global_graph->num_nodes();
+    float* tasks_raw = (float*)malloc(sizeof(float)*ntasks);
+    float maximum_load = 0.0;
+#pragma omp parallel for reduction(max:maximum_load)
+    for(NodeID i = 0; i < ntasks; ++i)
+    {
+	float load = global_graph->out_degree(i);
+	tasks_raw[i] = load;
+	maximum_load = std::max(load, maximum_load);
+    }
+
+#pragma omp parallel for
+    for(int i = 0; i < (int)ntasks; ++i)
+    {
+	tasks[i] = (unsigned)((tasks_raw[i] / maximum_load)*255) ;
+    }
+    free(tasks_raw);
+}
 
 // Place nodes u and v in same component of lower component ID
 void Link(NodeID u, NodeID v, pvector<NodeID>& comp) {
@@ -94,6 +120,17 @@ NodeID SampleFrequentElement(const pvector<NodeID>& comp,
 pvector<NodeID> Afforest(const Graph &g, int32_t neighbor_rounds = 2) {
   pvector<NodeID> comp(g.num_nodes());
 
+  if(strncmp(getenv("OMP_SCHEDULE"), "BINLPT", 6) == 0 ||
+     strncmp(getenv("OMP_SCHEDULE"), "HSS", 3) == 0)
+  {
+      Timer prof;
+      prof.Start();
+      long ntasks = (long)global_graph->num_nodes();
+      bo_register_workload(&workload_profile, ntasks);
+      prof.Stop();
+      PrintStep("workload", prof.Seconds());
+  }
+
   // Initialize each node to a single-node self-pointing tree
   #pragma omp parallel for
   for (NodeID n = 0; n < g.num_nodes(); n++)
@@ -102,7 +139,7 @@ pvector<NodeID> Afforest(const Graph &g, int32_t neighbor_rounds = 2) {
   // Process a sparse sampled subgraph first for approximating components.
   // Sample by processing a fixed number of neighbors for each node (see paper)
   for (int r = 0; r < neighbor_rounds; ++r) {
-    #pragma omp parallel for
+#pragma omp parallel for schedule(runtime)
     for (NodeID u = 0; u < g.num_nodes(); u++) {
       for (NodeID v : g.out_neigh(u, r)) {
         // Link at most one time if neighbor available at offset r
@@ -119,7 +156,7 @@ pvector<NodeID> Afforest(const Graph &g, int32_t neighbor_rounds = 2) {
 
   // Final 'link' phase over remaining edges (excluding largest component)
   if (!g.directed()) {
-    #pragma omp parallel for schedule(dynamic, 2048)
+#pragma omp parallel for schedule(static, 2048)
     for (NodeID u = 0; u < g.num_nodes(); u++) {
       // Skip processing nodes in the largest component
       if (comp[u] == c)
@@ -130,7 +167,7 @@ pvector<NodeID> Afforest(const Graph &g, int32_t neighbor_rounds = 2) {
       }
     }
   } else {
-    #pragma omp parallel for schedule(dynamic, 2048)
+#pragma omp parallel for schedule(static, 2048)
     for (NodeID u = 0; u < g.num_nodes(); u++) {
       if (comp[u] == c)
         continue;
@@ -221,6 +258,7 @@ int main(int argc, char* argv[]) {
     return -1;
   Builder b(cli);
   Graph g = b.MakeGraph();
+  global_graph = &g;
   auto CCBound = [](const Graph& gr){ return Afforest(gr); };
   BenchmarkKernel(cli, g, CCBound, PrintCompStats, CCVerifier);
   return 0;
