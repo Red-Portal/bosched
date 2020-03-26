@@ -257,7 +257,7 @@ namespace bosched
 
 	    for (j = 0; j < chunksizes[sortmap[i - 1]]; j++)	
 		taskmap[chunkoff[sortmap[i - 1]] + j] = tid;	
-	    load[tid] += chunks[i - 1];//sortmap[i - 1]];	
+	    load[tid] += chunks[sortmap[i - 1]];	
 	}	
 
 	/* House keeping. */	
