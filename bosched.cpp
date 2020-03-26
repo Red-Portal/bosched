@@ -273,8 +273,6 @@ extern "C"
 	    }
 	}
 
-	std::cout << "region_id = " << region_id << std::endl;
-
 	auto& loop = _params[region_id];
 	loop.hss.resize(ntasks);
 	provide_workload_profile(loop.hss.data());
