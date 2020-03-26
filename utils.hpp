@@ -7,6 +7,8 @@
 #include <cstdlib>
 #include <cassert>
 
+#include <cstdio>
+
 namespace bosched
 {
     inline std::string
@@ -257,6 +259,9 @@ namespace bosched
 		taskmap[chunkoff[sortmap[i - 1]] + j] = tid;	
 	    load[tid] += chunks[sortmap[i - 1]];	
 	}	
+
+	for (size_t i = 0; i < nthreads; ++i)
+	    printf("%d\n", load[i]);
 
 	/* House keeping. */	
 	free(chunkoff);	
