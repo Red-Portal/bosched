@@ -236,7 +236,7 @@ namespace bosched
 	chunkoff   = compute_cummulativesum(chunksizes, max_chunks);	
 
 	/* Sort tasks. */	
-	sort(chunks, max_chunks, sortmap);	
+	sort(chunks, max_chunks, sortmap.data());	
 
 	for (i = max_chunks; i > 0; i--)	
 	{	
