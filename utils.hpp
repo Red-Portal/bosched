@@ -260,9 +260,6 @@ namespace bosched
 	    load[tid] += chunks[sortmap[i - 1]];	
 	}	
 
-	for (size_t i = 0; i < nthreads; ++i)
-	    printf("%d\n", load[i]);
-
 	/* House keeping. */	
 	free(chunkoff);	
 	free(chunks);	
