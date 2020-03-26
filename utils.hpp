@@ -219,7 +219,6 @@ namespace bosched
 		   unsigned* taskmap)
     {	
 	unsigned i;               /* Loop index.       */	
-	unsigned sortmap[ntasks]; /* Sorting map.       */	
 	unsigned *chunksizes;     /* Chunks sizes.     */	
 	unsigned *chunks;         /* Chunks.           */	
 	unsigned *chunkoff;       /* Offset to chunks. */	
@@ -227,8 +226,8 @@ namespace bosched
 	/* Initialize scheduler data. */	
 	assert(taskmap != NULL);	
 
-	printf("%d", nthreads);
-	auto load = std::vector<size_t>(nthreads); /* Assigned load.    */	
+	auto sortmap = std::vector<unsigned>(ntasks); /* Sorting map.       */	
+	auto load    = std::vector<size_t>(nthreads); /* Assigned load.    */	
 
 	//printf("[binlpt] Balancing loop %s:%i\n", loops[curr_loop].filename, loops[curr_loop].line);	
 
