@@ -6,8 +6,7 @@
 #include <ctime>
 #include <cstdlib>
 #include <cassert>
-
-#include <cstdio>
+#include <vector>
 
 namespace bosched
 {
@@ -221,17 +220,16 @@ namespace bosched
     {	
 	unsigned i;               /* Loop index.       */	
 	unsigned sortmap[ntasks]; /* Sorting map.       */	
-	unsigned *load;           /* Assigned load.    */	
 	unsigned *chunksizes;     /* Chunks sizes.     */	
 	unsigned *chunks;         /* Chunks.           */	
 	unsigned *chunkoff;       /* Offset to chunks. */	
 
-	//printf("[binlpt] Balancing loop %s:%i\n", loops[curr_loop].filename, loops[curr_loop].line);	
-
 	/* Initialize scheduler data. */	
 	assert(taskmap != NULL);	
-	load = static_cast<unsigned*>(calloc(nthreads, sizeof(unsigned)));	
-	assert(load != NULL);	
+
+	auto load = std::vector<size_t>(nthreads); /* Assigned load.    */	
+
+	//printf("[binlpt] Balancing loop %s:%i\n", loops[curr_loop].filename, loops[curr_loop].line);	
 
 	chunksizes = compute_chunksizes(tasks, ntasks, max_chunks);	
 	chunks     = compute_chunks(tasks, ntasks, chunksizes, max_chunks);	
@@ -264,7 +262,6 @@ namespace bosched
 	free(chunkoff);	
 	free(chunks);	
 	free(chunksizes);	
-	free(load);	
     }
 }
 
