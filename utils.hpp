@@ -257,8 +257,12 @@ namespace bosched
 		taskmap[chunkoff[sortmap[i - 1]] + j] = tid;	
 	    load[tid] += chunks[sortmap[i - 1]];	
 	}	
+
+	auto load2 = std::vector<size_t>(nthreads, 0.0); /* Assigned load.    */	
+	for(size_t i = 0; i < ntasks; ++i)
+	    load2[taskmap[i]] += tasks[i]; 
 	for (size_t i = 0; i < nthreads; ++i)
-	    printf("%ld ", load[i]);
+	    printf("%ld ", load2[i]);
 	printf("\n");
 
 	/* House keeping. */	
