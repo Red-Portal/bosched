@@ -261,13 +261,13 @@ namespace bosched
 	size_t total_load = 0.0;
 	for(size_t i = 0; i < ntasks; ++i)
 	    total_load += tasks[i]; 
+	printf("total load %ld\n", total_load);
 
 	auto load2 = std::vector<size_t>(nthreads, 0.0); /* Assigned load.    */	
 	for(size_t i = 0; i < ntasks; ++i)
 	    load2[taskmap[i]] += tasks[i]; 
 	for (size_t i = 0; i < nthreads; ++i)
-	    printf("%f", (double)load2[i] / total_load);
-	printf("\n");
+	    printf("%f %ld\n", (double)load2[i] / total_load, load2[i]);
 
 	/* House keeping. */	
 	free(chunkoff);	
