@@ -43,22 +43,9 @@ extern "C"
 void workload_profile(unsigned* tasks)
 {
     NodeID ntasks = global_graph->num_nodes();
-    float* tasks_raw = (float*)malloc(sizeof(float)*ntasks);
-    float maximum_load = 0.0;
 #pragma omp parallel for reduction(max:maximum_load)
     for(NodeID i = 0; i < ntasks; ++i)
-    {
-	float load = global_graph->in_degree(i);
-	tasks_raw[i] = load;
-	maximum_load = std::max(load, maximum_load);
-    }
-
-#pragma omp parallel for
-    for(int i = 0; i < (int)ntasks; ++i)
-    {
-	tasks[i] = (unsigned)((tasks_raw[i] / maximum_load)*255) ;
-    }
-    free(tasks_raw);
+	tasks[i] = global_graph->in_degree(i);
 }
 
 pvector<ScoreT> PageRankPull(const Graph &g, int max_iters,
