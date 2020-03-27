@@ -49,7 +49,7 @@ Graph* global_graph;
 void workload_profile(unsigned* tasks)
 {
     NodeID ntasks = global_graph->num_nodes();
-#pragma omp parallel for reduction(max:maximum_load)
+#pragma omp parallel for
     for(NodeID i = 0; i < ntasks; ++i)
 	tasks[i] = global_graph->out_degree(i);
 }
