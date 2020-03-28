@@ -261,6 +261,16 @@ namespace bosched
 
 	for (size_t i = 0; i < ntasks; ++i)
 	    printf("%d\n", taskmap[i]);
+	printf("----------------\n");
+
+	for (size_t i = 0; i < max_chunks; ++i)
+	    printf("%d\n", chunks[i]);
+
+	printf("----------------\n");
+
+	for (size_t i = 0; i < nthreads; ++i)
+	    printf("%ld\n", load[i]);
+
 
 	/* House keeping. */	
 	free(chunkoff);	
