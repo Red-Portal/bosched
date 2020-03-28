@@ -263,8 +263,8 @@ namespace bosched
 	    printf("%d\n", taskmap[i]);
 	printf("----------------\n");
 
-	for (size_t i = 0; i < max_chunks; ++i)
-	    printf("%d\n", chunks[i]);
+	for (i = max_chunks; i > 0; i--)	
+	    printf("%d\n", chunks[sortmap[i - 1]]);
 
 	printf("----------------\n");
 
