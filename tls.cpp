@@ -14,6 +14,7 @@
 #include <thread>
 #include <unordered_map>
 #include <vector>
+#include <iostream>
 
 namespace statistic
 {
@@ -46,6 +47,8 @@ namespace statistic
         auto discrete    = std::chrono::duration_cast<
             std::chrono::nanoseconds>(duration);
         _total_runtime  += discrete.count();
+
+	std::cout << discrete.count() << '\n';
 
         _tailstamp[omp_get_thread_num()] = curr_point;
     }
