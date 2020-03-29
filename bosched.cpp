@@ -308,15 +308,15 @@ extern "C"
                              unsigned** task_map)
     {
 	auto& loop = _params[region_id];
-	//if(loop.binlpt.size() == 0)
-	//{
+	if(loop.binlpt.size() == 0)
+	{
 	    size_t ntasks = loop.hss.size();
 	    assert(ntasks > 0);
 	    unsigned P = omp_get_max_threads();
 	    loop.binlpt.resize(ntasks);
 	    bosched::binlpt_balance(loop.hss.data(), loop.hss.size(),
 				    P, P*2, loop.binlpt.data());
-	//}
+	}
 	*task_map = loop.binlpt.data();
         if(__builtin_expect (_is_debug, false))
         {
