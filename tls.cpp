@@ -48,8 +48,6 @@ namespace statistic
             std::chrono::nanoseconds>(duration);
         _total_runtime  += discrete.count();
 
-	std::cout << omp_get_thread_num() << ' ' << discrete.count() << ";\n";
-
         _tailstamp[omp_get_thread_num()] = curr_point;
     }
 
