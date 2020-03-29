@@ -259,22 +259,22 @@ namespace bosched
 	    load[tid] += chunks[sortmap[i - 1]];	
 	}	
 
-	for (size_t i = 0; i < ntasks; ++i)
-	    printf("%d\n", taskmap[i]);
-	printf("----------------\n");
+	// for (size_t i = 0; i < ntasks; ++i)
+	//     printf("%d\n", taskmap[i]);
+	// printf("----------------\n");
 
-	for (i = max_chunks; i > 0; i--)	
-	    printf("%d\n", chunks[sortmap[i - 1]]);
+	// for (i = max_chunks; i > 0; i--)	
+	//     printf("%d\n", chunks[sortmap[i - 1]]);
 
-	printf("----------------\n");
+	// printf("----------------\n");
 
-	for (i = max_chunks; i > 0; i--)	
-	    printf("%d\n", chunkoff[sortmap[i - 1]]);
+	// for (i = max_chunks; i > 0; i--)	
+	//     printf("%d\n", chunkoff[sortmap[i - 1]]);
 
-	printf("----------------\n");
+	// printf("----------------\n");
 
-	for (size_t i = 0; i < nthreads; ++i)
-	    printf("%ld\n", load[i]);
+	// for (size_t i = 0; i < nthreads; ++i)
+	//     printf("%ld\n", load[i]);
 
 
 	/* House keeping. */	
