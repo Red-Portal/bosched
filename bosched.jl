@@ -84,6 +84,7 @@ function cmd_args(args, show)
         arg_type = String
         help     = "Name of workload executable."
         metavar  = "<file>"
+
         default  = ""
     end
 
@@ -122,7 +123,7 @@ function classic_mode(workload_profile, loop_states, h, P)
         d["css"]    = h / σ
         d["fss"]    = μ / σ
         d["binlpt"] = binlpt_balance(prof, P, 2 * P)
-        d["hss"]    = stretch(prof, 0, 255)
+        d["hss"]    = stretch(prof, 1, 4096)
         loop["params"] = d
 
         @info "$(loop["id"]) classic mode " μ σ css=d["css"] fss=d["fss"]
