@@ -70,6 +70,12 @@ function binlpt_balance(tasks, P, K_max)
         end
         load[tid] += chunks[sortmap[i]]
     end
+
+    loads = zeros(P)
+    for i = 1:length(tasks)
+        loads[taskmap[i]] += tasks[i]
+    end
+    println(loads)
     return taskmap;
 end
 

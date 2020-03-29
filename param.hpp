@@ -52,24 +52,24 @@ namespace bosched
                 param_bundle.tss.emplace(tss);
             }
 
-            auto& binlpt_json = params["binlpt"];
+            //auto& binlpt_json = params["binlpt"];
             auto& hss_json    = params["hss"];
 
             param_bundle.css    = css_param;
             param_bundle.fss    = fss_param;
-            //param_bundle.fac    = fac_param;
-            param_bundle.binlpt = std::vector<unsigned>();//binlpt_json.size());
+            param_bundle.fac    = fac_param;
+            param_bundle.binlpt = std::vector<unsigned>(binlpt_json.size());
             param_bundle.hss    = std::vector<unsigned>(hss_json.size());
 
             std::transform(binlpt_json.begin(),
-                           binlpt_json.end(),
-                           param_bundle.binlpt.begin(),
-                           [](auto elem){
-                               return static_cast<unsigned>(elem);
-                           });
+			   binlpt_json.end(),
+			   param_bundle.binlpt.begin(),
+			   [](auto elem){
+			       return static_cast<unsigned>(elem);
+			   });
 
-            std::transform(hss_json.begin(),
-                           hss_json.end(),
+	    std::transform(hss_json.begin(),
+			   hss_json.end(),
                            param_bundle.hss.begin(),
                            [](auto elem){
                                return static_cast<unsigned>(elem);
