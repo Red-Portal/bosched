@@ -68,7 +68,7 @@ function binlpt_balance(tasks, P, K_max)
         for j = 1:chunksizes[sortmap[i]]
             taskmap[chunkoff[sortmap[i]] + j] = tid
         end
-        load[tid] += chunks[i]#sortmap[i]]
+        load[tid] += chunks[sortmap[i]]
     end
     return taskmap;
 end

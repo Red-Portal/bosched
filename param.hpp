@@ -58,7 +58,7 @@ namespace bosched
             param_bundle.css    = css_param;
             param_bundle.fss    = fss_param;
             //param_bundle.fac    = fac_param;
-            param_bundle.binlpt = std::vector<unsigned>(binlpt_json.size());
+            param_bundle.binlpt = std::vector<unsigned>();//binlpt_json.size());
             param_bundle.hss    = std::vector<unsigned>(hss_json.size());
 
             std::transform(binlpt_json.begin(),
