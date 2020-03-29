@@ -259,8 +259,8 @@ namespace bosched
 	    load[tid] += chunks[i - 1]; //sortmap[i - 1]];	
 	}	
 
-	for (size_t i = 0; i < ntasks; ++i)
-	    printf("%d\n", tasks[i]);
+	//for (size_t i = 0; i < ntasks; ++i)
+	//printf("%d\n", tasks[i]);
 	// printf("----------------\n");
 
 	// for (size_t i = 0; i < ntasks; ++i)
