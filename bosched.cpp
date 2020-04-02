@@ -484,7 +484,7 @@ extern "C"
             {
 		double exec_time = duration.count();
 		loop_state.obs_x.push_back(loop_state.param);
-		loop_state.obs_y.push_back(exec_time * _procs / loop_state.num_tasks);
+		loop_state.obs_y.push_back(exec_time);
 	    }
 
 	    if(__builtin_expect (_show_loop_stat, false))
