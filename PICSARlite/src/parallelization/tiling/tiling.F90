@@ -618,7 +618,7 @@ MODULE tiling
     ! - For some reason, don't set all values to zero?????
     ! - Have to set it manually for each element through
     ! - a DO loop see add_particle_at_tile
-    !$OMP PARALLEL DO COLLAPSE(3) SCHEDULE(runtime) DEFAULT(NONE)                     &
+    !$OMP PARALLEL DO COLLAPSE(3) DEFAULT(NONE)                     &
     !$OMP SHARED(species_array, ntx2, nty2, ntz2, nspec2) PRIVATE(ix, iy, iz,         &
     !$OMP ispecies, curr, curr_tile)
     DO iz=1, ntz2! LOOP ON TILES
