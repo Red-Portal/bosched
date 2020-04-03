@@ -1695,7 +1695,7 @@ mpi_npart(:, is) = 0
 
 !$OMP PARALLEL DO DEFAULT(NONE) SHARED(npid, is, tilebuf, mpi_npart, bufsend, ntilez, &
 !$OMP ntiley, ntilex) PRIVATE(ix, iy, iz, k, xbd, ybd, zbd, j, ib) COLLAPSE(3)        &
-!$OMP SCHEDULE(runtime) NUM_THREADS(nthreads_loop2)
+!$OMP NUM_THREADS(nthreads_loop2)
 DO xbd = -1, 1
   DO ybd = -1, 1
     DO zbd = -1, 1
@@ -1759,7 +1759,7 @@ DO is=1, nspecies! LOOP ON SPECIES
   !$OMP PARALLEL DO DEFAULT(NONE) SHARED(is, mpi_npart, comm, neighbour, nrecv_buf)   &
   !$OMP FIRSTPRIVATE(tag, status, stats, reqs, MPI_STATUSES_IGNORE) PRIVATE(ix, iy,   &
   !$OMP iz, k, ipx, ipy, ipz, dest, src, ib, ibs, errcode) COLLAPSE(3)                &
-  !$OMP SCHEDULE(runtime) NUM_THREADS(nthreads_loop2)
+  !$OMP NUM_THREADS(nthreads_loop2)
 
   DO iz = -1, 1
     DO iy = -1, 1
@@ -1873,7 +1873,7 @@ IF (.FALSE.) THEN
   !$OMP nrecv_buf, nrecv_buf_tot, recvbuf_index, MPI_STATUSES_IGNORE, bufsend,        &
   !$OMP mpidbl, recvbuf) FIRSTPRIVATE(tag, status, stats, reqs) PRIVATE(ix, iy, iz,   &
   !$OMP k, j, ipx, ipy, ipz, dest, src, ib, ibs, errcode, typebuffer) COLLAPSE(3)     &
-  !$OMP SCHEDULE(runtime) NUM_THREADS(nthreads_loop2)
+  !$OMP NUM_THREADS(nthreads_loop2)
   DO iz = -1, 1
     DO iy = -1, 1
       DO ix = -1, 1
