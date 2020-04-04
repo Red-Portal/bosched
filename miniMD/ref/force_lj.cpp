@@ -283,7 +283,7 @@ void ForceLJ::compute_halfneigh_threaded(Atom &atom, Neighbor &neighbor, int me)
   #pragma omp barrier
   // clear force on own and ghost atoms
 
-  OMPFORSCHEDULE
+#pragma omp for schedule(static)
   for(int i = 0; i < nall; i++) {
     f[i * PAD + 0] = 0.0;
     f[i * PAD + 1] = 0.0;
@@ -378,7 +378,7 @@ void ForceLJ::compute_fullneigh(Atom &atom, Neighbor &neighbor, int me)
   #pragma omp barrier
   // clear force on own and ghost atoms
 
-  OMPFORSCHEDULE
+#pragma omp for schedule(static)
   for(int i = 0; i < nlocal; i++) {
     f[i * PAD + 0] = 0.0;
     f[i * PAD + 1] = 0.0;
@@ -445,7 +445,6 @@ void ForceLJ::compute_fullneigh(Atom &atom, Neighbor &neighbor, int me)
   eng_vdwl += t_eng_vdwl;
   #pragma omp atomic
   virial += t_virial;
-  #pragma omp barrier
-}
+  #pragma omp barrier}
 
 

@@ -148,7 +148,7 @@ MMD_float Thermo::temperature(Atom &atom)
 
   MMD_float* v = atom.v;
 
-  OMPFORSCHEDULE
+#pragma omp for schedule(static)
   for(i = 0; i < atom.nlocal; i++) {
     vx = v[i * PAD + 0];
     vy = v[i * PAD + 1];
