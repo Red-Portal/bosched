@@ -445,6 +445,7 @@ void ForceLJ::compute_fullneigh(Atom &atom, Neighbor &neighbor, int me)
   eng_vdwl += t_eng_vdwl;
   #pragma omp atomic
   virial += t_virial;
-  #pragma omp barrier}
+  #pragma omp barrier
+}
 
 
