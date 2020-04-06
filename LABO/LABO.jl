@@ -1,4 +1,3 @@
-
 module LABO
 
 using AdvancedHMC
@@ -129,7 +128,7 @@ end
 function build_gp(data_x, data_y, time_idx, verbose::Bool=true)
     m, k = begin
         if(time_idx[end] == 1)
-            k_x = Mat52Iso(exp(-2.0), exp(1.0), [Normal(-2.0, 2.0), Normal(0.0, 2.0)])
+            k_x = Mat52Iso(exp(-3.0), exp(1.0), [Normal(-3.0, 2.0), Normal(0.0, 2.0)])
             k   = Masked(k_x, [2])
             m   = MeanConst(0.0)
             m, k
@@ -339,9 +338,8 @@ function labo(data_x, data_y, extra, time_samples, subsample;
     θ_mean, mean_opt = optimize_mean(gp, verbose)
 
     if(logdict != nothing)
-        logα(x) = log(acquisition(x, gp))
         αx = collect(0.0:0.01:1.0)
-        αy = exp.(logα.(αx))
+        αy = acquisition.(αx, Ref(gp))
         logdict[:data_x]     = data_x
         logdict[:data_y]     = data_y
         logdict[:acq_x]      = αx
