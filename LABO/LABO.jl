@@ -48,8 +48,8 @@ function optimize_acquisition(gp, verbose::Bool=true)
 
     if(verbose)
         @info("Acquisition optimization result",
-              acquisition_optimizer = opt_x,
-              acquisition_optimum = opt_y,
+              acquisition_optimizer = opt_x[1],
+              acquisition_optimum = opt_y[1],
               status = ret,
               elapsed = time)
     end
@@ -76,8 +76,8 @@ function optimize_mean(gp, verbose::Bool=true)
 
     if(verbose)
         @info("Mean optimization result",
-              mean_optimizer=opt_x,
-              mean_optimum = opt_y,
+              mean_optimizer=opt_x[1],
+              mean_optimum = opt_y[1],
               status = ret,
               elapsed = time)
     end
@@ -151,22 +151,19 @@ function build_gp(data_x, data_y, time_idx, verbose::Bool=true)
             # α   = fix(α, :lσ)
             # k   = (α*k_x + k_t)
 
-            # k_xt = Mat52Ard([exp(log(time_idx[end]/2)), exp(0.0)], exp(0.0),
-            #                [Normal(log(time_idx[end]/2), log(time_idx[end]/2)),
-            #                 Normal(-2.0, 2.0),
-            #                 Normal(0.0, 2.0)])
-            k = k_x + k_t
-            m = MeanConst(0.0)
+            k = (k_x + k_t)
+            m = MeanConst(mean(data_y))
             m, k
         end
     end
     ϵ    = -2.0
     gp   = GP(data_x, data_y, m, k, ϵ)
     set_priors!(gp.logNoise, [Normal(-2.0, 2.0)])
+    set_priors!(gp.mean,     [Normal(0.0,  2.0)])
 
     #gp = ess(gp, num_samples=2^10, num_adapts=2^10, thinning=2^3, verbose=verbose)
     gp = nuts(gp, num_samples=1024, num_adapts=1024,
-              thinning=4, verbose=verbose)
+              thinning=2, verbose=verbose)
     #K  = mean([g.cK.mat for g in gp.gp])
     #display(Plots.heatmap(K))
 
