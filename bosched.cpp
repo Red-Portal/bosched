@@ -52,8 +52,7 @@ namespace bosched
     inline double
     warmup_next_param(boost::random::sobol& qrng)
     {
-        static boost::random::uniform_01<double> dist{};
-        double next = dist(qrng);
+        static double next = boost::random::uniform_01<double>()(qrng);
         return next;
     }
 
