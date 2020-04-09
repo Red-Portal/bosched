@@ -128,7 +128,7 @@ end
 function build_gp(data_x, data_y, time_idx, verbose::Bool=true)
     m, k = begin
         if(time_idx[end] == 1)
-            k_x = Mat52Iso(exp(-3.0), exp(1.0), [Normal(-3.0, 2.0), Normal(0.0, 2.0)])
+            k_x = Mat52Iso(exp(-2.0), exp(0.0), [Normal(-2.0, 2.0), Normal(0.0, 2.0)])
             k   = Masked(k_x, [2])
             m   = MeanConst(0.0)
             m, k
@@ -171,6 +171,53 @@ function build_gp(data_x, data_y, time_idx, verbose::Bool=true)
     #gp   = slice(gp, num_samples=1024, num_adapts=1024,
     #             thinning=8, width=4.0, verbose=verbose)
     return gp
+end
+
+function filter_outlier(data_x, data_y, time_samples, verbose::Bool=true)
+    num_data   = floor(Int64, size(data_x, 2) / length(time_samples))
+    reshaped_x = reshape(data_x[2,:], (length(time_samples), num_data))
+    reshaped_y = reshape(data_y,      (length(time_samples), num_data))
+    @assert size(reshaped_x, 1) == length(time_samples)
+
+    total_outliers = []
+    for (i, t) in enumerate(time_samples)
+        m   = MeanConst(0.0)
+        k   = Mat52Iso(exp(-2.0), exp(0.0), [Normal(-2.0, 0.1), Normal(0.0, 1.0)])
+        l   = StuTLik(3,0.1)
+        
+        local_x = reshaped_x[t,:]
+        local_y = reshaped_y[t,:]
+        gpa = GPA(local_x, local_y, m, k, l)     
+        set_priors!(gpa.mean, [Normal(0.0,  2.0)])
+
+        f, σ² = predict_y(gpa, 0.0:0.01:1.0)
+
+        display(Plots.plot(0.0:0.01:1.0, f, ribbon=sqrt.(σ²)*2))
+        display(Plots.scatter!(local_x, local_y))
+
+        f, σ² = predict_y(gpa, local_x)
+        θ     = GaussianProcesses.get_params(gpa, lik=true)
+        dist  = TDist(θ[2])
+        logp  = logpdf.(dist, (local_y - f) ./ sqrt.(σ²)) - log.(σ²) / 2
+
+        outliers = logp .<= log(0.05)
+        outliers = xor.(outliers, true)
+        indices  = findall(outliers)
+
+        offset  = ((i-1) * length(time_samples))
+        push!(total_outliers, offset .+ indices...)
+    end
+
+    if(verbose)
+        @info(total_outliers = total_outliers,
+              xpoint = data_x[2,total_outliers],
+              ypoint = data_y[total_outliers])
+    end
+
+    nonoutliers = setdiff(1:size(data_x, 2), total_outliers)
+    data_x      = data_x[nonoutliers,:]
+    data_y      = data_y[nonoutliers,:]
+    return data_x, data_y
 end
 
 function data_preprocess(data_x, data_y, time_idx;
@@ -286,9 +333,10 @@ function time_quantization(extrapol_idx::Int64,
     else
         time_idx = range(1, stop=log(time_max), length=time_samples)
         time_idx = ℯ.^time_idx
-        time_idx = round.(Int64, time_idx, RoundNearest)
-        time_idx[1] = 1.0
     end
+    time_idx    = round.(Int64, time_idx, RoundNearest)
+    time_idx[1] = 1.0
+
     time_idx = vcat(time_idx, extrapol_idx)
     N        = length(time_idx)
 
@@ -301,6 +349,28 @@ function time_quantization(extrapol_idx::Int64,
     time_idx, time_w
 end
 
+function log_predictive(gp::GPE)
+    μ, σ2 = predict_y(gp, gp.x)
+    ppd   = Normal.(μ, sqrt.(σ2))
+    return logpdf.(ppd, gp.y)
+end
+
+function waic(mgp::AbstractParticleGP)
+    num_particles = length(mgp.gp)
+    num_samples   = length(mgp.gp[1].y)
+
+    lppd_matrix = zeros(Float64, num_particles, num_samples)
+    for i = 1:length(mgp.gp)
+        lppd_matrix[i,:] = log_predictive(mgp.gp[i])
+    end
+
+    Vlogpy  = [std((@view lppd_matrix[:,i]),
+                   StatsBase.weights(mgp.weights)) for i = 1:num_samples]
+    waic2   = sum(Vlogpy)
+    lppd    = sum(lppd_matrix'*mgp.weights)
+    return -2*(lppd - waic2)
+end
+
 function labo(data_x, data_y, extra, time_samples, subsample;
               verbose::Bool=true,
               legacy::Bool=false,
@@ -311,6 +381,7 @@ function labo(data_x, data_y, extra, time_samples, subsample;
                                          time_samples, uniform_quant)
     data_x, data_y = data_preprocess(data_x, data_y, time_idx,
                                      verbose=true, legacy=legacy)
+    #data_x, data_y = filter_outlier(data_x, data_y, time_idx, verbose)
 
     gp = fit_surrogate(data_x, data_y, time_idx, subsample, verbose)
     gp = TimeMarginalizedGP(gp, time_idx, time_w)
@@ -376,6 +447,9 @@ function labo(data_x, data_y, extra, time_samples, subsample;
         logdict[:gp_t]    = collect(t)
         logdict[:gp_mean] = μ
         logdict[:gp_std]  = Σ
+
+        model_score = waic(gp.non_marg_gp)
+        @info model_score = model_score
     end
     return θ_next, θ_mean, acq_opt, mean_opt
 end
