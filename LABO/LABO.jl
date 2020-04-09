@@ -228,13 +228,12 @@ function data_preprocess(data_x, data_y, time_idx;
         @info "Preprocessing data"
     end
 
-    extrapolating = size(data_x, 1) < time_idx[end]
+    #extrapolating = size(data_x, 1) < time_idx[end]
 
-    if(extrapolating)
-        time_idx = time_idx[1:end-1]
-        data_x = data_x[time_idx, :]
-        data_y = data_y[time_idx, :]
-    end
+    #if(extrapolating)
+    data_x = data_x[time_idx, :]
+    data_y = data_y[time_idx, :]
+    #end
 
     data_x = vcat(data_x...)'
     data_y = vcat(data_y...)
@@ -337,7 +336,7 @@ function time_quantization(extrapol_idx::Int64,
     time_idx    = round.(Int64, time_idx, RoundNearest)
     time_idx[1] = 1.0
 
-    time_idx = vcat(time_idx, extrapol_idx)
+    #time_idx = vcat(time_idx)#, extrapol_idx)
     N        = length(time_idx)
 
     time_w    = zeros(N)

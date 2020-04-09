@@ -233,6 +233,8 @@ function visualize_gp(loop_states, time_samples, subsize, P, quant, extra, thres
         x  = convert(Array{Float64}, x)
         y  = convert(Array{Float64}, y)
 
+        x = x[:,1:10]
+        y = y[:,1:10]
         println(size(x))
         println(size(y))
         @assert size(x) == size(y)
