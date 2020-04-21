@@ -1,5 +1,0 @@
-#!/bin/sh
-
-scp -rp . inti:Cplus 
-
-#EOF
