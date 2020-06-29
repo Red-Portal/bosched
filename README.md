@@ -1,5 +1,5 @@
 
-# A Probabilistic Machine Learning Approach to Scheduling Parallel Loops with Bayesian Optimization
+# `bosched`
 
 This repository contains the code of our paper ["A Probabilistic Machine Learning Approach to Scheduling Parallel Loops with Bayesian Optimization"](https://www.researchgate.net/publication/341869288_A_Probabilistic_Machine_Learning_Approach_to_Scheduling_Parallel_Loops_with_Bayesian_Optimization).
 
